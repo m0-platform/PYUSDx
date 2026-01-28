@@ -628,8 +628,8 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
      *   -   - [x] recipient receives netYield
      *   -   - [x] feeRecipient receives fee
      *   -   - [x] fee = grossYield × feeRate / 10000
-     *   - [ ] with custom claim recipient
-     *   -   - [ ] yield sent to custom recipient (requires Phase 2.12 setClaimRecipient)
+     *   - [x] with custom claim recipient
+     *   -   - [x] yield sent to custom recipient (requires Phase 2.12 setClaimRecipient)
      *   - [x] with 100% fee rate
      *   -   - [x] user receives 0, feeRecipient receives all yield
      */
@@ -648,7 +648,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Implement `setClaimRecipient` function**
+- [x] **Implement `setClaimRecipient` function**
   - Reference: SDD Section 3.1 (Primary Interface)
   - Signature: `function setClaimRecipient(address account, address claimRecipient) external`
   - Access control: Only callable by Earner Manager (EARNER_MANAGER_ROLE)
@@ -657,25 +657,29 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
     - Update `hasClaimRecipient` flag in Account struct
   - Emit: `ClaimRecipientSet(account, claimRecipient)`
 
-- [ ] **Implement `claimRecipientFor` view function**
+- [x] **Implement `claimRecipientFor` view function**
   - Return `_claimRecipients[account]` if set, else return `account`
 
 #### Unit Tests
 
-- [ ] **Add setClaimRecipient tests to PYUSDXUnit.t.sol**
+- [x] **Add setClaimRecipient tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] setClaimRecipient
-     *   - [ ] when caller is not Earner Manager
-     *   -   - [ ] revert
-     *   - [ ] with valid address
-     *   -   - [ ] success, claimRecipientFor returns custom address
-     *   -   - [ ] ClaimRecipientSet event emitted
-     *   - [ ] with address(0) (clear)
-     *   -   - [ ] success, claimRecipientFor returns account address
-     * - [ ] claimRecipientFor
-     *   - [ ] when not set
-     *   -   - [ ] return account address
+     * - [x] setClaimRecipient
+     *   - [x] when caller is not Earner Manager
+     *   -   - [x] revert
+     *   - [x] with valid address
+     *   -   - [x] success, claimRecipientFor returns custom address
+     *   -   - [x] ClaimRecipientSet event emitted
+     *   - [x] with address(0) (clear)
+     *   -   - [x] success, claimRecipientFor returns account address
+     * - [x] claimRecipientFor
+     *   - [x] when not set
+     *   -   - [x] return account address
+     *   - [x] when set to custom address
+     *   -   - [x] return custom address
+     *   - [x] when set to address(0) (cleared)
+     *   -   - [x] return account address
      */
 
 ### 2.13 Transfer Override

@@ -195,6 +195,21 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  *   - [x] with 100% fee rate
  *   -   - [x] user receives 0, feeRecipient receives all yield
  *   - [x] multiple claims accrues correctly
+ * - [x] setClaimRecipient
+ *   - [x] when caller is not Earner Manager
+ *   -   - [x] revert
+ *   - [x] with valid address
+ *   -   - [x] success, claimRecipientFor returns custom address
+ *   -   - [x] ClaimRecipientSet event emitted
+ *   - [x] with address(0) (clear)
+ *   -   - [x] success, claimRecipientFor returns account address
+ * - [x] claimRecipientFor
+ *   - [x] when not set
+ *   -   - [x] return account address
+ *   - [x] when set to custom address
+ *   -   - [x] return custom address
+ *   - [x] when set to address(0) (cleared)
+ *   -   - [x] return account address
  */
 contract PYUSDXUnitTest is Test {
     /* ============ Test Variables ============ */
@@ -1907,5 +1922,162 @@ contract PYUSDXUnitTest is Test {
         // The second claim should be greater than the first due to compounding
         // (principal increased from first claim, so more yield accrues)
         assertGt(secondClaim, firstClaim, "Second claim should be greater due to compounding");
+    }
+
+    /* ============ Set Claim Recipient Tests (Phase 2.12) ============ */
+
+    function test_SetClaimRecipient_NotEarnerManager_Reverts() public {
+        address account = address(0x100);
+        address customRecipient = address(0x200);
+
+        // Try to set claim recipient as non-manager
+        vm.expectRevert("not earner manager");
+        proxy.setClaimRecipient(account, customRecipient);
+    }
+
+    function test_SetClaimRecipient_WithValidAddress_Success() public {
+        address account = address(0x100);
+        address customRecipient = address(0x200);
+
+        // Set claim recipient as earner manager
+        vm.prank(earnerManager);
+        vm.expectEmit(true, true, true, true, address(proxy));
+        emit IPYUSDX.ClaimRecipientSet(account, customRecipient);
+        proxy.setClaimRecipient(account, customRecipient);
+
+        // Verify claimRecipientFor returns custom address
+        assertEq(
+            proxy.claimRecipientFor(account),
+            customRecipient,
+            "claimRecipientFor should return custom address"
+        );
+    }
+
+    function test_SetClaimRecipient_WithAddressZero_ClearsRecipient() public {
+        address account = address(0x100);
+        address customRecipient = address(0x200);
+
+        // First set a custom recipient
+        vm.prank(earnerManager);
+        proxy.setClaimRecipient(account, customRecipient);
+
+        // Verify it's set
+        assertEq(
+            proxy.claimRecipientFor(account),
+            customRecipient,
+            "claimRecipientFor should return custom address"
+        );
+
+        // Clear by setting to address(0)
+        vm.prank(earnerManager);
+        vm.expectEmit(true, true, true, true, address(proxy));
+        emit IPYUSDX.ClaimRecipientSet(account, address(0));
+        proxy.setClaimRecipient(account, address(0));
+
+        // Verify claimRecipientFor now returns account address
+        assertEq(
+            proxy.claimRecipientFor(account), account, "claimRecipientFor should return account address after clearing"
+        );
+    }
+
+    function test_SetClaimRecipient_CanBeUpdated() public {
+        address account = address(0x100);
+        address recipient1 = address(0x200);
+        address recipient2 = address(0x300);
+
+        // Set first recipient
+        vm.prank(earnerManager);
+        proxy.setClaimRecipient(account, recipient1);
+
+        // Update to second recipient
+        vm.prank(earnerManager);
+        vm.expectEmit(true, true, true, true, address(proxy));
+        emit IPYUSDX.ClaimRecipientSet(account, recipient2);
+        proxy.setClaimRecipient(account, recipient2);
+
+        // Verify it's updated
+        assertEq(proxy.claimRecipientFor(account), recipient2, "claimRecipientFor should return updated address");
+    }
+
+    function test_ClaimRecipientFor_NotSet_ReturnsAccountAddress() public {
+        address account = address(0x100);
+
+        // Without setting a custom recipient, should return account address
+        assertEq(proxy.claimRecipientFor(account), account, "claimRecipientFor should return account address when not set");
+    }
+
+    function test_ClaimRecipientFor_SetToCustomAddress_ReturnsCustomAddress() public {
+        address account = address(0x100);
+        address customRecipient = address(0x200);
+
+        // Set custom recipient
+        vm.prank(earnerManager);
+        proxy.setClaimRecipient(account, customRecipient);
+
+        // Verify it returns custom address
+        assertEq(proxy.claimRecipientFor(account), customRecipient, "claimRecipientFor should return custom address");
+    }
+
+    function test_ClaimRecipientFor_SetToAddressZero_ReturnsAccountAddress() public {
+        address account = address(0x100);
+        address customRecipient = address(0x200);
+
+        // Set then clear custom recipient
+        vm.prank(earnerManager);
+        proxy.setClaimRecipient(account, customRecipient);
+
+        vm.prank(earnerManager);
+        proxy.setClaimRecipient(account, address(0));
+
+        // Verify it returns account address after clearing
+        assertEq(proxy.claimRecipientFor(account), account, "claimRecipientFor should return account address after clearing");
+    }
+
+    function test_SetClaimRecipient_ClaimForUsesCustomRecipient() public {
+        address account = address(0x100);
+        address customRecipient = address(0x200);
+        uint256 amount = 1000e6;
+
+        // Mint to account
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        // Whitelist account as earner
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Start earning
+        proxy.startEarningFor(account);
+
+        // Set custom claim recipient
+        vm.prank(earnerManager);
+        proxy.setClaimRecipient(account, customRecipient);
+
+        // Set rate to generate yield
+        uint32 newRate = 1215752192;
+        vm.prank(rateManager);
+        proxy.setRate(newRate);
+
+        // Warp forward 1 year to accrue yield
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 customRecipientBalanceBefore = proxy.balanceOf(customRecipient);
+
+        // Claim yield
+        uint256 netYield = proxy.claimFor(account);
+
+        // Verify custom recipient received the net yield
+        uint256 customRecipientBalanceAfter = proxy.balanceOf(customRecipient);
+        assertEq(
+            customRecipientBalanceAfter - customRecipientBalanceBefore,
+            netYield,
+            "Custom recipient should receive the net yield"
+        );
+
+        // The account balance increases by grossYield (as part of claiming mechanism)
+        // but the netYield is sent to the custom recipient
+        // So the account ends up with grossYield added, and custom recipient gets netYield
+        uint256 accountBalanceAfter = proxy.balanceOf(account);
+        assertGt(accountBalanceAfter, amount, "Account balance should increase by grossYield");
     }
 }

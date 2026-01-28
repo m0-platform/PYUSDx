@@ -943,9 +943,23 @@ contract PYUSDX is
         emit RateSet(newRate);
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.12
+    /**
+     * @notice Sets the claim recipient for an earner
+     * @dev Only callable by EARNER_MANAGER_ROLE. Use address(0) to clear custom recipient.
+     * @param account Earner account to set recipient for
+     * @param claimRecipient Recipient for yield claims (address(0) to clear and revert to account)
+     */
     function setClaimRecipient(address account, address claimRecipient) external override {
-        revert("TODO: Phase 2.12");
+        // Access control: only earner manager can set claim recipient
+        if (!hasRole(EARNER_MANAGER_ROLE, msg.sender)) revert("not earner manager");
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        // Set claim recipient (address(0) is valid - it clears the custom recipient)
+        $.claimRecipients[account] = claimRecipient;
+        $.accounts[account].hasClaimRecipient = (claimRecipient != address(0));
+
+        emit ClaimRecipientSet(account, claimRecipient);
     }
 
     /// @notice Internal transfer hook - to be implemented in Phase 2.13
