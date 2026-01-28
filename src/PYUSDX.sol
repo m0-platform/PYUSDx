@@ -316,9 +316,92 @@ contract PYUSDX is
         return $.totalNonEarningSupply;
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.2
-    function mint(address account, uint256 amount) external override {
-        revert("TODO: Phase 2.2");
+    /* ============ Earner Management ============ */
+    // NOTE: These are minimal implementations for testing; full implementation in Phase 3.1
+
+    /**
+     * @notice Sets earner details for an account
+     * @dev Only callable by EARNER_MANAGER_ROLE
+     * @param account Account to set earner details for
+     * @param isWhitelisted Whether the account is whitelisted to earn
+     * @param feeRate Fee rate in basis points (0-10000)
+     * @param feeRecipient Recipient of fees
+     */
+    function setEarnerDetails(
+        address account,
+        bool isWhitelisted,
+        uint16 feeRate,
+        address feeRecipient
+    ) external {
+        if (!hasRole(EARNER_MANAGER_ROLE, msg.sender)) revert("not earner manager");
+        if (feeRate > 10000) revert("fee rate too high");
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        $.earnerDetails[account] = EarnerDetails({
+            isWhitelisted: isWhitelisted,
+            feeRate: feeRate,
+            feeRecipient: feeRecipient
+        });
+        $.accounts[account].hasEarnerDetails = true;
+    }
+
+    /**
+     * @notice Gets earner details for an account
+     * @param account Account to query
+     * @return isWhitelisted Whether the account is whitelisted to earn
+     * @return feeRate Fee rate in basis points
+     * @return feeRecipient Recipient of fees
+     */
+    function getEarnerDetails(
+        address account
+    ) external view returns (bool isWhitelisted, uint16 feeRate, address feeRecipient) {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        EarnerDetails memory details = $.earnerDetails[account];
+        return (details.isWhitelisted, details.feeRate, details.feeRecipient);
+    }
+
+    /**
+     * @notice Checks if an account is an approved earner
+     * @param account Account to check
+     * @return True if the account is whitelisted to earn
+     */
+    function earnerStatusFor(address account) external view returns (bool) {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        return $.earnerDetails[account].isWhitelisted;
+    }
+
+    /* ============ Mint ============ */
+
+    /**
+     * @notice Mints PYUSDX to an account
+     * @dev Only callable by the Minter Gateway
+     * @param account Recipient of minted tokens
+     * @param amount Amount to mint
+     */
+    function mint(address account, uint256 amount) external override whenNotPaused {
+        // Access control: only minter gateway can mint
+        if (msg.sender != minterGateway) revert NotMinterGateway();
+
+        // Pre-flight checks
+        _revertIfFrozen(account);
+        if (amount == 0) revert("zero amount");
+
+        // Cast amount to uint240 (will revert on overflow)
+        uint240 amount240 = UIntMath.safe240(amount);
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        // Update account balance
+        $.accounts[account].balance += amount240;
+
+        // Update supply tracking based on earning status
+        if ($.accounts[account].isEarning) {
+            $.totalEarningSupply += amount240;
+        } else {
+            $.totalNonEarningSupply += amount240;
+        }
+
+        emit Transfer(address(0), account, amount);
     }
 
     /// @notice Stub implementation - to be implemented in Phase 2.3

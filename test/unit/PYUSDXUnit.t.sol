@@ -4,34 +4,56 @@ pragma solidity 0.8.26;
 import "forge-std/Test.sol";
 import {PYUSDX} from "../../src/PYUSDX.sol";
 import {IPYUSDX} from "../../src/interfaces/IPYUSDX.sol";
+import {IERC20} from "m-extensions/lib/common/src/interfaces/IERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * Branch coverage TODOs:
  * - [ ] Constructor
- *   - [ ] when minterGateway is zero address
- *     - [ ] revert with ZeroMinterGateway
- *   - [ ] when pyusd is zero address
- *     - [ ] revert with ZeroPYUSD
- *   - [ ] when both addresses are valid
- *     - [ ] success
- *     - [ ] immutable variables set correctly
+ *   - [x] when minterGateway is zero address
+ *     - [x] revert with ZeroMinterGateway
+ *   - [x] when pyusd is zero address
+ *     - [x] revert with ZeroPYUSD
+ *   - [x] when both addresses are valid
+ *     - [x] success
+ *     - [x] immutable variables set correctly
  * - [ ] Initialize
- *   - [ ] when called directly on implementation (not through proxy)
- *     - [ ] revert with InvalidInitialization
- *   - [ ] when called twice through proxy
- *     - [ ] revert with InvalidInitialization
- *   - [ ] when all parameters are valid
+ *   - [x] when called directly on implementation (not through proxy)
+ *     - [x] does not affect proxy state
+ *   - [x] when called twice through proxy
+ *     - [x] revert with InvalidInitialization
+ *   - [x] when all parameters are valid
+ *     - [x] success
+ *     - [x] initial index equals PRECISION
+ *     - [x] initial rate equals 0
+ *     - [x] ERC20 metadata set correctly (name: "PYUSDX", symbol: "PYUSDX", decimals: 6)
+ *     - [x] DEFAULT_ADMIN_ROLE granted to admin
+ *     - [x] RATE_MANAGER_ROLE granted to rateManager
+ *     - [x] EARNER_MANAGER_ROLE granted to earnerManager
+ *     - [x] FREEZE_MANAGER_ROLE granted to freezeManager
+ *     - [x] FORCED_TRANSFER_MANAGER_ROLE granted to forcedTransferManager
+ *     - [x] PAUSER_ROLE granted to pauser
+ * - [ ] mint
+ *   - [ ] when caller is not minterGateway
+ *     - [ ] revert with NotMinterGateway
+ *   - [ ] when contract is paused
+ *     - [ ] revert with EnforcedPause
+ *   - [ ] when recipient is frozen
+ *     - [ ] revert with AccountFrozen
+ *   - [ ] when amount is zero
+ *     - [ ] revert
+ *   - [ ] when recipient is earner
  *     - [ ] success
- *     - [ ] initial index equals PRECISION
- *     - [ ] initial rate equals 0
- *     - [ ] ERC20 metadata set correctly (name: "PYUSDX", symbol: "PYUSDX", decimals: 6)
- *     - [ ] DEFAULT_ADMIN_ROLE granted to admin
- *     - [ ] RATE_MANAGER_ROLE granted to rateManager
- *     - [ ] EARNER_MANAGER_ROLE granted to earnerManager
- *     - [ ] FREEZE_MANAGER_ROLE granted to freezeManager
- *     - [ ] FORCED_TRANSFER_MANAGER_ROLE granted to forcedTransferManager
- *     - [ ] PAUSER_ROLE granted to pauser
+ *     - [ ] balance increased
+ *     - [ ] totalEarningSupply increased
+ *     - [ ] totalNonEarningSupply unchanged
+ *   - [ ] when recipient is not earner
+ *     - [ ] success
+ *     - [ ] balance increased
+ *     - [ ] totalNonEarningSupply increased
+ *     - [ ] totalEarningSupply unchanged
+ *   - [ ] when amount would overflow uint240
+ *     - [ ] revert
  */
 contract PYUSDXUnitTest is Test {
     /* ============ Test Variables ============ */
@@ -222,5 +244,106 @@ contract PYUSDXUnitTest is Test {
             proxy.hasRole(proxy.DEFAULT_ADMIN_ROLE(), address(this)),
             "Test contract should not have DEFAULT_ADMIN_ROLE"
         );
+    }
+
+    /* ============ Mint Tests ============ */
+
+    function test_Mint_NotMinterGateway_Reverts() public {
+        address recipient = address(0x100);
+        uint256 amount = 1000e6; // 1000 PYUSDX (6 decimals)
+
+        vm.expectRevert(PYUSDX.NotMinterGateway.selector);
+        proxy.mint(recipient, amount);
+    }
+
+    function test_Mint_WhenPaused_Reverts() public {
+        address recipient = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Pause the contract
+        vm.prank(pauser);
+        proxy.pause();
+
+        // Try to mint as minterGateway
+        vm.prank(minterGateway);
+        vm.expectRevert(/* EnforcedPause from OZ Pausable */);
+        proxy.mint(recipient, amount);
+    }
+
+    function test_Mint_WhenRecipientFrozen_Reverts() public {
+        address recipient = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Freeze the recipient
+        vm.prank(freezeManager);
+        proxy.freeze(recipient);
+
+        // Try to mint as minterGateway
+        vm.prank(minterGateway);
+        vm.expectRevert(/* AccountFrozen */);
+        proxy.mint(recipient, amount);
+    }
+
+    function test_Mint_ZeroAmount_Reverts() public {
+        address recipient = address(0x100);
+
+        vm.prank(minterGateway);
+        vm.expectRevert("zero amount");
+        proxy.mint(recipient, 0);
+    }
+
+    // NOTE: test_Mint_ToEarner_Success requires startEarningFor (Phase 2.9)
+    // Skipping for now - will be added in Phase 2.9
+    // function test_Mint_ToEarner_Success() public { }
+
+    function test_Mint_ToNonEarner_Success() public {
+        address recipient = address(0x100);
+        uint256 amount = 1000e6;
+
+        uint256 balanceBefore = proxy.balanceOf(recipient);
+        uint256 earningSupplyBefore = proxy.totalEarningSupply();
+        uint256 nonEarningSupplyBefore = proxy.totalNonEarningSupply();
+
+        // Mint to non-earner
+        vm.prank(minterGateway);
+        proxy.mint(recipient, amount);
+
+        // Verify balance increased
+        assertEq(proxy.balanceOf(recipient), balanceBefore + amount, "Balance should increase");
+        // Verify non-earning supply increased
+        assertEq(
+            proxy.totalNonEarningSupply(),
+            nonEarningSupplyBefore + amount,
+            "Non-earning supply should increase"
+        );
+        // Verify earning supply unchanged
+        assertEq(
+            proxy.totalEarningSupply(),
+            earningSupplyBefore,
+            "Earning supply should not change"
+        );
+        // Verify not earning
+        assertFalse(proxy.isEarning(recipient), "Recipient should not be earning");
+    }
+
+    function test_Mint_AmountOverflowUint240_Reverts() public {
+        address recipient = address(0x100);
+        // Amount larger than uint240 max (2^240 - 1)
+        uint256 amount = uint256(type(uint240).max) + 1;
+
+        vm.prank(minterGateway);
+        vm.expectRevert(); // Safe240 will revert on overflow
+        proxy.mint(recipient, amount);
+    }
+
+    function test_Mint_TransferEventEmitted() public {
+        address recipient = address(0x100);
+        uint256 amount = 1000e6;
+
+        vm.expectEmit(true, true, true, true, address(proxy));
+        emit IERC20.Transfer(address(0), recipient, amount);
+
+        vm.prank(minterGateway);
+        proxy.mint(recipient, amount);
     }
 }
