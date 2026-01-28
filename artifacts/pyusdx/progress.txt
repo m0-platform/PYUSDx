@@ -1129,3 +1129,30 @@ Date: 2025-01-27
 
 Date: 2025-01-27
 
+
+#### Phase 6.2: Document Deployment Process
+**Status:** COMPLETED
+
+**Approach:**
+- Created deployment script at `script/DeployPYUSDX.s.sol`:
+  - Deploys PYUSDX implementation contract
+  - Deploys ERC1967 proxy pointing to implementation
+  - Initializes proxy with constructor parameters
+- Documentation includes:
+  - Constructor parameters (minterGateway, pyusd addresses)
+  - Post-deployment setup instructions
+  - Role grants for all manager roles
+  - Storage layout information
+  - Upgrade safety notes
+  - Initial state values
+
+**Usage:**
+1. Update MINTER_GATEWAY and PYUSD constants in script
+2. Set PRIVATE_KEY environment variable
+3. Run: `forge script script/DeployPYUSDX.s.sol:DeployPYUSDX --rpc-url <RPC_URL> --broadcast`
+
+**Verification:**
+- `forge build`: Success
+
+Date: 2025-01-27
+

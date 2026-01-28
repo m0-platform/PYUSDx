@@ -1171,8 +1171,8 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
   - Verifies: deploy → mint → approve earner → start earning → set rate → wait → claim → transfer → stop earning → burn
   - All invariants hold throughout
 
-- [ ] **Document deployment process**
-  - Deployment script to be created separately
+- [x] **Document deployment process**
+  - Deployment script created: `script/DeployPYUSDX.s.sol`
   - Constructor parameters: `_minterGateway` (address), `_pyusd` (address)
   - Role assignments documented in initialize function NatSpec
   - Initial index/rate setup: index starts at PRECISION (1e12), rate starts at 0
