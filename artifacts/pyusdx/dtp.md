@@ -162,7 +162,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Implement constructor and initialize function**
+- [x] **Implement constructor and initialize function**
   - File: `src/PYUSDX.sol`
   - Reference: SDD Section 4.1 (State Variables)
   - Constructor sets immutable variables: `minterGateway`, `pyusd`

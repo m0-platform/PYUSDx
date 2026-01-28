@@ -1,0 +1,17 @@
+{
+  "lib/common": {
+    "tag": {
+      "name": "v1.4.0",
+      "rev": "613d2d95a476612270324ecbe92317eb5e9bc98f"
+    }
+  },
+  "lib/forge-std": {
+    "branch": {
+      "name": "v1",
+      "rev": "bb4ceea94d6f10eeb5b41dc2391c6c8bf8e734ef"
+    }
+  },
+  "lib/m-extensions": {
+    "rev": "381237440a0f95d7df95cdb63c87c14aa15c244e"
+  }
+}

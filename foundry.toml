@@ -7,6 +7,9 @@ optimizer = true
 optimizer_runs = 999999
 solc_version = "0.8.26"
 verbosity = 3
+remappings = [
+    "@openzeppelin/contracts-upgradeable/=lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/",
+]
 
 [lint]
 lint_on_build = false

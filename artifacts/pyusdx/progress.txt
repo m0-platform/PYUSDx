@@ -53,3 +53,26 @@
 **Verification:**
 - Storage layout compiles successfully
 
+#### Phase 2.1: Constructor and Initialization
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented constructor that validates and sets immutable `minterGateway` and `pyusd` addresses
+- Implemented `initialize` function that:
+  - Calls parent initializers (__ERC20ExtendedUpgradeable_init, __AccessControl_init, __Freezable_init, __ForcedTransferable_init, __Pausable_init)
+  - Sets ERC20 metadata: name="PYUSDX", symbol="PYUSDX", decimals=6
+  - Initializes index to PRECISION (1e12), rate to 0, timestamp to current block
+  - Grants DEFAULT_ADMIN_ROLE, RATE_MANAGER_ROLE, EARNER_MANAGER_ROLE
+- Added stub implementations for all interface functions (to be completed in subsequent phases)
+- Implemented `currentIndex()` and `rate()` view functions
+- Implemented `_calculateIndex()` internal function using ContinuousIndexingMath
+- Implemented `_updateIndex()` internal function that caches the index
+
+**Gotchas:**
+- Had to resolve duplicate OpenZeppelin imports between `lib/common` and `lib/m-extensions/lib/common`
+- Solution: Use imports from `m-extensions/lib/common` exclusively, and use only the `m-extensions` nested OZ via remappings
+- Had to use `override(IERC20, IPYUSDX)` for `balanceOf` since both interfaces define it
+
+**Verification:**
+- `forge build`: Success with only warnings (unreachable code in OZ, unused params in stubs)
+
