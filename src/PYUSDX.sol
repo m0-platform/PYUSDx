@@ -369,6 +369,15 @@ contract PYUSDX is
         return $.accounts[account].isEarning;
     }
 
+    /**
+     * @notice Returns the total earning principal across all earners
+     * @return Total earning principal
+     */
+    function totalEarningPrincipal() external view returns (uint112) {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        return $.totalEarningPrincipal;
+    }
+
     /// @notice Stub implementation - to be implemented in Phase 2.14
     function totalSupply() external pure override returns (uint256) {
         revert("TODO: Phase 2.14");
@@ -519,14 +528,105 @@ contract PYUSDX is
         revert("TODO: Phase 2.11");
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.9
-    function startEarningFor(address account) external override {
-        revert("TODO: Phase 2.9");
+    /**
+     * @notice Starts earning yield for an account
+     * @dev Permissionless function. Account must be whitelisted as earner and not already earning.
+     *      Principal is calculated as: balance × PRECISION / currentIndex
+     * @param account Account to start earning for
+     */
+    function startEarningFor(address account) external override whenNotPaused {
+        // Pre-flight checks
+        _revertIfFrozen(account);
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        // Account must be whitelisted as earner
+        if (!$.earnerDetails[account].isWhitelisted) {
+            revert("not approved earner");
+        }
+
+        Account storage accountData = $.accounts[account];
+
+        // Account must not already be earning
+        if (accountData.isEarning) {
+            revert("already earning");
+        }
+
+        // Calculate principal: balance × PRECISION / currentIndex
+        uint128 idx = _updateIndex();
+        uint256 balance = uint256(accountData.balance);
+
+        uint112 principal;
+        if (balance > 0) {
+            // Use getPrincipalAmountRoundedUp to get principal amount
+            // This ensures we don't lose yield due to rounding
+            principal = IndexingMath.getPrincipalAmountRoundedUp(uint240(balance), idx);
+            $.totalEarningPrincipal += principal;
+        }
+
+        // Mark account as earning
+        accountData.isEarning = true;
+        accountData.earningPrincipal = principal;
+
+        // Update supply tracking
+        $.totalEarningSupply += uint240(balance);
+        $.totalNonEarningSupply -= uint240(balance);
+
+        emit StartedEarning(account);
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.9
-    function startEarningFor(address[] calldata accounts) external override {
-        revert("TODO: Phase 2.9");
+    /**
+     * @notice Starts earning yield for multiple accounts
+     * @dev Batch variant of startEarningFor. Loops through accounts and calls single variant logic.
+     * @param accounts Array of accounts to start earning for
+     */
+    function startEarningFor(address[] calldata accounts) external override whenNotPaused {
+        if (accounts.length == 0) {
+            revert("array length zero");
+        }
+
+        for (uint256 i = 0; i < accounts.length; i++) {
+            address account = accounts[i];
+
+            // Pre-flight checks
+            _revertIfFrozen(account);
+
+            PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+            // Account must be whitelisted as earner
+            if (!$.earnerDetails[account].isWhitelisted) {
+                continue; // Skip non-approved earners
+            }
+
+            Account storage accountData = $.accounts[account];
+
+            // Account must not already be earning
+            if (accountData.isEarning) {
+                continue; // Skip already earning accounts
+            }
+
+            // Calculate principal: balance × PRECISION / currentIndex
+            // Note: _updateIndex is called each iteration to ensure fresh index
+            // This could be optimized by caching, but keeping it simple for now
+            uint128 idx = _updateIndex();
+            uint256 balance = uint256(accountData.balance);
+
+            uint112 principal;
+            if (balance > 0) {
+                principal = IndexingMath.getPrincipalAmountRoundedUp(uint240(balance), idx);
+                $.totalEarningPrincipal += principal;
+            }
+
+            // Mark account as earning
+            accountData.isEarning = true;
+            accountData.earningPrincipal = principal;
+
+            // Update supply tracking
+            $.totalEarningSupply += uint240(balance);
+            $.totalNonEarningSupply -= uint240(balance);
+
+            emit StartedEarning(account);
+        }
     }
 
     /// @notice Stub implementation - to be implemented in Phase 2.10

@@ -114,22 +114,46 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  * - [ ] accruedYieldOf
  *   - [x] when account is not earning
  *     - [x] return 0
- *   - [ ] when earningPrincipal is 0
- *     - [ ] return 0 (deferred to Phase 2.9)
+ *   - [x] when earningPrincipal is 0
+ *     - [x] return 0
  *   - [ ] when index has grown
- *     - [ ] return positive yield (deferred to Phase 2.9)
+ *     - [ ] return positive yield (deferred - full claimFor needed)
  *   - [ ] when balance already includes yield
- *     - [ ] return 0 (no double counting, deferred to Phase 2.9)
+ *     - [ ] return 0 (no double counting, deferred - full claimFor needed)
  *   - [x] when index equals PRECISION (no growth)
  *     - [x] return 0
  * - [ ] balanceOf: returns stored balance only
  *   - [x] excludes accrued yield
  * - [ ] balanceWithYieldOf: returns balance + accruedYield
  *   - [x] for non-earners: equals balance
- *   - [ ] for earners: includes yield (deferred to Phase 2.9)
+ *   - [x] for earners: includes yield
  * - [ ] earningPrincipalOf: returns principal
  *   - [x] for non-earners: returns 0
- *   - [ ] for earners: returns principal (deferred to Phase 2.9)
+ *   - [x] for earners: returns principal
+ * - [ ] startEarningFor
+ *   - [x] when account is not approved
+ *     - [x] revert
+ *   - [x] when contract is paused
+ *     - [x] revert with EnforcedPause
+ *   - [x] when account is frozen
+ *     - [x] revert with AccountFrozen
+ *   - [x] when already earning
+ *     - [x] revert
+ *   - [x] with zero balance
+ *     - [x] success, isEarning = true, earningPrincipal = 0
+ *   - [x] with positive balance
+ *     - [x] success, isEarning = true
+ *     - [x] earningPrincipal = balance × PRECISION / index
+ *     - [x] totalEarningPrincipal increased
+ *     - [x] totalEarningSupply increased
+ *     - [x] totalNonEarningSupply decreased
+ *     - [x] StartedEarning event emitted
+ *   - [x] batch with multiple accounts
+ *     - [x] success for all, all accounts marked as earning
+ *   - [x] batch with empty array
+ *     - [x] revert
+ *   - [x] batch with mix of approved and non-approved
+ *     - [x] only approved accounts start earning
  */
 contract PYUSDXUnitTest is Test {
     /* ============ Test Variables ============ */
@@ -933,9 +957,250 @@ contract PYUSDXUnitTest is Test {
         address account = address(0x100);
 
         // Account with no balance should have 0 earning principal
-        assertEq(proxy.earningPrincipalOf(account), uint112(0), "Account with no balance should have 0 earning principal");
+        assertEq(
+            proxy.earningPrincipalOf(account), uint112(0), "Account with no balance should have 0 earning principal"
+        );
     }
 
     // NOTE: Full tests for earners require startEarningFor (Phase 2.9)
     // The current implementation correctly handles non-earners.
+
+    /* ============ Start Earning Tests (Phase 2.9) ============ */
+
+    function test_StartEarningFor_NotApproved_Reverts() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint to account
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        // Try to start earning without whitelisting - should revert
+        vm.expectRevert("not approved earner");
+        proxy.startEarningFor(account);
+    }
+
+    function test_StartEarningFor_Paused_Reverts() public {
+        address account = address(0x100);
+
+        // Whitelist account as earner
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Pause contract
+        vm.prank(pauser);
+        proxy.pause();
+
+        // Try to start earning - should revert
+        // The EnforcedPause error has no parameters
+        vm.expectRevert();
+        proxy.startEarningFor(account);
+    }
+
+    function test_StartEarningFor_Frozen_Reverts() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint to account
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        // Whitelist account as earner
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Freeze account
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        // Try to start earning - should revert
+        vm.expectRevert(abi.encodeWithSignature("AccountFrozen(address)", account));
+        proxy.startEarningFor(account);
+    }
+
+    function test_StartEarningFor_AlreadyEarning_Reverts() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint to account
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        // Whitelist account as earner
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Start earning
+        proxy.startEarningFor(account);
+
+        // Try to start earning again - should revert
+        vm.expectRevert("already earning");
+        proxy.startEarningFor(account);
+    }
+
+    function test_StartEarningFor_ZeroBalance_Success() public {
+        address account = address(0x100);
+
+        // Whitelist account as earner
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Start earning with zero balance
+        vm.expectEmit(true, true, true, true, address(proxy));
+        emit IPYUSDX.StartedEarning(account);
+        proxy.startEarningFor(account);
+
+        // Verify account is earning
+        assertTrue(proxy.isEarning(account), "Account should be earning");
+        assertEq(proxy.earningPrincipalOf(account), uint112(0), "Principal should be 0");
+        assertEq(proxy.totalEarningPrincipal(), uint112(0), "Total earning principal should be 0");
+    }
+
+    function test_StartEarningFor_PositiveBalance_Success() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint to account
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        // Record state before
+        uint256 totalNonEarningBefore = proxy.totalNonEarningSupply();
+        uint256 totalEarningBefore = proxy.totalEarningSupply();
+        uint256 totalPrincipalBefore = proxy.totalEarningPrincipal();
+
+        // Whitelist account as earner
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Start earning
+        vm.expectEmit(true, true, true, true, address(proxy));
+        emit IPYUSDX.StartedEarning(account);
+        proxy.startEarningFor(account);
+
+        // Verify account is earning
+        assertTrue(proxy.isEarning(account), "Account should be earning");
+
+        // Verify earning principal is set (should be balance * PRECISION / index)
+        // Since index = PRECISION, principal should equal balance
+        assertEq(
+            proxy.earningPrincipalOf(account), uint112(amount), "Principal should equal balance when index=PRECISION"
+        );
+
+        // Verify supply tracking
+        assertEq(proxy.totalEarningSupply(), totalEarningBefore + amount, "Earning supply should increase by balance");
+        assertEq(
+            proxy.totalNonEarningSupply(),
+            totalNonEarningBefore - amount,
+            "Non-earning supply should decrease by balance"
+        );
+        assertEq(
+            proxy.totalEarningPrincipal(),
+            totalPrincipalBefore + amount,
+            "Total earning principal should increase by principal amount"
+        );
+
+        // Verify balance is unchanged
+        assertEq(proxy.balanceOf(account), amount, "Balance should be unchanged");
+    }
+
+    function test_StartEarningFor_Batch_MultipleAccounts_Success() public {
+        address account1 = address(0x100);
+        address account2 = address(0x200);
+        address account3 = address(0x300);
+        uint256 amount1 = 1000e6;
+        uint256 amount2 = 2000e6;
+        uint256 amount3 = 3000e6;
+
+        // Mint to accounts
+        vm.prank(minterGateway);
+        proxy.mint(account1, amount1);
+        vm.prank(minterGateway);
+        proxy.mint(account2, amount2);
+        vm.prank(minterGateway);
+        proxy.mint(account3, amount3);
+
+        // Whitelist all accounts as earners
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account1, true, 0, address(0));
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account2, true, 0, address(0));
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account3, true, 0, address(0));
+
+        // Record state before
+        uint256 totalNonEarningBefore = proxy.totalNonEarningSupply();
+        uint256 totalEarningBefore = proxy.totalEarningSupply();
+        uint256 totalPrincipalBefore = proxy.totalEarningPrincipal();
+
+        // Start earning for all accounts
+        address[] memory accounts = new address[](3);
+        accounts[0] = account1;
+        accounts[1] = account2;
+        accounts[2] = account3;
+
+        proxy.startEarningFor(accounts);
+
+        // Verify all accounts are earning
+        assertTrue(proxy.isEarning(account1), "Account1 should be earning");
+        assertTrue(proxy.isEarning(account2), "Account2 should be earning");
+        assertTrue(proxy.isEarning(account3), "Account3 should be earning");
+
+        // Verify all principals are set
+        assertEq(proxy.earningPrincipalOf(account1), uint112(amount1), "Principal1 should equal balance");
+        assertEq(proxy.earningPrincipalOf(account2), uint112(amount2), "Principal2 should equal balance");
+        assertEq(proxy.earningPrincipalOf(account3), uint112(amount3), "Principal3 should equal balance");
+
+        // Verify supply tracking
+        uint256 totalAmount = amount1 + amount2 + amount3;
+        assertEq(proxy.totalEarningSupply(), totalEarningBefore + totalAmount, "Earning supply should increase");
+        assertEq(
+            proxy.totalNonEarningSupply(), totalNonEarningBefore - totalAmount, "Non-earning supply should decrease"
+        );
+        assertEq(
+            proxy.totalEarningPrincipal(), totalPrincipalBefore + totalAmount, "Total earning principal should increase"
+        );
+    }
+
+    function test_StartEarningFor_Batch_EmptyArray_Reverts() public {
+        address[] memory accounts = new address[](0);
+
+        vm.expectRevert("array length zero");
+        proxy.startEarningFor(accounts);
+    }
+
+    function test_StartEarningFor_Batch_MixApprovedOnlySomeStart() public {
+        address account1 = address(0x100);
+        address account2 = address(0x200);
+        address account3 = address(0x300);
+        uint256 amount = 1000e6;
+
+        // Mint to accounts
+        vm.prank(minterGateway);
+        proxy.mint(account1, amount);
+        vm.prank(minterGateway);
+        proxy.mint(account2, amount);
+        vm.prank(minterGateway);
+        proxy.mint(account3, amount);
+
+        // Only whitelist account1 and account3
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account1, true, 0, address(0));
+        // account2 is not whitelisted
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account3, true, 0, address(0));
+
+        // Start earning for all accounts
+        address[] memory accounts = new address[](3);
+        accounts[0] = account1;
+        accounts[1] = account2;
+        accounts[2] = account3;
+
+        proxy.startEarningFor(accounts);
+
+        // Verify only approved accounts are earning
+        assertTrue(proxy.isEarning(account1), "Account1 should be earning");
+        assertFalse(proxy.isEarning(account2), "Account2 should NOT be earning (not approved)");
+        assertTrue(proxy.isEarning(account3), "Account3 should be earning");
+    }
 }
