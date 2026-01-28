@@ -305,36 +305,40 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
     - Balance never goes negative
   - Bounds: `amount` must be <= `balanceOf(account)`
 
-### 2.4 Set Rate (Inherited)
+### 2.4 Set Rate
 
 #### Implementation
 
-- [ ] **Verify `setRate` inherited from ContinuousIndexing**
+- [x] **Implement `setRate` function**
   - Reference: SDD Section 6.3 (Set Rate)
-  - Function: `setRate(uint32 newRate) external onlyRateManager`
-  - This should be inherited; verify it works with PYUSDX storage layout
-  - If not inherited, implement in ContinuousIndexing:
-    - it sets the `rate` variable 
-  - Verify `rate` is accessible
+  - Function: `setRate(uint32 newRate) external`
+  - Access control: Only callable by `RATE_MANAGER_ROLE`
+  - Pre-flight checks:
+    - Rate does not exceed 100% (PRECISION = 1e12)
+  - Logic:
+    - Update index to apply old rate for elapsed period
+    - Early return if rate unchanged
+    - Set new rate
+  - Emit: `RateSet(newRate)`
 
 #### Unit Tests
 
-- [ ] **Add setRate tests to PYUSDXUnit.t.sol**
+- [x] **Add setRate tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
     /**
      * Branch coverage TODOs:
-     * - [ ] setRate
-     *   - [ ] when caller is not RATE_MANAGER_ROLE
-     *   -   - [ ] revert
-     *   - [ ] when rate exceeds 10000 (100%)
-     *   -   - [ ] revert with RateTooHigh
-     *   - [ ] when rate equals current rate
-     *   -   - [ ] return early (no event)
-     *   - [ ] when rate is valid and different
-     *   -   - [ ] success
-     *   -   - [ ] rate updated
-     *   -   - [ ] RateSet event emitted
+     * - [x] setRate
+     *   - [x] when caller is not RATE_MANAGER_ROLE
+     *   -   - [x] revert
+     *   - [x] when rate exceeds 10000 (100%)
+     *   -   - [x] revert with RateTooHigh
+     *   - [x] when rate equals current rate
+     *   -   - [x] return early (no event)
+     *   - [x] when rate is valid and different
+     *   -   - [x] success
+     *   -   - [x] rate updated
+     *   -   - [x] RateSet event emitted
      */
     ```
 

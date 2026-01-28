@@ -48,29 +48,17 @@ contract PYUSDXFuzzTest is Test {
 
         // Deploy proxy pointing to implementation
         bytes memory initData = abi.encodeWithSelector(
-            PYUSDX.initialize.selector,
-            admin,
-            rateManager,
-            earnerManager,
-            freezeManager,
-            forcedTransferManager,
-            pauser
+            PYUSDX.initialize.selector, admin, rateManager, earnerManager, freezeManager, forcedTransferManager, pauser
         );
 
-        erc1967Proxy = new ERC1967Proxy(
-            address(implementation),
-            initData
-        );
+        erc1967Proxy = new ERC1967Proxy(address(implementation), initData);
 
         proxy = PYUSDX(address(erc1967Proxy));
     }
 
     /* ============ Mint Fuzz Tests ============ */
 
-    function testFuzz_Mint_AmountWithinBounds(
-        address recipient,
-        uint256 amount
-    ) public {
+    function testFuzz_Mint_AmountWithinBounds(address recipient, uint256 amount) public {
         // Bound amount to uint240 max and exclude zero
         vm.assume(amount > 0 && amount <= uint256(type(uint240).max));
         vm.assume(recipient != address(0));
@@ -81,11 +69,7 @@ contract PYUSDXFuzzTest is Test {
         proxy.mint(recipient, amount);
 
         // Verify balance increased
-        assertEq(
-            proxy.balanceOf(recipient),
-            balanceBefore + amount,
-            "Balance should increase by minted amount"
-        );
+        assertEq(proxy.balanceOf(recipient), balanceBefore + amount, "Balance should increase by minted amount");
 
         // Verify total supply consistency
         // Note: totalSupply not implemented yet (Phase 2.14)
@@ -102,10 +86,7 @@ contract PYUSDXFuzzTest is Test {
         proxy.mint(recipient, amount);
     }
 
-    function testFuzz_Mint_TotalSupplyInvariant(
-        address recipient,
-        uint256 amount
-    ) public {
+    function testFuzz_Mint_TotalSupplyInvariant(address recipient, uint256 amount) public {
         vm.assume(amount > 0 && amount <= uint256(type(uint240).max));
         vm.assume(recipient != address(0));
 
@@ -126,11 +107,7 @@ contract PYUSDXFuzzTest is Test {
                 nonEarningSupplyBefore + amount,
                 "Non-earning supply should increase for non-earner"
             );
-            assertEq(
-                totalEarningAfter,
-                earningSupplyBefore,
-                "Earning supply should not change for non-earner"
-            );
+            assertEq(totalEarningAfter, earningSupplyBefore, "Earning supply should not change for non-earner");
         }
         // Note: Earner case requires startEarningFor (Phase 2.9) to be implemented
     }
@@ -146,11 +123,7 @@ contract PYUSDXFuzzTest is Test {
         proxy.mint(address(0), amount);
     }
 
-    function testFuzz_Mint_SameRecipientMultipleTimes(
-        address recipient,
-        uint256 amount1,
-        uint256 amount2
-    ) public {
+    function testFuzz_Mint_SameRecipientMultipleTimes(address recipient, uint256 amount1, uint256 amount2) public {
         vm.assume(recipient != address(0));
         vm.assume(amount1 > 0 && amount1 <= uint256(type(uint240).max));
         vm.assume(amount2 > 0 && amount2 <= uint256(type(uint240).max));
@@ -166,18 +139,13 @@ contract PYUSDXFuzzTest is Test {
         vm.stopPrank();
 
         assertEq(
-            proxy.balanceOf(recipient),
-            balanceBefore + amount1 + amount2,
-            "Balance should increase by sum of all mints"
+            proxy.balanceOf(recipient), balanceBefore + amount1 + amount2, "Balance should increase by sum of all mints"
         );
     }
 
     /* ============ Invariant Tests ============ */
 
-    function testFuzz_Invariant_BalanceNeverNegative(
-        address recipient,
-        uint256 mintAmount
-    ) public {
+    function testFuzz_Invariant_BalanceNeverNegative(address recipient, uint256 mintAmount) public {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(recipient != address(0));
 
@@ -193,11 +161,7 @@ contract PYUSDXFuzzTest is Test {
 
     /* ============ Burn Fuzz Tests ============ */
 
-    function testFuzz_Burn_AmountWithinBounds(
-        address account,
-        uint256 mintAmount,
-        uint256 burnAmount
-    ) public {
+    function testFuzz_Burn_AmountWithinBounds(address account, uint256 mintAmount, uint256 burnAmount) public {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount > 0 && burnAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount <= mintAmount); // Can't burn more than minted
@@ -216,11 +180,7 @@ contract PYUSDXFuzzTest is Test {
         proxy.burn(account, burnAmount);
 
         // Verify balance decreased
-        assertEq(
-            proxy.balanceOf(account),
-            balanceBefore - burnAmount,
-            "Balance should decrease by burned amount"
-        );
+        assertEq(proxy.balanceOf(account), balanceBefore - burnAmount, "Balance should decrease by burned amount");
 
         // For non-earners, non-earning supply should decrease
         if (!proxy.isEarning(account)) {
@@ -229,19 +189,11 @@ contract PYUSDXFuzzTest is Test {
                 nonEarningSupplyBefore - burnAmount,
                 "Non-earning supply should decrease for non-earner"
             );
-            assertEq(
-                proxy.totalEarningSupply(),
-                earningSupplyBefore,
-                "Earning supply should not change for non-earner"
-            );
+            assertEq(proxy.totalEarningSupply(), earningSupplyBefore, "Earning supply should not change for non-earner");
         }
     }
 
-    function testFuzz_Burn_InsufficientBalance(
-        address account,
-        uint256 mintAmount,
-        uint256 burnAmount
-    ) public {
+    function testFuzz_Burn_InsufficientBalance(address account, uint256 mintAmount, uint256 burnAmount) public {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount > mintAmount); // Burn more than minted
         vm.assume(burnAmount <= uint256(type(uint240).max));
@@ -257,11 +209,9 @@ contract PYUSDXFuzzTest is Test {
         proxy.burn(account, burnAmount);
     }
 
-    function testFuzz_Burn_Invariant_BalanceNeverNegative(
-        address account,
-        uint256 mintAmount,
-        uint256 burnAmount
-    ) public {
+    function testFuzz_Burn_Invariant_BalanceNeverNegative(address account, uint256 mintAmount, uint256 burnAmount)
+        public
+    {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount > 0 && burnAmount <= uint256(type(uint240).max));
         vm.assume(account != address(0));
@@ -283,11 +233,7 @@ contract PYUSDXFuzzTest is Test {
         }
     }
 
-    function testFuzz_Burn_MintBurnCycle(
-        address account,
-        uint256 mintAmount,
-        uint256 burnAmount
-    ) public {
+    function testFuzz_Burn_MintBurnCycle(address account, uint256 mintAmount, uint256 burnAmount) public {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount > 0 && burnAmount <= uint256(type(uint240).max));
         vm.assume(account != address(0));

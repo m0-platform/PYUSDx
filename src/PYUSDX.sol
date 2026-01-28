@@ -25,11 +25,11 @@ abstract contract PYUSDXLayout is IPYUSDX {
      * @dev Packed to exactly 2 slots (64 bytes) for efficiency
      */
     struct Account {
-        bool isEarning;           // 1 byte  - Whether account is actively earning yield
-        uint240 balance;          // 30 bytes - Token balance (excluding accrued yield)
+        bool isEarning; // 1 byte  - Whether account is actively earning yield
+        uint240 balance; // 30 bytes - Token balance (excluding accrued yield)
         uint112 earningPrincipal; // 14 bytes - Principal amount for yield calculations
-        bool hasClaimRecipient;   // 1 byte  - Whether custom claim recipient is set
-        bool hasEarnerDetails;    // 1 byte  - Whether earner details are set
+        bool hasClaimRecipient; // 1 byte  - Whether custom claim recipient is set
+        bool hasEarnerDetails; // 1 byte  - Whether earner details are set
         // 16 bytes padding to align to slot boundary
     }
 
@@ -38,18 +38,18 @@ abstract contract PYUSDXLayout is IPYUSDX {
      * @dev Stored in same storage struct to save slots
      */
     struct IndexingState {
-        uint128 latestIndex;          // Current yield index (scaled by EXP_SCALED_ONE = 1e12)
+        uint128 latestIndex; // Current yield index (scaled by EXP_SCALED_ONE = 1e12)
         uint40 latestUpdateTimestamp; // Timestamp of last index update
-        uint32 rate;                  // Current annual yield rate (basis points, scaled by 1e12)
-        uint32 _latestRate;           // Previous rate for index calculation
+        uint32 rate; // Current annual yield rate (basis points, scaled by 1e12)
+        uint32 _latestRate; // Previous rate for index calculation
     }
 
     /**
      * @notice Earner details for fee management
      */
     struct EarnerDetails {
-        bool isWhitelisted;  // Whether account is whitelisted to earn
-        uint16 feeRate;      // Fee rate in basis points (0-10000)
+        bool isWhitelisted; // Whether account is whitelisted to earn
+        uint16 feeRate; // Fee rate in basis points (0-10000)
         address feeRecipient; // Recipient of fees
     }
 
@@ -58,13 +58,13 @@ abstract contract PYUSDXLayout is IPYUSDX {
      * @dev Stored at ERC-7201 namespaced storage slot
      */
     struct PYUSDXStorageStruct {
-        mapping(address => Account) accounts;         // Account states
-        mapping(address => address) claimRecipients;   // Custom claim recipients
+        mapping(address => Account) accounts; // Account states
+        mapping(address => address) claimRecipients; // Custom claim recipients
         mapping(address => EarnerDetails) earnerDetails; // Earner whitelisting and fees
-        uint112 totalEarningPrincipal;                // Sum of all earning principals
-        uint240 totalEarningSupply;                   // Total supply of earning tokens
-        uint240 totalNonEarningSupply;                // Total supply of non-earning tokens
-        IndexingState indexing;                       // Yield index and rate
+        uint112 totalEarningPrincipal; // Sum of all earning principals
+        uint240 totalEarningSupply; // Total supply of earning tokens
+        uint240 totalNonEarningSupply; // Total supply of non-earning tokens
+        IndexingState indexing; // Yield index and rate
     }
 
     /* ============ Storage Layout ============ */
@@ -126,14 +126,6 @@ contract PYUSDX is
 
     /// @notice Thrown when caller is not the minter gateway
     error NotMinterGateway();
-
-    /* ============ Events ============ */
-
-    /// @notice Emitted when the yield rate is set
-    event RateSet(uint32 indexed newRate);
-
-    /// @notice Emitted when the index is updated
-    event IndexUpdated(uint128 indexed newIndex, uint256 indexed timestamp);
 
     /* ============ Constructor ============ */
 
@@ -327,21 +319,13 @@ contract PYUSDX is
      * @param feeRate Fee rate in basis points (0-10000)
      * @param feeRecipient Recipient of fees
      */
-    function setEarnerDetails(
-        address account,
-        bool isWhitelisted,
-        uint16 feeRate,
-        address feeRecipient
-    ) external {
+    function setEarnerDetails(address account, bool isWhitelisted, uint16 feeRate, address feeRecipient) external {
         if (!hasRole(EARNER_MANAGER_ROLE, msg.sender)) revert("not earner manager");
         if (feeRate > 10000) revert("fee rate too high");
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        $.earnerDetails[account] = EarnerDetails({
-            isWhitelisted: isWhitelisted,
-            feeRate: feeRate,
-            feeRecipient: feeRecipient
-        });
+        $.earnerDetails[account] =
+            EarnerDetails({isWhitelisted: isWhitelisted, feeRate: feeRate, feeRecipient: feeRecipient});
         $.accounts[account].hasEarnerDetails = true;
     }
 
@@ -352,9 +336,11 @@ contract PYUSDX is
      * @return feeRate Fee rate in basis points
      * @return feeRecipient Recipient of fees
      */
-    function getEarnerDetails(
-        address account
-    ) external view returns (bool isWhitelisted, uint16 feeRate, address feeRecipient) {
+    function getEarnerDetails(address account)
+        external
+        view
+        returns (bool isWhitelisted, uint16 feeRate, address feeRecipient)
+    {
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
         EarnerDetails memory details = $.earnerDetails[account];
         return (details.isWhitelisted, details.feeRate, details.feeRecipient);
@@ -438,7 +424,8 @@ contract PYUSDX is
             if (principal > 0 && balance > 0) {
                 // Calculate principal to remove: amount * principal / balance
                 // Use round up to ensure we don't leave dust principal
-                uint112 principalToRemove = uint112((uint256(amount240) * uint256(principal) + uint256(balance) - 1) / uint256(balance));
+                uint112 principalToRemove =
+                    uint112((uint256(amount240) * uint256(principal) + uint256(balance) - 1) / uint256(balance));
                 $.accounts[account].earningPrincipal = principal - principalToRemove;
                 $.totalEarningPrincipal -= principalToRemove;
             }
@@ -472,6 +459,38 @@ contract PYUSDX is
     /// @notice Stub implementation - to be implemented in Phase 2.10
     function stopEarningFor(address[] calldata accounts) external override {
         revert("TODO: Phase 2.10");
+    }
+
+    /* ============ Set Rate ============ */
+
+    /**
+     * @notice Sets the annual yield rate
+     * @dev Only callable by RATE_MANAGER_ROLE. Rate is in basis points (1e12 scaling = 100%).
+     *      This triggers an index update to apply the old rate for the elapsed period.
+     * @param newRate New annual yield rate (0 to 10000 basis points, scaled by 1e12)
+     */
+    function setRate(uint32 newRate) external {
+        // Access control: only rate manager can set rate
+        if (!hasRole(RATE_MANAGER_ROLE, msg.sender)) revert("not rate manager");
+
+        // Validate rate doesn't exceed 100% (10000 basis points)
+        // Validate rate doesn't exceed 100% (10000 basis points)
+        // Rate is in format: bps * PRECISION / 10000, so max 100% = 10000 * PRECISION / 10000 = PRECISION
+        if (newRate > uint32(PRECISION)) revert RateTooHigh();
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        // Update index to apply old rate for elapsed period
+        _updateIndex();
+
+        // Early return if rate unchanged
+        if ($.indexing.rate == newRate) {
+            return;
+        }
+
+        // Set new rate
+        $.indexing.rate = newRate;
+        emit RateSet(newRate);
     }
 
     /// @notice Stub implementation - to be implemented in Phase 2.12

@@ -123,4 +123,13 @@ interface IPYUSDX {
     /// @param account Earner account
     /// @param recipient New claim recipient
     event ClaimRecipientSet(address indexed account, address indexed recipient);
+
+    /// @notice Emitted when the yield rate is set
+    /// @param newRate New annual yield rate (basis points, scaled by 1e12)
+    event RateSet(uint32 indexed newRate);
+
+    /// @notice Emitted when the yield index is updated
+    /// @param newIndex New index value
+    /// @param timestamp Timestamp of the update
+    event IndexUpdated(uint128 indexed newIndex, uint256 indexed timestamp);
 }

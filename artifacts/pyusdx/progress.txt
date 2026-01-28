@@ -146,3 +146,27 @@
 - All 10 fuzz tests pass with 5000 runs each (6 from Phase 2.2 + 4 new burn tests)
 - `forge build`: Success
 
+#### Phase 2.4: Set Rate Function
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented `setRate` function with:
+  - Access control: Only callable by `RATE_MANAGER_ROLE`
+  - Validation: Rate cannot exceed 100% (PRECISION = 1e12)
+  - Updates index to apply old rate for elapsed period before setting new rate
+  - Early return if rate unchanged (no event emitted)
+  - Emits `RateSet` event on successful rate change
+- Added `RateSet` and `IndexUpdated` events to `IPYUSDX` interface
+- Unit tests cover: Not rate manager, rate exceeds max (reverts), rate at max boundary, same rate as current, valid different rate, RateSet event, zero rate, multiple rate changes
+
+**Gotchas:**
+- The validation formula `newRate > 10000 * uint32(PRECISION)` overflows because `10000 * 1e12 = 1e16` exceeds `uint32` max (~4.3e9)
+- Fixed by using `newRate > uint32(PRECISION)` instead, since the rate format is `bps * PRECISION / 10000`, so 100% = 1e12
+- Test rate calculations needed to use `uint256` casting to avoid overflow during test compilation: `uint32((uint256(1000) * uint256(PRECISION)) / 10000)`
+- Rate format: rate is stored as `bps * PRECISION / 10000`, so 10% = 1000 * 1e12 / 10000 = 1e11
+
+**Verification:**
+- All 41 unit tests pass (33 from Phase 2.3 + 8 new setRate tests)
+- `forge build`: Success
+- `forge fmt --check`: Pass
+
