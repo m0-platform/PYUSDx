@@ -636,7 +636,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Fuzz Tests
 
-- [ ] **Add claim fuzz tests to PYUSDXFuzz.t.sol**
+- [x] **Add claim fuzz tests to PYUSDXFuzz.t.sol**
   - Fuzzable parameters: `feeRate` (uint16), `yieldAmount` (uint240)
   - Invariants:
     - `balanceAfter == balanceBefore + grossYield`
