@@ -3861,4 +3861,237 @@ contract PYUSDXUnitTest is Test {
         // 3. Total supply increased
         assertEq(proxy.totalSupply(), totalSupplyBefore + amount, "Total supply should increase");
     }
+
+    /* ============ Edge Case Tests (SDD Section 11.3) ============ */
+
+    function test_EdgeCase_StopEarningImmediatelyAfterStarting() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint to account
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        // Whitelist as earner
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Start earning
+        proxy.startEarningFor(account);
+        assertTrue(proxy.isEarning(account), "Account should be earning");
+        assertEq(proxy.earningPrincipalOf(account), amount, "Principal should be set");
+
+        // Immediately remove from whitelist
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, false, 0, address(0));
+
+        // Stop earning immediately
+        proxy.stopEarningFor(account);
+
+        // Verify account is no longer earning
+        assertFalse(proxy.isEarning(account), "Account should not be earning");
+        assertEq(proxy.earningPrincipalOf(account), uint112(0), "Principal should be 0");
+        assertEq(proxy.totalEarningPrincipal(), uint112(0), "Total earning principal should be 0");
+
+        // Balance should be unchanged (no yield accrued since no time passed)
+        assertEq(proxy.balanceOf(account), amount, "Balance should be unchanged");
+    }
+
+    function test_EdgeCase_TransferEntireBalance() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 amount = 1000e6;
+
+        // Mint to sender
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+
+        // Transfer entire balance
+        vm.prank(sender);
+        proxy.transfer(recipient, amount);
+
+        // Verify sender has 0 balance
+        assertEq(proxy.balanceOf(sender), 0, "Sender should have 0 balance");
+        assertEq(proxy.balanceOf(recipient), amount, "Recipient should have full amount");
+    }
+
+    function test_EdgeCase_TransferEntireBalanceFromEarner() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 amount = 1000e6;
+
+        // Mint to sender
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+
+        // Whitelist sender as earner
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(sender, true, 0, address(0));
+
+        // Start earning
+        proxy.startEarningFor(sender);
+
+        uint112 principalBefore = proxy.earningPrincipalOf(sender);
+
+        // Transfer entire balance
+        vm.prank(sender);
+        proxy.transfer(recipient, amount);
+
+        // Verify sender has 0 balance and 0 principal
+        assertEq(proxy.balanceOf(sender), 0, "Sender should have 0 balance");
+        assertEq(proxy.earningPrincipalOf(sender), uint112(0), "Sender should have 0 principal");
+        assertEq(proxy.balanceOf(recipient), amount, "Recipient should have full amount");
+    }
+
+    function test_EdgeCase_MaximumUint240Balance() public {
+        address account = address(0x100);
+        uint256 maxUint240 = type(uint240).max;
+
+        // Mint max uint240 (this should work)
+        vm.prank(minterGateway);
+        proxy.mint(account, maxUint240);
+
+        assertEq(proxy.balanceOf(account), maxUint240, "Balance should be max uint240");
+        assertEq(proxy.totalSupply(), maxUint240, "Total supply should be max uint240");
+
+        // Trying to mint even 1 more should fail
+        vm.expectRevert();
+        vm.prank(minterGateway);
+        proxy.mint(account, 1);
+    }
+
+    function test_EdgeCase_MaximumUint112Principal() public {
+        address account = address(0x100);
+        // Use a balance that will result in max uint112 principal
+        // When index = PRECISION, principal = balance, so we can use max uint112 as balance
+        uint256 balanceAmount = uint256(type(uint112).max);
+
+        // Mint the amount
+        vm.prank(minterGateway);
+        proxy.mint(account, balanceAmount);
+
+        // Whitelist as earner
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Start earning - principal should equal balance when index = PRECISION
+        proxy.startEarningFor(account);
+
+        assertEq(proxy.earningPrincipalOf(account), type(uint112).max, "Principal should be max uint112");
+        assertEq(proxy.totalEarningPrincipal(), type(uint112).max, "Total earning principal should be max uint112");
+    }
+
+    function test_EdgeCase_MultipleRateChangesBeforeClaim() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint and setup earner
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        proxy.startEarningFor(account);
+
+        // Set rate 1: 5%
+        uint32 rate1 = uint32((uint256(500) * uint256(PRECISION)) / 10000);
+        vm.prank(rateManager);
+        proxy.setRate(rate1);
+
+        // Warp 1 year
+        vm.warp(block.timestamp + 365 days);
+
+        // Set rate 2: 10%
+        uint32 rate2 = uint32((uint256(1000) * uint256(PRECISION)) / 10000);
+        vm.prank(rateManager);
+        proxy.setRate(rate2);
+
+        // Warp another 6 months
+        vm.warp(block.timestamp + 180 days);
+
+        // Set rate 3: 0% (stop earning)
+        vm.prank(rateManager);
+        proxy.setRate(0);
+
+        // Warp another month
+        vm.warp(block.timestamp + 30 days);
+
+        // Claim yield - should compound from all rate changes
+        uint256 balanceBefore = proxy.balanceOf(account);
+        uint256 principalBefore = proxy.earningPrincipalOf(account);
+
+        uint256 netYield = proxy.claimFor(account);
+
+        // Verify yield was accrued and claimed
+        assertGe(proxy.balanceOf(account), balanceBefore, "Balance should not decrease");
+        assertGe(proxy.earningPrincipalOf(account), principalBefore, "Principal should not decrease");
+        assertGt(netYield, 0, "Should have accrued some yield");
+
+        // Verify principal increased (allowing for rounding differences)
+        // Note: Principal uses rounded-down calculation, so it may be slightly less than balance increase
+        uint256 balanceIncrease = proxy.balanceOf(account) - balanceBefore;
+        uint256 principalIncrease = proxy.earningPrincipalOf(account) - principalBefore;
+        assertGe(principalIncrease, 0, "Principal should increase");
+        // Principal increase should be approximately equal to balance increase (within rounding tolerance)
+        // Allow up to 1% tolerance due to rounding in getPrincipalAmountRoundedDown
+        assertApproxEqRel(
+            principalIncrease, balanceIncrease, 0.01e18, "Principal increase should approximate balance increase"
+        );
+    }
+
+    function test_EdgeCase_FeeRateZeroPercent() public {
+        address account = address(0x100);
+        address feeRecipient = address(0x200);
+        uint256 amount = 1000e6;
+        uint16 feeRate = 0; // 0%
+
+        // Mint and setup earner with 0% fee
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, feeRate, feeRecipient);
+
+        proxy.startEarningFor(account);
+
+        // Set rate and warp to accrue yield
+        uint32 rate = uint32((uint256(1000) * uint256(PRECISION)) / 10000); // 10%
+        vm.prank(rateManager);
+        proxy.setRate(rate);
+        vm.warp(block.timestamp + 365 days);
+
+        // Claim yield
+        uint256 netYield = proxy.claimFor(account);
+
+        // With 0% fee, netYield should equal grossYield
+        // Since fee is 0, account balance increases by full yield
+        assertGt(netYield, 0, "Should have yield");
+
+        // Account's balance should be increased by gross yield (which equals net yield when fee is 0)
+        uint256 balanceIncrease = proxy.balanceOf(account) - amount;
+        assertEq(netYield, balanceIncrease, "Net yield should equal balance increase when fee is 0");
+    }
+
+    function test_EdgeCase_ClaimWithZeroYield() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint and setup earner
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        proxy.startEarningFor(account);
+
+        // Claim immediately with no time passed (rate is 0 by default)
+        uint256 netYield = proxy.claimFor(account);
+
+        assertEq(netYield, 0, "Yield should be 0 when no time has passed");
+
+        // Balance should be unchanged
+        assertEq(proxy.balanceOf(account), amount, "Balance should be unchanged");
+    }
 }

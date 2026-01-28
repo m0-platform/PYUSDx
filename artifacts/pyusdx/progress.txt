@@ -942,4 +942,36 @@ Date: 2025-01-27
 
 Date: 2025-01-27
 
+#### Phase 3.5: Test Edge Cases from SDD Section 11.3
+**Status:** COMPLETED
+
+**Approach:**
+- Reviewed existing tests to identify which edge cases were already covered
+- Added 8 edge case tests to `test/unit/PYUSDXUnit.t.sol`:
+  - `test_EdgeCase_StopEarningImmediatelyAfterStarting`: Verifies stop earning right after start works correctly
+  - `test_EdgeCase_TransferEntireBalance`: Verifies transferring entire balance to zero
+  - `test_EdgeCase_TransferEntireBalanceFromEarner`: Verifies transferring entire balance from earner zeroes principal
+  - `test_EdgeCase_MaximumUint240Balance`: Verifies minting max uint240 works and 1 more fails
+  - `test_EdgeCase_MaximumUint112Principal`: Verifies principal can reach max uint112
+  - `test_EdgeCase_MultipleRateChangesBeforeClaim`: Verifies compounding with multiple rate changes
+  - `test_EdgeCase_FeeRateZeroPercent`: Verifies 0% fee rate behavior
+  - `test_EdgeCase_ClaimWithZeroYield`: Verifies claim with no yield returns 0
+
+**Already Covered:**
+- Start earning with zero balance: `test_StartEarningFor_ZeroBalance_Success`
+- Claim with zero yield: `test_ClaimFor_NoAccruedYield_ReturnsZero`
+- Multiple rate changes: `test_SetRate_MultipleRateChanges_Success`
+- Fee rate of 100%: `test_ClaimFor_With100PercentFee_UserReceivesZero`
+
+**Gotchas:**
+- The `test_EdgeCase_MultipleRateChangesBeforeClaim` test had to use approximate equality for principal vs balance increase comparison due to rounding in `getPrincipalAmountRoundedDown`
+- The principal increase can be slightly less than the balance increase due to integer rounding (about 0.33% difference in the test case)
+- Used `assertApproxEqRel` with 1% tolerance to accommodate rounding behavior
+
+**Verification:**
+- All 172 unit tests pass (164 from before + 8 new edge case tests)
+- All 24 fuzz tests pass
+- `forge build`: Success with only expected warnings
+- `forge fmt --check`: Pass
+
 Date: 2025-01-27

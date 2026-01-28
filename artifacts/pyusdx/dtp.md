@@ -977,15 +977,15 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
   - Create test that attempts to reenter `claimFor`
   - Verify state updates happen before external calls
 
-- [ ] **Test edge cases from SDD Section 11.3**
-  - Start earning with zero balance
-  - Claim with zero yield
-  - Transfer entire balance
-  - Stop earning immediately after starting
-  - Multiple rate changes before claim
-  - Fee rate of 100% and 0%
-  - Maximum uint240 balance
-  - Principal at uint112 max
+- [x] **Test edge cases from SDD Section 11.3**
+  - Start earning with zero balance (already covered: test_StartEarningFor_ZeroBalance_Success)
+  - Claim with zero yield (already covered: test_ClaimFor_NoAccruedYield_ReturnsZero)
+  - Transfer entire balance (test_EdgeCase_TransferEntireBalance, test_EdgeCase_TransferEntireBalanceFromEarner)
+  - Stop earning immediately after starting (test_EdgeCase_StopEarningImmediatelyAfterStarting)
+  - Multiple rate changes before claim (test_EdgeCase_MultipleRateChangesBeforeClaim)
+  - Fee rate of 100% and 0% (already covered: test_ClaimFor_With100PercentFee_UserReceivesZero, test_EdgeCase_FeeRateZeroPercent)
+  - Maximum uint240 balance (test_EdgeCase_MaximumUint240Balance)
+  - Principal at uint112 max (test_EdgeCase_MaximumUint112Principal)
 
 #### Fuzz Tests
 
