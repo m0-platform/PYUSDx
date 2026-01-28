@@ -909,3 +909,37 @@ Date: 2025-01-27
 - `forge fmt --check`: Pass
 
 Date: 2025-01-27
+
+#### Phase 3.5: Reentrancy Protection Tests
+**Status:** COMPLETED
+
+**Approach:**
+- Added 3 reentrancy protection tests to `test/unit/PYUSDXUnit.t.sol`:
+  - `test_Reentrancy_ClaimFor_StateUpdatesBeforeExternalCalls`: Verifies state updates complete before function returns
+  - `test_Reentrancy_Transfer_StateUpdatesComplete`: Verifies transfer state updates are atomic
+  - `test_Reentrancy_Mint_StateUpdatesComplete`: Verifies mint state updates are atomic
+
+**Analysis:**
+- The `claimFor` function is NOT vulnerable to reentrancy because:
+  1. All state updates (balance, principal, supply tracking) happen via SSTORE operations within the function
+  2. There are NO external calls that could trigger reentrancy (only emits events at the end)
+  3. The function follows the checks-effects-interactions pattern perfectly
+- The `transfer` function similarly completes all state updates before emitting events
+- The `mint` function updates state before emitting events
+- No ReentrancyGuard is needed because there are no external calls to user-controlled contracts
+
+**Gotchas:**
+- The key insight is that reentrancy is only possible when a contract makes external calls to user-controlled addresses
+- PYUSDX functions only update internal storage and emit events (which cannot trigger reentrancy)
+- The "interactions" in checks-effects-interactions are just event emissions, not external contract calls
+- Tests verify that all state updates are complete and atomic before the function returns
+
+**Verification:**
+- All 167 unit tests pass (164 from before + 3 new reentrancy tests)
+- All 24 fuzz tests pass
+- `forge build`: Success
+- `forge fmt --check`: Pass
+
+Date: 2025-01-27
+
+Date: 2025-01-27

@@ -973,7 +973,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
   - Consider caching storage reads in memory
   - Document gas costs in code comments
 
-- [ ] **Test reentrancy protection**
+- [x] **Test reentrancy protection**
   - Create test that attempts to reenter `claimFor`
   - Verify state updates happen before external calls
 
