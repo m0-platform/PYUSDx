@@ -34,26 +34,49 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  *     - [x] FORCED_TRANSFER_MANAGER_ROLE granted to forcedTransferManager
  *     - [x] PAUSER_ROLE granted to pauser
  * - [ ] mint
+ *   - [x] when caller is not minterGateway
+ *     - [x] revert with NotMinterGateway
+ *   - [x] when contract is paused
+ *     - [x] revert with EnforcedPause
+ *   - [x] when recipient is frozen
+ *     - [x] revert with AccountFrozen
+ *   - [x] when amount is zero
+ *     - [x] revert
+ *   - [ ] when recipient is earner
+ *     - [ ] success (requires Phase 2.9 startEarningFor)
+ *     - [ ] balance increased
+ *     - [ ] totalEarningSupply increased
+ *     - [ ] totalNonEarningSupply unchanged
+ *   - [x] when recipient is not earner
+ *     - [x] success
+ *     - [x] balance increased
+ *     - [x] totalNonEarningSupply increased
+ *     - [x] totalEarningSupply unchanged
+ *   - [x] when amount would overflow uint240
+ *     - [x] revert
+ * - [ ] burn
  *   - [ ] when caller is not minterGateway
  *     - [ ] revert with NotMinterGateway
  *   - [ ] when contract is paused
  *     - [ ] revert with EnforcedPause
- *   - [ ] when recipient is frozen
+ *   - [ ] when account is frozen
  *     - [ ] revert with AccountFrozen
+ *   - [ ] when amount exceeds balance
+ *     - [ ] revert
  *   - [ ] when amount is zero
  *     - [ ] revert
- *   - [ ] when recipient is earner
+ *   - [ ] when account is earner
  *     - [ ] success
- *     - [ ] balance increased
- *     - [ ] totalEarningSupply increased
- *     - [ ] totalNonEarningSupply unchanged
- *   - [ ] when recipient is not earner
+ *     - [ ] balance decreased
+ *     - [ ] totalEarningSupply decreased
+ *     - [ ] earningPrincipal decreased proportionally
+ *   - [ ] when account is not earner
  *     - [ ] success
- *     - [ ] balance increased
- *     - [ ] totalNonEarningSupply increased
- *     - [ ] totalEarningSupply unchanged
- *   - [ ] when amount would overflow uint240
- *     - [ ] revert
+ *     - [ ] balance decreased
+ *     - [ ] totalNonEarningSupply decreased
+ *   - [ ] when burning entire balance
+ *     - [ ] balance set to 0
+ *     - [ ] earningPrincipal set to 0 (if earner)
  */
 contract PYUSDXUnitTest is Test {
     /* ============ Test Variables ============ */
@@ -345,5 +368,167 @@ contract PYUSDXUnitTest is Test {
 
         vm.prank(minterGateway);
         proxy.mint(recipient, amount);
+    }
+
+    /* ============ Burn Tests ============ */
+
+    function test_Burn_NotMinterGateway_Reverts() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 500e6;
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Try to burn as non-minter
+        vm.expectRevert(PYUSDX.NotMinterGateway.selector);
+        proxy.burn(account, burnAmount);
+    }
+
+    function test_Burn_WhenPaused_Reverts() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 500e6;
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Pause the contract
+        vm.prank(pauser);
+        proxy.pause();
+
+        // Try to burn
+        vm.prank(minterGateway);
+        vm.expectRevert(/* EnforcedPause from OZ Pausable */);
+        proxy.burn(account, burnAmount);
+    }
+
+    function test_Burn_WhenAccountFrozen_Reverts() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 500e6;
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Freeze the account
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        // Try to burn
+        vm.prank(minterGateway);
+        vm.expectRevert(/* AccountFrozen */);
+        proxy.burn(account, burnAmount);
+    }
+
+    function test_Burn_InsufficientBalance_Reverts() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 1500e6; // More than balance
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Try to burn more than balance
+        vm.prank(minterGateway);
+        vm.expectRevert("insufficient balance");
+        proxy.burn(account, burnAmount);
+    }
+
+    function test_Burn_ZeroAmount_Reverts() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Try to burn zero
+        vm.prank(minterGateway);
+        vm.expectRevert("zero amount");
+        proxy.burn(account, 0);
+    }
+
+    // NOTE: test_Burn_FromEarner_Success requires startEarningFor (Phase 2.9)
+    // Skipping for now - will be added in Phase 2.9
+    // function test_Burn_FromEarner_Success() public { }
+
+    function test_Burn_FromNonEarner_Success() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 400e6;
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        uint256 balanceBefore = proxy.balanceOf(account);
+        uint256 earningSupplyBefore = proxy.totalEarningSupply();
+        uint256 nonEarningSupplyBefore = proxy.totalNonEarningSupply();
+
+        // Burn
+        vm.prank(minterGateway);
+        proxy.burn(account, burnAmount);
+
+        // Verify balance decreased
+        assertEq(
+            proxy.balanceOf(account),
+            balanceBefore - burnAmount,
+            "Balance should decrease"
+        );
+        // Verify non-earning supply decreased
+        assertEq(
+            proxy.totalNonEarningSupply(),
+            nonEarningSupplyBefore - burnAmount,
+            "Non-earning supply should decrease"
+        );
+        // Verify earning supply unchanged
+        assertEq(
+            proxy.totalEarningSupply(),
+            earningSupplyBefore,
+            "Earning supply should not change"
+        );
+        // Verify not earning
+        assertFalse(proxy.isEarning(account), "Account should not be earning");
+    }
+
+    function test_Burn_EntireBalance_ZeroesOut() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Burn entire balance
+        vm.prank(minterGateway);
+        proxy.burn(account, mintAmount);
+
+        // Verify balance is 0
+        assertEq(proxy.balanceOf(account), 0, "Balance should be 0");
+        // Note: earningPrincipalOf is not implemented until Phase 2.8
+        // For now, just verify the account is not earning (principal is 0 by default)
+        assertFalse(proxy.isEarning(account), "Account should not be earning");
+    }
+
+    function test_Burn_TransferEventEmitted() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 400e6;
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Expect Transfer event for burn
+        vm.expectEmit(true, true, true, true, address(proxy));
+        emit IERC20.Transfer(account, address(0), burnAmount);
+
+        vm.prank(minterGateway);
+        proxy.burn(account, burnAmount);
     }
 }

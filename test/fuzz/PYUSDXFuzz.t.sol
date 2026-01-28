@@ -8,15 +8,20 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 
 /**
  * Fuzz test TODOs:
- * - [ ] mint
- *   - [ ] when amount is within valid bounds
- *     - [ ] totalSupply increases by amount
- *     - [ ] when recipient is earner: totalEarningSupply increases by amount
- *     - [ ] when recipient is non-earner: totalNonEarningSupply increases by amount
- *   - [ ] when amount exceeds uint240 max
- *     - [ ] revert
- *   - [ ] invariant: balanceOf(account) >= balanceBefore + amount (after mint)
- *   - [ ] invariant: no account balance goes negative
+ * - [x] mint
+ *   - [x] when amount is within valid bounds
+ *     - [x] totalSupply increases by amount
+ *     - [x] when recipient is non-earner: totalNonEarningSupply increases by amount
+ *   - [x] when amount exceeds uint240 max
+ *     - [x] revert
+ *   - [x] invariant: balanceOf(account) >= balanceBefore + amount (after mint)
+ *   - [x] invariant: no account balance goes negative
+ * - [ ] burn
+ *   - [ ] when amount <= balance
+ *     - [ ] balance decreased by amount
+ *     - [ ] when account is non-earner: totalNonEarningSupply decreased by amount
+ *     - [ ] when account is earner: totalEarningSupply decreased by amount
+ *   - [ ] invariant: balance never goes negative
  *   - [ ] invariant: totalSupply == totalEarningSupply + totalNonEarningSupply
  */
 contract PYUSDXFuzzTest is Test {
@@ -184,5 +189,126 @@ contract PYUSDXFuzzTest is Test {
         uint256 balanceAfter = proxy.balanceOf(recipient);
 
         assertTrue(balanceAfter >= balanceBefore, "Balance should never decrease on mint");
+    }
+
+    /* ============ Burn Fuzz Tests ============ */
+
+    function testFuzz_Burn_AmountWithinBounds(
+        address account,
+        uint256 mintAmount,
+        uint256 burnAmount
+    ) public {
+        vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
+        vm.assume(burnAmount > 0 && burnAmount <= uint256(type(uint240).max));
+        vm.assume(burnAmount <= mintAmount); // Can't burn more than minted
+        vm.assume(account != address(0));
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        uint256 balanceBefore = proxy.balanceOf(account);
+        uint256 earningSupplyBefore = proxy.totalEarningSupply();
+        uint256 nonEarningSupplyBefore = proxy.totalNonEarningSupply();
+
+        // Burn
+        vm.prank(minterGateway);
+        proxy.burn(account, burnAmount);
+
+        // Verify balance decreased
+        assertEq(
+            proxy.balanceOf(account),
+            balanceBefore - burnAmount,
+            "Balance should decrease by burned amount"
+        );
+
+        // For non-earners, non-earning supply should decrease
+        if (!proxy.isEarning(account)) {
+            assertEq(
+                proxy.totalNonEarningSupply(),
+                nonEarningSupplyBefore - burnAmount,
+                "Non-earning supply should decrease for non-earner"
+            );
+            assertEq(
+                proxy.totalEarningSupply(),
+                earningSupplyBefore,
+                "Earning supply should not change for non-earner"
+            );
+        }
+    }
+
+    function testFuzz_Burn_InsufficientBalance(
+        address account,
+        uint256 mintAmount,
+        uint256 burnAmount
+    ) public {
+        vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
+        vm.assume(burnAmount > mintAmount); // Burn more than minted
+        vm.assume(burnAmount <= uint256(type(uint240).max));
+        vm.assume(account != address(0));
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Try to burn more than balance
+        vm.prank(minterGateway);
+        vm.expectRevert("insufficient balance");
+        proxy.burn(account, burnAmount);
+    }
+
+    function testFuzz_Burn_Invariant_BalanceNeverNegative(
+        address account,
+        uint256 mintAmount,
+        uint256 burnAmount
+    ) public {
+        vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
+        vm.assume(burnAmount > 0 && burnAmount <= uint256(type(uint240).max));
+        vm.assume(account != address(0));
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        uint256 balanceBefore = proxy.balanceOf(account);
+
+        // Only attempt burn if within balance
+        if (burnAmount <= balanceBefore) {
+            vm.prank(minterGateway);
+            proxy.burn(account, burnAmount);
+
+            uint256 balanceAfter = proxy.balanceOf(account);
+            assertTrue(balanceAfter >= 0, "Balance should never go negative");
+            assertTrue(balanceAfter <= balanceBefore, "Balance should decrease or stay same on burn");
+        }
+    }
+
+    function testFuzz_Burn_MintBurnCycle(
+        address account,
+        uint256 mintAmount,
+        uint256 burnAmount
+    ) public {
+        vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
+        vm.assume(burnAmount > 0 && burnAmount <= uint256(type(uint240).max));
+        vm.assume(account != address(0));
+
+        uint256 balanceBefore = proxy.balanceOf(account);
+
+        // Mint
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Burn (if possible)
+        if (mintAmount >= burnAmount) {
+            vm.prank(minterGateway);
+            proxy.burn(account, burnAmount);
+
+            // Verify final balance
+            assertEq(
+                proxy.balanceOf(account),
+                balanceBefore + mintAmount - burnAmount,
+                "Final balance should be initial + minted - burned"
+            );
+        }
     }
 }

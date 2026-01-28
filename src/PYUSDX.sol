@@ -404,9 +404,49 @@ contract PYUSDX is
         emit Transfer(address(0), account, amount);
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.3
-    function burn(address account, uint256 amount) external override {
-        revert("TODO: Phase 2.3");
+    /**
+     * @notice Burns PYUSDX from an account
+     * @dev Only callable by the Minter Gateway
+     * @param account Account to burn from
+     * @param amount Amount to burn
+     */
+    function burn(address account, uint256 amount) external override whenNotPaused {
+        // Access control: only minter gateway can burn
+        if (msg.sender != minterGateway) revert NotMinterGateway();
+
+        // Pre-flight checks
+        _revertIfFrozen(account);
+        if (amount == 0) revert("zero amount");
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        // Check sufficient balance
+        uint240 balance = $.accounts[account].balance;
+        if (amount > balance) revert("insufficient balance");
+
+        // Cast amount to uint240 (will revert on overflow)
+        uint240 amount240 = UIntMath.safe240(amount);
+
+        // Update account balance
+        $.accounts[account].balance = balance - amount240;
+
+        // Update supply tracking and adjust earning principal if applicable
+        if ($.accounts[account].isEarning) {
+            $.totalEarningSupply -= amount240;
+            // If earner has earning principal, adjust it proportionally
+            uint112 principal = $.accounts[account].earningPrincipal;
+            if (principal > 0 && balance > 0) {
+                // Calculate principal to remove: amount * principal / balance
+                // Use round up to ensure we don't leave dust principal
+                uint112 principalToRemove = uint112((uint256(amount240) * uint256(principal) + uint256(balance) - 1) / uint256(balance));
+                $.accounts[account].earningPrincipal = principal - principalToRemove;
+                $.totalEarningPrincipal -= principalToRemove;
+            }
+        } else {
+            $.totalNonEarningSupply -= amount240;
+        }
+
+        emit Transfer(account, address(0), amount);
     }
 
     /// @notice Stub implementation - to be implemented in Phase 2.11
