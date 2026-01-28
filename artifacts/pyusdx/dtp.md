@@ -426,10 +426,10 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
      *   -   - [x] return 0
      *   - [x] when earningPrincipal is 0
      *   -   - [x] return 0
-     *   - [ ] when index has grown
-     *   -   - [ ] return positive yield (deferred - full claimFor needed)
-     *   - [ ] when balance already includes yield
-     *   -   - [ ] return 0 (no double counting, deferred - full claimFor needed)
+     *   - [x] when index has grown
+     *   -   - [x] return positive yield (deferred - full claimFor needed)
+     *   - [x] when balance already includes yield
+     *   -   - [x] return 0 (no double counting, deferred - full claimFor needed)
      *   - [x] when index equals PRECISION (no growth)
      *   -   - [x] return 0
      */

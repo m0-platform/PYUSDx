@@ -887,3 +887,25 @@ Date: 2025-01-27
 - `forge fmt --check`: Pass
 
 Date: 2025-01-27
+
+#### Phase 2.7: Accrued Yield Calculation - Earner Tests
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented the two missing `accruedYieldOf` tests that were deferred until Phase 2.9 (startEarningFor) and Phase 2.11 (claimFor) were complete
+- Tests added:
+  - `test_AccruedYieldOf_IndexGrown_ReturnsPositiveYield`: Verifies accrued yield is positive when index has grown
+  - `test_AccruedYieldOf_BalanceAlreadyIncludesYield_NoDoubleCounting`: Verifies no double counting after claiming yield
+
+**Gotchas:**
+- The test for "balance already includes yield" tests the scenario where yield has been claimed, increasing both the balance and the earning principal
+- After a claim, the new accrued yield should be calculated based on the increased principal
+- The formula `balanceWithYield = principal × index / PRECISION` always yields a value >= balance after a claim, because the principal was increased by the claimed yield
+- The test uses `assertApproxEqRel` for yield comparison due to rounding differences in integer division
+
+**Verification:**
+- All 161 unit tests pass (159 from before + 2 new accruedYieldOf tests)
+- `forge build`: Success
+- `forge fmt --check`: Pass
+
+Date: 2025-01-27
