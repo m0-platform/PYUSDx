@@ -673,3 +673,80 @@ Date: 2025-01-27
 - `forge fmt --check`: Pass
 
 Date: 2025-01-27
+
+#### Phase 3.3: Force Transfer (Inherited)
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented `_forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override` function:
+  - Verifies frozen account is actually frozen before transfer (uses `_revertIfNotFrozen`)
+  - Validates recipient is not zero address
+  - Checks sufficient balance
+  - Casts amount to `uint240` using `UIntMath.safe240()`
+  - Handles transfer based on earning status of both frozenAccount and recipient
+  - Emits ForcedTransfer event from ForcedTransferable parent
+  - Calls `_updateIndex()` at end
+- The public `forceTransfer` and `forceTransfers` functions are inherited from ForcedTransferable
+
+**Tests Added:**
+- Added 4 forceTransfer tests to `test/unit/PYUSDXUnit.t.sol`:
+  - `test_ForceTransfer_NotForcedTransferManager_Reverts`: Verifies revert when caller lacks role
+  - `test_ForceTransfer_FromAccountNotFrozen_Reverts`: Verifies revert when source account is not frozen
+  - `test_ForceTransfer_InsufficientBalance_Reverts`: Verifies revert when amount exceeds balance
+  - `test_ForceTransfer_Success_TransfersTokens`: Verifies success with proper balance and principal adjustments
+
+**Gotchas:**
+- The `_forceTransfer` function must override the internal function from ForcedTransferable
+- The `_revertIfNotFrozen` function is inherited from Freezable and reverts if the account is NOT frozen
+- Principal adjustments are made for earner transfers, similar to regular transfers
+- Batch forceTransfers tests were not added as the plan indicates they are pending (requires array length mismatch test)
+
+**Verification:**
+- All 153 unit tests pass (149 from Phase 3.2 + 4 new forceTransfer tests)
+- All 24 fuzz tests pass
+- `forge build`: Success with only expected warnings
+- `forge fmt --check`: Pass
+
+Date: 2025-01-27
+
+#### Phase 3.4: Pause/Unpause (Inherited)
+**Status:** COMPLETED
+
+**Approach:**
+- Verified pause/unpause functions are inherited from Pausable contract
+  - `pause()` and `unpause()` functions work correctly
+  - `paused()` view function returns correct status
+  - `PAUSER_ROLE` constant is accessible
+- Verified `whenNotPaused` modifiers are applied to state-changing functions:
+  - `mint` (line 459), `burn` (line 491), `claimFor` (line 539)
+  - `startEarningFor` single and batch (lines 622, 668)
+  - `stopEarningFor` single and batch (lines 723, 824)
+  - `_transfer` uses `_requireNotPaused()` internally (line 1077)
+- Verified admin functions do NOT have pause restrictions:
+  - `setRate` (no modifier - admin function)
+  - `freeze`, `unfreeze`, `freezeAccounts`, `unfreezeAccounts` (from Freezable)
+  - `forceTransfer`, `forceTransfers` (from ForcedTransferable)
+  - `pause`, `unpause` (from Pausable - allow recovery)
+
+**Tests Added:**
+- Added 6 pause/unpause tests to `test/unit/PYUSDXUnit.t.sol`:
+  - `test_Pause_AlreadyPaused_Reverts`: Verifies revert when already paused (EnforcedPause)
+  - `test_Pause_NotPaused_Success`: Verifies success when not paused
+  - `test_Unpause_NotPaused_Reverts`: Verifies revert when not paused (ExpectedPause)
+  - `test_Unpause_Paused_Success`: Verifies success when paused
+  - `test_Paused_AdminFunctions_Work`: Verifies admin functions work when paused (setRate, freeze, unfreeze, forceTransfer, unpause)
+  - `test_Paused_StopEarningFor_Reverts`: Verifies stopEarningFor reverts when paused
+
+**Gotchas:**
+- The `pause()` function uses OZ's `whenNotPaused` modifier internally, so it reverts with `EnforcedPause` when already paused
+- The `unpause()` function uses OZ's `whenPaused` modifier internally, so it reverts with `ExpectedPause` when not paused
+- Access control tests for pause/unpause already existed in Phase 3.1, so only additional behavior tests were added
+- The `test_Paused_AdminFunctions_Work` test needed to mint tokens to the account first before testing forceTransfer
+
+**Verification:**
+- All 165 unit tests pass (153 from Phase 3.3 + 6 new pause/unpause tests)
+- All 24 fuzz tests pass
+- `forge build`: Success with only expected warnings
+- `forge fmt --check`: Pass
+
+Date: 2025-01-27
