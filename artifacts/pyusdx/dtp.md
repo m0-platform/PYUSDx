@@ -175,7 +175,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Unit Tests
 
-- [ ] **Create unit test file for PYUSDX**
+- [x] **Create unit test file for PYUSDX**
   - File: `test/unit/PYUSDXUnit.t.sol`
   - Add initialization TODO list at top:
     ```solidity
