@@ -250,15 +250,39 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
  *   - [x] returns true after startEarningFor
  *   - [x] returns false after stopEarningFor
  *   - [x] returns false for non-earners
- * - [ ] Access Control (Phase 3.1)
- *   - [ ] DEFAULT_ADMIN_ROLE can grant/revoke all roles
- *   - [ ] RATE_MANAGER_ROLE can call setRate
- *   - [ ] EARNER_MANAGER_ROLE can call setEarnerDetails, setClaimRecipient
- *   - [ ] FREEZE_MANAGER_ROLE can call freeze, unfreeze
- *   - [ ] FORCED_TRANSFER_MANAGER_ROLE can call forceTransfer
- *   - [ ] PAUSER_ROLE can call pause, unpause
- *   - [ ] Non-role-holders cannot call privileged functions
- *   - [ ] Role grants and revokes emit events
+ * - [x] Access Control (Phase 3.1)
+ *   - [x] DEFAULT_ADMIN_ROLE can grant/revoke all roles
+ *   - [x] RATE_MANAGER_ROLE can call setRate
+ *   - [x] EARNER_MANAGER_ROLE can call setEarnerDetails, setClaimRecipient
+ *   - [x] FREEZE_MANAGER_ROLE can call freeze, unfreeze
+ *   - [x] FORCED_TRANSFER_MANAGER_ROLE can call forceTransfer
+ *   - [x] PAUSER_ROLE can call pause, unpause
+ *   - [x] Non-role-holders cannot call privileged functions
+ *   - [x] Role grants and revokes emit events
+ * - [x] freeze (Phase 3.2)
+ *   - [x] when caller is not FREEZE_MANAGER_ROLE
+ *   -   - [x] revert
+ *   - [x] when already frozen
+ *   -   - [x] return early
+ *   - [x] when not frozen
+ *   -   - [x] success, Frozen event emitted
+ * - [x] unfreeze (Phase 3.2)
+ *   - [x] when caller is not FREEZE_MANAGER_ROLE
+ *   -   - [x] revert
+ *   - [x] when not frozen
+ *   -   - [x] return early
+ *   - [x] when frozen
+ *   -   - [x] success, Unfrozen event emitted
+ * - [x] freezeAccounts batch (Phase 3.2)
+ *   - [x] freeze multiple accounts
+ * - [x] unfreezeAccounts batch (Phase 3.2)
+ *   - [x] unfreeze multiple accounts
+ * - [x] isFrozen (Phase 3.2)
+ *   - [x] returns correct status
+ * - [x] frozen accounts (Phase 3.2)
+ *   - [x] cannot transfer, mint, burn, claim
+ *   - [x] cannot startEarningFor
+ *   - [x] cannot stopEarningFor
  */
 contract PYUSDXUnitTest is Test {
     /* ============ Test Variables ============ */
@@ -3043,5 +3067,252 @@ contract PYUSDXUnitTest is Test {
 
         vm.prank(admin);
         proxy.revokeRole(rateManagerRole, rateManagerToRevoke);
+    }
+
+    /* ============ Phase 3.2: Freeze/Unfreeze Tests ============ */
+
+    function test_Freeze_AlreadyFrozen_ReturnsEarly() public {
+        address account = address(0x200);
+
+        // Freeze account first
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        assertTrue(proxy.isFrozen(account), "Account should be frozen");
+
+        // Freeze again - should return early without error
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        assertTrue(proxy.isFrozen(account), "Account should still be frozen");
+    }
+
+    function test_Freeze_NotFrozen_Success() public {
+        address account = address(0x200);
+
+        assertFalse(proxy.isFrozen(account), "Account should not be frozen initially");
+
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        assertTrue(proxy.isFrozen(account), "Account should be frozen");
+    }
+
+    function test_Unfreeze_NotFrozen_ReturnsEarly() public {
+        address account = address(0x200);
+
+        assertFalse(proxy.isFrozen(account), "Account should not be frozen initially");
+
+        // Unfreeze non-frozen account - should return early without error
+        vm.prank(freezeManager);
+        proxy.unfreeze(account);
+
+        assertFalse(proxy.isFrozen(account), "Account should still not be frozen");
+    }
+
+    function test_Unfreeze_Frozen_Success() public {
+        address account = address(0x200);
+
+        // Freeze account first
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+        assertTrue(proxy.isFrozen(account), "Account should be frozen");
+
+        // Unfreeze
+        vm.prank(freezeManager);
+        proxy.unfreeze(account);
+
+        assertFalse(proxy.isFrozen(account), "Account should be unfrozen");
+    }
+
+    function test_FreezeAccounts_Batch() public {
+        address account1 = address(0x200);
+        address account2 = address(0x201);
+        address account3 = address(0x202);
+
+        address[] memory accounts = new address[](3);
+        accounts[0] = account1;
+        accounts[1] = account2;
+        accounts[2] = account3;
+
+        vm.prank(freezeManager);
+        proxy.freezeAccounts(accounts);
+
+        assertTrue(proxy.isFrozen(account1), "Account1 should be frozen");
+        assertTrue(proxy.isFrozen(account2), "Account2 should be frozen");
+        assertTrue(proxy.isFrozen(account3), "Account3 should be frozen");
+    }
+
+    function test_UnfreezeAccounts_Batch() public {
+        address account1 = address(0x200);
+        address account2 = address(0x201);
+        address account3 = address(0x202);
+
+        // Freeze accounts first
+        address[] memory accounts = new address[](3);
+        accounts[0] = account1;
+        accounts[1] = account2;
+        accounts[2] = account3;
+
+        vm.prank(freezeManager);
+        proxy.freezeAccounts(accounts);
+
+        assertTrue(proxy.isFrozen(account1), "Account1 should be frozen");
+        assertTrue(proxy.isFrozen(account2), "Account2 should be frozen");
+        assertTrue(proxy.isFrozen(account3), "Account3 should be frozen");
+
+        // Unfreeze all
+        vm.prank(freezeManager);
+        proxy.unfreezeAccounts(accounts);
+
+        assertFalse(proxy.isFrozen(account1), "Account1 should be unfrozen");
+        assertFalse(proxy.isFrozen(account2), "Account2 should be unfrozen");
+        assertFalse(proxy.isFrozen(account3), "Account3 should be unfrozen");
+    }
+
+    function test_IsFrozen_ReturnsCorrectStatus() public {
+        address account1 = address(0x200);
+        address account2 = address(0x201);
+
+        // Initially not frozen
+        assertFalse(proxy.isFrozen(account1), "Account1 should not be frozen initially");
+        assertFalse(proxy.isFrozen(account2), "Account2 should not be frozen initially");
+
+        // Freeze account1
+        vm.prank(freezeManager);
+        proxy.freeze(account1);
+
+        assertTrue(proxy.isFrozen(account1), "Account1 should be frozen");
+        assertFalse(proxy.isFrozen(account2), "Account2 should not be frozen");
+    }
+
+    function test_Frozen_CannotTransfer() public {
+        address sender = address(0x200);
+        address recipient = address(0x201);
+        uint256 amount = 100e6;
+
+        // Mint to sender
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+
+        // Freeze sender
+        vm.prank(freezeManager);
+        proxy.freeze(sender);
+
+        // Try to transfer - should revert
+        vm.expectRevert();
+        vm.prank(sender);
+        proxy.transfer(recipient, amount);
+    }
+
+    function test_Frozen_CannotMint() public {
+        address account = address(0x200);
+        uint256 amount = 100e6;
+
+        // Freeze account
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        // Try to mint - should revert
+        vm.expectRevert();
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+    }
+
+    function test_Frozen_CannotBurn() public {
+        address account = address(0x200);
+        uint256 amount = 100e6;
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        // Freeze account
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        // Try to burn - should revert
+        vm.expectRevert();
+        vm.prank(minterGateway);
+        proxy.burn(account, amount);
+    }
+
+    function test_Frozen_CannotClaim() public {
+        address account = address(0x200);
+        uint256 amount = 1000e6;
+
+        // Setup: mint, approve as earner, start earning, set rate, wait
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        vm.prank(earnerManager);
+        proxy.startEarningFor(account);
+
+        // Set rate to generate yield (10% = 1000 bps * 1e12 / 10000 = 1e11)
+        uint32 newRate = uint32((uint256(1000) * uint256(PRECISION)) / 10000);
+        vm.prank(rateManager);
+        proxy.setRate(newRate);
+
+        // Warp time to accrue yield
+        vm.warp(block.timestamp + 365 days);
+
+        // Freeze account
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        // Try to claim - should revert
+        vm.expectRevert();
+        proxy.claimFor(account);
+    }
+
+    function test_Frozen_CannotStartEarning() public {
+        address account = address(0x200);
+        uint256 amount = 100e6;
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        // Approve as earner
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Freeze account
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        // Try to start earning - should revert
+        vm.expectRevert();
+        proxy.startEarningFor(account);
+    }
+
+    function test_Frozen_CannotStopEarning() public {
+        address account = address(0x200);
+        uint256 amount = 100e6;
+
+        // Setup: mint, approve as earner, start earning
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        vm.prank(earnerManager);
+        proxy.startEarningFor(account);
+
+        // Freeze account
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        // Remove earner approval
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, false, 0, address(0));
+
+        // Try to stop earning - should revert
+        vm.expectRevert();
+        proxy.stopEarningFor(account);
     }
 }

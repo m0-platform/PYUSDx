@@ -635,3 +635,41 @@ Date: 2025-01-27
 - `forge fmt --check`: Pass
 
 Date: 2025-01-27
+
+#### Phase 3.2: Freeze/Unfreeze (Inherited)
+**Status:** COMPLETED
+
+**Approach:**
+- Verified freeze/unfreeze functions are inherited from Freezable contract
+  - `freeze(address)` and `freezeAccounts(address[])` functions work correctly
+  - `unfreeze(address)` and `unfreezeAccounts(address[])` functions work correctly
+  - `isFrozen(address)` view function returns correct status
+- Added freeze check to `stopEarningFor` for consistency with `startEarningFor`
+- Added 13 freeze/unfreeze compliance tests to `test/unit/PYUSDXUnit.t.sol`:
+  - `test_Freeze_AlreadyFrozen_ReturnsEarly`: Verifies early return when already frozen
+  - `test_Freeze_NotFrozen_Success`: Verifies success when not frozen
+  - `test_Unfreeze_NotFrozen_ReturnsEarly`: Verifies early return when not frozen
+  - `test_Unfreeze_Frozen_Success`: Verifies success when frozen
+  - `test_FreezeAccounts_Batch`: Verifies batch freeze operation
+  - `test_UnfreezeAccounts_Batch`: Verifies batch unfreeze operation
+  - `test_IsFrozen_ReturnsCorrectStatus`: Verifies isFrozen view function
+  - `test_Frozen_CannotTransfer`: Verifies frozen accounts cannot transfer
+  - `test_Frozen_CannotMint`: Verifies frozen accounts cannot be minted to
+  - `test_Frozen_CannotBurn`: Verifies frozen accounts cannot be burned from
+  - `test_Frozen_CannotClaim`: Verifies frozen accounts cannot claim yield
+  - `test_Frozen_CannotStartEarning`: Verifies frozen accounts cannot start earning
+  - `test_Frozen_CannotStopEarning`: Verifies frozen accounts cannot stop earning
+
+**Gotchas:**
+- The `stopEarningFor` function was missing the `_revertIfFrozen(account)` check that `startEarningFor` had
+- Added the freeze check to both `stopEarningFor(address)` and `stopEarningFor(address[])` for consistency
+- The frozen account tests verify that frozen accounts cannot perform any state-changing operations
+- Rate calculation for the claim test used proper formula: `uint32((uint256(1000) * uint256(PRECISION)) / 10000)` for 10% rate
+
+**Verification:**
+- All 149 unit tests pass (136 from Phase 3.1 + 13 new freeze/unfreeze tests)
+- All 24 fuzz tests pass
+- `forge build`: Success with only expected warnings
+- `forge fmt --check`: Pass
+
+Date: 2025-01-27

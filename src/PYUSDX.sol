@@ -721,6 +721,9 @@ contract PYUSDX is
      * @param account Account to stop earning for
      */
     function stopEarningFor(address account) external override whenNotPaused {
+        // Pre-flight checks
+        _revertIfFrozen(account);
+
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 
         Account storage accountData = $.accounts[account];
@@ -825,6 +828,9 @@ contract PYUSDX is
 
         for (uint256 i = 0; i < accounts.length; i++) {
             address account = accounts[i];
+
+            // Pre-flight checks
+            _revertIfFrozen(account);
 
             PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 

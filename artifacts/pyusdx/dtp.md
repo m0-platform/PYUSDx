@@ -846,40 +846,44 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Verify freeze/unfreeze inherited from Freezable**
+- [x] **Verify freeze/unfreeze inherited from Freezable**
   - Reference: SDD Section 6.7 (Compliance Operations)
   - Functions: `freeze(address)`, `unfreeze(address)`, `freezeAccounts(address[])`, `unfreezeAccounts(address[])`
-  - Verify `_frozen` mapping is accessible
+  - Verified `_frozen` mapping is accessible through inherited `isFrozen` function
 
-- [ ] **Implement `isFrozen` view function if not inherited**
+- [x] **Implement `isFrozen` view function if not inherited**
   - Signature: `function isFrozen(address account) public view returns (bool)`
+  - Already inherited from Freezable, no implementation needed
 
 #### Tests
 
-- [ ] **Add compliance tests to PYUSDXUnit.t.sol**
-  - Add to TODO list:
-    ```solidity
-     * - [ ] freeze
-     *   - [ ] when caller is not FREEZE_MANAGER_ROLE
-     *   -   - [ ] revert
-     *   - [ ] when already frozen
-     *   -   - [ ] return early
-     *   - [ ] when not frozen
-     *   -   - [ ] success, Frozen event emitted
-     * - [ ] unfreeze
-     *   - [ ] when caller is not FREEZE_MANAGER_ROLE
-     *   -   - [ ] revert
-     *   - [ ] when not frozen
-     *   -   - [ ] return early
-     *   - [ ] when frozen
-     *   -   - [ ] success, Unfrozen event emitted
-     * - [ ] freezeAccounts batch
-     *   - [ ] freeze multiple accounts
-     * - [ ] isFrozen
-     *   - [ ] returns correct status
-     * - [ ] frozen accounts
-     *   - [ ] cannot transfer, mint, burn, claim
-     */
+- [x] **Add compliance tests to PYUSDXUnit.t.sol**
+  - Added tests:
+    * - [x] freeze
+    *   - [x] when caller is not FREEZE_MANAGER_ROLE
+    *   -   - [x] revert (tested in Phase 3.1)
+    *   - [x] when already frozen
+    *   -   - [x] return early
+    *   - [x] when not frozen
+    *   -   - [x] success, Frozen event emitted
+    * - [x] unfreeze
+    *   - [x] when caller is not FREEZE_MANAGER_ROLE
+    *   -   - [x] revert (tested in Phase 3.1)
+    *   - [x] when not frozen
+    *   -   - [x] return early
+    *   - [x] when frozen
+    *   -   - [x] success, Unfrozen event emitted
+    * - [x] freezeAccounts batch
+    *   - [x] freeze multiple accounts
+    * - [x] unfreezeAccounts batch
+    *   - [x] unfreeze multiple accounts
+    * - [x] isFrozen
+    *   - [x] returns correct status
+    * - [x] frozen accounts
+    *   - [x] cannot transfer, mint, burn, claim
+    *   - [x] cannot startEarningFor
+    *   - [x] cannot stopEarningFor
+    * - **Note**: Added `_revertIfFrozen` check to `stopEarningFor` for consistency with `startEarningFor`
 
 ### 3.3 Force Transfer (Inherited)
 
