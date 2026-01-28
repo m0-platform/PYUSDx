@@ -667,9 +667,54 @@ contract PYUSDXUnitTest is Test {
         proxy.burn(account, 0);
     }
 
-    // NOTE: test_Burn_FromEarner_Success requires startEarningFor (Phase 2.9)
-    // Skipping for now - will be added in Phase 2.9
-    // function test_Burn_FromEarner_Success() public { }
+    function test_Burn_FromEarner_Success() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 400e6;
+
+        // Mint first
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Whitelist and start earning
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+        proxy.startEarningFor(account);
+
+        uint256 balanceBefore = proxy.balanceOf(account);
+        uint112 principalBefore = proxy.earningPrincipalOf(account);
+        uint256 earningSupplyBefore = proxy.totalEarningSupply();
+        uint256 totalEarningPrincipalBefore = proxy.totalEarningPrincipal();
+        uint256 nonEarningSupplyBefore = proxy.totalNonEarningSupply();
+
+        // Burn
+        vm.prank(minterGateway);
+        proxy.burn(account, burnAmount);
+
+        // Verify balance decreased
+        assertEq(proxy.balanceOf(account), balanceBefore - burnAmount, "Balance should decrease");
+        // Verify earning supply decreased
+        assertEq(
+            proxy.totalEarningSupply(), earningSupplyBefore - burnAmount, "Earning supply should decrease"
+        );
+        // Verify non-earning supply unchanged
+        assertEq(proxy.totalNonEarningSupply(), nonEarningSupplyBefore, "Non-earning supply should not change");
+        // Verify earning principal decreased proportionally
+        // Formula: principalToRemove = (burnAmount * principal + balance - 1) / balance (round up)
+        uint112 expectedPrincipalRemoved = uint112((uint256(burnAmount) * uint256(principalBefore) + uint256(balanceBefore) - 1) / uint256(balanceBefore));
+        assertEq(
+            proxy.earningPrincipalOf(account),
+            principalBefore - expectedPrincipalRemoved,
+            "Earning principal should decrease proportionally"
+        );
+        assertEq(
+            proxy.totalEarningPrincipal(),
+            totalEarningPrincipalBefore - expectedPrincipalRemoved,
+            "Total earning principal should decrease"
+        );
+        // Verify still earning
+        assertTrue(proxy.isEarning(account), "Account should still be earning");
+    }
 
     function test_Burn_FromNonEarner_Success() public {
         address account = address(0x100);
