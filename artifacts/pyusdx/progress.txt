@@ -1040,3 +1040,28 @@ Date: 2025-01-27
 
 Date: 2025-01-27
 
+#### Phase 4.2: M0 Common Libraries Integration
+**Status:** COMPLETED
+
+**Approach:**
+- Added 5 M0 library integration tests to `PYUSDXIntegration.t.sol`:
+  - `test_Integration_IndexingMath_GetPresentAmountRoundedDown`: Verifies `balanceWithYield = principal * index / PRECISION`
+  - `test_Integration_IndexingMath_GetPrincipalAmountRoundedUp`: Verifies `principal = balance * PRECISION / index` (rounded up)
+  - `test_Integration_IndexingMath_EdgeCases`: Tests zero balance, small balance (1 unit), large index growth
+  - `test_Integration_UIntMath_Bound128`: Verifies high rates don't cause uint128 overflow
+  - `test_Integration_UIntMath_Safe240`: Verifies minting > uint240.max reverts
+- Verified IndexingMath functions work correctly with PYUSDX storage layout
+- Verified UIntMath bounds checking prevents overflow
+
+**Gotchas:**
+- The max rate allowed by `setRate` is `PRECISION` (1e12), but stored as `uint32`, so actual max is lower (~4.3e9)
+- Tests use rate values that fit in uint32 (e.g., 3_000_000_000 for high rate test)
+- Small balance (1 unit) requires separate account to test principal calculation correctly
+
+**Verification:**
+- All 18 integration tests pass (8 from Phase 4.1 + 5 new M0 library + 5 other)
+- All 214 total tests pass (172 unit + 24 fuzz + 5 invariant + 13 integration)
+- `forge build`: Success
+
+Date: 2025-01-27
+

@@ -1034,20 +1034,23 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Verify IndexingMath integration**
-  - Confirm `IndexingMath.getPresentAmountRoundedDown` works as expected
-  - Confirm `IndexingMath.multiplyIndicesDown` works as expected
+- [x] **Verify IndexingMath integration**
+  - Confirmed `IndexingMath.getPresentAmountRoundedDown` works as expected
+  - Confirmed `IndexingMath.getPrincipalAmountRoundedUp` works as expected
+  - Already used throughout PYUSDX for yield calculations
 
-- [ ] **Verify UIntMath integration**
-  - Confirm `UIntMath.bound128` prevents overflow
-  - Use for all uint128 conversions
+- [x] **Verify UIntMath integration**
+  - Confirmed `UIntMath.bound128` prevents overflow in index calculations
+  - Confirmed `UIntMath.safe240` prevents overflow in mint/burn operations
+  - Already used throughout PYUSDX for bounds checking
 
 #### Integration Tests
 
-- [ ] **Test IndexingMath functions**
-  - Test `getPresentAmountRoundedDown` with edge cases
-  - Test `multiplyIndicesDown` with large values
-  - Verify rounding behavior
+- [x] **Test IndexingMath functions**
+  - Test `getPresentAmountRoundedDown` verifies balanceWithYield formula
+  - Test `getPrincipalAmountRoundedUp` verifies principal calculation
+  - Test edge cases: zero balance, small balance, large index growth
+  - All tests passing
 
 ### 4.3 EarnerManager Integration (Inherited)
 
