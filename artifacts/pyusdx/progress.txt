@@ -194,3 +194,31 @@
 - All 49 unit tests pass (41 from Phase 2.4 + 8 new tests)
 - `forge build`: Success
 
+=== Phase 2.7: Accrued Yield Calculation ===
+
+COMPLETED: accruedYieldOf function implementation
+
+Implementation:
+- Added accruedYieldOf(address) external view function
+  - Returns 0 for non-earners (checks isEarning flag)
+  - Calculates balance with yield: earningPrincipal × currentIndex / PRECISION
+  - Returns difference: max(0, balanceWithYield - balance)
+  - Uses IndexingMath.getPresentAmountRoundedDown for calculation
+
+- Added _getAccruedYield internal helper (pure function)
+  - Encapsulates yield calculation logic for reuse
+  - Handles edge case: zero principal returns 0
+  - Safe subtraction: returns 0 if balanceWithYield <= balance
+
+Tests Added:
+- test_AccruedYieldOf_AccountNotEarning_ReturnsZero: Verifies 0 for non-earners
+- test_AccruedYieldOf_IndexEqualsPrecision_NoGrowth_ReturnsZero: Verifies 0 when no index growth
+- Additional tests deferred to Phase 2.9 (require startEarningFor to properly set up earner state)
+
+Gotchas:
+- The IndexingMath.getPresentAmountRoundedDown function expects (principal, index) and returns the present value
+- The formula is: balanceWithYield = principal × index / PRECISION (rounded down)
+- Yield is then: balanceWithYield - balance (capped at 0)
+- Non-earners always return 0 regardless of balance or index
+
+Date: 2025-01-27

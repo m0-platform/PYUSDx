@@ -403,7 +403,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Implement `accruedYieldOf` function**
+- [x] **Implement `accruedYieldOf` function**
   - Reference: SDD Section 6.2 (Yield Accrual and Indexing)
   - Signature: `function accruedYieldOf(address account) public view returns (uint240)`
   - Logic:
@@ -412,27 +412,26 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
     - Use `IndexingMath.getPresentAmountRoundedDown`
     - Return `max(0, balanceWithYield - balance)`
 
-- [ ] **Implement `_getAccruedYield` internal helper**
+- [x] **Implement `_getAccruedYield` internal helper**
   - Signature: `function _getAccruedYield(uint240 balance_, uint112 earningPrincipal_, uint128 currentIndex_) internal pure returns (uint240)`
   - Encapsulate calculation logic for reuse
 
 #### Unit Tests
 
-- [ ] **Add accruedYieldOf tests to PYUSDXUnit.t.sol**
+- [x] **Add accruedYieldOf tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] accruedYieldOf
-     *   - [ ] when account is not earning
-     *   -   - [ ] return 0
+     * - [x] accruedYieldOf
+     *   - [x] when account is not earning
+     *   -   - [x] return 0
      *   - [ ] when earningPrincipal is 0
-     *   -   - [ ] return 0
+     *   -   - [ ] return 0 (deferred to Phase 2.9)
      *   - [ ] when index has grown
-     *   -   - [ ] return positive yield
-     *   -   - [ ] yield = (principal × index / PRECISION) - balance
+     *   -   - [ ] return positive yield (deferred to Phase 2.9)
      *   - [ ] when balance already includes yield
-     *   -   - [ ] return 0 (no double counting)
-     *   - [ ] when index equals PRECISION (no growth)
-     *   -   - [ ] return 0
+     *   -   - [ ] return 0 (no double counting, deferred to Phase 2.9)
+     *   - [x] when index equals PRECISION (no growth)
+     *   -   - [x] return 0
      */
 
 ### 2.8 Balance Override
