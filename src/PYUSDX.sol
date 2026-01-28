@@ -1036,12 +1036,7 @@ contract PYUSDX is
      * @param amount Amount to transfer
      * @param senderIsEarning Whether both are earning (if false, both are non-earning)
      */
-    function _transferAmountInKind(
-        address sender,
-        address recipient,
-        uint240 amount,
-        bool senderIsEarning
-    ) private {
+    function _transferAmountInKind(address sender, address recipient, uint240 amount, bool senderIsEarning) private {
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 
         // If both are earning, adjust principals

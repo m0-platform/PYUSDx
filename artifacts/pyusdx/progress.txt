@@ -750,3 +750,22 @@ Date: 2025-01-27
 - `forge fmt --check`: Pass
 
 Date: 2025-01-27
+
+#### Phase 3.3: Force Transfer - Batch Tests
+**Status:** COMPLETED
+
+**Approach:**
+- Added 2 batch `forceTransfers` tests to `test/unit/PYUSDXUnit.t.sol`:
+  - `test_ForceTransfers_Batch_MultipleTransfers_Success`: Verifies successful batch transfer of 3 frozen accounts to 3 recipients
+  - `test_ForceTransfers_ArrayLengthMismatch_Reverts`: Verifies revert when frozenAccounts, recipients, and amounts arrays have mismatched lengths
+
+**Gotchas:**
+- The batch `forceTransfers` function is inherited from `ForcedTransferable` - it validates array lengths and calls `_forceTransfer` for each element
+- The `ArrayLengthMismatch` error signature has no parameters: `abi.encodeWithSignature("ArrayLengthMismatch()")`
+
+**Verification:**
+- All 157 unit tests pass
+- `forge build`: Success with only expected warnings
+- `forge fmt --check`: Pass
+
+Date: 2025-01-27

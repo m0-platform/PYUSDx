@@ -913,9 +913,9 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
      *   -   - [x] success, tokens transferred from frozen account
      *   -   - [x] principal adjusted if earner
      *   -   - [x] ForcedTransfer event emitted
-     * - [ ] forceTransfers batch
-     *   - [ ] handle multiple transfers
-     *   - [ ] revert on array length mismatch
+     * - [x] forceTransfers batch
+     *   - [x] handle multiple transfers
+     *   - [x] revert on array length mismatch
      */
 
 ### 3.4 Pause/Unpause (Inherited)

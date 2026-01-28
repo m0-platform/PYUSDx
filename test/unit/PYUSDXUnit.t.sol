@@ -2037,11 +2037,7 @@ contract PYUSDXUnitTest is Test {
         proxy.setClaimRecipient(account, customRecipient);
 
         // Verify claimRecipientFor returns custom address
-        assertEq(
-            proxy.claimRecipientFor(account),
-            customRecipient,
-            "claimRecipientFor should return custom address"
-        );
+        assertEq(proxy.claimRecipientFor(account), customRecipient, "claimRecipientFor should return custom address");
     }
 
     function test_SetClaimRecipient_WithAddressZero_ClearsRecipient() public {
@@ -2053,11 +2049,7 @@ contract PYUSDXUnitTest is Test {
         proxy.setClaimRecipient(account, customRecipient);
 
         // Verify it's set
-        assertEq(
-            proxy.claimRecipientFor(account),
-            customRecipient,
-            "claimRecipientFor should return custom address"
-        );
+        assertEq(proxy.claimRecipientFor(account), customRecipient, "claimRecipientFor should return custom address");
 
         // Clear by setting to address(0)
         vm.prank(earnerManager);
@@ -2094,7 +2086,9 @@ contract PYUSDXUnitTest is Test {
         address account = address(0x100);
 
         // Without setting a custom recipient, should return account address
-        assertEq(proxy.claimRecipientFor(account), account, "claimRecipientFor should return account address when not set");
+        assertEq(
+            proxy.claimRecipientFor(account), account, "claimRecipientFor should return account address when not set"
+        );
     }
 
     function test_ClaimRecipientFor_SetToCustomAddress_ReturnsCustomAddress() public {
@@ -2121,7 +2115,9 @@ contract PYUSDXUnitTest is Test {
         proxy.setClaimRecipient(account, address(0));
 
         // Verify it returns account address after clearing
-        assertEq(proxy.claimRecipientFor(account), account, "claimRecipientFor should return account address after clearing");
+        assertEq(
+            proxy.claimRecipientFor(account), account, "claimRecipientFor should return account address after clearing"
+        );
     }
 
     function test_SetClaimRecipient_ClaimForUsesCustomRecipient() public {
@@ -2286,9 +2282,7 @@ contract PYUSDXUnitTest is Test {
 
         // totalNonEarningSupply should be unchanged for non-earner to non-earner
         assertEq(
-            proxy.totalNonEarningSupply(),
-            totalNonEarningSupplyBefore,
-            "totalNonEarningSupply should be unchanged"
+            proxy.totalNonEarningSupply(), totalNonEarningSupplyBefore, "totalNonEarningSupply should be unchanged"
         );
     }
 
@@ -2373,17 +2367,11 @@ contract PYUSDXUnitTest is Test {
         assertGt(recipientPrincipalAfter, recipientPrincipalBefore, "Recipient principal should increase");
 
         // totalEarningSupply should increase
-        assertEq(
-            proxy.totalEarningSupply(),
-            totalEarningSupplyBefore + amount,
-            "totalEarningSupply should increase"
-        );
+        assertEq(proxy.totalEarningSupply(), totalEarningSupplyBefore + amount, "totalEarningSupply should increase");
 
         // totalNonEarningSupply should decrease
         assertEq(
-            proxy.totalNonEarningSupply(),
-            totalNonEarningSupplyBefore - amount,
-            "totalNonEarningSupply should decrease"
+            proxy.totalNonEarningSupply(), totalNonEarningSupplyBefore - amount, "totalNonEarningSupply should decrease"
         );
     }
 
@@ -2421,17 +2409,11 @@ contract PYUSDXUnitTest is Test {
         assertLt(senderPrincipalAfter, senderPrincipalBefore, "Sender principal should decrease");
 
         // totalEarningSupply should decrease
-        assertEq(
-            proxy.totalEarningSupply(),
-            totalEarningSupplyBefore - amount,
-            "totalEarningSupply should decrease"
-        );
+        assertEq(proxy.totalEarningSupply(), totalEarningSupplyBefore - amount, "totalEarningSupply should decrease");
 
         // totalNonEarningSupply should increase
         assertEq(
-            proxy.totalNonEarningSupply(),
-            totalNonEarningSupplyBefore + amount,
-            "totalNonEarningSupply should increase"
+            proxy.totalNonEarningSupply(), totalNonEarningSupplyBefore + amount, "totalNonEarningSupply should increase"
         );
     }
 
@@ -2594,11 +2576,7 @@ contract PYUSDXUnitTest is Test {
 
         uint256 totalSupplyAfter = proxy.totalSupply();
 
-        assertEq(
-            totalSupplyAfter,
-            totalSupplyBefore - burnAmount,
-            "totalSupply should decrease by burned amount"
-        );
+        assertEq(totalSupplyAfter, totalSupplyBefore - burnAmount, "totalSupply should decrease by burned amount");
     }
 
     function test_TotalSupply_BurnFromNonEarner_Decreases() public {
@@ -2618,11 +2596,7 @@ contract PYUSDXUnitTest is Test {
 
         uint256 totalSupplyAfter = proxy.totalSupply();
 
-        assertEq(
-            totalSupplyAfter,
-            totalSupplyBefore - burnAmount,
-            "totalSupply should decrease by burned amount"
-        );
+        assertEq(totalSupplyAfter, totalSupplyBefore - burnAmount, "totalSupply should decrease by burned amount");
     }
 
     function test_TotalEarningSupply_IncreasesOnMintToEarner() public {
@@ -2978,8 +2952,7 @@ contract PYUSDXUnitTest is Test {
 
         // Verify forced transfer manager has role
         assertTrue(
-            proxy.hasRole(forcedTransferManagerRole, forcedTransferManager),
-            "Forced transfer manager should have role"
+            proxy.hasRole(forcedTransferManagerRole, forcedTransferManager), "Forced transfer manager should have role"
         );
 
         // Forced transfer manager can call forceTransfer
@@ -3008,6 +2981,98 @@ contract PYUSDXUnitTest is Test {
         vm.expectRevert();
         vm.prank(randomUser);
         proxy.forceTransfer(from, to, amount);
+    }
+
+    function test_ForceTransfers_Batch_MultipleTransfers_Success() public {
+        address from1 = address(0x200);
+        address from2 = address(0x201);
+        address from3 = address(0x202);
+        address to1 = address(0x210);
+        address to2 = address(0x211);
+        address to3 = address(0x212);
+        uint256 amount1 = 100e6;
+        uint256 amount2 = 200e6;
+        uint256 amount3 = 300e6;
+
+        // Mint to frozen accounts
+        vm.prank(minterGateway);
+        proxy.mint(from1, amount1);
+        vm.prank(minterGateway);
+        proxy.mint(from2, amount2);
+        vm.prank(minterGateway);
+        proxy.mint(from3, amount3);
+
+        // Freeze all accounts
+        vm.prank(freezeManager);
+        proxy.freeze(from1);
+        vm.prank(freezeManager);
+        proxy.freeze(from2);
+        vm.prank(freezeManager);
+        proxy.freeze(from3);
+
+        // Prepare arrays
+        address[] memory frozenAccounts = new address[](3);
+        frozenAccounts[0] = from1;
+        frozenAccounts[1] = from2;
+        frozenAccounts[2] = from3;
+
+        address[] memory recipients = new address[](3);
+        recipients[0] = to1;
+        recipients[1] = to2;
+        recipients[2] = to3;
+
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = amount1;
+        amounts[1] = amount2;
+        amounts[2] = amount3;
+
+        // Execute batch force transfers
+        vm.prank(forcedTransferManager);
+        proxy.forceTransfers(frozenAccounts, recipients, amounts);
+
+        // Verify all transfers succeeded
+        assertEq(proxy.balanceOf(from1), 0, "From1 balance should be 0");
+        assertEq(proxy.balanceOf(from2), 0, "From2 balance should be 0");
+        assertEq(proxy.balanceOf(from3), 0, "From3 balance should be 0");
+        assertEq(proxy.balanceOf(to1), amount1, "To1 balance should be amount1");
+        assertEq(proxy.balanceOf(to2), amount2, "To2 balance should be amount2");
+        assertEq(proxy.balanceOf(to3), amount3, "To3 balance should be amount3");
+    }
+
+    function test_ForceTransfers_ArrayLengthMismatch_Reverts() public {
+        address from1 = address(0x200);
+        address from2 = address(0x201);
+        address to1 = address(0x210);
+        address to2 = address(0x211);
+        uint256 amount1 = 100e6;
+        uint256 amount2 = 200e6;
+
+        // Mint and freeze accounts
+        vm.prank(minterGateway);
+        proxy.mint(from1, amount1);
+        vm.prank(minterGateway);
+        proxy.mint(from2, amount2);
+        vm.prank(freezeManager);
+        proxy.freeze(from1);
+        vm.prank(freezeManager);
+        proxy.freeze(from2);
+
+        // Prepare arrays with mismatched lengths
+        address[] memory frozenAccounts = new address[](2);
+        frozenAccounts[0] = from1;
+        frozenAccounts[1] = from2;
+
+        address[] memory recipients = new address[](2);
+        recipients[0] = to1;
+        recipients[1] = to2;
+
+        uint256[] memory amounts = new uint256[](1); // Only 1 amount
+        amounts[0] = amount1;
+
+        // Should revert due to array length mismatch
+        vm.expectRevert(abi.encodeWithSignature("ArrayLengthMismatch()"));
+        vm.prank(forcedTransferManager);
+        proxy.forceTransfers(frozenAccounts, recipients, amounts);
     }
 
     function test_AccessControl_PauserRole_CanCallPause() public {

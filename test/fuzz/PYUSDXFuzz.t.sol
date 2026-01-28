@@ -507,12 +507,7 @@ contract PYUSDXFuzzTest is Test {
         }
     }
 
-
-    function testFuzz_ClaimFor_ZeroFeeRate_NoFeeDeduced(
-        address earner,
-        uint32 rate,
-        uint256 timeDelta
-    ) public {
+    function testFuzz_ClaimFor_ZeroFeeRate_NoFeeDeduced(address earner, uint32 rate, uint256 timeDelta) public {
         vm.assume(earner != address(0));
         vm.assume(rate > 0 && rate <= 1000000000);
         vm.assume(timeDelta >= 1 hours && timeDelta <= 365 days);
@@ -608,7 +603,12 @@ contract PYUSDXFuzzTest is Test {
 
     /* ============ Transfer Fuzz Tests ============ */
 
-    function testFuzz_Transfer_TotalSupplyUnchanged(address sender, address recipient, uint256 mintAmount, uint256 transferAmount) public {
+    function testFuzz_Transfer_TotalSupplyUnchanged(
+        address sender,
+        address recipient,
+        uint256 mintAmount,
+        uint256 transferAmount
+    ) public {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
         vm.assume(sender != address(0) && recipient != address(0) && sender != recipient);
@@ -642,7 +642,12 @@ contract PYUSDXFuzzTest is Test {
         );
     }
 
-    function testFuzz_Transfer_BalanceConservation(address sender, address recipient, uint256 mintAmount, uint256 transferAmount) public {
+    function testFuzz_Transfer_BalanceConservation(
+        address sender,
+        address recipient,
+        uint256 mintAmount,
+        uint256 transferAmount
+    ) public {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
         vm.assume(sender != address(0) && recipient != address(0) && sender != recipient);
@@ -671,11 +676,24 @@ contract PYUSDXFuzzTest is Test {
         uint256 recipientBalanceAfter = proxy.balanceOf(recipient);
 
         // Balance conservation: sender lost, recipient gained same amount
-        assertEq(senderBalanceAfter, senderBalanceBefore - transferAmount, "Sender balance should decrease by transfer amount");
-        assertEq(recipientBalanceAfter, recipientBalanceBefore + transferAmount, "Recipient balance should increase by transfer amount");
+        assertEq(
+            senderBalanceAfter,
+            senderBalanceBefore - transferAmount,
+            "Sender balance should decrease by transfer amount"
+        );
+        assertEq(
+            recipientBalanceAfter,
+            recipientBalanceBefore + transferAmount,
+            "Recipient balance should increase by transfer amount"
+        );
     }
 
-    function testFuzz_Transfer_BalanceNeverNegative(address sender, address recipient, uint256 mintAmount, uint256 transferAmount) public {
+    function testFuzz_Transfer_BalanceNeverNegative(
+        address sender,
+        address recipient,
+        uint256 mintAmount,
+        uint256 transferAmount
+    ) public {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > 0 && transferAmount <= uint256(type(uint240).max));
         vm.assume(sender != address(0) && recipient != address(0) && sender != recipient);
@@ -696,7 +714,7 @@ contract PYUSDXFuzzTest is Test {
         // Transfer (will revert if amount exceeds balance)
         if (transferAmount <= proxy.balanceOf(sender)) {
             vm.prank(sender);
-        proxy.transfer(recipient, transferAmount);
+            proxy.transfer(recipient, transferAmount);
 
             // Verify balances are non-negative
             assertTrue(proxy.balanceOf(sender) >= 0, "Sender balance should be non-negative");
@@ -704,11 +722,16 @@ contract PYUSDXFuzzTest is Test {
         } else {
             vm.expectRevert();
             vm.prank(sender);
-        proxy.transfer(recipient, transferAmount);
+            proxy.transfer(recipient, transferAmount);
         }
     }
 
-    function testFuzz_Transfer_EarnerToEarner(address sender, address recipient, uint256 mintAmount, uint256 transferAmount) public {
+    function testFuzz_Transfer_EarnerToEarner(
+        address sender,
+        address recipient,
+        uint256 mintAmount,
+        uint256 transferAmount
+    ) public {
         // Use a smaller bound to avoid uint112 principal overflow issues
         vm.assume(mintAmount > 0 && mintAmount <= 1e18); // Reasonable bound
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
@@ -741,10 +764,19 @@ contract PYUSDXFuzzTest is Test {
         uint256 totalEarningSupplyAfter = proxy.totalEarningSupply();
 
         // Total earning supply should be unchanged for earner-to-earner transfer
-        assertEq(totalEarningSupplyAfter, totalEarningSupplyBefore, "Total earning supply should be unchanged for earner-to-earner");
+        assertEq(
+            totalEarningSupplyAfter,
+            totalEarningSupplyBefore,
+            "Total earning supply should be unchanged for earner-to-earner"
+        );
     }
 
-    function testFuzz_Transfer_NonEarnerToNonEarner(address sender, address recipient, uint256 mintAmount, uint256 transferAmount) public {
+    function testFuzz_Transfer_NonEarnerToNonEarner(
+        address sender,
+        address recipient,
+        uint256 mintAmount,
+        uint256 transferAmount
+    ) public {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
         vm.assume(sender != address(0) && recipient != address(0) && sender != recipient);
@@ -762,14 +794,23 @@ contract PYUSDXFuzzTest is Test {
         uint256 totalNonEarningSupplyAfter = proxy.totalNonEarningSupply();
 
         // Total non-earning supply should be unchanged for non-earner-to-non-earner transfer
-        assertEq(totalNonEarningSupplyAfter, totalNonEarningSupplyBefore, "Total non-earning supply should be unchanged for non-earner-to-non-earner");
+        assertEq(
+            totalNonEarningSupplyAfter,
+            totalNonEarningSupplyBefore,
+            "Total non-earning supply should be unchanged for non-earner-to-non-earner"
+        );
     }
 
     // NOTE: testFuzz_Transfer_EarnerToNonEarner and testFuzz_Transfer_NonEarnerToEarner
     // are skipped due to a known bug in _addEarningAmount and _subtractEarningAmount
     // functions. See guardrails.md for details.
 
-    function testFuzz_Transfer_InsufficientBalance(address sender, address recipient, uint256 mintAmount, uint256 transferAmount) public {
+    function testFuzz_Transfer_InsufficientBalance(
+        address sender,
+        address recipient,
+        uint256 mintAmount,
+        uint256 transferAmount
+    ) public {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > mintAmount); // Transfer more than balance
         vm.assume(transferAmount <= uint256(type(uint240).max));
