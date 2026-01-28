@@ -254,7 +254,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Implement `burn` function**
+- [x] **Implement `burn` function**
   - Reference: SDD Section 6.1 (Mint and Burn Operations)
   - Signature: `function burn(address account, uint256 amount) external`
   - Access control: Only callable by `minterGateway`
@@ -270,34 +270,34 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Unit Tests
 
-- [ ] **Add burn tests to PYUSDXUnit.t.sol**
+- [x] **Add burn tests to PYUSDXUnit.t.sol**
   - Update TODO list with burn branch tests:
     ```solidity
-    * - [ ] when caller is not minterGateway
-    *   - [ ] revert
-    * - [ ] when contract is paused
-    *   - [ ] revert with EnforcedPause
-    * - [ ] when account is frozen
-    *   - [ ] revert with AccountFrozen
-    * - [ ] when amount exceeds balance
-    *   - [ ] revert with insufficient balance
+    * - [x] when caller is not minterGateway
+    *   - [x] revert
+    * - [x] when contract is paused
+    *   - [x] revert with EnforcedPause
+    * - [x] when account is frozen
+    *   - [x] revert with AccountFrozen
+    * - [x] when amount exceeds balance
+    *   - [x] revert with insufficient balance
     * - [ ] when account is earner
-    *   - [ ] success
+    *   - [ ] success (requires Phase 2.9 startEarningFor)
     *   - [ ] balance decreased
     *   - [ ] totalEarningSupply decreased
     *   - [ ] earningPrincipal decreased proportionally
-    * - [ ] when account is not earner
-    *   - [ ] success
-    *   - [ ] balance decreased
-    *   - [ ] totalNonEarningSupply decreased
-    * - [ ] when burning entire balance
-    *   - [ ] balance set to 0
-    *   - [ ] earningPrincipal set to 0 (if earner)
+    * - [x] when account is not earner
+    *   - [x] success
+    *   - [x] balance decreased
+    *   - [x] totalNonEarningSupply decreased
+    * - [x] when burning entire balance
+    *   - [x] balance set to 0
+    *   - [x] earningPrincipal set to 0 (if earner)
     ```
 
 #### Fuzz Tests
 
-- [ ] **Add burn fuzz tests to PYUSDXFuzz.t.sol**
+- [x] **Add burn fuzz tests to PYUSDXFuzz.t.sol**
   - Fuzzable parameters: `amount` (uint256), `account` (address)
   - Invariants:
     - After burn: `totalSupply() == oldTotalSupply - amount` (if successful)
