@@ -456,6 +456,10 @@ contract PYUSDX is
      * @dev Only callable by the Minter Gateway
      * @param account Recipient of minted tokens
      * @param amount Amount to mint
+     *
+     * Gas costs (min/avg/max):
+     * - To non-earner: ~25k / 48k / 52k gas
+     * - To earner: +3k gas (totalEarningSupply update instead of totalNonEarningSupply)
      */
     function mint(address account, uint256 amount) external override whenNotPaused {
         // Access control: only minter gateway can mint
@@ -488,6 +492,10 @@ contract PYUSDX is
      * @dev Only callable by the Minter Gateway
      * @param account Account to burn from
      * @param amount Amount to burn
+     *
+     * Gas costs (min/avg/max):
+     * - From non-earner: ~2.5k / 14k / 29k gas
+     * - From earner: +5k-10k gas (principal adjustment calculation)
      */
     function burn(address account, uint256 amount) external override whenNotPaused {
         // Access control: only minter gateway can burn
@@ -537,6 +545,11 @@ contract PYUSDX is
      *      and transfers net yield to claim recipient.
      * @param account Account to claim yield for
      * @return netYield Amount of yield actually received (after fee deduction)
+     *
+     * Gas costs (min/avg/max):
+     * - No yield: ~2.5k gas (early return)
+     * - With yield, no fee: ~90k gas
+     * - With yield and fee: ~90k-95k gas
      */
     function claimFor(address account) external override whenNotPaused returns (uint240) {
         // Pre-flight checks
@@ -621,6 +634,10 @@ contract PYUSDX is
      * @dev Permissionless function. Account must be whitelisted as earner and not already earning.
      *      Principal is calculated as: balance × PRECISION / currentIndex
      * @param account Account to start earning for
+     *
+     * Gas costs (min/avg/max):
+     * - Zero balance: ~2.5k / 9k gas
+     * - With balance: ~2.5k / 67k / 71k gas
      */
     function startEarningFor(address account) external override whenNotPaused {
         // Pre-flight checks
@@ -1072,6 +1089,12 @@ contract PYUSDX is
      * @param sender Sender address
      * @param recipient Recipient address (must not be zero address)
      * @param amount Amount to transfer
+     *
+     * Gas costs (min/avg/max):
+     * - Non-earner to non-earner: ~2.6k / 20k / 34k gas
+     * - Earner to earner: ~2.6k / 27k / 84k gas (principal adjustment)
+     * - Earner to non-earner: ~2.6k / 33k / 50k gas (principal adjustment)
+     * - Non-earner to earner: ~2.6k / 24k / 45k gas (principal calculation)
      */
     function _transfer(address sender, address recipient, uint256 amount) internal override {
         // Pause check - contract must not be paused

@@ -966,7 +966,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
   - Review and address findings
   - Focus on: reentrancy, overflow, access control issues
 
-- [ ] **Gas optimization review**
+- [x] **Gas optimization review**
   - Run: `forge snapshot --gas-report`
   - Identify gas-heavy functions
   - Optimize hot paths: `transfer`, `claimFor`, `updateIndex`
