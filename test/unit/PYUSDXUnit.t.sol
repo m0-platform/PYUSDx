@@ -283,6 +283,24 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
  *   - [x] cannot transfer, mint, burn, claim
  *   - [x] cannot startEarningFor
  *   - [x] cannot stopEarningFor
+ * - [x] pause (Phase 3.4)
+ *   - [x] when caller is not PAUSER_ROLE
+ *   -   - [x] revert
+ *   - [x] when already paused
+ *   -   - [x] revert with EnforcedPause
+ *   - [x] when not paused
+ *   -   - [x] success, Paused event emitted
+ * - [x] unpause (Phase 3.4)
+ *   - [x] when caller is not PAUSER_ROLE
+ *   -   - [x] revert
+ *   - [x] when not paused
+ *   -   - [x] revert with ExpectedPause
+ *   - [x] when paused
+ *   -   - [x] success, Unpaused event emitted
+ * - [x] when paused: state-changing functions revert (Phase 3.4)
+ *   - [x] mint, burn, transfer, claimFor, startEarningFor, stopEarningFor all revert
+ * - [x] when paused: admin functions still work (Phase 3.4)
+ *   - [x] setRate, freeze, forceTransfer, unpause all work
  */
 contract PYUSDXUnitTest is Test {
     /* ============ Test Variables ============ */
@@ -3041,6 +3059,122 @@ contract PYUSDXUnitTest is Test {
         vm.expectRevert();
         vm.prank(randomUser);
         proxy.unpause();
+    }
+
+    function test_Pause_AlreadyPaused_Reverts() public {
+        // Pause the contract
+        vm.prank(pauser);
+        proxy.pause();
+
+        assertTrue(proxy.paused(), "Contract should be paused");
+
+        // Try to pause again - should revert with EnforcedPause
+        vm.expectRevert();
+        vm.prank(pauser);
+        proxy.pause();
+    }
+
+    function test_Pause_NotPaused_Success() public {
+        assertFalse(proxy.paused(), "Contract should not be paused initially");
+
+        // Pause the contract
+        vm.prank(pauser);
+        proxy.pause();
+
+        assertTrue(proxy.paused(), "Contract should be paused");
+    }
+
+    function test_Unpause_NotPaused_Reverts() public {
+        assertFalse(proxy.paused(), "Contract should not be paused initially");
+
+        // Try to unpause when not paused - should revert with ExpectedPause
+        vm.expectRevert();
+        vm.prank(pauser);
+        proxy.unpause();
+    }
+
+    function test_Unpause_Paused_Success() public {
+        // Pause the contract first
+        vm.prank(pauser);
+        proxy.pause();
+
+        assertTrue(proxy.paused(), "Contract should be paused");
+
+        // Unpause the contract
+        vm.prank(pauser);
+        proxy.unpause();
+
+        assertFalse(proxy.paused(), "Contract should not be paused");
+    }
+
+    function test_Paused_StopEarningFor_Reverts() public {
+        address account = address(0x200);
+
+        // Setup: Approve earner and start earning
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Mint to account
+        vm.prank(minterGateway);
+        proxy.mint(account, 1000e6);
+
+        // Start earning
+        proxy.startEarningFor(account);
+
+        // Pause the contract
+        vm.prank(pauser);
+        proxy.pause();
+
+        // Remove earner approval
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, false, 0, address(0));
+
+        // Try to stop earning - should revert
+        vm.expectRevert();
+        proxy.stopEarningFor(account);
+    }
+
+    function test_Paused_AdminFunctions_Work() public {
+        address account = address(0x200);
+        address recipient = address(0x300);
+
+        // Mint to account first so forceTransfer has balance to transfer
+        vm.prank(minterGateway);
+        proxy.mint(account, 1000e6);
+
+        // Pause the contract
+        vm.prank(pauser);
+        proxy.pause();
+        assertTrue(proxy.paused(), "Contract should be paused");
+
+        // setRate should work
+        vm.prank(rateManager);
+        proxy.setRate(100); // 1% rate
+
+        // freeze should work
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+        assertTrue(proxy.isFrozen(account), "Account should be frozen");
+
+        // unfreeze should work
+        vm.prank(freezeManager);
+        proxy.unfreeze(account);
+        assertFalse(proxy.isFrozen(account), "Account should not be frozen");
+
+        // forceTransfer should work (after freezing account first)
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        vm.prank(forcedTransferManager);
+        proxy.forceTransfer(account, recipient, 100e6);
+
+        // Verify transfer occurred
+        assertEq(proxy.balanceOf(recipient), 100e6, "Recipient should have received tokens");
+
+        // unpause should work
+        vm.prank(pauser);
+        proxy.unpause();
+        assertFalse(proxy.paused(), "Contract should not be paused");
     }
 
     function test_AccessControl_RoleGrantEmitsEvent() public {

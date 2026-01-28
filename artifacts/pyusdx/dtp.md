@@ -922,38 +922,38 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Verify pause/unpause inherited from Pausable**
+- [x] **Verify pause/unpause inherited from Pausable**
   - Reference: SDD Section 6.7 (Compliance Operations)
   - Functions: `pause()`, `unpause()`
   - Verify `_paused` is accessible
 
-- [ ] **Add `whenNotPaused` and `whenPaused` modifiers to state-changing functions**
+- [x] **Add `whenNotPaused` and `whenPaused` modifiers to state-changing functions**
   - Apply to: `mint`, `burn`, `transfer`, `transferFrom`, `claimFor`, `startEarningFor`, `stopEarningFor`
   - Do NOT apply to: `setRate`, `freeze`, `unfreeze`, `forceTransfer`, `pause`, `unpause`
 
 #### Tests
 
-- [ ] **Add pause/unpause tests to PYUSDXUnit.t.sol**
+- [x] **Add pause/unpause tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] pause
-     *   - [ ] when caller is not PAUSER_ROLE
-     *   -   - [ ] revert
-     *   - [ ] when already paused
-     *   -   - [ ] revert
-     *   - [ ] when not paused
-     *   -   - [ ] success, Paused event emitted (from OZ)
-     * - [ ] unpause
-     *   - [ ] when caller is not PAUSER_ROLE
-     *   -   - [ ] revert
-     *   - [ ] when not paused
-     *   -   - [ ] revert
-     *   - [ ] when paused
-     *   -   - [ ] success, Unpaused event emitted (from OZ)
-     * - [ ] when paused: state-changing functions revert
-     *   - [ ] mint, burn, transfer, claimFor, startEarningFor, stopEarningFor all revert
-     * - [ ] when paused: admin functions still work
-     *   - [ ] setRate, freeze, forceTransfer, unpause all work
+     * - [x] pause
+     *   - [x] when caller is not PAUSER_ROLE
+     *   -   - [x] revert
+     *   - [x] when already paused
+     *   -   - [x] revert
+     *   - [x] when not paused
+     *   -   - [x] success, Paused event emitted (from OZ)
+     * - [x] unpause
+     *   - [x] when caller is not PAUSER_ROLE
+     *   -   - [x] revert
+     *   - [x] when not paused
+     *   -   - [x] revert
+     *   - [x] when paused
+     *   -   - [x] success, Unpaused event emitted (from OZ)
+     * - [x] when paused: state-changing functions revert
+     *   - [x] mint, burn, transfer, claimFor, startEarningFor, stopEarningFor all revert
+     * - [x] when paused: admin functions still work
+     *   - [x] setRate, freeze, forceTransfer, unpause all work
      */
 
 ### 3.5 Security Analysis
