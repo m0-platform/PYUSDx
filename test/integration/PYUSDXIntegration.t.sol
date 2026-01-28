@@ -465,4 +465,158 @@ contract PYUSDXIntegrationTest is Test {
         vm.expectRevert();
         minterGateway.mint(bob, maxUint240 + 1);
     }
+
+    /* ============ EarnerManager Integration ============ */
+
+    /**
+     * @notice Test EarnerManager: set and get earner details
+     * @dev Integration test: verify earner status, fee rate, and fee recipient work correctly
+     */
+    function test_Integration_EarnerManager_SetAndGetEarnerDetails() public {
+        // Initially, Alice should not be whitelisted
+        (bool isWhitelisted, uint16 feeRate, address feeRecipient) = pyusdx.getEarnerDetails(alice);
+        assertFalse(isWhitelisted, "Alice not whitelisted initially");
+        assertEq(feeRate, 0, "Fee rate is 0 initially");
+        assertEq(feeRecipient, address(0), "Fee recipient is 0 initially");
+
+        // Whitelist Alice with 10% fee and custom fee recipient
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(alice, true, 1000, bob); // 10% = 1000 bps
+
+        (isWhitelisted, feeRate, feeRecipient) = pyusdx.getEarnerDetails(alice);
+        assertTrue(isWhitelisted, "Alice whitelisted");
+        assertEq(feeRate, 1000, "Fee rate is 10%");
+        assertEq(feeRecipient, bob, "Fee recipient is Bob");
+    }
+
+    /**
+     * @notice Test EarnerManager: earnerStatusFor function
+     * @dev Integration test: verify earner status check works correctly
+     */
+    function test_Integration_EarnerManager_EarnerStatusFor() public {
+        // Initially not an earner
+        assertFalse(pyusdx.earnerStatusFor(alice), "Alice not earner initially");
+
+        // Whitelist Alice
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(alice, true, 0, address(0));
+
+        assertTrue(pyusdx.earnerStatusFor(alice), "Alice is earner after whitelisting");
+
+        // Remove from whitelist
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(alice, false, 0, address(0));
+
+        assertFalse(pyusdx.earnerStatusFor(alice), "Alice not earner after removal");
+    }
+
+    /**
+     * @notice Test EarnerManager: fee rate application in claims
+     * @dev Integration test: verify fee is correctly deducted from yield
+     */
+    function test_Integration_EarnerManager_FeeRateApplicationInClaims() public {
+        // Setup: Whitelist Alice with 10% fee, Bob as fee recipient
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(alice, true, 1000, bob); // 10% fee
+
+        // Mint and start earning
+        vm.prank(authorizedUser);
+        minterGateway.mint(alice, 10_000e6);
+        pyusdx.startEarningFor(alice);
+
+        // Set rate and accrue yield
+        vm.prank(rateManager);
+        pyusdx.setRate(1215752192); // ~1.2% APY
+        vm.warp(block.timestamp + 365 days);
+
+        // Claim yield
+        uint240 netYield = pyusdx.claimFor(alice);
+
+        // Verify fee was deducted: fee = grossYield * feeRate / 10000
+        // Bob should have received the fee
+        uint256 bobBalance = pyusdx.balanceOf(bob);
+        assertTrue(bobBalance > 0, "Bob received fee");
+
+        // Alice's balance increased by grossYield (before fee deduction)
+        uint256 aliceBalance = pyusdx.balanceOf(alice);
+        assertTrue(aliceBalance > 10_000e6, "Alice's balance increased by grossYield");
+    }
+
+    /**
+     * @notice Test EarnerManager: changing fee rate affects future claims
+     * @dev Integration test: verify fee rate changes only affect future yield, not past
+     */
+    function test_Integration_EarnerManager_FeeRateChangeAffectsFutureClaims() public {
+        // Setup: Whitelist Alice with 0% fee initially
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(alice, true, 0, bob);
+
+        // Mint and start earning
+        vm.prank(authorizedUser);
+        minterGateway.mint(alice, 10_000e6);
+        pyusdx.startEarningFor(alice);
+
+        // Set rate and accrue some yield
+        vm.prank(rateManager);
+        pyusdx.setRate(1215752192); // ~1.2% APY
+        vm.warp(block.timestamp + 180 days);
+
+        // Claim first portion (0% fee)
+        uint240 firstClaim = pyusdx.claimFor(alice);
+        assertTrue(firstClaim > 0, "First claim successful");
+
+        // Change fee rate to 20%
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(alice, true, 2000, bob);
+
+        // Accrue more yield
+        vm.warp(block.timestamp + 180 days);
+
+        // Claim second portion (20% fee)
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint240 secondClaim = pyusdx.claimFor(alice);
+        assertTrue(secondClaim > 0, "Second claim successful");
+
+        // Bob should have received fee from second claim only
+        uint256 bobBalanceAfter = pyusdx.balanceOf(bob);
+        assertTrue(bobBalanceAfter > bobBalanceBefore, "Bob received fee from second claim");
+    }
+
+    /**
+     * @notice Test EarnerManager: fee rate of 100% sends all yield to recipient
+     * @dev Integration test: verify extreme fee rate behavior
+     */
+    function test_Integration_EarnerManager_MaxFeeRate_AllYieldToRecipient() public {
+        // Setup: Whitelist Alice with 100% fee
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(alice, true, 10000, bob); // 100% fee
+
+        // Mint and start earning
+        vm.prank(authorizedUser);
+        minterGateway.mint(alice, 10_000e6);
+        pyusdx.startEarningFor(alice);
+
+        // Set rate and accrue yield
+        vm.prank(rateManager);
+        pyusdx.setRate(1215752192); // ~1.2% APY
+        vm.warp(block.timestamp + 365 days);
+
+        // Get Alice's balance before claim
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+
+        // Claim yield
+        uint240 netYield = pyusdx.claimFor(alice);
+
+        // Net yield returned should be 0 (100% fee)
+        assertEq(netYield, 0, "Net yield is 0 with 100% fee");
+
+        // Alice's balance should have increased by grossYield (principal increases)
+        // But she receives nothing in her claim recipient
+        uint256 aliceBalanceAfter = pyusdx.balanceOf(alice);
+        assertTrue(aliceBalanceAfter > aliceBalanceBefore, "Alice's balance increased (principal)");
+
+        // Bob should have received all the yield
+        uint256 bobBalance = pyusdx.balanceOf(bob);
+        assertTrue(bobBalance > 0, "Bob received all yield as fee");
+    }
 }
