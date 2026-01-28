@@ -801,3 +801,28 @@ Date: 2025-01-27
 - No code changes required
 
 Date: 2025-01-27
+
+#### Phase 2.2: Mint To Earner Test
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented `test_Mint_ToEarner_Success` which was deferred until Phase 2.9 (startEarningFor) was complete
+- Test verifies:
+  - Balance increases when minting to an earner
+  - totalEarningSupply increases (earner's balance went up)
+  - totalNonEarningSupply remains unchanged
+  - isEarning status remains true
+- Test setup: Mint initial amount, whitelist and start earning, then mint additional amount to earner
+
+**Gotchas:**
+- The test was skipped in Phase 2.2 because `startEarningFor` was not yet implemented
+- Now that Phase 2.9 is complete, the test can be properly implemented
+- The mint function correctly adds to totalEarningSupply when the recipient is already earning
+
+**Verification:**
+- All 158 unit tests pass (157 from before + 1 new mint to earner test)
+- All 24 fuzz tests pass
+- `forge build`: Success with only expected warnings
+- `forge fmt --check`: Pass
+
+Date: 2025-01-27
