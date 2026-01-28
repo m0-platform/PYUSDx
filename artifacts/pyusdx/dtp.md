@@ -549,25 +549,25 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Unit Tests
 
-- [ ] **Add stopEarningFor tests to PYUSDXUnit.t.sol**
+- [x] **Add stopEarningFor tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] stopEarningFor
-     *   - [ ] when account is still approved
-     *   -   - [ ] revert
-     *   - [ ] when not earning
-     *   -   - [ ] revert (or return early)
-     *   - [ ] with unclaimed yield
-     *   -   - [ ] success, yield claimed first
-     *   -   - [ ] isEarning = false, earningPrincipal = 0
-     *   -   - [ ] totalEarningPrincipal decreased
-     *   -   - [ ] totalEarningSupply decreased
-     *   -   - [ ] totalNonEarningSupply increased
-     *   -   - [ ] StoppedEarning event emitted
-     *   - [ ] with no accrued yield
-     *   -   - [ ] success, no claim made
-     *   - [ ] batch
-     *   -   - [ ] success for all, all accounts marked as non-earning
+     * - [x] stopEarningFor
+     *   - [x] when account is still approved
+     *   -   - [x] revert
+     *   - [x] when not earning
+     *   -   - [x] revert (or return early)
+     *   - [x] with unclaimed yield
+     *   -   - [x] success, yield claimed first
+     *   -   - [x] isEarning = false, earningPrincipal = 0
+     *   -   - [x] totalEarningPrincipal decreased
+     *   -   - [x] totalEarningSupply decreased
+     *   -   - [x] totalNonEarningSupply increased
+     *   -   - [x] StoppedEarning event emitted
+     *   - [x] with no accrued yield
+     *   -   - [x] success, no claim made
+     *   - [x] batch
+     *   -   - [x] success for all, all accounts marked as non-earning
      */
 
 ### 2.11 Claim For
