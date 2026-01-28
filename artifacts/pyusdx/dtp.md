@@ -812,7 +812,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Verify role definitions from inherited contracts**
+- [x] **Verify role definitions from inherited contracts**
   - Reference: SDD Section 7.1 (Roles)
   - Roles from ContinuousIndexing: `RATE_MANAGER_ROLE`
   - Roles from EarnerManager: `EARNER_MANAGER_ROLE`
@@ -821,25 +821,25 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
   - Roles from Pausable: `PAUSER_ROLE`
   - Verify all role constants are accessible
 
-- [ ] **Set up initial role assignments in initialize**
+- [x] **Set up initial role assignments in initialize**
   - Assign `DEFAULT_ADMIN_ROLE` to deployer
   - Assign initial manager roles as specified in deployment config
   - Document role assignment strategy
 
 #### Tests
 
-- [ ] **Add access control tests to PYUSDXUnit.t.sol**
+- [x] **Add access control tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] Access Control
-     *   - [ ] DEFAULT_ADMIN_ROLE can grant/revoke all roles
-     *   - [ ] RATE_MANAGER_ROLE can call setRate
-     *   - [ ] EARNER_MANAGER_ROLE can call setEarnerDetails, setClaimRecipient
-     *   - [ ] FREEZE_MANAGER_ROLE can call freeze, unfreeze
-     *   - [ ] FORCED_TRANSFER_MANAGER_ROLE can call forceTransfer
-     *   - [ ] PAUSER_ROLE can call pause, unpause
-     *   - [ ] Non-role-holders cannot call privileged functions
-     *   - [ ] Role grants and revokes emit events
+     * - [x] Access Control
+     *   - [x] DEFAULT_ADMIN_ROLE can grant/revoke all roles
+     *   - [x] RATE_MANAGER_ROLE can call setRate
+     *   - [x] EARNER_MANAGER_ROLE can call setEarnerDetails, setClaimRecipient
+     *   - [x] FREEZE_MANAGER_ROLE can call freeze, unfreeze
+     *   - [x] FORCED_TRANSFER_MANAGER_ROLE can call forceTransfer
+     *   - [x] PAUSER_ROLE can call pause, unpause
+     *   - [x] Non-role-holders cannot call privileged functions
+     *   - [x] Role grants and revokes emit events
      */
 
 ### 3.2 Freeze/Unfreeze (Inherited)
@@ -885,26 +885,30 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Verify forceTransfer inherited from ForcedTransferable**
+- [x] **Implement _forceTransfer override from ForcedTransferable**
   - Reference: SDD Section 6.7 (Compliance Operations)
   - Functions: `forceTransfer(address, address, uint256)`, `forceTransfers(address[], address[], uint256[])`
+  - Override `_forceTransfer` internal function to perform actual transfer
+  - Verify frozen account is actually frozen before transfer
+  - Handle earning status correctly during transfer
+  - Emit ForcedTransfer event
 
 #### Tests
 
-- [ ] **Add forceTransfer tests to PYUSDXUnit.t.sol**
+- [x] **Add forceTransfer tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] forceTransfer
-     *   - [ ] when caller is not FORCED_TRANSFER_MANAGER_ROLE
-     *   -   - [ ] revert
-     *   - [ ] when from account not frozen
-     *   -   - [ ] revert with AccountNotFrozen
-     *   - [ ] when amount exceeds balance
-     *   -   - [ ] revert
-     *   - [ ] with valid parameters
-     *   -   - [ ] success, tokens transferred from frozen account
-     *   -   - [ ] principal adjusted if earner
-     *   -   - [ ] ForcedTransfer event emitted
+     * - [x] forceTransfer
+     *   - [x] when caller is not FORCED_TRANSFER_MANAGER_ROLE
+     *   -   - [x] revert
+     *   - [x] when from account not frozen
+     *   -   - [x] revert with AccountNotFrozen
+     *   - [x] when amount exceeds balance
+     *   -   - [x] revert
+     *   - [x] with valid parameters
+     *   -   - [x] success, tokens transferred from frozen account
+     *   -   - [x] principal adjusted if earner
+     *   -   - [x] ForcedTransfer event emitted
      * - [ ] forceTransfers batch
      *   - [ ] handle multiple transfers
      *   - [ ] revert on array length mismatch

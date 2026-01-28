@@ -572,3 +572,66 @@ Date: 2025-01-27
 - `forge test --match-path "test/unit/PYUSDXUnit.t.sol"`: 121 passed, 0 failed
 
 Date: 2025-01-27
+
+#### Phase 2.15: Is Earning View Function
+**Status:** COMPLETED
+
+**Approach:**
+- The `isEarning` view function was already implemented in `src/PYUSDX.sol:367-369`
+- Added comprehensive unit tests for `isEarning` in `test/unit/PYUSDXUnit.t.sol`
+- Tests verify:
+  - Returns true after startEarningFor
+  - Returns false after stopEarningFor
+  - Returns false for non-earners (including approved but not started)
+
+**Verification:**
+- `forge build`: Success
+- `forge test --match-test "test_IsEarning"`: 3/3 tests passed
+- `forge test`: 140 tests passed (1 unrelated failure in Foo.t.sol due to Alchemy API)
+
+#### Phase 3.1: Role Definitions and Setup
+**Status:** COMPLETED
+
+**Approach:**
+- Verified role definitions from inherited contracts:
+  - `RATE_MANAGER_ROLE` from PYUSDX (keccak256("RATE_MANAGER_ROLE"))
+  - `EARNER_MANAGER_ROLE` from PYUSDX (keccak256("EARNER_MANAGER_ROLE"))
+  - `FREEZE_MANAGER_ROLE` from Freezable (keccak256("FREEZE_MANAGER_ROLE"))
+  - `FORCED_TRANSFER_MANAGER_ROLE` from ForcedTransferable (keccak256("FORCED_TRANSFER_MANAGER_ROLE"))
+  - `PAUSER_ROLE` from Pausable (keccak256("PAUSER_ROLE"))
+  - `DEFAULT_ADMIN_ROLE` from AccessControlUpgradeable
+- Initial role assignments were already set up in the `initialize` function (lines 157-183)
+
+**Tests Added:**
+- Added 20 access control tests to `test/unit/PYUSDXUnit.t.sol`:
+  - `test_AccessControl_DefaultAdminRole_CanGrantAllRoles`
+  - `test_AccessControl_NonAdminCannotGrantRoles`
+  - `test_AccessControl_RateManagerRole_CanCallSetRate`
+  - `test_AccessControl_NonRateManagerCannotCallSetRate`
+  - `test_AccessControl_EarnerManagerRole_CanCallSetEarnerDetails`
+  - `test_AccessControl_NonEarnerManagerCannotCallSetEarnerDetails`
+  - `test_AccessControl_EarnerManagerRole_CanCallSetClaimRecipient`
+  - `test_AccessControl_NonEarnerManagerCannotCallSetClaimRecipient`
+  - `test_AccessControl_FreezeManagerRole_CanCallFreeze`
+  - `test_AccessControl_NonFreezeManagerCannotCallFreeze`
+  - `test_AccessControl_FreezeManagerRole_CanCallUnfreeze`
+  - `test_AccessControl_NonFreezeManagerCannotCallUnfreeze`
+  - `test_AccessControl_ForcedTransferManagerRole_CanCallForceTransfer`
+  - `test_AccessControl_NonForcedTransferManagerCannotCallForceTransfer`
+  - `test_AccessControl_PauserRole_CanCallPause`
+  - `test_AccessControl_NonPauserCannotCallPause`
+  - `test_AccessControl_PauserRole_CanCallUnpause`
+  - `test_AccessControl_NonPauserCannotCallUnpause`
+  - `test_AccessControl_RoleGrantEmitsEvent`
+  - `test_AccessControl_RoleRevokeEmitsEvent`
+
+**Gotchas:**
+- Added `import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";` to test file for event emission tests
+- Used `IAccessControl.RoleGranted` and `IAccessControl.RoleRevoked` for event checks
+
+**Verification:**
+- All 136 unit tests pass (116 from Phase 2.15 + 20 new access control tests)
+- `forge build`: Success
+- `forge fmt --check`: Pass
+
+Date: 2025-01-27

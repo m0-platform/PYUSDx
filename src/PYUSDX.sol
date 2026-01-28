@@ -1133,4 +1133,87 @@ contract PYUSDX is
         // Update index at end
         _updateIndex();
     }
+
+    /* ============ Force Transfer ============ */
+
+    /**
+     * @notice Internal force transfer function
+     * @dev Called by forceTransfer from ForcedTransferable parent
+     *      Bypasses pause checks since force transfer is an administrative function
+     * @param frozenAccount The frozen account from which tokens are seized
+     * @param recipient The recipient address
+     * @param amount The amount to transfer
+     */
+    function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        // Verify frozen account is actually frozen
+        _revertIfNotFrozen(frozenAccount);
+
+        // Validate recipient is not zero address
+        if (recipient == address(0)) {
+            revert("ERC20: transfer to zero address");
+        }
+
+        // Check sufficient balance
+        uint240 balance = $.accounts[frozenAccount].balance;
+        if (amount > balance) {
+            revert("insufficient balance");
+        }
+
+        // Cast amount to uint240 with overflow protection
+        uint240 amount240 = UIntMath.safe240(amount);
+
+        // Get storage
+        bool senderIsEarning = $.accounts[frozenAccount].isEarning;
+        bool recipientIsEarning = $.accounts[recipient].isEarning;
+
+        // Emit Transfer event at start
+        emit Transfer(frozenAccount, recipient, amount240);
+
+        // Handle transfer based on earning status
+        if (senderIsEarning == recipientIsEarning) {
+            // In-kind transfer (both earning or both non-earning)
+            _transferAmountInKind(frozenAccount, recipient, amount240, senderIsEarning);
+        } else if (senderIsEarning) {
+            // Earner to non-earner
+            uint128 idx = _calculateIndex($);
+            uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedUp(amount240, idx);
+
+            _subtractEarningAmount(frozenAccount, principalAmount);
+            _addNonEarningAmount(recipient, amount240);
+
+            // Transfer balances
+            $.accounts[frozenAccount].balance -= amount240;
+            $.accounts[recipient].balance += amount240;
+
+            // Adjust sender principal
+            unchecked {
+                $.accounts[frozenAccount].earningPrincipal -= principalAmount;
+            }
+        } else {
+            // Non-earner to earner
+            uint128 idx = _calculateIndex($);
+            uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedDown(amount240, idx);
+
+            _subtractNonEarningAmount(frozenAccount, amount240);
+            _addEarningAmount(recipient, principalAmount);
+
+            // Transfer balances
+            $.accounts[frozenAccount].balance -= amount240;
+            $.accounts[recipient].balance += amount240;
+
+            // Adjust recipient principal
+            unchecked {
+                $.accounts[recipient].earningPrincipal =
+                    uint112(uint256($.accounts[recipient].earningPrincipal) + uint256(principalAmount));
+            }
+        }
+
+        // Emit ForcedTransfer event
+        emit ForcedTransfer(frozenAccount, recipient, msg.sender, amount);
+
+        // Update index at end
+        _updateIndex();
+    }
 }

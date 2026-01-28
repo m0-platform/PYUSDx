@@ -6,6 +6,7 @@ import {PYUSDX} from "../../src/PYUSDX.sol";
 import {IPYUSDX} from "../../src/interfaces/IPYUSDX.sol";
 import {IERC20} from "m-extensions/lib/common/src/interfaces/IERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 /**
  * Branch coverage TODOs:
@@ -249,6 +250,15 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  *   - [x] returns true after startEarningFor
  *   - [x] returns false after stopEarningFor
  *   - [x] returns false for non-earners
+ * - [ ] Access Control (Phase 3.1)
+ *   - [ ] DEFAULT_ADMIN_ROLE can grant/revoke all roles
+ *   - [ ] RATE_MANAGER_ROLE can call setRate
+ *   - [ ] EARNER_MANAGER_ROLE can call setEarnerDetails, setClaimRecipient
+ *   - [ ] FREEZE_MANAGER_ROLE can call freeze, unfreeze
+ *   - [ ] FORCED_TRANSFER_MANAGER_ROLE can call forceTransfer
+ *   - [ ] PAUSER_ROLE can call pause, unpause
+ *   - [ ] Non-role-holders cannot call privileged functions
+ *   - [ ] Role grants and revokes emit events
  */
 contract PYUSDXUnitTest is Test {
     /* ============ Test Variables ============ */
@@ -2737,5 +2747,301 @@ contract PYUSDXUnitTest is Test {
 
         // Still not earning (approved but not started)
         assertFalse(proxy.isEarning(account), "Approved but not started earner should return false");
+    }
+
+    /* ============ Access Control Tests (Phase 3.1) ============ */
+
+    function test_AccessControl_DefaultAdminRole_CanGrantAllRoles() public {
+        address newAdmin = address(0x200);
+        address newRateManager = address(0x201);
+
+        bytes32 defaultAdminRole = proxy.DEFAULT_ADMIN_ROLE();
+        bytes32 rateManagerRole = proxy.RATE_MANAGER_ROLE();
+
+        // Verify initial admin has DEFAULT_ADMIN_ROLE
+        assertTrue(proxy.hasRole(defaultAdminRole, admin), "Admin should have DEFAULT_ADMIN_ROLE");
+
+        // Admin grants RATE_MANAGER_ROLE to new address
+        vm.prank(admin);
+        proxy.grantRole(rateManagerRole, newRateManager);
+
+        // Verify new address has the role
+        assertTrue(proxy.hasRole(rateManagerRole, newRateManager), "New rate manager should have role");
+    }
+
+    function test_AccessControl_NonAdminCannotGrantRoles() public {
+        address randomUser = address(0x200);
+        address newRateManager = address(0x201);
+
+        bytes32 defaultAdminRole = proxy.DEFAULT_ADMIN_ROLE();
+        bytes32 rateManagerRole = proxy.RATE_MANAGER_ROLE();
+
+        // Verify random user is not admin
+        assertFalse(proxy.hasRole(defaultAdminRole, randomUser), "Random user should not be admin");
+
+        // Random user tries to grant role - should revert
+        vm.expectRevert();
+        vm.prank(randomUser);
+        proxy.grantRole(rateManagerRole, newRateManager);
+    }
+
+    function test_AccessControl_RateManagerRole_CanCallSetRate() public {
+        address newRateManager = address(0x200);
+        bytes32 rateManagerRole = proxy.RATE_MANAGER_ROLE();
+
+        // Grant rate manager role
+        vm.prank(admin);
+        proxy.grantRole(rateManagerRole, newRateManager);
+
+        // Verify role
+        assertTrue(proxy.hasRole(rateManagerRole, newRateManager), "Should have RATE_MANAGER_ROLE");
+
+        // New rate manager can call setRate
+        uint32 newRate = 100; // Small rate value
+        vm.prank(newRateManager);
+        proxy.setRate(newRate); // Should succeed
+
+        assertEq(proxy.rate(), newRate, "Rate should be updated");
+    }
+
+    function test_AccessControl_NonRateManagerCannotCallSetRate() public {
+        address randomUser = address(0x200);
+
+        // Random user cannot call setRate
+        vm.expectRevert();
+        vm.prank(randomUser);
+        proxy.setRate(100);
+    }
+
+    function test_AccessControl_EarnerManagerRole_CanCallSetEarnerDetails() public {
+        address newEarnerManager = address(0x200);
+        address account = address(0x201);
+        bytes32 earnerManagerRole = proxy.EARNER_MANAGER_ROLE();
+
+        // Grant earner manager role
+        vm.prank(admin);
+        proxy.grantRole(earnerManagerRole, newEarnerManager);
+
+        // Verify role
+        assertTrue(proxy.hasRole(earnerManagerRole, newEarnerManager), "Should have EARNER_MANAGER_ROLE");
+
+        // New earner manager can call setEarnerDetails
+        vm.prank(newEarnerManager);
+        proxy.setEarnerDetails(account, true, 500, address(0x202)); // Should succeed
+
+        (bool isWhitelisted, uint16 feeRate, address feeRecipient) = proxy.getEarnerDetails(account);
+        assertTrue(isWhitelisted, "Account should be whitelisted");
+        assertEq(feeRate, 500, "Fee rate should be set");
+        assertEq(feeRecipient, address(0x202), "Fee recipient should be set");
+    }
+
+    function test_AccessControl_NonEarnerManagerCannotCallSetEarnerDetails() public {
+        address randomUser = address(0x200);
+        address account = address(0x201);
+
+        // Random user cannot call setEarnerDetails
+        vm.expectRevert();
+        vm.prank(randomUser);
+        proxy.setEarnerDetails(account, true, 500, address(0x202));
+    }
+
+    function test_AccessControl_EarnerManagerRole_CanCallSetClaimRecipient() public {
+        address newEarnerManager = address(0x200);
+        address account = address(0x201);
+        address customRecipient = address(0x202);
+        bytes32 earnerManagerRole = proxy.EARNER_MANAGER_ROLE();
+
+        // Grant earner manager role
+        vm.prank(admin);
+        proxy.grantRole(earnerManagerRole, newEarnerManager);
+
+        // Verify role
+        assertTrue(proxy.hasRole(earnerManagerRole, newEarnerManager), "Should have EARNER_MANAGER_ROLE");
+
+        // New earner manager can call setClaimRecipient
+        vm.prank(newEarnerManager);
+        proxy.setClaimRecipient(account, customRecipient); // Should succeed
+
+        assertEq(proxy.claimRecipientFor(account), customRecipient, "Claim recipient should be set");
+    }
+
+    function test_AccessControl_NonEarnerManagerCannotCallSetClaimRecipient() public {
+        address randomUser = address(0x200);
+        address account = address(0x201);
+
+        // Random user cannot call setClaimRecipient
+        vm.expectRevert();
+        vm.prank(randomUser);
+        proxy.setClaimRecipient(account, address(0x202));
+    }
+
+    function test_AccessControl_FreezeManagerRole_CanCallFreeze() public {
+        address account = address(0x200);
+        bytes32 freezeManagerRole = proxy.FREEZE_MANAGER_ROLE();
+
+        // Verify freeze manager has role
+        assertTrue(proxy.hasRole(freezeManagerRole, freezeManager), "Freeze manager should have role");
+
+        // Freeze manager can call freeze
+        vm.prank(freezeManager);
+        proxy.freeze(account); // Should succeed
+    }
+
+    function test_AccessControl_NonFreezeManagerCannotCallFreeze() public {
+        address randomUser = address(0x200);
+        address account = address(0x201);
+
+        // Random user cannot call freeze
+        vm.expectRevert();
+        vm.prank(randomUser);
+        proxy.freeze(account);
+    }
+
+    function test_AccessControl_FreezeManagerRole_CanCallUnfreeze() public {
+        address account = address(0x200);
+        bytes32 freezeManagerRole = proxy.FREEZE_MANAGER_ROLE();
+
+        // Freeze account first
+        vm.prank(freezeManager);
+        proxy.freeze(account);
+
+        // Freeze manager can call unfreeze
+        vm.prank(freezeManager);
+        proxy.unfreeze(account); // Should succeed
+    }
+
+    function test_AccessControl_NonFreezeManagerCannotCallUnfreeze() public {
+        address randomUser = address(0x200);
+        address account = address(0x201);
+
+        // Random user cannot call unfreeze
+        vm.expectRevert();
+        vm.prank(randomUser);
+        proxy.unfreeze(account);
+    }
+
+    function test_AccessControl_ForcedTransferManagerRole_CanCallForceTransfer() public {
+        address from = address(0x200);
+        address to = address(0x201);
+        uint256 amount = 100e6;
+        bytes32 forcedTransferManagerRole = proxy.FORCED_TRANSFER_MANAGER_ROLE();
+
+        // Mint to sender
+        vm.prank(minterGateway);
+        proxy.mint(from, amount);
+
+        // Freeze sender first (required for forceTransfer)
+        vm.prank(freezeManager);
+        proxy.freeze(from);
+
+        // Verify forced transfer manager has role
+        assertTrue(
+            proxy.hasRole(forcedTransferManagerRole, forcedTransferManager),
+            "Forced transfer manager should have role"
+        );
+
+        // Forced transfer manager can call forceTransfer
+        vm.prank(forcedTransferManager);
+        proxy.forceTransfer(from, to, amount); // Should succeed
+
+        assertEq(proxy.balanceOf(from), 0, "From balance should be 0");
+        assertEq(proxy.balanceOf(to), amount, "To balance should be amount");
+    }
+
+    function test_AccessControl_NonForcedTransferManagerCannotCallForceTransfer() public {
+        address randomUser = address(0x200);
+        address from = address(0x201);
+        address to = address(0x202);
+        uint256 amount = 100e6;
+
+        // Mint to sender
+        vm.prank(minterGateway);
+        proxy.mint(from, amount);
+
+        // Freeze sender first (required for forceTransfer)
+        vm.prank(freezeManager);
+        proxy.freeze(from);
+
+        // Random user cannot call forceTransfer
+        vm.expectRevert();
+        vm.prank(randomUser);
+        proxy.forceTransfer(from, to, amount);
+    }
+
+    function test_AccessControl_PauserRole_CanCallPause() public {
+        bytes32 pauserRole = proxy.PAUSER_ROLE();
+
+        // Verify pauser has role
+        assertTrue(proxy.hasRole(pauserRole, pauser), "Pauser should have role");
+
+        // Pauser can call pause
+        vm.prank(pauser);
+        proxy.pause(); // Should succeed
+
+        // Verify contract is paused
+        assertTrue(proxy.paused(), "Contract should be paused");
+    }
+
+    function test_AccessControl_NonPauserCannotCallPause() public {
+        address randomUser = address(0x200);
+
+        // Random user cannot call pause
+        vm.expectRevert();
+        vm.prank(randomUser);
+        proxy.pause();
+    }
+
+    function test_AccessControl_PauserRole_CanCallUnpause() public {
+        bytes32 pauserRole = proxy.PAUSER_ROLE();
+
+        // Pause first
+        vm.prank(pauser);
+        proxy.pause();
+
+        // Pauser can call unpause
+        vm.prank(pauser);
+        proxy.unpause(); // Should succeed
+
+        // Verify contract is unpaused
+        assertFalse(proxy.paused(), "Contract should be unpaused");
+    }
+
+    function test_AccessControl_NonPauserCannotCallUnpause() public {
+        address randomUser = address(0x200);
+
+        // Pause first
+        vm.prank(pauser);
+        proxy.pause();
+
+        // Random user cannot call unpause
+        vm.expectRevert();
+        vm.prank(randomUser);
+        proxy.unpause();
+    }
+
+    function test_AccessControl_RoleGrantEmitsEvent() public {
+        address newRateManager = address(0x200);
+        bytes32 rateManagerRole = proxy.RATE_MANAGER_ROLE();
+
+        vm.expectEmit(true, true, true, true);
+        emit IAccessControl.RoleGranted(rateManagerRole, newRateManager, admin);
+
+        vm.prank(admin);
+        proxy.grantRole(rateManagerRole, newRateManager);
+    }
+
+    function test_AccessControl_RoleRevokeEmitsEvent() public {
+        address rateManagerToRevoke = address(0x200);
+        bytes32 rateManagerRole = proxy.RATE_MANAGER_ROLE();
+
+        // Grant role first
+        vm.prank(admin);
+        proxy.grantRole(rateManagerRole, rateManagerToRevoke);
+
+        vm.expectEmit(true, true, true, true);
+        emit IAccessControl.RoleRevoked(rateManagerRole, rateManagerToRevoke, admin);
+
+        vm.prank(admin);
+        proxy.revokeRole(rateManagerRole, rateManagerToRevoke);
     }
 }
