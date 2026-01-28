@@ -228,7 +228,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
     * - [ ] when recipient is earner
     *   - [ ] success (requires Phase 2.9 startEarningFor)
     *   - [ ] balance increased
-    *   - [ ] totalEarningSupply increased
+    *   - [x] totalEarningSupply increased
     *   - [ ] totalNonEarningSupply unchanged
     * - [x] when recipient is not earner
     *   - [x] success
@@ -574,7 +574,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Implement `claimFor` function**
+- [x] **Implement `claimFor` function**
   - Reference: SDD Section 6.5 (Claim Yield)
   - Signature: `function claimFor(address account) external returns (uint240)`
   - Access control: Permissionless (anyone can claim for any earner)
@@ -605,33 +605,33 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Unit Tests
 
-- [ ] **Add claimFor tests to PYUSDXUnit.t.sol**
+- [x] **Add claimFor tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] claimFor
-     *   - [ ] when account is not earning
-     *   -   - [ ] revert (or return 0)
-     *   - [ ] when contract is paused
-     *   -   - [ ] revert with EnforcedPause
-     *   - [ ] when account is frozen
-     *   -   - [ ] revert with AccountFrozen
-     *   - [ ] with no accrued yield
-     *   -   - [ ] return 0, no state changes
-     *   - [ ] with yield, no fee
-     *   -   - [ ] success, balance increased by grossYield
-     *   -   - [ ] earningPrincipal increased
-     *   -   - [ ] totalEarningSupply increased
-     *   -   - [ ] totalEarningPrincipal increased
-     *   -   - [ ] Claimed event emitted with netYield
-     *   - [ ] with yield and fee
-     *   -   - [ ] success, balance increased by grossYield
-     *   -   - [ ] recipient receives netYield
-     *   -   - [ ] feeRecipient receives fee
-     *   -   - [ ] fee = grossYield × feeRate / 10000
+     * - [x] claimFor
+     *   - [x] when account is not earning
+     *   -   - [x] revert
+     *   - [x] when contract is paused
+     *   -   - [x] revert with EnforcedPause
+     *   - [x] when account is frozen
+     *   -   - [x] revert with AccountFrozen
+     *   - [x] with no accrued yield
+     *   -   - [x] return 0, no state changes
+     *   - [x] with yield, no fee
+     *   -   - [x] success, balance increased by grossYield
+     *   -   - [x] earningPrincipal increased
+     *   -   - [x] totalEarningSupply increased
+     *   -   - [x] totalEarningPrincipal increased
+     *   -   - [x] Claimed event emitted
+     *   - [x] with yield and fee
+     *   -   - [x] success, balance increased by grossYield
+     *   -   - [x] recipient receives netYield
+     *   -   - [x] feeRecipient receives fee
+     *   -   - [x] fee = grossYield × feeRate / 10000
      *   - [ ] with custom claim recipient
-     *   -   - [ ] yield sent to custom recipient
-     *   - [ ] with 100% fee rate
-     *   -   - [ ] user receives 0, feeRecipient receives all yield
+     *   -   - [ ] yield sent to custom recipient (requires Phase 2.12 setClaimRecipient)
+     *   - [x] with 100% fee rate
+     *   -   - [x] user receives 0, feeRecipient receives all yield
      */
 
 #### Fuzz Tests
@@ -718,11 +718,11 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
     ```solidity
      * - [ ] transfer
      *   - [ ] when paused
-     *   -   - [ ] revert with EnforcedPause
+     *   -   - [x] revert with EnforcedPause
      *   - [ ] when sender frozen
-     *   -   - [ ] revert with AccountFrozen
+     *   -   - [x] revert with AccountFrozen
      *   - [ ] when recipient frozen
-     *   -   - [ ] revert with AccountFrozen
+     *   -   - [x] revert with AccountFrozen
      *   - [ ] when insufficient balance
      *   -   - [ ] revert
      *   - [ ] earner to earner
@@ -731,7 +731,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
      *   -   - [ ] success, totalNonEarningSupply unchanged
      *   - [ ] non-earner to earner
      *   -   - [ ] success, recipient principal increased
-     *   -   - [ ] totalEarningSupply increased, totalNonEarningSupply decreased
+     *   -   - [x] totalEarningSupply increased, totalNonEarningSupply decreased
      *   - [ ] earner to non-earner
      *   -   - [ ] success, sender principal decreased
      *   -   - [ ] totalEarningSupply decreased, totalNonEarningSupply increased

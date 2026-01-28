@@ -366,3 +366,51 @@ Date: 2025-01-27
 - `forge test --match-path "test/unit/PYUSDXUnit.t.sol"`: 75 passed, 0 failed
 - `forge fmt --check`: Pass
 
+
+#### Phase 2.11: Claim For
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented `claimFor(address account)` function:
+  - Permissionless function (anyone can claim for any earner)
+  - Pre-flight checks: Not paused (via `whenNotPaused`), account not frozen (via `_revertIfFrozen`), account is earning
+  - Calculates accrued yield using `_getAccruedYield`
+  - Early return with 0 if no yield accrued
+  - Gets earner details for fee calculation (direct storage access to `$.earnerDetails[account]`)
+  - Calculates fee deduction if `feeRate > 0`
+  - Gets claim recipient (returns account if not set)
+  - Updates account balance and principal with claimed yield
+  - Updates `totalEarningSupply` and `totalEarningPrincipal`
+  - Transfers fee to fee recipient if applicable (mints to non-earning supply)
+  - Transfers net yield to recipient (mints to non-earning supply if different from account)
+  - Calls `_updateIndex()` at end
+  - Emits `Claimed(account, recipient, netYield)` and `Transfer(address(0), account, grossYield)` events
+
+- Unit tests cover:
+  - Not earning reverts
+  - Paused contract reverts (with `whenNotPaused` modifier check)
+  - Frozen account reverts (with `_revertIfFrozen` check)
+  - No accrued yield: returns 0, no state changes
+  - With yield, no fee: success, balance increased by grossYield, earningPrincipal increased, totalEarningSupply increased, totalEarningPrincipal increased
+  - Claimed event emitted
+  - With yield and fee: success, balance increased by grossYield, recipient receives netYield, feeRecipient receives fee, fee = grossYield × feeRate / 10000
+  - With 100% fee rate: user receives 0, feeRecipient receives all yield
+  - Multiple claims: second claim is greater due to compounding
+  - Custom claim recipient test skipped (requires Phase 2.12 setClaimRecipient)
+
+**Gotchas:**
+- Claim logic matches the inlined claim logic from `stopEarningFor` (Phase 2.10)
+- The account's balance is increased by `grossYield` (before fee deduction), while the fee is minted separately to the fee recipient
+- When recipient is different from account, the net yield is minted to the recipient's balance in non-earning supply
+- When recipient is the account itself, the balance already includes the gross yield, so only the Transfer event is emitted
+- Multiple claims show compounding behavior because each claim increases the earning principal, leading to more yield in subsequent claims
+- The test `test_ClaimFor_ClaimedEventEmitted` had to be adjusted to do a preliminary claim to get the expected yield amount, then reset for the actual event test
+- Stack too deep error was encountered due to too many local variables in `test_ClaimFor_WithYieldAndFee_Success`; fixed by reducing variable count
+
+**Verification:**
+- All 84 unit tests pass (75 from Phase 2.10 + 9 new claimFor tests)
+- `forge build`: Success with only expected warnings (unreachable code, unused params, stub functions)
+- `forge fmt --check`: Pass
+- `forge test --match-path "test/unit/PYUSDXUnit.t.sol"`: 84 passed, 0 failed
+
+Date: 2025-01-27

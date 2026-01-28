@@ -523,9 +523,89 @@ contract PYUSDX is
         emit Transfer(account, address(0), amount);
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.11
-    function claimFor(address account) external override returns (uint240) {
-        revert("TODO: Phase 2.11");
+    /**
+     * @notice Claims accrued yield for an account
+     * @dev Permissionless function (anyone can claim for any earner).
+     *      Calculates gross yield, deducts fee if applicable, updates account state,
+     *      and transfers net yield to claim recipient.
+     * @param account Account to claim yield for
+     * @return netYield Amount of yield actually received (after fee deduction)
+     */
+    function claimFor(address account) external override whenNotPaused returns (uint240) {
+        // Pre-flight checks
+        _revertIfFrozen(account);
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        // Account must be earning
+        if (!accountData.isEarning) {
+            revert("not earning");
+        }
+
+        // Update index to get current value
+        uint128 idx = _updateIndex();
+
+        // Calculate accrued yield
+        uint240 grossYield = _getAccruedYield(accountData.balance, accountData.earningPrincipal, idx);
+
+        // Early return if no yield to claim
+        if (grossYield == 0) {
+            return 0;
+        }
+
+        // Get earner details for fee calculation
+        EarnerDetails memory earnerInfo = $.earnerDetails[account];
+        uint16 feeRate = earnerInfo.feeRate;
+        address feeRecipient = earnerInfo.feeRecipient;
+
+        uint240 netYield = grossYield;
+        uint240 fee = 0;
+
+        // Calculate fee if applicable
+        if (feeRate > 0) {
+            fee = uint240((uint256(grossYield) * uint256(feeRate)) / 10000);
+            netYield = grossYield - fee;
+        }
+
+        // Get claim recipient (returns account if not set)
+        address recipient = $.claimRecipients[account];
+        if (recipient == address(0)) {
+            recipient = account;
+        }
+
+        // Store old principal for delta calculation
+        uint112 oldPrincipal = accountData.earningPrincipal;
+
+        // Update account state
+        accountData.balance += grossYield;
+        accountData.earningPrincipal =
+            uint112(uint256(oldPrincipal) + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx));
+
+        // Update totals
+        $.totalEarningSupply += grossYield;
+        $.totalEarningPrincipal += accountData.earningPrincipal - oldPrincipal;
+
+        // Transfer fee if applicable
+        if (fee > 0 && feeRecipient != address(0)) {
+            $.accounts[feeRecipient].balance += fee;
+            $.totalNonEarningSupply += fee;
+            emit Transfer(address(0), feeRecipient, fee);
+        }
+
+        // Transfer net yield to recipient
+        if (recipient != account) {
+            $.accounts[recipient].balance += netYield;
+            $.totalNonEarningSupply += netYield;
+            emit Transfer(address(0), recipient, netYield);
+        } else {
+            // Recipient is the account itself, already added to balance
+            emit Transfer(address(0), account, netYield);
+        }
+
+        emit Claimed(account, recipient, netYield);
+
+        return netYield;
     }
 
     /**
@@ -685,8 +765,8 @@ contract PYUSDX is
 
                 // Update account balance and principal
                 accountData.balance += grossYield;
-                accountData.earningPrincipal = uint112(uint256(principal)
-                    + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx));
+                accountData.earningPrincipal =
+                    uint112(uint256(principal) + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx));
 
                 // Update total earning supply
                 $.totalEarningSupply += grossYield;
@@ -789,8 +869,8 @@ contract PYUSDX is
 
                     // Update account balance and principal
                     accountData.balance += grossYield;
-                    accountData.earningPrincipal = uint112(uint256(principal)
-                        + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx));
+                    accountData.earningPrincipal =
+                        uint112(uint256(principal) + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx));
 
                     // Update total earning supply
                     $.totalEarningSupply += grossYield;
