@@ -198,7 +198,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Implement `mint` function**
+- [x] **Implement `mint` function**
   - Reference: SDD Section 6.1 (Mint and Burn Operations)
   - Signature: `function mint(address account, uint256 amount) external`
   - Access control: Only callable by `minterGateway`
@@ -214,34 +214,34 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Unit Tests
 
-- [ ] **Add mint tests to PYUSDXUnit.t.sol**
+- [x] **Add mint tests to PYUSDXUnit.t.sol**
   - Update TODO list with mint branch tests:
     ```solidity
-    * - [ ] when caller is not minterGateway
-    *   - [ ] revert
-    * - [ ] when contract is paused
-    *   - [ ] revert with EnforcedPause
-    * - [ ] when recipient is frozen
-    *   - [ ] revert with AccountFrozen
-    * - [ ] when amount is zero
-    *   - [ ] revert
+    * - [x] when caller is not minterGateway
+    *   - [x] revert
+    * - [x] when contract is paused
+    *   - [x] revert with EnforcedPause
+    * - [x] when recipient is frozen
+    *   - [x] revert with AccountFrozen
+    * - [x] when amount is zero
+    *   - [x] revert
     * - [ ] when recipient is earner
-    *   - [ ] success
+    *   - [ ] success (requires Phase 2.9 startEarningFor)
     *   - [ ] balance increased
     *   - [ ] totalEarningSupply increased
     *   - [ ] totalNonEarningSupply unchanged
-    * - [ ] when recipient is not earner
-    *   - [ ] success
-    *   - [ ] balance increased
-    *   - [ ] totalNonEarningSupply increased
-    *   - [ ] totalEarningSupply unchanged
-    * - [ ] when amount would overflow uint240
-    *   - [ ] revert with overflow
+    * - [x] when recipient is not earner
+    *   - [x] success
+    *   - [x] balance increased
+    *   - [x] totalNonEarningSupply increased
+    *   - [x] totalEarningSupply unchanged
+    * - [x] when amount would overflow uint240
+    *   - [x] revert with overflow
     ```
 
 #### Fuzz Tests
 
-- [ ] **Create fuzz test file for mint**
+- [x] **Create fuzz test file for mint**
   - File: `test/fuzz/PYUSDXFuzz.t.sol`
   - Fuzzable parameters: `amount` (uint256), `account` (address)
   - Invariants:

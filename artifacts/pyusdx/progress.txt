@@ -98,3 +98,28 @@
 - All 18 tests pass
 - `forge test --match-path "test/unit/PYUSDXUnit.t.sol"`: 18 passed, 0 failed
 
+#### Phase 2.2: Mint Function
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented `mint` function with:
+  - Access control: Only callable by `minterGateway` (reverts with `NotMinterGateway` otherwise)
+  - Pre-flight checks: Not paused (via `whenNotPaused`), recipient not frozen (via `_revertIfFrozen`), amount > 0
+  - Amount casting to `uint240` with overflow protection using `UIntMath.safe240()`
+  - Balance update and supply tracking based on earning status
+  - Transfer event emission
+- Added minimal earner management functions (`setEarnerDetails`, `getEarnerDetails`, `earnerStatusFor`) to support earner testing in later phases
+- Unit tests cover: Not minter gateway, paused, frozen recipient, zero amount, to non-earner, overflow uint240, Transfer event
+- Fuzz tests cover: Amount within bounds, amount exceeds uint240, total supply invariant, zero address, same recipient multiple times, balance never negative
+
+**Gotchas:**
+- Earner test for mint to earner is skipped since `startEarningFor` (Phase 2.9) is not yet implemented
+- Used `_revertIfFrozen(account)` from Freezable instead of direct `_frozen` mapping access
+- Fuzz tests needed `vm.assume(amount > 0)` to exclude zero amount which is rejected by mint
+- Fuzz test for multiple mints needed additional bounds checking to prevent uint240 overflow
+
+**Verification:**
+- All 25 unit tests pass (18 from Phase 2.1 + 7 new mint tests)
+- All 6 fuzz tests pass with 5000 runs each
+- `forge build`: Success
+
