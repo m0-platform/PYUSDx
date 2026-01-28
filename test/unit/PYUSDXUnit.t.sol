@@ -245,6 +245,10 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  *   - [x] totalNonEarningSupply tracks non-earners
  *   -   - [x] increases on mint to non-earner
  *   -   - [x] decreases on burn from non-earner
+ * - [x] isEarning
+ *   - [x] returns true after startEarningFor
+ *   - [x] returns false after stopEarningFor
+ *   - [x] returns false for non-earners
  */
 contract PYUSDXUnitTest is Test {
     /* ============ Test Variables ============ */
@@ -2666,5 +2670,72 @@ contract PYUSDXUnitTest is Test {
             totalNonEarningSupplyBefore - burnAmount,
             "totalNonEarningSupply should decrease by burned amount"
         );
+    }
+
+    /* ============ IsEarning Tests (Phase 2.15) ============ */
+
+    function test_IsEarning_ReturnsTrueAfterStartEarningFor() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint and setup as earner
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Initially not earning
+        assertFalse(proxy.isEarning(account), "Account should not be earning initially");
+
+        // Start earning
+        proxy.startEarningFor(account);
+
+        // Now earning
+        assertTrue(proxy.isEarning(account), "Account should be earning after startEarningFor");
+    }
+
+    function test_IsEarning_ReturnsFalseAfterStopEarningFor() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint, setup as earner, and start earning
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+        proxy.startEarningFor(account);
+
+        assertTrue(proxy.isEarning(account), "Account should be earning");
+
+        // Remove earner status
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, false, 0, address(0));
+
+        // Stop earning
+        proxy.stopEarningFor(account);
+
+        // Now not earning
+        assertFalse(proxy.isEarning(account), "Account should not be earning after stopEarningFor");
+    }
+
+    function test_IsEarning_ReturnsFalseForNonEarners() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint but don't setup as earner
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        // Not earning
+        assertFalse(proxy.isEarning(account), "Non-earner should return false");
+
+        // Setup as earner but don't start earning
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        // Still not earning (approved but not started)
+        assertFalse(proxy.isEarning(account), "Approved but not started earner should return false");
     }
 }

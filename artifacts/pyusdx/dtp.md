@@ -788,20 +788,20 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Implement `isEarning` view function**
+- [x] **Implement `isEarning` view function**
   - Reference: SDD Section 3.1 (Primary Interface)
   - Signature: `function isEarning(address account) public view returns (bool)`
   - Logic: Return `_accounts[account].isEarning`
 
 #### Unit Tests
 
-- [ ] **Add isEarning tests to PYUSDXUnit.t.sol**
+- [x] **Add isEarning tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] isEarning
-     *   - [ ] returns true after startEarningFor
-     *   - [ ] returns false after stopEarningFor
-     *   - [ ] returns false for non-earners
+     * - [x] isEarning
+     *   - [x] returns true after startEarningFor
+     *   - [x] returns false after stopEarningFor
+     *   - [x] returns false for non-earners
      */
 
 ---
