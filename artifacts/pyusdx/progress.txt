@@ -250,3 +250,50 @@ Date: 2025-01-27
 - `forge build`: Success
 - `forge fmt --check`: Pass
 
+#### Phase 2.9: Start Earning For
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented `startEarningFor(address account)` function:
+  - Permissionless function (anyone can call for any approved earner)
+  - Pre-flight checks: Not paused, account not frozen, account is whitelisted as earner, not already earning
+  - Principal calculation: `balance × PRECISION / currentIndex` using `IndexingMath.getPrincipalAmountRoundedUp`
+  - Sets `isEarning = true`, stores `earningPrincipal`
+  - Updates `totalEarningPrincipal`, `totalEarningSupply`, `totalNonEarningSupply`
+  - Calls `_updateIndex()` at end
+  - Emits `StartedEarning(account)` event
+
+- Implemented `startEarningFor(address[] calldata accounts)` batch variant:
+  - Loops through accounts and applies same logic as single variant
+  - Skips non-approved and already-earning accounts (continues instead of reverting)
+  - Validates array length > 0
+  - Emits `StartedEarning` event for each successfully started account
+
+- Added `totalEarningPrincipal()` view function for testing
+
+- Unit tests cover:
+  - Not approved earner reverts
+  - Paused contract reverts (with `whenNotPaused` modifier check)
+  - Frozen account reverts (with `_revertIfFrozen` check)
+  - Already earning reverts
+  - Zero balance: success with isEarning=true, earningPrincipal=0
+  - Positive balance: success with proper principal calculation, supply tracking updates
+  - Batch with multiple accounts: all marked as earning
+  - Batch with empty array: reverts
+  - Batch with mix of approved/non-approved: only approved start earning
+
+**Gotchas:**
+- The batch variant uses `continue` for non-approved or already-earning accounts instead of reverting
+- This is intentional to allow batch operations to partially succeed
+- Error format for `vm.expectRevert()` needed to be adjusted:
+  - For `EnforcedPause`: used `vm.expectRevert()` without parameters (custom error with no args)
+  - For `AccountFrozen`: used `vm.expectRevert(abi.encodeWithSignature("AccountFrozen(address)", account))`
+- Principal calculation uses `getPrincipalAmountRoundedUp` to ensure users don't lose yield due to rounding
+- When index = PRECISION (no growth), principal equals balance exactly
+
+**Verification:**
+- All 66 unit tests pass (57 from Phase 2.8 + 9 new startEarningFor tests)
+- `forge build`: Success
+- `forge fmt --check`: Pass
+- `forge test --match-path "test/unit/PYUSDXUnit.t.sol"`: 66 passed, 0 failed
+

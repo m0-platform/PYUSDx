@@ -424,12 +424,12 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
      * - [x] accruedYieldOf
      *   - [x] when account is not earning
      *   -   - [x] return 0
-     *   - [ ] when earningPrincipal is 0
-     *   -   - [ ] return 0 (deferred to Phase 2.9)
+     *   - [x] when earningPrincipal is 0
+     *   -   - [x] return 0
      *   - [ ] when index has grown
-     *   -   - [ ] return positive yield (deferred to Phase 2.9)
+     *   -   - [ ] return positive yield (deferred - full claimFor needed)
      *   - [ ] when balance already includes yield
-     *   -   - [ ] return 0 (no double counting, deferred to Phase 2.9)
+     *   -   - [ ] return 0 (no double counting, deferred - full claimFor needed)
      *   - [x] when index equals PRECISION (no growth)
      *   -   - [x] return 0
      */
@@ -461,10 +461,10 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
     * - [x] balanceOf: returns stored balance only
     *   - [x] excludes accrued yield
     * - [x] balanceWithYieldOf: returns balance + accruedYield
-    *   - [ ] for earners: includes yield (deferred to Phase 2.9)
+    *   - [x] for earners: includes yield
     *   - [x] for non-earners: equals balance
     * - [x] earningPrincipalOf: returns principal
-    *   - [ ] for earners: returns principal (deferred to Phase 2.9)
+    *   - [x] for earners: returns principal
     *   - [x] for non-earners: returns 0
     ```
 
@@ -472,7 +472,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Implement `startEarningFor` function**
+- [x] **Implement `startEarningFor` function**
   - Reference: SDD Section 6.4 (Start/Stop Earning)
   - Signature: `function startEarningFor(address account) external`
   - Access control: Permissionless (anyone can call)
@@ -491,36 +491,36 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
     - Call `_updateIndex()` at end
   - Emit: `StartedEarning(account)`
 
-- [ ] **Implement batch variant `startEarningFor(address[] calldata accounts)`**
+- [x] **Implement batch variant `startEarningFor(address[] calldata accounts)`**
   - Loop through accounts and call single variant for each
   - Validate array length > 0
 
 #### Unit Tests
 
-- [ ] **Add startEarningFor tests to PYUSDXUnit.t.sol**
+- [x] **Add startEarningFor tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] startEarningFor
-     *   - [ ] when account is not approved
-     *   -   - [ ] revert
-     *   - [ ] when contract is paused
-     *   -   - [ ] revert with EnforcedPause
-     *   - [ ] when account is frozen
-     *   -   - [ ] revert with AccountFrozen
-     *   - [ ] when already earning
-     *   -   - [ ] revert (or return early)
-     *   - [ ] with zero balance
-     *   -   - [ ] success, isEarning = true, earningPrincipal = 0
-     *   - [ ] with positive balance
-     *   -   - [ ] success, isEarning = true, earningPrincipal = balance × PRECISION / index
-     *   -   - [ ] totalEarningPrincipal increased
-     *   -   - [ ] totalEarningSupply increased
-     *   -   - [ ] totalNonEarningSupply decreased
-     *   -   - [ ] StartedEarning event emitted
-     *   - [ ] batch with multiple accounts
-     *   -   - [ ] success for all, all accounts marked as earning
-     *   - [ ] batch with empty array
-     *   -   - [ ] revert with ArrayLengthZero
+     * - [x] startEarningFor
+     *   - [x] when account is not approved
+     *   -   - [x] revert
+     *   - [x] when contract is paused
+     *   -   - [x] revert with EnforcedPause
+     *   - [x] when account is frozen
+     *   -   - [x] revert with AccountFrozen
+     *   - [x] when already earning
+     *   -   - [x] revert (or return early)
+     *   - [x] with zero balance
+     *   -   - [x] success, isEarning = true, earningPrincipal = 0
+     *   - [x] with positive balance
+     *   -   - [x] success, isEarning = true, earningPrincipal = balance × PRECISION / index
+     *   -   - [x] totalEarningPrincipal increased
+     *   -   - [x] totalEarningSupply increased
+     *   -   - [x] totalNonEarningSupply decreased
+     *   -   - [x] StartedEarning event emitted
+     *   - [x] batch with multiple accounts
+     *   -   - [x] success for all, all accounts marked as earning
+     *   - [x] batch with empty array
+     *   -   - [x] revert with ArrayLengthZero
      */
 
 ### 2.10 Stop Earning For
