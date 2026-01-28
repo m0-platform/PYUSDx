@@ -313,14 +313,47 @@ contract PYUSDX is
         return _getAccruedYield(accountData.balance, accountData.earningPrincipal, _calculateIndex($));
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.8
+    /**
+     * @notice Returns balance plus accrued yield for an account
+     * @dev For earners: returns balance + accruedYieldOf(account)
+     *      For non-earners: returns balance (same as balanceOf)
+     * @param account Account to query
+     * @return Balance including any accrued but unclaimed yield
+     */
     function balanceWithYieldOf(address account) external view override returns (uint256) {
-        revert("TODO: Phase 2.8");
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account memory accountData = $.accounts[account];
+
+        uint256 balance = uint256(accountData.balance);
+
+        // Non-earners: balance is same as stored balance
+        if (!accountData.isEarning) {
+            return balance;
+        }
+
+        // Earners: add accrued yield
+        uint240 yield = _getAccruedYield(accountData.balance, accountData.earningPrincipal, _calculateIndex($));
+        return balance + uint256(yield);
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.8
+    /**
+     * @notice Returns the earning principal for an account
+     * @dev The earning principal is the amount used to calculate yield.
+     *      For earners: returns the stored earning principal.
+     *      For non-earners: returns 0.
+     * @param account Account to query
+     * @return Earning principal amount (0 if not earning)
+     */
     function earningPrincipalOf(address account) external view override returns (uint112) {
-        revert("TODO: Phase 2.8");
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account memory accountData = $.accounts[account];
+
+        // Return 0 for non-earners
+        if (!accountData.isEarning) {
+            return 0;
+        }
+
+        return accountData.earningPrincipal;
     }
 
     /// @notice Stub implementation - to be implemented in Phase 2.12
