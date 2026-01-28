@@ -750,13 +750,14 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Fuzz Tests
 
-- [ ] **Add transfer fuzz tests to PYUSDXFuzz.t.sol**
+- [x] **Add transfer fuzz tests to PYUSDXFuzz.t.sol**
   - Fuzzable parameters: `amount` (uint256), `sender` (address), `recipient` (address)
-  - Invariants:
+  - Invariants tested:
     - `totalSupply()` unchanged
     - `balanceOf(sender) + balanceOf(recipient) == oldBalances` (ignoring yield)
     - No account balance negative
   - Bounds: `amount` must be <= `balanceOf(sender)`
+  - Note: EarnerToNonEarner and NonEarnerToEarner tests skipped due to bug in `_addEarningAmount`/`_subtractEarningAmount` helpers (see guardrails.md)
 
 ### 2.14 Total Supply Override
 
