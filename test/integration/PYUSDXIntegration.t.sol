@@ -323,4 +323,146 @@ contract PYUSDXIntegrationTest is Test {
         assertEq(pyusdx.totalNonEarningSupply(), mintAmount - burnAmount, "After burn from non-earner: Non-earning supply");
         assertEq(pyusdx.totalSupply(), pyusdx.totalEarningSupply() + pyusdx.totalNonEarningSupply(), "Invariant holds");
     }
+
+    /* ============ M0 Common Libraries Integration ============ */
+
+    /**
+     * @notice Test IndexingMath.getPresentAmountRoundedDown
+     * @dev Integration test: verify the formula balanceWithYield = principal * index / PRECISION
+     */
+    function test_Integration_IndexingMath_GetPresentAmountRoundedDown() public {
+        // Setup: Whitelist Alice as earner and mint tokens
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(alice, true, 0, address(0));
+        vm.prank(authorizedUser);
+        minterGateway.mint(alice, 10_000e6);
+        pyusdx.startEarningFor(alice);
+
+        // Set a rate and fast forward to accrue yield
+        vm.prank(rateManager);
+        pyusdx.setRate(1215752192); // ~1.2% APY
+        vm.warp(block.timestamp + 365 days);
+
+        // Get balance with yield (uses IndexingMath.getPresentAmountRoundedDown internally)
+        uint256 balance = pyusdx.balanceOf(alice);
+        uint256 principal = pyusdx.earningPrincipalOf(alice);
+        uint256 balanceWithYield = pyusdx.balanceWithYieldOf(alice);
+        uint256 currentIndex = pyusdx.currentIndex();
+
+        // Verify: balanceWithYield = principal * currentIndex / PRECISION (rounded down)
+        uint256 expectedBalanceWithYield = (principal * currentIndex) / 1e12;
+        assertEq(balanceWithYield, expectedBalanceWithYield, "Balance with yield matches formula");
+        assertTrue(balanceWithYield >= balance, "Balance with yield >= balance");
+
+        // Accrued yield should be the difference
+        uint256 accruedYield = pyusdx.accruedYieldOf(alice);
+        assertEq(balanceWithYield, balance + accruedYield, "Balance with yield = balance + accrued");
+    }
+
+    /**
+     * @notice Test IndexingMath.getPrincipalAmountRoundedUp
+     * @dev Integration test: verify principal = balance * PRECISION / index (rounded up)
+     */
+    function test_Integration_IndexingMath_GetPrincipalAmountRoundedUp() public {
+        // Setup: Whitelist Alice as earner, mint tokens, and start earning with index > PRECISION
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(alice, true, 0, address(0));
+        vm.prank(authorizedUser);
+        minterGateway.mint(alice, 10_000e6);
+
+        // Set rate and fast forward to grow index
+        vm.prank(rateManager);
+        pyusdx.setRate(1215752192); // ~1.2% APY
+        vm.warp(block.timestamp + 365 days);
+
+        // Now start earning - principal should be calculated using current index
+        uint256 balanceBeforeStart = pyusdx.balanceOf(alice);
+        uint256 currentIndex = pyusdx.currentIndex();
+        pyusdx.startEarningFor(alice);
+
+        uint256 principal = pyusdx.earningPrincipalOf(alice);
+
+        // Verify: principal = balance * PRECISION / index (rounded up)
+        // Formula: principal = ceil(balance * PRECISION / currentIndex)
+        uint256 expectedPrincipal = (balanceBeforeStart * 1e12 + currentIndex - 1) / currentIndex;
+        assertEq(principal, expectedPrincipal, "Principal matches formula (rounded up)");
+    }
+
+    /**
+     * @notice Test IndexingMath with edge cases
+     * @dev Integration test: zero balance, max index, etc.
+     */
+    function test_Integration_IndexingMath_EdgeCases() public {
+        // Whitelist Alice as earner
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(alice, true, 0, address(0));
+
+        // Edge case 1: Zero balance
+        pyusdx.startEarningFor(alice);
+        assertEq(pyusdx.earningPrincipalOf(alice), 0, "Zero balance => zero principal");
+        assertEq(pyusdx.balanceWithYieldOf(alice), 0, "Zero balance => zero balance with yield");
+
+        // Edge case 2: Very small balance (1 unit)
+        // Mint to a new account and start earning to test principal calculation
+        address charlie = makeAddr("charlie");
+        vm.prank(earnerManager);
+        pyusdx.setEarnerDetails(charlie, true, 0, address(0));
+        vm.prank(authorizedUser);
+        minterGateway.mint(charlie, 1); // 1 unit (6 decimals)
+        pyusdx.startEarningFor(charlie);
+        assertEq(pyusdx.earningPrincipalOf(charlie), 1, "1 unit => 1 principal at index=PRECISION");
+
+        // Edge case 3: Large index growth
+        vm.prank(rateManager);
+        pyusdx.setRate(1215752192); // ~1.2% APY
+        vm.warp(block.timestamp + 365 days);
+        assertTrue(pyusdx.currentIndex() > 1e12, "Index grew");
+
+        // Verify balance with yield calculation still works (using charlie who has 1 unit)
+        uint256 charlieBalance = pyusdx.balanceOf(charlie);
+        uint256 charlieBalanceWithYield = pyusdx.balanceWithYieldOf(charlie);
+        assertTrue(charlieBalanceWithYield >= charlieBalance, "Balance with yield >= original balance");
+    }
+
+    /**
+     * @notice Test UIntMath.bound128 prevents overflow
+     * @dev Integration test: verify uint128 bounds checking
+     */
+    function test_Integration_UIntMath_Bound128() public {
+        // The uint128 bounds are used in _calculateIndex when computing newIndex
+        // Let's verify that setting high rates doesn't cause overflow
+
+        // Set a high rate (uint32 max is about 4.29e9, but we use what fits in uint32)
+        // PRECISION = 1e12, so max rate allowed is 1e12
+        vm.prank(rateManager);
+        uint32 highRate = 3_000_000_000; // High rate but within uint32 and PRECISION bounds
+        pyusdx.setRate(highRate);
+
+        // Fast forward significantly
+        vm.warp(block.timestamp + 365 days);
+
+        // Index should still be within uint128 bounds
+        uint256 index = pyusdx.currentIndex();
+        assertTrue(index <= type(uint128).max, "Index within uint128 bounds");
+        assertTrue(index >= 1e12, "Index >= PRECISION");
+    }
+
+    /**
+     * @notice Test UIntMath.safe240 prevents overflow
+     * @dev Integration test: verify uint240 bounds checking in mint
+     */
+    function test_Integration_UIntMath_Safe240() public {
+        // Try to mint more than uint240 max
+        uint256 maxUint240 = type(uint240).max;
+
+        // Minting uint240.max should work
+        vm.prank(authorizedUser);
+        minterGateway.mint(alice, maxUint240);
+        assertEq(pyusdx.balanceOf(alice), maxUint240, "Max uint240 minted");
+
+        // Try to mint 1 more - this should revert due to overflow
+        vm.prank(authorizedUser);
+        vm.expectRevert();
+        minterGateway.mint(bob, maxUint240 + 1);
+    }
 }
