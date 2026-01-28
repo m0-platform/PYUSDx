@@ -111,6 +111,18 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  *     - [x] return latestIndex (no growth)
  *   - [x] monotonicity: index never decreases
  *     - [x] always true
+ * - [ ] accruedYieldOf
+ *   - [ ] when account is not earning
+ *     - [ ] return 0
+ *   - [ ] when earningPrincipal is 0
+ *     - [ ] return 0
+ *   - [ ] when index has grown
+ *     - [ ] return positive yield
+ *     - [ ] yield = (principal × index / PRECISION) - balance
+ *   - [ ] when balance already includes yield
+ *     - [ ] return 0 (no double counting)
+ *   - [ ] when index equals PRECISION (no growth)
+ *     - [ ] return 0
  */
 contract PYUSDXUnitTest is Test {
     /* ============ Test Variables ============ */
@@ -812,4 +824,37 @@ contract PYUSDXUnitTest is Test {
         }
     }
 
+    /* ============ Accrued Yield Tests ============ */
+
+    function test_AccruedYieldOf_AccountNotEarning_ReturnsZero() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Mint to account (non-earner by default)
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        // Verify account is not earning
+        assertFalse(proxy.isEarning(account), "Account should not be earning");
+
+        // accruedYieldOf should return 0 for non-earners
+        assertEq(proxy.accruedYieldOf(account), uint240(0), "Non-earner should have 0 accrued yield");
+    }
+
+    function test_AccruedYieldOf_IndexEqualsPrecision_NoGrowth_ReturnsZero() public {
+        address account = address(0x100);
+
+        // Mint to account
+        vm.prank(minterGateway);
+        proxy.mint(account, 1000e6);
+
+        // Even if the account were earning, if index = PRECISION (no growth), yield = 0
+        // This test will be fully implementable after Phase 2.9 (startEarningFor)
+        // For now, verify that index equals PRECISION (no growth yet)
+        assertEq(proxy.currentIndex(), uint128(PRECISION), "Index should be PRECISION (no growth)");
+    }
+
+    // NOTE: Full accruedYieldOf tests require startEarningFor (Phase 2.9)
+    // to properly set up earner state. These tests will be expanded in Phase 2.9.
+    // The current implementation correctly returns 0 for non-earners.
 }

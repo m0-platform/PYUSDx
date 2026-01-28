@@ -254,6 +254,36 @@ contract PYUSDX is
         return newIndex;
     }
 
+    /**
+     * @notice Calculates accrued yield for an earner
+     * @dev Computes the difference between balance with yield and current balance.
+     *      Formula: max(0, (earningPrincipal × currentIndex / PRECISION) - balance)
+     * @param balance_ Current balance (excluding accrued yield)
+     * @param earningPrincipal_ Principal amount for yield calculations
+     * @param currentIndex_ Current yield index
+     * @return Accrued yield amount (0 if no yield or negative)
+     */
+    function _getAccruedYield(uint240 balance_, uint112 earningPrincipal_, uint128 currentIndex_)
+        internal
+        pure
+        returns (uint240)
+    {
+        // If no principal, no yield can be accrued
+        if (earningPrincipal_ == 0) {
+            return 0;
+        }
+
+        // Calculate balance with yield: principal × currentIndex / PRECISION
+        uint256 balanceWithYield = IndexingMath.getPresentAmountRoundedDown(earningPrincipal_, currentIndex_);
+
+        // Return the difference (accrued yield), ensuring no underflow
+        uint256 balance = uint256(balance_);
+        if (balanceWithYield > balance) {
+            return uint240(balanceWithYield - balance);
+        }
+        return 0;
+    }
+
     /* ============ Interface Implementation Stubs ============ */
     // NOTE: These will be implemented in subsequent phases as per the DTP
 
@@ -263,9 +293,24 @@ contract PYUSDX is
         return $.accounts[account].balance;
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.7
+    /**
+     * @notice Returns accrued but unclaimed yield for an account
+     * @dev Returns 0 for non-earners. For earners, calculates the difference
+     *      between balance with yield and current balance.
+     * @param account Account to query
+     * @return Accrued yield amount
+     */
     function accruedYieldOf(address account) external view override returns (uint240) {
-        revert("TODO: Phase 2.7");
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account memory accountData = $.accounts[account];
+
+        // Non-earners have no accrued yield
+        if (!accountData.isEarning) {
+            return 0;
+        }
+
+        // Calculate accrued yield using internal helper
+        return _getAccruedYield(accountData.balance, accountData.earningPrincipal, _calculateIndex($));
     }
 
     /// @notice Stub implementation - to be implemented in Phase 2.8
