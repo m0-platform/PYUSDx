@@ -527,7 +527,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Implement `stopEarningFor` function**
+- [x] **Implement `stopEarningFor` function**
   - Reference: SDD Section 6.4 (Start/Stop Earning)
   - Signature: `function stopEarningFor(address account) external`
   - Access control: Permissionless (anyone can call)
@@ -545,7 +545,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
     - Call `_updateIndex()` at end
   - Emit: `StoppedEarning(account)`
 
-- [ ] **Implement batch variant `stopEarningFor(address[] calldata accounts)`**
+- [x] **Implement batch variant `stopEarningFor(address[] calldata accounts)`**
 
 #### Unit Tests
 

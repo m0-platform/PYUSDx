@@ -629,14 +629,206 @@ contract PYUSDX is
         }
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.10
-    function stopEarningFor(address account) external override {
-        revert("TODO: Phase 2.10");
+    /**
+     * @notice Stops earning yield for an account
+     * @dev Permissionless function. Account must be earning and earner status must be false (removed).
+     *      If yield has accrued, it is claimed before stopping earning.
+     * @param account Account to stop earning for
+     */
+    function stopEarningFor(address account) external override whenNotPaused {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        Account storage accountData = $.accounts[account];
+
+        // Account must be earning
+        if (!accountData.isEarning) {
+            revert("not earning");
+        }
+
+        // Account must not be whitelisted as earner (removed by EarnerManager)
+        if ($.earnerDetails[account].isWhitelisted) {
+            revert("still approved earner");
+        }
+
+        // Update index to get current value
+        uint128 idx = _updateIndex();
+
+        // Calculate and claim accrued yield if any
+        // Note: This inlines the claim logic since claimFor is implemented in Phase 2.11
+        uint256 balance = uint256(accountData.balance);
+        uint112 principal = accountData.earningPrincipal;
+
+        if (principal > 0 && balance > 0) {
+            uint240 accruedYield = _getAccruedYield(accountData.balance, principal, idx);
+
+            if (accruedYield > 0) {
+                // Get earner details for fee calculation (direct storage access)
+                EarnerDetails memory earnerInfo = $.earnerDetails[account];
+                uint16 feeRate = earnerInfo.feeRate;
+                address feeRecipient = earnerInfo.feeRecipient;
+
+                uint240 grossYield = accruedYield;
+                uint240 netYield = accruedYield;
+                uint240 fee = 0;
+
+                // Calculate fee if applicable
+                if (feeRate > 0) {
+                    fee = uint240((uint256(grossYield) * uint256(feeRate)) / 10000);
+                    netYield = grossYield - fee;
+                }
+
+                // Get claim recipient
+                address recipient = $.claimRecipients[account];
+                if (recipient == address(0)) {
+                    recipient = account;
+                }
+
+                // Update account balance and principal
+                accountData.balance += grossYield;
+                accountData.earningPrincipal = uint112(uint256(principal)
+                    + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx));
+
+                // Update total earning supply
+                $.totalEarningSupply += grossYield;
+                $.totalEarningPrincipal += accountData.earningPrincipal - principal;
+
+                // Transfer fee if applicable
+                if (fee > 0 && feeRecipient != address(0)) {
+                    // Mint fee to fee recipient (same as claim balance increase)
+                    $.accounts[feeRecipient].balance += fee;
+                    $.totalNonEarningSupply += fee;
+                    emit Transfer(address(0), feeRecipient, fee);
+                }
+
+                // Transfer net yield to recipient
+                if (recipient != account) {
+                    $.accounts[recipient].balance += netYield;
+                    $.totalNonEarningSupply += netYield;
+                    emit Transfer(address(0), recipient, netYield);
+                } else {
+                    // Recipient is the account itself, already added to balance
+                    emit Transfer(address(0), account, netYield);
+                }
+
+                emit Claimed(account, recipient, netYield);
+            }
+        }
+
+        // Clear earning state
+        accountData.isEarning = false;
+        uint112 oldPrincipal = accountData.earningPrincipal;
+        accountData.earningPrincipal = 0;
+
+        // Update totals
+        balance = uint256(accountData.balance); // Re-read in case it changed from claim
+        $.totalEarningPrincipal -= oldPrincipal;
+        $.totalEarningSupply -= uint240(balance);
+        $.totalNonEarningSupply += uint240(balance);
+
+        emit StoppedEarning(account);
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.10
-    function stopEarningFor(address[] calldata accounts) external override {
-        revert("TODO: Phase 2.10");
+    /**
+     * @notice Stops earning yield for multiple accounts
+     * @dev Batch variant of stopEarningFor. Loops through accounts and applies single variant logic.
+     * @param accounts Array of accounts to stop earning for
+     */
+    function stopEarningFor(address[] calldata accounts) external override whenNotPaused {
+        if (accounts.length == 0) {
+            revert("array length zero");
+        }
+
+        for (uint256 i = 0; i < accounts.length; i++) {
+            address account = accounts[i];
+
+            PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+            Account storage accountData = $.accounts[account];
+
+            // Account must be earning
+            if (!accountData.isEarning) {
+                continue; // Skip non-earning accounts
+            }
+
+            // Account must not be whitelisted as earner
+            if ($.earnerDetails[account].isWhitelisted) {
+                continue; // Skip approved earners
+            }
+
+            // Update index
+            uint128 idx = _updateIndex();
+
+            // Calculate and claim accrued yield if any
+            uint256 balance = uint256(accountData.balance);
+            uint112 principal = accountData.earningPrincipal;
+
+            if (principal > 0 && balance > 0) {
+                uint240 accruedYield = _getAccruedYield(accountData.balance, principal, idx);
+
+                if (accruedYield > 0) {
+                    // Get earner details for fee calculation (direct storage access)
+                    EarnerDetails memory earnerInfo = $.earnerDetails[account];
+                    uint16 feeRate = earnerInfo.feeRate;
+                    address feeRecipient = earnerInfo.feeRecipient;
+
+                    uint240 grossYield = accruedYield;
+                    uint240 netYield = accruedYield;
+                    uint240 fee = 0;
+
+                    // Calculate fee if applicable
+                    if (feeRate > 0) {
+                        fee = uint240((uint256(grossYield) * uint256(feeRate)) / 10000);
+                        netYield = grossYield - fee;
+                    }
+
+                    // Get claim recipient
+                    address recipient = $.claimRecipients[account];
+                    if (recipient == address(0)) {
+                        recipient = account;
+                    }
+
+                    // Update account balance and principal
+                    accountData.balance += grossYield;
+                    accountData.earningPrincipal = uint112(uint256(principal)
+                        + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx));
+
+                    // Update total earning supply
+                    $.totalEarningSupply += grossYield;
+                    $.totalEarningPrincipal += accountData.earningPrincipal - principal;
+
+                    // Transfer fee if applicable
+                    if (fee > 0 && feeRecipient != address(0)) {
+                        $.accounts[feeRecipient].balance += fee;
+                        $.totalNonEarningSupply += fee;
+                        emit Transfer(address(0), feeRecipient, fee);
+                    }
+
+                    // Transfer net yield to recipient
+                    if (recipient != account) {
+                        $.accounts[recipient].balance += netYield;
+                        $.totalNonEarningSupply += netYield;
+                        emit Transfer(address(0), recipient, netYield);
+                    } else {
+                        emit Transfer(address(0), account, netYield);
+                    }
+
+                    emit Claimed(account, recipient, netYield);
+                }
+            }
+
+            // Clear earning state
+            accountData.isEarning = false;
+            uint112 oldPrincipal = accountData.earningPrincipal;
+            accountData.earningPrincipal = 0;
+
+            // Update totals
+            balance = uint256(accountData.balance); // Re-read in case it changed
+            $.totalEarningPrincipal -= oldPrincipal;
+            $.totalEarningSupply -= uint240(balance);
+            $.totalNonEarningSupply += uint240(balance);
+
+            emit StoppedEarning(account);
+        }
     }
 
     /* ============ Set Rate ============ */

@@ -297,3 +297,44 @@ Date: 2025-01-27
 - `forge fmt --check`: Pass
 - `forge test --match-path "test/unit/PYUSDXUnit.t.sol"`: 66 passed, 0 failed
 
+#### Phase 2.10: Stop Earning For
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented `stopEarningFor(address account)` function:
+  - Permissionless function (anyone can call for any removed earner)
+  - Pre-flight checks: Not paused (via `whenNotPaused`), account is earning, account is NOT whitelisted as earner (removed)
+  - Updates index via `_updateIndex()` to get current value
+  - If yield accrued: inlines claim logic since `claimFor` (Phase 2.11) is not yet implemented
+    - Calculates accrued yield using `_getAccruedYield`
+    - Gets earner details for fee calculation (direct storage access to `$.earnerDetails[account]`)
+    - Calculates fee deduction if `feeRate > 0`
+    - Updates account balance and principal with claimed yield
+    - Transfers fee to fee recipient if applicable
+    - Transfers net yield to claim recipient
+    - Emits `Claimed` event
+  - Clears earning state: `isEarning = false`, `earningPrincipal = 0`
+  - Updates `totalEarningPrincipal`, `totalEarningSupply`, `totalNonEarningSupply`
+  - Emits `StoppedEarning(account)` event
+
+- Implemented `stopEarningFor(address[] calldata accounts)` batch variant:
+  - Loops through accounts and applies same logic as single variant
+  - Skips non-earning or still-approved accounts (continues instead of reverting)
+  - Validates array length > 0
+  - Emits `StoppedEarning` event for each successfully stopped account
+
+**Gotchas:**
+- Since `claimFor` is Phase 2.11 (not yet implemented), I inlined the claim logic within `stopEarningFor`
+- This includes fee calculation and distribution, balance/principal updates, and event emission
+- Direct storage access to `$.earnerDetails[account]` was needed instead of calling external `getEarnerDetails` function
+- The batch variant uses `continue` for invalid accounts instead of reverting (same pattern as `startEarningFor`)
+- Balance is re-read after potential claim to ensure supply tracking uses updated values
+- Fee distribution mints new tokens to fee recipient (same as claim balance increase)
+
+**Verification:**
+- All 66 existing unit tests still pass (no new tests added for stopEarningFor yet - tests will be added separately)
+- `forge build`: Success with only expected warnings (unreachable code, unused params, stub functions)
+- `forge test --match-path "test/unit/PYUSDXUnit.t.sol"`: 66 passed, 0 failed
+
+**Note:** Unit tests for `stopEarningFor` will be added in a subsequent task to ensure full branch coverage.
+
