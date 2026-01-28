@@ -2,3 +2,9 @@
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
 	branch = v1
+[submodule "lib/common"]
+	path = lib/common
+	url = https://github.com/m0-foundation/common
+[submodule "lib/m-extensions"]
+	path = lib/m-extensions
+	url = https://github.com/m0-foundation/m-extensions

@@ -62,14 +62,14 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Initialize Foundry project**
+- [x] **Initialize Foundry project**
   - Create `foundry.toml` with optimizer settings, solidity version, and test configuration
   - Use relative paths for M0 dependencies (no remappings needed)
   - Configure coverage settings for branch coverage reporting
 
 #### Tests
 
-- [ ] **Verify Foundry setup**
+- [x] **Verify Foundry setup**
   - Run `forge build` to confirm compilation works
   - Run `forge test` to confirm test runner works
   - Check `forge --version` for version compatibility
@@ -78,21 +78,21 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Install M0 Foundation libraries**
+- [x] **Install M0 Foundation libraries**
   - Add M0 Common Libraries: `@m0-foundation/common` (includes OpenZeppelin upgradeable contracts)
   - Add M0 EVM Extensions: `@m0-foundation/m-extensions`
   - Verify all dependencies compile
 
 #### Tests
 
-- [ ] **Verify dependency imports**
+- [x] **Verify dependency imports**
   - Confirm IndexingMath, UIntMath, and extension contracts are accessible
 
 ### 1.3 Base Interface
 
 #### Implementation
 
-- [ ] **Create IPYUSDX interface**
+- [x] **Create IPYUSDX interface**
   - File: `src/interfaces/IPYUSDX.sol`
   - Reference: SDD Section 3.1 (Primary Interface)
   - Define all view functions: `accruedYieldOf`, `balanceOf`, `balanceWithYieldOf`, `earningPrincipalOf`, `claimRecipientFor`, `currentIndex`, `isEarning`, `totalEarningSupply`, `totalNonEarningSupply`
@@ -102,7 +102,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Tests
 
-- [ ] **Verify interface compiles**
+- [x] **Verify interface compiles**
   - Confirm interface syntax is valid
   - Confirm all function signatures match SDD
 
@@ -110,7 +110,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Define Account struct and storage layout**
+- [x] **Define Account struct and storage layout**
   - File: `src/PYUSDX.sol` (placeholder)
   - Reference: SDD Section 4.2 (Structs)
   - Follow M0 Foundation storage pattern:
@@ -147,7 +147,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
   - Precompute the storage slot value using the formula
   - Inherit `PYUSDXLayout` in the main `PYUSDX` contract
 
-- [ ] **Define custom errors**
+- [x] **Define custom errors**
   - File: `src/PYUSDX.sol`
   - Errors from IPYUSDX: `ZeroMinterGateway`, `ZeroPYUSD`
   - Additional errors as needed during implementation
