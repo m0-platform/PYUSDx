@@ -960,7 +960,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Analysis & Tests
 
-- [ ] **Run Slither static analysis**
+- [x] **Run Slither static analysis**
   - Install Slither: `pip install slither-analyzer`
   - Run: `slither .`
   - Review and address findings

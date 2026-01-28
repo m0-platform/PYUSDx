@@ -96,16 +96,16 @@ This document describes the technical design for PYUSDX, an upgradeable, non-reb
 
 ### 2.2 Component Overview
 
-| Component | Responsibility | Interactions |
-|-----------|---------------|--------------|
-| **PYUSDX** | Main token contract; coordinates all components | MinterGateway (mint/burn), setRate (inherited from ContinuousIndexing, via RATE_MANAGER_ROLE), EarnerManager (inherited) |
-| **ContinuousIndexing** | Manages yield index and rate updates | Internal rate storage; updates index based on stored rate |
-| **ERC20ExtendedUpgradeable** | Standard ERC20 + EIP-2612 (permit) + EIP-3009 (gasless transfer) | External wallets, DEXs, integrators |
-| **EarnerManager** | Manages approved earners and fee rates | Admin (via EARNER_MANAGER_ROLE) |
-| **Freezable** | Account-level freeze functionality | Freeze Manager (via FREEZE_MANAGER_ROLE) |
-| **ForcedTransferable** | Force transfer from frozen accounts | Forced Transfer Manager (via FORCED_TRANSFER_MANAGER_ROLE) |
-| **Pausable** | Contract-level pause functionality | Pauser (via PAUSER_ROLE) |
-| **Minter Gateway** | External contract that mints/burns PYUSDX | Calls mint/burn on PYUSDX; collateral held by Minter (off-chain or in separate contract) |
+| Component                    | Responsibility                                                   | Interactions                                                                                                             |
+| ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **PYUSDX**                   | Main token contract; coordinates all components                  | MinterGateway (mint/burn), setRate (inherited from ContinuousIndexing, via RATE_MANAGER_ROLE), EarnerManager (inherited) |
+| **ContinuousIndexing**       | Manages yield index and rate updates                             | Internal rate storage; updates index based on stored rate                                                                |
+| **ERC20ExtendedUpgradeable** | Standard ERC20 + EIP-2612 (permit) + EIP-3009 (gasless transfer) | External wallets, DEXs, integrators                                                                                      |
+| **EarnerManager**            | Manages approved earners and fee rates                           | Admin (via EARNER_MANAGER_ROLE)                                                                                          |
+| **Freezable**                | Account-level freeze functionality                               | Freeze Manager (via FREEZE_MANAGER_ROLE)                                                                                 |
+| **ForcedTransferable**       | Force transfer from frozen accounts                              | Forced Transfer Manager (via FORCED_TRANSFER_MANAGER_ROLE)                                                               |
+| **Pausable**                 | Contract-level pause functionality                               | Pauser (via PAUSER_ROLE)                                                                                                 |
+| **Minter Gateway**           | External contract that mints/burns PYUSDX                        | Calls mint/burn on PYUSDX; collateral held by Minter (off-chain or in separate contract)                                 |
 
 ### 2.3 Contract Structure
 
@@ -169,13 +169,13 @@ This document describes the technical design for PYUSDX, an upgradeable, non-reb
 
 ### 2.4 External Dependencies
 
-| Dependency | Type | Purpose | Trust Assumptions |
-|------------|------|---------|-------------------|
-| **Minter Gateway** | Protocol/Contract | Authorized to mint/burn PYUSDX; collateral held by Minter (off-chain or in separate contract) | Trusted custodian |
-| **PYUSD Token** | ERC20 Token | Reference asset; collateral backing PYUSDX | PayPal-issued stablecoin |
-| **M0 Common Libraries** | Library | Shared utilities (IndexingMath, UIntMath, base contracts) | Open-source, audited by M0 |
-| **M0 EVM Extensions** | Library | ForcedTransferable, Freezable, Pausable components | Open-source, audited by M0 |
-| **OpenZeppelin Contracts** | Library | Access control, upgradeable patterns | Industry standard, audited |
+| Dependency                 | Type              | Purpose                                                                                       | Trust Assumptions          |
+| -------------------------- | ----------------- | --------------------------------------------------------------------------------------------- | -------------------------- |
+| **Minter Gateway**         | Protocol/Contract | Authorized to mint/burn PYUSDX; collateral held by Minter (off-chain or in separate contract) | Trusted custodian          |
+| **PYUSD Token**            | ERC20 Token       | Reference asset; collateral backing PYUSDX                                                    | PayPal-issued stablecoin   |
+| **M0 Common Libraries**    | Library           | Shared utilities (IndexingMath, UIntMath, base contracts)                                     | Open-source, audited by M0 |
+| **M0 EVM Extensions**      | Library           | ForcedTransferable, Freezable, Pausable components                                            | Open-source, audited by M0 |
+| **OpenZeppelin Contracts** | Library           | Access control, upgradeable patterns                                                          | Industry standard, audited |
 
 ---
 
@@ -188,107 +188,111 @@ This document describes the technical design for PYUSDX, an upgradeable, non-reb
 pragma solidity ^0.8.30;
 
 interface IPYUSDX {
-    /* ============ Errors ============ */
+  /* ============ Errors ============ */
 
-    /// @notice Thrown when minter gateway address is zero
-    error ZeroMinterGateway();
+  /// @notice Thrown when minter gateway address is zero
+  error ZeroMinterGateway();
 
-    /// @notice Thrown when PYUSD address is zero
-    error ZeroPYUSD();
+  /// @notice Thrown when PYUSD address is zero
+  error ZeroPYUSD();
 
-    /* ============ View Functions ============ */
+  /* ============ View Functions ============ */
 
-    /// @notice Returns accrued but unclaimed yield
-    /// @param account Account to query
-    /// @return Accrued yield amount
-    function accruedYieldOf(address account) external view returns (uint240);
+  /// @notice Returns accrued but unclaimed yield
+  /// @param account Account to query
+  /// @return Accrued yield amount
+  function accruedYieldOf(address account) external view returns (uint240);
 
-    /// @notice Returns balance excluding accrued yield
-    /// @param account Account to query
-    /// @return Current balance
-    function balanceOf(address account) external view override returns (uint256);
+  /// @notice Returns balance excluding accrued yield
+  /// @param account Account to query
+  /// @return Current balance
+  function balanceOf(address account) external view override returns (uint256);
 
-    /// @notice Returns balance including accrued yield
-    /// @param account Account to query
-    /// @return Balance plus accrued yield
-    function balanceWithYieldOf(address account) external view returns (uint256);
+  /// @notice Returns balance including accrued yield
+  /// @param account Account to query
+  /// @return Balance plus accrued yield
+  function balanceWithYieldOf(address account) external view returns (uint256);
 
-    /// @notice Returns earning principal for yield calculations
-    /// @param account Account to query
-    /// @return Principal amount
-    function earningPrincipalOf(address account) external view returns (uint112);
+  /// @notice Returns earning principal for yield calculations
+  /// @param account Account to query
+  /// @return Principal amount
+  function earningPrincipalOf(address account) external view returns (uint112);
 
-    /// @notice Returns claim recipient for an account
-    /// @param account Account to query
-    /// @return Claim recipient (account if not set)
-    function claimRecipientFor(address account) external view returns (address);
+  /// @notice Returns claim recipient for an account
+  /// @param account Account to query
+  /// @return Claim recipient (account if not set)
+  function claimRecipientFor(address account) external view returns (address);
 
-    /// @notice Returns current yield index
-    /// @return Current index value
-    function currentIndex() external view returns (uint128);
+  /// @notice Returns current yield index
+  /// @return Current index value
+  function currentIndex() external view returns (uint128);
 
-    /// @notice Returns whether an account is earning
-    /// @param account Account to query
-    /// @return True if earning
-    function isEarning(address account) external view returns (bool);
+  /// @notice Returns whether an account is earning
+  /// @param account Account to query
+  /// @return True if earning
+  function isEarning(address account) external view returns (bool);
 
-    /// @notice Returns total supply of tokens in earning state
-    /// @return Total earning supply
-    function totalEarningSupply() external view returns (uint256);
+  /// @notice Returns total supply of tokens in earning state
+  /// @return Total earning supply
+  function totalEarningSupply() external view returns (uint256);
 
-    /// @notice Returns total supply of tokens not earning
-    /// @return Total non-earning supply
-    function totalNonEarningSupply() external view returns (uint256);
+  /// @notice Returns total supply of tokens not earning
+  /// @return Total non-earning supply
+  function totalNonEarningSupply() external view returns (uint256);
 
-    /* ============ Interactive Functions ============ */
+  /* ============ Interactive Functions ============ */
 
-    /// @notice Mints PYUSDX to an account
-    /// @dev Only callable by the Minter Gateway
-    /// @param account Recipient of minted tokens
-    /// @param amount Amount to mint
-    function mint(address account, uint256 amount) external;
+  /// @notice Mints PYUSDX to an account
+  /// @dev Only callable by the Minter Gateway
+  /// @param account Recipient of minted tokens
+  /// @param amount Amount to mint
+  function mint(address account, uint256 amount) external;
 
-    /// @notice Burns PYUSDX from an account
-    /// @dev Only callable by the Minter Gateway
-    /// @param account Account to burn from
-    /// @param amount Amount to burn
-    function burn(address account, uint256 amount) external;
+  /// @notice Burns PYUSDX from an account
+  /// @dev Only callable by the Minter Gateway
+  /// @param account Account to burn from
+  /// @param amount Amount to burn
+  function burn(address account, uint256 amount) external;
 
-    /// @notice Claims accrued yield for an earner
-    /// @param account Earner to claim for
-    /// @return Amount of yield claimed
-    function claimFor(address account) external returns (uint240);
+  /// @notice Claims accrued yield for an earner
+  /// @param account Earner to claim for
+  /// @return Amount of yield claimed
+  function claimFor(address account) external returns (uint240);
 
-    /// @notice Starts earning for an approved earner
-    /// @param account Account to start earning
-    function startEarningFor(address account) external;
+  /// @notice Starts earning for an approved earner
+  /// @param account Account to start earning
+  function startEarningFor(address account) external;
 
-    /// @notice Starts earning for multiple approved earners
-    /// @param accounts Accounts to start earning
-    function startEarningFor(address[] calldata accounts) external;
+  /// @notice Starts earning for multiple approved earners
+  /// @param accounts Accounts to start earning
+  function startEarningFor(address[] calldata accounts) external;
 
-    /// @notice Stops earning for a removed earner
-    /// @dev Only callable by the Earner Manager; remaining yield is claimed before stopping earning
-    /// @param account Account to stop earning
-    function stopEarningFor(address account) external;
+  /// @notice Stops earning for a removed earner
+  /// @dev Only callable by the Earner Manager; remaining yield is claimed before stopping earning
+  /// @param account Account to stop earning
+  function stopEarningFor(address account) external;
 
-    /// @notice Stops earning for multiple removed earners
-    /// @dev Only callable by the Earner Manager; remaining yield is claimed before stopping earning
-    /// @param accounts Accounts to stop earning
-    function stopEarningFor(address[] calldata accounts) external;
+  /// @notice Stops earning for multiple removed earners
+  /// @dev Only callable by the Earner Manager; remaining yield is claimed before stopping earning
+  /// @param accounts Accounts to stop earning
+  function stopEarningFor(address[] calldata accounts) external;
 
-    /// @notice Sets claim recipient for an earner
-    /// @dev Only callable by the Earner Manager
-    /// @param account Earner account
-    /// @param claimRecipient Recipient for yield claims (address(0) to clear)
-    function setClaimRecipient(address account, address claimRecipient) external;
+  /// @notice Sets claim recipient for an earner
+  /// @dev Only callable by the Earner Manager
+  /// @param account Earner account
+  /// @param claimRecipient Recipient for yield claims (address(0) to clear)
+  function setClaimRecipient(address account, address claimRecipient) external;
 
-    /* ============ Events ============ */
+  /* ============ Events ============ */
 
-    event Claimed(address indexed account, address indexed recipient, uint240 yield);
-    event StartedEarning(address indexed account);
-    event StoppedEarning(address indexed account);
-    event ClaimRecipientSet(address indexed account, address indexed recipient);
+  event Claimed(
+    address indexed account,
+    address indexed recipient,
+    uint240 yield
+  );
+  event StartedEarning(address indexed account);
+  event StoppedEarning(address indexed account);
+  event ClaimRecipientSet(address indexed account, address indexed recipient);
 }
 ```
 
@@ -297,80 +301,100 @@ interface IPYUSDX {
 ```solidity
 // External interface for EarnerManager contract (inherited by PYUSDX)
 interface IEarnerManager {
-    /* ============ Errors ============ */
+  /* ============ Errors ============ */
 
-    /// @notice Emitted when no earner manager is set
-    error ZeroEarnerManager();
+  /// @notice Emitted when no earner manager is set
+  error ZeroEarnerManager();
 
-    /// @notice Emitted when the fee rate provided is too high (higher than 100% in basis points)
-    error FeeRateTooHigh();
+  /// @notice Emitted when the fee rate provided is too high (higher than 100% in basis points)
+  error FeeRateTooHigh();
 
-    /// @notice Emitted when setting fee rate to a nonzero value while setting status to false
-    error InvalidDetails();
+  /// @notice Emitted when setting fee rate to a nonzero value while setting status to false
+  error InvalidDetails();
 
-    /// @notice Emitted when the lengths of input arrays do not match
-    error ArrayLengthMismatch();
+  /// @notice Emitted when the lengths of input arrays do not match
+  error ArrayLengthMismatch();
 
-    /// @notice Emitted when the length of an input array is 0
-    error ArrayLengthZero();
+  /// @notice Emitted when the length of an input array is 0
+  error ArrayLengthZero();
 
-    /// @notice Emitted when the earner details have already been set by an existing and active admin
-    error EarnerDetailsAlreadySet(address account);
+  /// @notice Emitted when the earner details have already been set by an existing and active admin
+  error EarnerDetailsAlreadySet(address account);
 
-    /* ============ View Functions ============ */
+  /* ============ View Functions ============ */
 
-    /// @notice The role that can manage earners
-    function EARNER_MANAGER_ROLE() external view returns (bytes32);
+  /// @notice The role that can manage earners
+  function EARNER_MANAGER_ROLE() external view returns (bytes32);
 
-    /// @notice Returns the earner status for an account
-    /// @param account The account being queried
-    /// @return Whether the account is an earner
-    function earnerStatusFor(address account) external view returns (bool);
+  /// @notice Returns the earner status for an account
+  /// @param account The account being queried
+  /// @return Whether the account is an earner
+  function earnerStatusFor(address account) external view returns (bool);
 
-    /// @notice Returns the earner statuses for multiple accounts
-    /// @param accounts The accounts being queried
-    /// @return Whether each account is an earner, respectively
-    function earnerStatusesFor(address[] calldata accounts) external view returns (bool[] memory);
+  /// @notice Returns the earner statuses for multiple accounts
+  /// @param accounts The accounts being queried
+  /// @return Whether each account is an earner, respectively
+  function earnerStatusesFor(
+    address[] calldata accounts
+  ) external view returns (bool[] memory);
 
-    /// @notice Returns the earner details for an account
-    /// @param account The account being queried
-    /// @return status Whether the account is an earner
-    /// @return feeRate The fee rate to be taken from the yield
-    /// @return admin The admin who set the details and who will collect the fee
-    function getEarnerDetails(address account) external view returns (bool status, uint16 feeRate, address admin);
+  /// @notice Returns the earner details for an account
+  /// @param account The account being queried
+  /// @return status Whether the account is an earner
+  /// @return feeRate The fee rate to be taken from the yield
+  /// @return admin The admin who set the details and who will collect the fee
+  function getEarnerDetails(
+    address account
+  ) external view returns (bool status, uint16 feeRate, address admin);
 
-    /// @notice Returns the earner details for multiple accounts
-    /// @param accounts The accounts being queried
-    /// @return statuses Whether each account is an earner, respectively
-    /// @return feeRates The fee rates to be taken from the yield, respectively
-    /// @return admins The admin who set the details and who will collect the fee, respectively
-    function getEarnerDetails(
-        address[] calldata accounts
-    ) external view returns (bool[] memory statuses, uint16[] memory feeRates, address[] memory admins);
+  /// @notice Returns the earner details for multiple accounts
+  /// @param accounts The accounts being queried
+  /// @return statuses Whether each account is an earner, respectively
+  /// @return feeRates The fee rates to be taken from the yield, respectively
+  /// @return admins The admin who set the details and who will collect the fee, respectively
+  function getEarnerDetails(
+    address[] calldata accounts
+  )
+    external
+    view
+    returns (
+      bool[] memory statuses,
+      uint16[] memory feeRates,
+      address[] memory admins
+    );
 
-    /* ============ Interactive Functions ============ */
+  /* ============ Interactive Functions ============ */
 
-    /// @notice Sets earner details
-    /// @dev Only callable by the Earner Manager
-    /// @param account Account to configure
-    /// @param status True to approve as earner, false to remove
-    /// @param feeRate Fee rate in basis points (0-10000)
-    function setEarnerDetails(address account, bool status, uint16 feeRate) external;
+  /// @notice Sets earner details
+  /// @dev Only callable by the Earner Manager
+  /// @param account Account to configure
+  /// @param status True to approve as earner, false to remove
+  /// @param feeRate Fee rate in basis points (0-10000)
+  function setEarnerDetails(
+    address account,
+    bool status,
+    uint16 feeRate
+  ) external;
 
-    /// @notice Batch sets earner details
-    /// @dev Only callable by the Earner Manager
-    /// @param accounts Accounts to configure
-    /// @param statuses Earner statuses
-    /// @param feeRates Fee rates
-    function setEarnerDetails(
-        address[] calldata accounts,
-        bool[] calldata statuses,
-        uint16[] calldata feeRates
-    ) external;
+  /// @notice Batch sets earner details
+  /// @dev Only callable by the Earner Manager
+  /// @param accounts Accounts to configure
+  /// @param statuses Earner statuses
+  /// @param feeRates Fee rates
+  function setEarnerDetails(
+    address[] calldata accounts,
+    bool[] calldata statuses,
+    uint16[] calldata feeRates
+  ) external;
 
-    /* ============ Events ============ */
+  /* ============ Events ============ */
 
-    event EarnerDetailsSet(address indexed account, bool status, address indexed admin, uint16 feeRate);
+  event EarnerDetailsSet(
+    address indexed account,
+    bool status,
+    address indexed admin,
+    uint16 feeRate
+  );
 }
 ```
 
@@ -382,80 +406,80 @@ interface IEarnerManager {
  * @author M0 Labs
  */
 interface IFreezable {
-    /* ============ Events ============ */
+  /* ============ Events ============ */
 
-    /**
-     * @notice Emitted when an account is frozen
-     * @param account The address of the frozen account
-     * @param timestamp The timestamp at which the account was frozen
-     */
-    event Frozen(address indexed account, uint256 timestamp);
+  /**
+   * @notice Emitted when an account is frozen
+   * @param account The address of the frozen account
+   * @param timestamp The timestamp at which the account was frozen
+   */
+  event Frozen(address indexed account, uint256 timestamp);
 
-    /**
-     * @notice Emitted when an account is unfrozen
-     * @param account The address of the unfrozen account
-     * @param timestamp The timestamp at which the account was unfrozen
-     */
-    event Unfrozen(address indexed account, uint256 timestamp);
+  /**
+   * @notice Emitted when an account is unfrozen
+   * @param account The address of the unfrozen account
+   * @param timestamp The timestamp at which the account was unfrozen
+   */
+  event Unfrozen(address indexed account, uint256 timestamp);
 
-    /* ============ Errors ============ */
+  /* ============ Errors ============ */
 
-    /**
-     * @notice Emitted when an account is already frozen
-     * @param account The address of the frozen account
-     */
-    error AccountFrozen(address account);
+  /**
+   * @notice Emitted when an account is already frozen
+   * @param account The address of the frozen account
+   */
+  error AccountFrozen(address account);
 
-    /**
-     * @notice Emitted when an account is not frozen
-     * @param account The address of the account that is not frozen
-     */
-    error AccountNotFrozen(address account);
+  /**
+   * @notice Emitted when an account is not frozen
+   * @param account The address of the account that is not frozen
+   */
+  error AccountNotFrozen(address account);
 
-    /// @notice Emitted if no freeze manager is set
-    error ZeroFreezeManager();
+  /// @notice Emitted if no freeze manager is set
+  error ZeroFreezeManager();
 
-    /* ============ Interactive Functions ============ */
+  /* ============ Interactive Functions ============ */
 
-    /**
-     * @notice Freezes an account
-     * @dev MUST only be callable by the FREEZE_MANAGER_ROLE
-     * @param account The address of the account to freeze
-     */
-    function freeze(address account) external;
+  /**
+   * @notice Freezes an account
+   * @dev MUST only be callable by the FREEZE_MANAGER_ROLE
+   * @param account The address of the account to freeze
+   */
+  function freeze(address account) external;
 
-    /**
-     * @notice Freezes multiple accounts
-     * @dev MUST only be callable by the FREEZE_MANAGER_ROLE
-     * @param accounts The list of addresses to freeze
-     */
-    function freezeAccounts(address[] calldata accounts) external;
+  /**
+   * @notice Freezes multiple accounts
+   * @dev MUST only be callable by the FREEZE_MANAGER_ROLE
+   * @param accounts The list of addresses to freeze
+   */
+  function freezeAccounts(address[] calldata accounts) external;
 
-    /**
-     * @notice Unfreezes an account
-     * @dev MUST only be callable by the FREEZE_MANAGER_ROLE
-     * @param account The address of the account to unfreeze
-     */
-    function unfreeze(address account) external;
+  /**
+   * @notice Unfreezes an account
+   * @dev MUST only be callable by the FREEZE_MANAGER_ROLE
+   * @param account The address of the account to unfreeze
+   */
+  function unfreeze(address account) external;
 
-    /**
-     * @notice Unfreezes multiple accounts
-     * @dev MUST only be callable by the FREEZE_MANAGER_ROLE
-     * @param accounts The list of addresses to unfreeze
-     */
-    function unfreezeAccounts(address[] calldata accounts) external;
+  /**
+   * @notice Unfreezes multiple accounts
+   * @dev MUST only be callable by the FREEZE_MANAGER_ROLE
+   * @param accounts The list of addresses to unfreeze
+   */
+  function unfreezeAccounts(address[] calldata accounts) external;
 
-    /* ============ View/Pure Functions ============ */
+  /* ============ View/Pure Functions ============ */
 
-    /// @notice The role that can manage the freezelist
-    function FREEZE_MANAGER_ROLE() external view returns (bytes32);
+  /// @notice The role that can manage the freezelist
+  function FREEZE_MANAGER_ROLE() external view returns (bytes32);
 
-    /**
-     * @notice Returns whether an account is frozen or not
-     * @param account The address of the account to check
-     * @return True if the account is frozen, false otherwise
-     */
-    function isFrozen(address account) external view returns (bool);
+  /**
+   * @notice Returns whether an account is frozen or not
+   * @param account The address of the account to check
+   * @return True if the account is frozen, false otherwise
+   */
+  function isFrozen(address account) external view returns (bool);
 }
 ```
 
@@ -463,61 +487,65 @@ interface IFreezable {
 
 ```solidity
 interface IForcedTransferable {
-    /* ============ Events ============ */
+  /* ============ Events ============ */
 
-    /**
-     * @notice Emitted when tokens are forcefully transferred from a frozen account
-     */
-    event ForcedTransfer(
-        address indexed frozenAccount,
-        address indexed recipient,
-        address indexed forcedTransferManager,
-        uint256 amount
-    );
+  /**
+   * @notice Emitted when tokens are forcefully transferred from a frozen account
+   */
+  event ForcedTransfer(
+    address indexed frozenAccount,
+    address indexed recipient,
+    address indexed forcedTransferManager,
+    uint256 amount
+  );
 
-    /* ============ Custom Errors ============ */
+  /* ============ Custom Errors ============ */
 
-    /// @notice Error for zero forced transfer manager address
-    error ZeroForcedTransferManager();
+  /// @notice Error for zero forced transfer manager address
+  error ZeroForcedTransferManager();
 
-    /// @notice Error for array length mismatch
-    error ArrayLengthMismatch();
+  /// @notice Error for array length mismatch
+  error ArrayLengthMismatch();
 
-    /* ============ Interactive Functions ============ */
+  /* ============ Interactive Functions ============ */
 
-    /**
-     * @notice Forcefully transfers tokens from a frozen account to a recipient
-     * @dev MUST only be callable by the FORCE_TRANSFER_MANAGER_ROLE
-     * @dev SHOULD revert if `frozenAccount` is not frozen
-     * @dev SHOULD revert if `recipient` is the zero address
-     * @dev SHOULD revert if `amount` exceeds the balance of `frozenAccount`
-     * @param frozenAccount The address of the frozen account from which tokens are seized
-     * @param recipient     The address receiving the seized tokens
-     * @param amount        The amount of tokens to transfer
-     */
-    function forceTransfer(address frozenAccount, address recipient, uint256 amount) external;
+  /**
+   * @notice Forcefully transfers tokens from a frozen account to a recipient
+   * @dev MUST only be callable by the FORCE_TRANSFER_MANAGER_ROLE
+   * @dev SHOULD revert if `frozenAccount` is not frozen
+   * @dev SHOULD revert if `recipient` is the zero address
+   * @dev SHOULD revert if `amount` exceeds the balance of `frozenAccount`
+   * @param frozenAccount The address of the frozen account from which tokens are seized
+   * @param recipient     The address receiving the seized tokens
+   * @param amount        The amount of tokens to transfer
+   */
+  function forceTransfer(
+    address frozenAccount,
+    address recipient,
+    uint256 amount
+  ) external;
 
-    /**
-     * @notice Forcefully transfers tokens from multiple frozen accounts to multiple recipients
-     * @dev MUST only be callable by the FORCE_TRANSFER_MANAGER_ROLE
-     * @dev SHOULD revert if any `frozenAccount` is not frozen
-     * @dev SHOULD revert if array lengths do not match
-     * @dev SHOULD revert if any `recipient` is the zero address
-     * @dev SHOULD revert if any `amount` exceeds the balance of the corresponding `frozenAccount`
-     * @param frozenAccounts The array of frozen accounts from which tokens are seized
-     * @param recipients     The array of recipient addresses
-     * @param amounts        The array of amounts to transfer for each account
-     */
-    function forceTransfers(
-        address[] calldata frozenAccounts,
-        address[] calldata recipients,
-        uint256[] calldata amounts
-    ) external;
+  /**
+   * @notice Forcefully transfers tokens from multiple frozen accounts to multiple recipients
+   * @dev MUST only be callable by the FORCE_TRANSFER_MANAGER_ROLE
+   * @dev SHOULD revert if any `frozenAccount` is not frozen
+   * @dev SHOULD revert if array lengths do not match
+   * @dev SHOULD revert if any `recipient` is the zero address
+   * @dev SHOULD revert if any `amount` exceeds the balance of the corresponding `frozenAccount`
+   * @param frozenAccounts The array of frozen accounts from which tokens are seized
+   * @param recipients     The array of recipient addresses
+   * @param amounts        The array of amounts to transfer for each account
+   */
+  function forceTransfers(
+    address[] calldata frozenAccounts,
+    address[] calldata recipients,
+    uint256[] calldata amounts
+  ) external;
 
-    /* ============ View/Pure Functions ============ */
+  /* ============ View/Pure Functions ============ */
 
-    /// @notice The role that can manage force transfers
-    function FORCED_TRANSFER_MANAGER_ROLE() external view returns (bytes32);
+  /// @notice The role that can manage force transfers
+  function FORCED_TRANSFER_MANAGER_ROLE() external view returns (bytes32);
 }
 ```
 
@@ -529,31 +557,31 @@ interface IForcedTransferable {
  * @author M0 Labs
  */
 interface IPausable {
-    /* ============ Errors ============ */
+  /* ============ Errors ============ */
 
-    /// @notice Emitted if no pauser is set
-    error ZeroPauser();
+  /// @notice Emitted if no pauser is set
+  error ZeroPauser();
 
-    /* ============ Interactive Functions ============ */
+  /* ============ Interactive Functions ============ */
 
-    /**
-     * @notice Pauses the contract
-     * @dev Can only be called by an account with the PAUSER_ROLE
-     * @dev When paused, wrap/unwrap and transfer of tokens should be disabled
-     * @dev Approval should still be enabled to allow users to change their allowances
-     */
-    function pause() external;
+  /**
+   * @notice Pauses the contract
+   * @dev Can only be called by an account with the PAUSER_ROLE
+   * @dev When paused, wrap/unwrap and transfer of tokens should be disabled
+   * @dev Approval should still be enabled to allow users to change their allowances
+   */
+  function pause() external;
 
-    /**
-     * @notice Unpauses the contract
-     * @dev Can only be called by an account with the PAUSER_ROLE
-     */
-    function unpause() external;
+  /**
+   * @notice Unpauses the contract
+   * @dev Can only be called by an account with the PAUSER_ROLE
+   */
+  function unpause() external;
 
-    /* ============ View/Pure Functions ============ */
+  /* ============ View/Pure Functions ============ */
 
-    /// @notice The role that can pause/unpause the contract
-    function PAUSER_ROLE() external view returns (bytes32);
+  /// @notice The role that can pause/unpause the contract
+  function PAUSER_ROLE() external view returns (bytes32);
 }
 ```
 
@@ -562,24 +590,24 @@ interface IPausable {
 ```solidity
 // External interface for Minter Gateway contract
 interface IMinterGateway {
-    /* ============ View Functions ============ */
+  /* ============ View Functions ============ */
 
-    /// @notice The role that can mint/burn
-    function MINTER_ROLE() external view returns (bytes32);
+  /// @notice The role that can mint/burn
+  function MINTER_ROLE() external view returns (bytes32);
 
-    /* ============ Interactive Functions ============ */
+  /* ============ Interactive Functions ============ */
 
-    /// @notice Mints PYUSDX to recipient
-    /// @dev Only callable by the minter
-    /// @param recipient Recipient of minted tokens
-    /// @param amount Amount to mint
-    function mintPYUSDX(address recipient, uint256 amount) external;
+  /// @notice Mints PYUSDX to recipient
+  /// @dev Only callable by the minter
+  /// @param recipient Recipient of minted tokens
+  /// @param amount Amount to mint
+  function mintPYUSDX(address recipient, uint256 amount) external;
 
-    /// @notice Burns PYUSDX from account
-    /// @dev Only callable by the minter
-    /// @param account Account to burn from
-    /// @param amount Amount to burn
-    function burnPYUSDX(address account, uint256 amount) external;
+  /// @notice Burns PYUSDX from account
+  /// @dev Only callable by the minter
+  /// @param account Account to burn from
+  /// @param amount Amount to burn
+  function burnPYUSDX(address account, uint256 amount) external;
 }
 ```
 
@@ -591,46 +619,46 @@ interface IMinterGateway {
 
 ```solidity
 contract PYUSDX is
-    IPYUSDX,
-    ContinuousIndexing,
-    EarnerManager,
-    ERC20ExtendedUpgradeable,
-    ForcedTransferable,
-    Freezable,
-    Pausable
+  IPYUSDX,
+  ContinuousIndexing,
+  EarnerManager,
+  ERC20ExtendedUpgradeable,
+  ForcedTransferable,
+  Freezable,
+  Pausable
 {
-    // =====================================================================
-    // Immutable Variables (set in constructor)
-    // =====================================================================
+  // =====================================================================
+  // Immutable Variables (set in constructor)
+  // =====================================================================
 
-    /// @notice Address of the Minter Gateway contract
-    address public immutable minterGateway;
+  /// @notice Address of the Minter Gateway contract
+  address public immutable minterGateway;
 
-    /// @notice Address of the PYUSD token contract
-    address public immutable pyusd;
+  /// @notice Address of the PYUSD token contract
+  address public immutable pyusd;
 
-    // =====================================================================
-    // Mutable Variables
-    // =====================================================================
+  // =====================================================================
+  // Mutable Variables
+  // =====================================================================
 
-    /// @notice Sum of all earners' principal balances
-    uint112 public totalEarningPrincipal;
+  /// @notice Sum of all earners' principal balances
+  uint112 public totalEarningPrincipal;
 
-    /// @notice Total supply of tokens held by earners
-    uint240 public totalEarningSupply;
+  /// @notice Total supply of tokens held by earners
+  uint240 public totalEarningSupply;
 
-    /// @notice Total supply of tokens held by non-earners
-    uint240 public totalNonEarningSupply;
+  /// @notice Total supply of tokens held by non-earners
+  uint240 public totalNonEarningSupply;
 
-    // =====================================================================
-    // Internal Mappings
-    // =====================================================================
+  // =====================================================================
+  // Internal Mappings
+  // =====================================================================
 
-    /// @notice Per-account balance and earning state
-    mapping(address => Account) internal _accounts;
+  /// @notice Per-account balance and earning state
+  mapping(address => Account) internal _accounts;
 
-    /// @notice Custom claim recipients per account
-    mapping(address => address) internal _claimRecipients;
+  /// @notice Custom claim recipients per account
+  mapping(address => address) internal _claimRecipients;
 }
 ```
 
@@ -639,21 +667,21 @@ contract PYUSDX is
 ```solidity
 /// @notice Represents an account's balance and yield earning details
 struct Account {
-    // First Slot (32 bytes)
-    bool isEarning;           // Whether the account is actively earning yield (1 byte)
-    uint240 balance;          // The current token balance (30 bytes)
-
-    // Second Slot (32 bytes)
-    uint112 earningPrincipal; // Principal for yield calculations (14 bytes)
-    bool hasClaimRecipient;   // Whether account has custom claim recipient (1 byte)
-    bool hasEarnerDetails;    // Whether account has earner details set (1 byte)
-    // 16 bytes padding for future use
+  // First Slot (32 bytes)
+  bool isEarning; // Whether the account is actively earning yield (1 byte)
+  uint240 balance; // The current token balance (30 bytes)
+  // Second Slot (32 bytes)
+  uint112 earningPrincipal; // Principal for yield calculations (14 bytes)
+  bool hasClaimRecipient; // Whether account has custom claim recipient (1 byte)
+  bool hasEarnerDetails; // Whether account has earner details set (1 byte)
+  // 16 bytes padding for future use
 }
 ```
 
 ### 4.3 Storage Layout Considerations
 
 **Slot Allocation:**
+
 - Slot 1: `minterGateway` (address, 20 bytes) + `pyusd` (address, 20 bytes) = 40 bytes → 2 slots needed
 - Slot 2-3: Immutable addresses
 - Slot 4: `latestIndex` (128 bits) + `latestUpdateTimestamp` (40 bits) + `rate` (32 bits) + `_latestRate` (32 bits) = 232 bits (packed) from ContinuousIndexing
@@ -663,11 +691,13 @@ struct Account {
 - Slot 8: role storage from inherited components
 
 **Account Mapping:**
+
 - Each `Account` struct uses exactly 2 storage slots
 - First slot: `isEarning` (1 byte) + `balance` (30 bytes)
 - Second slot: `earningPrincipal` (14 bytes) + `hasClaimRecipient` (1 byte) + `hasEarnerDetails` (1 byte) + padding (16 bytes)
 
 **Gas Optimization Notes:**
+
 - Use `uint240` for balances (PYUSD has 6 decimals, supports up to ~10^18 tokens)
 - Use `uint112` for earning principal (sufficient for PYUSD scale)
 - Pack boolean flags with larger uints where possible
@@ -898,6 +928,7 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
    - Adjust supply tracking based on earning status
 
 **Edge Cases:**
+
 - **Recipient is earner but no principal set**: Should not happen if startEarningFor was called correctly. Defensive: treat as non-earner for supply tracking.
 - **Amount exceeds uint240**: Revert with overflow error.
 - **Mint to zero address**: Revert with standard ERC20 expectation.
@@ -927,62 +958,73 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
 **Algorithm/Logic:**
 
 1. **updateIndex()** (called before yield-sensitive operations):
+
    ```solidity
    function updateIndex() internal returns (uint128) {
-       uint32 currentRate = rate();
+     uint32 currentRate = rate();
 
-       if (latestUpdateTimestamp == block.timestamp && _latestRate == currentRate) {
-           return latestIndex;
-       }
-
-       latestIndex = currentIndex();
-       _latestRate = currentRate;
-       latestUpdateTimestamp = uint40(block.timestamp);
-
-       emit IndexUpdated(latestIndex, currentRate);
+     if (
+       latestUpdateTimestamp == block.timestamp && _latestRate == currentRate
+     ) {
        return latestIndex;
+     }
+
+     latestIndex = currentIndex();
+     _latestRate = currentRate;
+     latestUpdateTimestamp = uint40(block.timestamp);
+
+     emit IndexUpdated(latestIndex, currentRate);
+     return latestIndex;
    }
    ```
 
 2. **currentIndex()** (view - calculates current index on-the-fly):
+
    ```solidity
    function currentIndex() public view returns (uint128) {
-       unchecked {
-           uint256 newIndex = ContinuousIndexingMath.multiplyIndicesDown(
-               latestIndex,
-               ContinuousIndexingMath.getContinuousIndex(
-                   ContinuousIndexingMath.convertFromBasisPoints(_latestRate),
-                   uint32(block.timestamp - latestUpdateTimestamp)
-               )
-           );
-           return UIntMath.bound128(newIndex);
-       }
+     unchecked {
+       uint256 newIndex = ContinuousIndexingMath.multiplyIndicesDown(
+         latestIndex,
+         ContinuousIndexingMath.getContinuousIndex(
+           ContinuousIndexingMath.convertFromBasisPoints(_latestRate),
+           uint32(block.timestamp - latestUpdateTimestamp)
+         )
+       );
+       return UIntMath.bound128(newIndex);
+     }
    }
    ```
 
 3. **accruedYieldOf(account)**:
+
    ```solidity
    function accruedYieldOf(address account) public view returns (uint240) {
-       if (!_isEarning[account]) return 0;
+     if (!_isEarning[account]) return 0;
 
-       Account storage acct = _accounts[account];
-       return _getAccruedYield(acct.balance, acct.earningPrincipal, currentIndex());
+     Account storage acct = _accounts[account];
+     return
+       _getAccruedYield(acct.balance, acct.earningPrincipal, currentIndex());
    }
 
    function _getAccruedYield(
-       uint240 balance_,
-       uint112 earningPrincipal_,
-       uint128 currentIndex_
+     uint240 balance_,
+     uint112 earningPrincipal_,
+     uint128 currentIndex_
    ) internal pure returns (uint240 yield_) {
-       uint240 balanceWithYield_ = IndexingMath.getPresentAmountRoundedDown(earningPrincipal_, currentIndex_);
+     uint240 balanceWithYield_ = IndexingMath.getPresentAmountRoundedDown(
+       earningPrincipal_,
+       currentIndex_
+     );
 
-       unchecked {
-           return (balanceWithYield_ <= balance_) ? 0 : balanceWithYield_ - balance_;
-       }
+     unchecked {
+       return
+         (balanceWithYield_ <= balance_) ? 0 : balanceWithYield_ - balance_;
+     }
    }
    ```
 
 **Edge Cases:**
+
 - **Rate changes mid-period**: Index uses linear interpolation; rate changes are applied on next updateIndex() call.
 - **First update (latestIndex = 0)**: Initialize index to PRECISION (1e18 or similar).
 - **Overflow in index calculation**: Use IndexingMath library with overflow checks.
@@ -994,30 +1036,33 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
 **Algorithm/Logic:**
 
 1. **setRate(newRate)** (in ContinuousIndexing, inherited by PYUSDX):
+
    ```solidity
    function setRate(uint32 newRate) external onlyRateManager {
-       _setRate(newRate);
+     _setRate(newRate);
    }
    ```
 
 2. **rate()** (public view in ContinuousIndexing):
+
    ```solidity
    function rate() public view returns (uint32) {
-       return _latestRate;
+     return _latestRate;
    }
    ```
 
-3. **_setRate(newRate)** (internal in ContinuousIndexing):
+3. **\_setRate(newRate)** (internal in ContinuousIndexing):
    ```solidity
    function _setRate(uint32 newRate) internal {
-       if (newRate == rate) return;  // No change, return early
-       if (newRate > 10000) revert RateTooHigh();  // Max 100%
-       rate = newRate;
-       emit RateSet(newRate);
+     if (newRate == rate) return; // No change, return early
+     if (newRate > 10000) revert RateTooHigh(); // Max 100%
+     rate = newRate;
+     emit RateSet(newRate);
    }
    ```
 
 **Edge Cases:**
+
 - **Rate too high**: Revert with `RateTooHigh()` if > 10000 (100%)
 - **Same rate as current**: Return early without event emission
 - **Negative rate**: uint32 prevents negative values
@@ -1076,6 +1121,7 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
    - Emit `StoppedEarning(account)`
 
 **Edge Cases:**
+
 - **Starting with zero balance**: Principal set to 0; account marked as earning but generates no yield until balance > 0.
 - **Stopping with unclaimed yield**: Automatically claimed before stopping (per user requirement).
 - **EarnerManager removes but stop not called**: Account remains earning until someone calls stopEarningFor. This is intentional - permissionless stop after removal.
@@ -1118,6 +1164,7 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
    - Verify account is earning
 
 2. **Calculate yield:**
+
    ```solidity
    Account storage acct = _accounts[account];
    uint240 grossYield = _getAccruedYield(acct.balance, acct.earningPrincipal, currentIndex());
@@ -1126,6 +1173,7 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
    ```
 
 3. **Apply fee (if configured):**
+
    ```solidity
    (, uint16 feeRate,) = getEarnerDetails(account);
    uint240 netYield = grossYield;
@@ -1148,6 +1196,7 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
    - `Transfer(address(0), account, grossYield)` (to show yield minted)
 
 **Edge Cases:**
+
 - **Claim recipient not set**: Yield transferred to the earner (account) by default
 - **Claim when paused**: Revert with `EnforcedPause()` (from OZ `_requireNotPaused()`)
 - **Claim with zero yield**: Return 0 (no revert)
@@ -1187,6 +1236,7 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
    - Verify sufficient balance
 
 2. **Adjust principals (if both earning):**
+
    ```solidity
    if (_accounts[msg.sender].isEarning && _accounts[recipient].isEarning) {
        uint256 principalAmount = amount * PRECISION / currentIndex();
@@ -1209,6 +1259,7 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
    ```
 
 **Edge Cases:**
+
 - **Transfer with unclaimed yield**: Yield stays with sender; principal adjusted mathematically (per user requirement).
 - **Transfer to/from frozen account**: Revert with `AccountFrozen()`.
 - **Transfer when paused**: Revert with `ContractPaused()`.
@@ -1267,6 +1318,7 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
    - Calls OZ's `_unpause()` which handles state check and event emission
 
 **Edge Cases:**
+
 - **Force transfer from non-frozen account**: Revert with `AccountNotFrozen()`.
 - **Freeze the zero address**: Technically allowed but meaningless; could add check.
 - **Pause while index update pending**: Index update continues to work (pause only blocks user operations).
@@ -1337,32 +1389,32 @@ _Description: Fees are deducted from gross yield; net yield goes to claim recipi
 
 ### 7.1 Roles
 
-| Role | Description | Assignment |
-|------|-------------|------------|
-| **DEFAULT_ADMIN_ROLE** | Can grant/revoke all roles; full admin access | Deployer; set in `initialize()` |
-| **RATE_MANAGER_ROLE** | Can update yield rate via setRate() (inherited from ContinuousIndexing) | Set in `initialize()`; can add multiple managers |
-| **EARNER_MANAGER_ROLE** | Can approve/remove earners and set fee rates | Set in `initialize()`; can add multiple managers |
-| **FORCED_TRANSFER_MANAGER_ROLE** | Can force transfer from frozen accounts | Set in `initialize()` |
-| **FREEZE_MANAGER_ROLE** | Can freeze/unfreeze accounts | Set in `initialize()` |
-| **PAUSER_ROLE** | Can pause/unpause contract | Set in `initialize()` |
+| Role                             | Description                                                             | Assignment                                       |
+| -------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------ |
+| **DEFAULT_ADMIN_ROLE**           | Can grant/revoke all roles; full admin access                           | Deployer; set in `initialize()`                  |
+| **RATE_MANAGER_ROLE**            | Can update yield rate via setRate() (inherited from ContinuousIndexing) | Set in `initialize()`; can add multiple managers |
+| **EARNER_MANAGER_ROLE**          | Can approve/remove earners and set fee rates                            | Set in `initialize()`; can add multiple managers |
+| **FORCED_TRANSFER_MANAGER_ROLE** | Can force transfer from frozen accounts                                 | Set in `initialize()`                            |
+| **FREEZE_MANAGER_ROLE**          | Can freeze/unfreeze accounts                                            | Set in `initialize()`                            |
+| **PAUSER_ROLE**                  | Can pause/unpause contract                                              | Set in `initialize()`                            |
 
 ### 7.2 Permission Matrix
 
-| Function | DEFAULT_ADMIN | RATE_MANAGER | EARNER_MANAGER | FORCED_TRANSFER_MANAGER | FREEZE_MANAGER | PAUSER | Public |
-|----------|---------------|--------------|----------------|-------------------------|----------------|--------|--------|
-| `mint()` / `burn()` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | Minter Gateway only |
-| `setRate()` | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `transfer()` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (if not frozen/paused) |
-| `transferFrom()` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (if not frozen/paused) |
-| `claimFor()` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (for any earner) |
-| `startEarningFor()` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (if approved) |
-| `stopEarningFor()` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (if removed) |
-| `setClaimRecipient()` | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `setEarnerDetails()` | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `freeze()` / `unfreeze()` | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ |
-| `forceTransfer()` | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ |
-| `pause()` / `unpause()` | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
-| `updateIndex()` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (anyone) |
+| Function                  | DEFAULT_ADMIN | RATE_MANAGER | EARNER_MANAGER | FORCED_TRANSFER_MANAGER | FREEZE_MANAGER | PAUSER     | Public                   |
+| ------------------------- | ------------- | ------------ | -------------- | ----------------------- | -------------- | ---------- | ------------------------ |
+| `mint()` / `burn()`       | ✗             | ✗            | ✗              | ✗                       | ✗              | ✗          | Minter Gateway only      |
+| `setRate()`               | ✗             | ✓            | ✗              | ✗                       | ✗              | ✗          | ✗                        |
+| `transfer()`              | ✓             | ✓            | ✓              | ✓                       | ✓              | ✓          | ✓ (if not frozen/paused) |
+| `transferFrom()`          | ✓             | ✓            | ✓              | ✓                       | ✓              | ✓          | ✓ (if not frozen/paused) |
+| `claimFor()`              | ✓             | ✓            | ✓              | ✓                       | ✓              | ✓          | ✓ (for any earner)       |
+| `startEarningFor()`       | ✓             | ✓            | ✓              | ✓                       | ✓              | ✓          | ✓ (if approved)          |
+| `stopEarningFor()`        | ✓             | ✓            | ✓              | ✓                       | ✓              | ✓          | ✓ (if removed)           |
+| `setClaimRecipient()`     | ✗             | ✗            | ✓              | ✗                       | ✗              | ✗          | ✗                        |
+| `setEarnerDetails()`      | ✗             | ✗            | ✓              | ✗                       | ✗              | ✗          | ✗                        |
+| `freeze()` / `unfreeze()` | ✗             | ✗            | ✗              | ✗                       | ✓              | ✗          | ✗                        |
+| `forceTransfer()`         | ✗             | ✗            | ✗              | ✓                       | ✗              | ✗          | ✗                        |
+| `pause()` / `unpause()`   | ✗             | ✗            | ✗              | ✗                       | ✓              | ✗          |
+| `updateIndex()`           | ✓             | ✓            | ✓              | ✓                       | ✓              | ✓ (anyone) |
 
 ### 7.3 Access Control Implementation
 
@@ -1386,6 +1438,7 @@ bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 ```
 
 Each component provides its own access control:
+
 - **ContinuousIndexing**: `onlyRateManager()` modifier for `setRate()`
 - **EarnerManager**: `onlyEarnerManager()` modifier for `setEarnerDetails()`, `setClaimRecipient()`
 - **Freezable**: `onlyFreezeManager()` role check for `freeze()`, `unfreeze()`, `freezeAccounts()`, `unfreezeAccounts()`
@@ -1400,21 +1453,21 @@ Each component provides its own access control:
 
 #### 8.1.1 Assets at Risk
 
-| Asset | Value | Protection Priority |
-|-------|-------|---------------------|
-| **PYUSD collateral (held by Minter; may be off-chain or on-chain)** | Full backing of PYUSDX supply | High |
-| **PYUSDX tokens held by earners** | User funds | High |
-| **Accrued but unclaimed yield** | Pending yield payments | Medium |
-| **Protocol fees** | Revenue stream | Medium |
+| Asset                                                               | Value                         | Protection Priority |
+| ------------------------------------------------------------------- | ----------------------------- | ------------------- |
+| **PYUSD collateral (held by Minter; may be off-chain or on-chain)** | Full backing of PYUSDX supply | High                |
+| **PYUSDX tokens held by earners**                                   | User funds                    | High                |
+| **Accrued but unclaimed yield**                                     | Pending yield payments        | Medium              |
+| **Protocol fees**                                                   | Revenue stream                | Medium              |
 
 #### 8.1.2 Threat Actors
 
-| Actor | Motivation | Capabilities |
-|-------|-----------|--------------|
-| **Malicious User** | Extract yield, manipulate state, bypass restrictions | Can call public functions, submit transactions |
-| **Compromised Admin/Manager** | Drain funds, manipulate rates, freeze accounts | Has privileged access to admin functions |
-| **Minter Gateway Compromise** | Mint unlimited PYUSDX without collateral | Can call mint/burn functions |
-| **Rate Model Manipulator** | Set artificial rates to extract value | Can call setRate() (inherited from ContinuousIndexing) via RATE_MANAGER_ROLE |
+| Actor                         | Motivation                                           | Capabilities                                                                 |
+| ----------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Malicious User**            | Extract yield, manipulate state, bypass restrictions | Can call public functions, submit transactions                               |
+| **Compromised Admin/Manager** | Drain funds, manipulate rates, freeze accounts       | Has privileged access to admin functions                                     |
+| **Minter Gateway Compromise** | Mint unlimited PYUSDX without collateral             | Can call mint/burn functions                                                 |
+| **Rate Model Manipulator**    | Set artificial rates to extract value                | Can call setRate() (inherited from ContinuousIndexing) via RATE_MANAGER_ROLE |
 
 #### 8.1.3 Attack Vectors
 
@@ -1494,12 +1547,12 @@ Each component provides its own access control:
 
 ### 9.1 Required Off-Chain Infrastructure
 
-| Component | Purpose | Criticality |
-|-----------|---------|-------------|
-| **Minter Gateway Service** | Manages PYUSD collateral, triggers mint/burn | Required |
-| **Rate Oracle/Updater** | Monitors off-chain yield rate and calls setRate() on PYUSDX (via RATE_MANAGER_ROLE) | Required |
-| **Yield Claim Bot** (optional) | Auto-claims yield for users who opt-in | Optional |
-| **Monitoring Service** | Tracks index updates, supply consistency, and emits alerts | Recommended |
+| Component                      | Purpose                                                                             | Criticality |
+| ------------------------------ | ----------------------------------------------------------------------------------- | ----------- |
+| **Minter Gateway Service**     | Manages PYUSD collateral, triggers mint/burn                                        | Required    |
+| **Rate Oracle/Updater**        | Monitors off-chain yield rate and calls setRate() on PYUSDX (via RATE_MANAGER_ROLE) | Required    |
+| **Yield Claim Bot** (optional) | Auto-claims yield for users who opt-in                                              | Optional    |
+| **Monitoring Service**         | Tracks index updates, supply consistency, and emits alerts                          | Recommended |
 
 ### 9.2 Keeper/Bot Requirements
 
@@ -1546,30 +1599,35 @@ Each component provides its own access control:
 ### 10.2 Feature-Specific Patterns
 
 **Non-Rebasing Yield Token Pattern:**
+
 - Store principal separately from balance
 - Calculate yield on-demand using global index
 - Never auto-adjust balances with index
 - Claim must be explicit action
 
 **Continuous Indexing Pattern:**
+
 - Index grows monotonically: `index[t] >= index[t-1]`
 - Rate changes are linearly interpolated between updates
 - Index precision (PRECISION) should be high enough for accurate calculations (e.g., 1e18)
 - Update index before any yield-sensitive operation
 
 **Permission-Based Earning Pattern:**
+
 - Separate "token holder" from "earner" status
 - Only approved earners can accrue yield
 - Earner status managed by designated admin (EarnerManager)
 - Supply tracking differentiates earning vs non-earning
 
 **Compliance-First Design:**
+
 - Freeze at account level (can freeze specific users)
 - Pause at contract level (global emergency stop)
 - Forced transfer from frozen accounts (recovery mechanism)
 - All compliance features emit events for transparency
 
 **Fee Collection Pattern:**
+
 - Fee deducted at claim time, not accrual time
 - Fee rate set per earner (basis points: 0-10000)
 - Fee portion goes to configurable recipient
@@ -1595,54 +1653,57 @@ Each component provides its own access control:
 
 ### 11.1 Critical Test Scenarios
 
-| Scenario | Type | Priority |
-|----------|------|----------|
-| **Mint and burn operations** | Unit | High |
-| **Start earning flow** | Unit | High |
-| **Stop earning flow with claim** | Unit | High |
-| **Claim yield with fee deduction** | Unit | High |
-| **Transfer between earners** | Unit | High |
-| **Transfer earner to non-earner** | Unit | High |
-| **Transfer non-earner to earner** | Unit | High |
-| **Force transfer from frozen account** | Integration | High |
-| **Freeze/unfreeze account** | Unit | Medium |
-| **Pause/unpause contract** | Unit | Medium |
-| **Index update with rate change** | Unit | High |
-| **Set claim recipient** | Unit | Medium |
-| **Batch operations (start/stop earning)** | Unit | Medium |
-| **Set earner details** | Unit | Medium |
-| **Reentrancy on claim** | Fuzz | High |
-| **Supply consistency** | Invariant | High |
-| **Principal consistency** | Invariant | High |
-| **Overflow/underflow protection** | Fuzz | High |
+| Scenario                                  | Type        | Priority |
+| ----------------------------------------- | ----------- | -------- |
+| **Mint and burn operations**              | Unit        | High     |
+| **Start earning flow**                    | Unit        | High     |
+| **Stop earning flow with claim**          | Unit        | High     |
+| **Claim yield with fee deduction**        | Unit        | High     |
+| **Transfer between earners**              | Unit        | High     |
+| **Transfer earner to non-earner**         | Unit        | High     |
+| **Transfer non-earner to earner**         | Unit        | High     |
+| **Force transfer from frozen account**    | Integration | High     |
+| **Freeze/unfreeze account**               | Unit        | Medium   |
+| **Pause/unpause contract**                | Unit        | Medium   |
+| **Index update with rate change**         | Unit        | High     |
+| **Set claim recipient**                   | Unit        | Medium   |
+| **Batch operations (start/stop earning)** | Unit        | Medium   |
+| **Set earner details**                    | Unit        | Medium   |
+| **Reentrancy on claim**                   | Fuzz        | High     |
+| **Supply consistency**                    | Invariant   | High     |
+| **Principal consistency**                 | Invariant   | High     |
+| **Overflow/underflow protection**         | Fuzz        | High     |
 
 ### 11.2 Invariant Testing
 
 **Invariant 1: Total Supply Consistency**
+
 ```solidity
 // Invariant: totalSupply == totalEarningSupply + totalNonEarningSupply
 function invariant_totalSupplyConsistency() public {
-    assertEq(
-        pyusdx.totalSupply(),
-        pyusdx.totalEarningSupply() + pyusdx.totalNonEarningSupply()
-    );
+  assertEq(
+    pyusdx.totalSupply(),
+    pyusdx.totalEarningSupply() + pyusdx.totalNonEarningSupply()
+  );
 }
 ```
 
 **Invariant 2: Principal Sum**
+
 ```solidity
 // Invariant: totalEarningPrincipal == sum of all earning principals
 function invariant_principalSum() public {
-    uint256 sum = 0;
-    address[] memory earners = getEarners();
-    for (uint i = 0; i < earners.length; i++) {
-        sum += pyusdx.earningPrincipalOf(earners[i]);
-    }
-    assertEq(pyusdx.totalEarningPrincipal(), sum);
+  uint256 sum = 0;
+  address[] memory earners = getEarners();
+  for (uint i = 0; i < earners.length; i++) {
+    sum += pyusdx.earningPrincipalOf(earners[i]);
+  }
+  assertEq(pyusdx.totalEarningPrincipal(), sum);
 }
 ```
 
 **Invariant 3: Index Monotonicity**
+
 ```solidity
 // Invariant: index never decreases
 uint128 private lastIndex;
@@ -1654,17 +1715,18 @@ function invariant_indexMonotonicity() public {
 ```
 
 **Invariant 4: Balance Calculation**
+
 ```solidity
 // Invariant: balanceWithYield == balance + accruedYield
 function invariant_balanceCalculation(address account) public {
-    if (pyusdx.isEarning(account)) {
-        assertEq(
-            pyusdx.balanceWithYieldOf(account),
-            pyusdx.balanceOf(account) + pyusdx.accruedYieldOf(account)
-        );
-    } else {
-        assertEq(pyusdx.accruedYieldOf(account), 0);
-    }
+  if (pyusdx.isEarning(account)) {
+    assertEq(
+      pyusdx.balanceWithYieldOf(account),
+      pyusdx.balanceOf(account) + pyusdx.accruedYieldOf(account)
+    );
+  } else {
+    assertEq(pyusdx.accruedYieldOf(account), 0);
+  }
 }
 ```
 
@@ -1695,6 +1757,7 @@ Tests should be organized by test type, not by individual scenarios:
 - **Invariant tests**: `PYUSDXInvariants.t.sol` - Test system-wide invariants (supply consistency, principal sums, index monotonicity)
 
 **Rationale:**
+
 - Grouping by type reduces test suite overhead (setup/teardown shared)
 - Easier to run specific test categories (e.g., only fuzz tests for CI)
 - Clearer separation of concerns between unit, integration, and property testing
@@ -1704,14 +1767,14 @@ Tests should be organized by test type, not by individual scenarios:
 
 ## 12. Open Design Questions
 
-| # | Question | Options | Recommendation |
-|---|----------|---------|----------------|
-| 1 | Should claim recipient be per-account or global? | Per-account, Global, Hybrid | **Per-account** (as specified) - allows flexibility for different fee structures |
-| 2 | Should there be a minimum claim amount? | No minimum, 1e6 (1 PYUSD), Configurable | **No minimum** - adds complexity for minimal benefit; users can optimize their own gas |
-| 3 | Should updateIndex() be callable by anyone or restricted? | Anyone, Admin only, Keepers only | **Anyone** - enables permissionless operation; gas paid by caller benefits protocol |
-| 4 | Should we implement a "warm-up" period for new earners? | Immediate earning, 1-day delay, Configurable | **Immediate earning** - per user requirement for immediate removal |
-| 5 | How to protect against rate manipulation? | Trust, Add timelock, Multi-sig, Circuit breaker | **Multi-sig + timelock** on RATE_MANAGER_ROLE for rate changes; critical for security |
-| 6 | Should totalSupply() include virtual yield? | No (balance only), Yes (balance + yield) | **No** - totalSupply reflects actual minted tokens; balanceWithYieldOf for individual view |
+| #   | Question                                                  | Options                                         | Recommendation                                                                             |
+| --- | --------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 1   | Should claim recipient be per-account or global?          | Per-account, Global, Hybrid                     | **Per-account** (as specified) - allows flexibility for different fee structures           |
+| 2   | Should there be a minimum claim amount?                   | No minimum, 1e6 (1 PYUSD), Configurable         | **No minimum** - adds complexity for minimal benefit; users can optimize their own gas     |
+| 3   | Should updateIndex() be callable by anyone or restricted? | Anyone, Admin only, Keepers only                | **Anyone** - enables permissionless operation; gas paid by caller benefits protocol        |
+| 4   | Should we implement a "warm-up" period for new earners?   | Immediate earning, 1-day delay, Configurable    | **Immediate earning** - per user requirement for immediate removal                         |
+| 5   | How to protect against rate manipulation?                 | Trust, Add timelock, Multi-sig, Circuit breaker | **Multi-sig + timelock** on RATE_MANAGER_ROLE for rate changes; critical for security      |
+| 6   | Should totalSupply() include virtual yield?               | No (balance only), Yes (balance + yield)        | **No** - totalSupply reflects actual minted tokens; balanceWithYieldOf for individual view |
 
 ---
 
@@ -1719,19 +1782,19 @@ Tests should be organized by test type, not by individual scenarios:
 
 ### A. Glossary
 
-| Term | Definition |
-|------|------------|
-| **PYUSD** | PayPal USD stablecoin (6 decimals) |
-| **PYUSDX** | Yield-bearing ERC20 token backed by PYUSD collateral |
-| **Earner** | Token holder approved to receive yield on their balance |
-| **Principal** | Original balance amount stored separately from total balance; used for yield calculations; does NOT include claimed yield |
-| **Index** | Global increasing value representing cumulative yield multiplier; current balance = principal × index / PRECISION |
-| **Rate** | Yield rate (e.g., 4% annual) stored in ContinuousIndexing (inherited by PYUSDX); updated by RATE_MANAGER_ROLE |
-| **Claim Recipient** | Address that receives claimed yield; may differ from earner; set by Earner Manager |
-| **Non-rebasing** | Token balances don't auto-adjust with index; principal stays constant; yield is claimed separately |
-| **PRECISION** | Scaling factor for index calculations (typically 1e18) |
-| **Continuous Indexing** | Pattern where index grows continuously based on rate and time |
-| **Minter Gateway** | External contract authorized to mint and burn PYUSDX; Minter holds PYUSD collateral (off-chain or on-chain) |
+| Term                    | Definition                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **PYUSD**               | PayPal USD stablecoin (6 decimals)                                                                                        |
+| **PYUSDX**              | Yield-bearing ERC20 token backed by PYUSD collateral                                                                      |
+| **Earner**              | Token holder approved to receive yield on their balance                                                                   |
+| **Principal**           | Original balance amount stored separately from total balance; used for yield calculations; does NOT include claimed yield |
+| **Index**               | Global increasing value representing cumulative yield multiplier; current balance = principal × index / PRECISION         |
+| **Rate**                | Yield rate (e.g., 4% annual) stored in ContinuousIndexing (inherited by PYUSDX); updated by RATE_MANAGER_ROLE             |
+| **Claim Recipient**     | Address that receives claimed yield; may differ from earner; set by Earner Manager                                        |
+| **Non-rebasing**        | Token balances don't auto-adjust with index; principal stays constant; yield is claimed separately                        |
+| **PRECISION**           | Scaling factor for index calculations (typically 1e18)                                                                    |
+| **Continuous Indexing** | Pattern where index grows continuously based on rate and time                                                             |
+| **Minter Gateway**      | External contract authorized to mint and burn PYUSDX; Minter holds PYUSD collateral (off-chain or on-chain)               |
 
 ### B. External References
 
@@ -1748,8 +1811,8 @@ Tests should be organized by test type, not by individual scenarios:
 
 ### C. Revision History
 
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0 | 2025-01-26 | Claude (sc-sdd skill) | Initial design based on PRD and specifications |
+| Version | Date       | Author                | Changes                                        |
+| ------- | ---------- | --------------------- | ---------------------------------------------- |
+| 1.0     | 2025-01-26 | Claude (sc-sdd skill) | Initial design based on PRD and specifications |
 
 ---
