@@ -170,3 +170,27 @@
 - `forge build`: Success
 - `forge fmt --check`: Pass
 
+#### Phase 2.5 & 2.6: Update Index and CurrentIndex Functions
+**Status:** COMPLETED
+
+**Approach:**
+- Verified `_updateIndex()` internal function works correctly with PYUSDX storage layout
+- Verified `currentIndex()` external view function works correctly with PYUSDX storage layout
+- Note: PYUSDX implements these functions internally using custom storage layout (via `IndexingState` struct in `PYUSDXStorageStruct`) instead of inheriting from ContinuousIndexing
+- Unit tests cover:
+  - UpdateIndex: Cache behavior, rate=0 (no growth), rate>0 with time (growth + IndexUpdated event), rate changes (compounding)
+  - CurrentIndex: Returns latestIndex immediately after update, calculates growth with time elapsed, no growth when rate=0 or no time passed, monotonicity (never decreases)
+- Tests are executed indirectly via `setRate` (which calls `_updateIndex()`) and `currentIndex()` view function
+
+**Gotchas:**
+- Rate format for ContinuousIndexingMath.getContinuousIndex is a raw uint32 value, not `bps * PRECISION / 10000`
+- Rate values that fit in uint32: ~1.2% APY uses rate value ~1.2e9 (1215752192)
+- Rate calculation `bps * PRECISION / 10000` overflows for most common values since `1e11 > 2^32`
+- Solution: Use raw uint32 values directly that are compatible with ContinuousIndexingMath
+- Index growth is small (~1.2% annually for rate=1215752192), so tests check for positive growth rather than specific percentages
+- Used `vm.warp()` to simulate time passage for index growth tests
+
+**Verification:**
+- All 49 unit tests pass (41 from Phase 2.4 + 8 new tests)
+- `forge build`: Success
+

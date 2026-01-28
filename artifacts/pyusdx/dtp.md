@@ -346,55 +346,57 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Verify `updateIndex` inherited from ContinuousIndexing**
+- [x] **Verify `updateIndex` inherited from ContinuousIndexing**
   - Reference: SDD Section 6.2 (Yield Accrual and Indexing)
-  - Function: `function updateIndex() internal returns (uint128)`
-  - This should be inherited from ContinuousIndexing; verify it works with PYUSDX storage layout
+  - Function: `function _updateIndex() internal returns (uint128)`
+  - Note: PYUSDX implements `_updateIndex()` internally using custom storage layout instead of inheriting from ContinuousIndexing
+  - Verified it works with PYUSDX storage layout through testing
 
 #### Unit Tests
 
-- [ ] **Add updateIndex tests to PYUSDXUnit.t.sol**
+- [x] **Add updateIndex tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] updateIndex
-     *   - [ ] when called multiple times in same block
-     *   -   - [ ] return cached index (no recalculation)
-     *   - [ ] when rate is 0
-     *   -   - [ ] index unchanged
-     *   - [ ] when rate > 0 and time has passed
-     *   -   - [ ] index increased
-     *   -   - [ ] IndexUpdated event emitted
-     *   - [ ] when rate changes between updates
-     *   -   - [ ] index compounds correctly
-     *   -   - [ ] old rate applied for old period
-     *   -   - [ ] new rate applied for new period
+     * - [x] updateIndex (internal, tested via setRate and currentTimeIndex)
+     *   - [x] when called multiple times in same block
+     *   -   - [x] return cached index (no recalculation, no new IndexUpdated event)
+     *   - [x] when rate is 0
+     *   -   - [x] index unchanged after time passes
+     *   - [x] when rate > 0 and time has passed
+     *   -   - [x] index increased
+     *   -   - [x] IndexUpdated event emitted
+     *   - [x] when rate changes between updates
+     *   -   - [x] index compounds correctly
+     *   -   - [x] old rate applied for old period
+     *   -   - [x] new rate applied for new period
      */
 
 ### 2.6 currentIndex (Inherited)
 
 #### Implementation
 
-- [ ] **Verify currentIndex inherited from ContinuousIndexing**
+- [x] **Verify currentIndex inherited from ContinuousIndexing**
   - Reference: SDD Section 6.2 (Yield Accrual and Indexing)
   - Function: `function currentIndex() public view returns (uint128)`
-  - This should be inherited; verify it works with PYUSDX storage layout
+  - Note: PYUSDX implements `currentIndex()` externally using custom storage layout instead of inheriting from ContinuousIndexing
+  - Verified it works with PYUSDX storage layout through testing
 
 #### Unit Tests
 
-- [ ] **Add currentIndex tests to PYUSDXUnit.t.sol**
+- [x] **Add currentIndex tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] currentIndex
-     *   - [ ] when called immediately after updateIndex
-     *   -   - [ ] return latestIndex
-     *   - [ ] when called with time elapsed
-     *   -   - [ ] return calculated index > latestIndex
-     *   - [ ] when rate is 0
-     *   -   - [ ] return latestIndex (no growth)
-     *   - [ ] when time elapsed is 0
-     *   -   - [ ] return latestIndex (no growth)
-     *   - [ ] monotonicity: index never decreases
-     *   -   - [ ] always true
+     * - [x] currentIndex
+     *   - [x] when called immediately after updateIndex
+     *   -   - [x] return latestIndex
+     *   - [x] when called with time elapsed and rate > 0
+     *   -   - [x] return calculated index > latestIndex
+     *   - [x] when rate is 0
+     *   -   - [x] return latestIndex (no growth)
+     *   - [x] when time elapsed is 0
+     *   -   - [x] return latestIndex (no growth)
+     *   - [x] monotonicity: index never decreases
+     *   -   - [x] always true
      */
 
 ### 2.7 Accrued Yield Calculation
