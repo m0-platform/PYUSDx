@@ -1012,3 +1012,31 @@ Date: 2025-01-27
 
 Date: 2025-01-27
 
+#### Phase 4.1: Minter Gateway Integration
+**Status:** COMPLETED
+
+**Approach:**
+- Created `MinterGatewayMock` in `test/mocks/MinterGatewayMock.sol`:
+  - Implements `mint(address, uint256)` and `burn(address, uint256)` functions
+  - Includes caller authorization via `setAuthorizedCaller(address)`
+  - Uses immutable `pyusdx` address to call PYUSDX contract
+- Created `PYUSDXIntegration.t.sol` in `test/integration/`:
+  - Tests Minter Gateway can mint tokens successfully
+  - Tests direct calls to PYUSDX.mint/burn fail (NotMinterGateway error)
+  - Tests unauthorized callers cannot use Minter Gateway
+  - Tests full user flow: mint → earn → claim → transfer → burn
+  - Tests invariants maintained throughout mint/burn cycle
+
+**Gotchas:**
+- The PYUSDX contract has an immutable `minterGateway` address set in constructor
+- Since we need to deploy MinterGatewayMock with the PYUSDX address, but PYUSDX needs the MinterGateway address in its constructor, we used `vm.etch` to replace the dummy minterGateway's bytecode with the actual mock's bytecode
+- The full flow test uses earner-to-earner transfer to avoid the known supply tracking bug in earner-to-non-earner transfers (documented in guardrails.md)
+
+**Verification:**
+- All 8 integration tests pass
+- All 209 total tests pass (172 unit + 24 fuzz + 5 invariant + 8 integration)
+- `forge build`: Success
+- `forge test --match-path "test/integration/PYUSDXIntegration.t.sol"`: 8 passed
+
+Date: 2025-01-27
+
