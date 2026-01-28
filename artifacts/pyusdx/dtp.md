@@ -438,34 +438,34 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Override `balanceOf` function**
+- [x] **Override `balanceOf` function**
   - Reference: SDD Section 3.1 (Primary Interface)
   - Signature: `function balanceOf(address account) public view override returns (uint256)`
   - Logic: Return stored balance (exclude accrued yield per user requirement)
 
-- [ ] **Implement `balanceWithYieldOf` function**
+- [x] **Implement `balanceWithYieldOf` function**
   - Reference: SDD Section 3.1 (Primary Interface)
   - Signature: `function balanceWithYieldOf(address account) public view returns (uint256)`
   - Logic: Return `balance + accruedYieldOf(account)`
 
-- [ ] **Implement `earningPrincipalOf` function**
+- [x] **Implement `earningPrincipalOf` function**
   - Reference: SDD Section 3.1 (Primary Interface)
   - Signature: `function earningPrincipalOf(address account) public view returns (uint112)`
   - Logic: Return stored earning principal
 
 #### Unit Tests
 
-- [ ] **Add balance tests to PYUSDXUnit.t.sol**
+- [x] **Add balance tests to PYUSDXUnit.t.sol**
   - Add TODO list:
     ```solidity
-    * - [ ] balanceOf: returns stored balance only
-    *   - [ ] excludes accrued yield
-    * - [ ] balanceWithYieldOf: returns balance + accruedYield
-    *   - [ ] for earners: includes yield
-    *   - [ ] for non-earners: equals balance
-    * - [ ] earningPrincipalOf: returns principal
-    *   - [ ] for earners: returns principal
-    *   - [ ] for non-earners: returns 0
+    * - [x] balanceOf: returns stored balance only
+    *   - [x] excludes accrued yield
+    * - [x] balanceWithYieldOf: returns balance + accruedYield
+    *   - [ ] for earners: includes yield (deferred to Phase 2.9)
+    *   - [x] for non-earners: equals balance
+    * - [x] earningPrincipalOf: returns principal
+    *   - [ ] for earners: returns principal (deferred to Phase 2.9)
+    *   - [x] for non-earners: returns 0
     ```
 
 ### 2.9 Start Earning For

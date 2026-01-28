@@ -222,3 +222,31 @@ Gotchas:
 - Non-earners always return 0 regardless of balance or index
 
 Date: 2025-01-27
+
+#### Phase 2.8: Balance Override Functions
+**Status:** COMPLETED
+
+**Approach:**
+- Verified `balanceOf` override was already implemented (returns stored balance, excludes accrued yield)
+- Implemented `balanceWithYieldOf` function:
+  - For non-earners: returns balance (same as balanceOf)
+  - For earners: returns balance + accruedYieldOf(account)
+  - Uses existing `_getAccruedYield` helper for yield calculation
+- Implemented `earningPrincipalOf` function:
+  - For non-earners: returns 0
+  - For earners: returns stored earning principal (uint112)
+- Unit tests cover:
+  - balanceOf: returns stored balance only
+  - balanceWithYieldOf: non-earner equals balance, account with no balance returns 0
+  - earningPrincipalOf: non-earner returns 0, account with no balance returns 0
+
+**Gotchas:**
+- Full earner tests deferred to Phase 2.9 since `startEarningFor` is required to properly set up earner state with earning principal
+- balanceOf was already implemented in Phase 2.1, just needed to verify it works correctly
+- The functions correctly handle non-earners (return 0 for earningPrincipal, return balance for balanceWithYield)
+
+**Verification:**
+- All 57 unit tests pass (49 from Phase 2.5/2.6 + 2 from Phase 2.7 + 6 new balance tests)
+- `forge build`: Success
+- `forge fmt --check`: Pass
+
