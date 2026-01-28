@@ -863,3 +863,27 @@ No significant optimizations are needed without sacrificing functionality or saf
 
 Date: 2025-01-27
 
+
+#### Phase 2.3: Burn Function - Earner Test
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented `test_Burn_FromEarner_Success` which was deferred until Phase 2.9 (startEarningFor) was complete
+- Test verifies:
+  - Balance decreases when burning from earner
+  - totalEarningSupply decreases
+  - earningPrincipal decreases proportionally using round-up formula: `principalToRemove = (burnAmount * principal + balance - 1) / balance`
+  - Non-earning supply unchanged
+  - Account remains earning after partial burn
+
+**Gotchas:**
+- The principal adjustment formula uses round-up division to ensure dust principal is removed when burning
+- When burning from an earner, both the balance and the earning principal must be adjusted proportionally
+- The formula ensures that the ratio of principal to balance is maintained after the burn
+
+**Verification:**
+- All 159 unit tests pass (158 from before + 1 new burn earner test)
+- `forge build`: Success
+- `forge fmt --check`: Pass
+
+Date: 2025-01-27

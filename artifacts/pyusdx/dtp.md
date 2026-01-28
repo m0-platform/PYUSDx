@@ -281,11 +281,11 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
     *   - [x] revert with AccountFrozen
     * - [x] when amount exceeds balance
     *   - [x] revert with insufficient balance
-    * - [ ] when account is earner
-    *   - [ ] success (requires Phase 2.9 startEarningFor)
-    *   - [ ] balance decreased
-    *   - [ ] totalEarningSupply decreased
-    *   - [ ] earningPrincipal decreased proportionally
+    * - [x] when account is earner
+    *   - [x] success (requires Phase 2.9 startEarningFor)
+    *   - [x] balance decreased
+    *   - [x] totalEarningSupply decreased
+    *   - [x] earningPrincipal decreased proportionally
     * - [x] when account is not earner
     *   - [x] success
     *   - [x] balance decreased

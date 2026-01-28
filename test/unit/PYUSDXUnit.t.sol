@@ -1115,9 +1115,92 @@ contract PYUSDXUnitTest is Test {
         assertEq(proxy.currentIndex(), uint128(PRECISION), "Index should be PRECISION (no growth)");
     }
 
-    // NOTE: Full accruedYieldOf tests require startEarningFor (Phase 2.9)
-    // to properly set up earner state. These tests will be expanded in Phase 2.9.
-    // The current implementation correctly returns 0 for non-earners.
+    function test_AccruedYieldOf_IndexGrown_ReturnsPositiveYield() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+
+        // Mint to account
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Whitelist and start earning
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+        proxy.startEarningFor(account);
+
+        uint112 principalBefore = proxy.earningPrincipalOf(account);
+
+        // Set a rate and advance time to grow the index
+        uint32 rate = 1215752192; // ~1.2% APY raw rate
+        vm.prank(rateManager);
+        proxy.setRate(rate);
+
+        // Advance time by 1 year
+        vm.warp(block.timestamp + 365 days);
+
+        // accruedYieldOf should return positive yield
+        uint240 accruedYield = proxy.accruedYieldOf(account);
+        assertGt(accruedYield, uint240(0), "Accrued yield should be positive when index has grown");
+
+        // Verify the yield is approximately what we expect
+        // balanceWithYield = principal × index / PRECISION
+        // yield = balanceWithYield - balance
+        uint128 currentIndex = proxy.currentIndex();
+        uint256 balanceWithYield = (uint256(principalBefore) * uint256(currentIndex)) / PRECISION;
+        uint256 expectedYield = balanceWithYield - mintAmount;
+        assertApproxEqRel(accruedYield, expectedYield, 0.001e18, "Accrued yield should match expected");
+    }
+
+    function test_AccruedYieldOf_BalanceAlreadyIncludesYield_NoDoubleCounting() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+
+        // Mint to account
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        // Whitelist and start earning
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+        proxy.startEarningFor(account);
+
+        // Set a rate and advance time to grow the index
+        uint32 rate = 1215752192; // ~1.2% APY raw rate
+        vm.prank(rateManager);
+        proxy.setRate(rate);
+
+        // Advance time by 6 months
+        vm.warp(block.timestamp + 180 days);
+
+        // Claim the yield
+        uint240 netYield1 = proxy.claimFor(account);
+
+        // Balance should now include the claimed yield
+        uint256 balanceAfterClaim = proxy.balanceOf(account);
+        assertGt(balanceAfterClaim, mintAmount, "Balance should increase after claim");
+
+        // Advance more time
+        vm.warp(block.timestamp + 180 days);
+
+        // accruedYieldOf should calculate NEW yield on top of the increased balance
+        // It should NOT double-count the already claimed yield
+        uint240 accruedYield = proxy.accruedYieldOf(account);
+        assertGe(accruedYield, uint240(0), "Accrued yield should be non-negative");
+
+        // The new accrued yield should be based on the new (higher) principal
+        // which was increased by the previous claim
+        uint256 balance = proxy.balanceOf(account);
+        uint112 principal = proxy.earningPrincipalOf(account);
+        uint128 currentIndex = proxy.currentIndex();
+
+        // balanceWithYield should be >= balance (can't be less)
+        uint256 balanceWithYield = (uint256(principal) * uint256(currentIndex)) / PRECISION;
+        assertGe(balanceWithYield, balance, "Balance with yield should be >= balance");
+
+        // accruedYield should be balanceWithYield - balance (capped at 0)
+        uint256 expectedYield = balanceWithYield >= balance ? balanceWithYield - balance : 0;
+        assertEq(accruedYield, expectedYield, "No double counting of yield");
+    }
 
     /* ============ Balance Functions Tests (Phase 2.8) ============ */
 
