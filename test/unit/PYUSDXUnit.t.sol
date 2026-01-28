@@ -54,11 +54,11 @@ import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.so
  *     - [x] revert with AccountFrozen
  *   - [x] when amount is zero
  *     - [x] revert
- *   - [ ] when recipient is earner
- *     - [ ] success (requires Phase 2.9 startEarningFor)
- *     - [ ] balance increased
- *     - [ ] totalEarningSupply increased
- *     - [ ] totalNonEarningSupply unchanged
+ *   - [x] when recipient is earner
+ *     - [x] success (requires Phase 2.9 startEarningFor)
+ *     - [x] balance increased
+ *     - [x] totalEarningSupply increased
+ *     - [x] totalNonEarningSupply unchanged
  *   - [x] when recipient is not earner
  *     - [x] success
  *     - [x] balance increased
@@ -510,9 +510,36 @@ contract PYUSDXUnitTest is Test {
         proxy.mint(recipient, 0);
     }
 
-    // NOTE: test_Mint_ToEarner_Success requires startEarningFor (Phase 2.9)
-    // Skipping for now - will be added in Phase 2.9
-    // function test_Mint_ToEarner_Success() public { }
+    function test_Mint_ToEarner_Success() public {
+        address recipient = address(0x100);
+        uint256 amount = 1000e6;
+
+        // First mint some amount and make the recipient an earner
+        vm.prank(minterGateway);
+        proxy.mint(recipient, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(recipient, true, 0, address(0));
+        proxy.startEarningFor(recipient);
+
+        uint256 balanceBefore = proxy.balanceOf(recipient);
+        uint256 earningSupplyBefore = proxy.totalEarningSupply();
+        uint256 nonEarningSupplyBefore = proxy.totalNonEarningSupply();
+
+        // Mint additional amount to existing earner
+        uint256 mintAmount = 500e6;
+        vm.prank(minterGateway);
+        proxy.mint(recipient, mintAmount);
+
+        // Verify balance increased
+        assertEq(proxy.balanceOf(recipient), balanceBefore + mintAmount, "Balance should increase");
+        // Verify earning supply increased (earner's balance went up)
+        assertEq(proxy.totalEarningSupply(), earningSupplyBefore + mintAmount, "Earning supply should increase");
+        // Verify non-earning supply unchanged
+        assertEq(proxy.totalNonEarningSupply(), nonEarningSupplyBefore, "Non-earning supply should not change");
+        // Verify still earning
+        assertTrue(proxy.isEarning(recipient), "Recipient should still be earning");
+    }
 
     function test_Mint_ToNonEarner_Success() public {
         address recipient = address(0x100);
