@@ -537,3 +537,38 @@ Date: 2025-01-27
   - Use uint256 type with vm.assume bounds instead of uint112 for parameters to avoid fuzzer confusion
   - Keep mintAmount <= 1e18 to avoid uint112 principal overflow in startEarningFor
   - Focus tests on invariants that DO work correctly when known bugs exist
+
+#### Phase 2.14: Total Supply Override
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented `totalSupply()` function:
+  - Returns `totalEarningSupply + totalNonEarningSupply`
+  - Changed from `pure` stub that reverted to `view` function that returns sum
+- The `totalEarningSupply()` and `totalNonEarningSupply()` functions were already implemented
+
+**Unit Tests:**
+- Added 8 totalSupply tests to `test/unit/PYUSDXUnit.t.sol`:
+  - `test_TotalSupply_EqualsEarningPlusNonEarning`: Verifies totalSupply equals sum
+  - `test_TotalSupply_MintToEarner_Increases`: Verifies totalSupply increases on mint to earner
+  - `test_TotalSupply_MintToNonEarner_Increases`: Verifies totalSupply increases on mint to non-earner
+  - `test_TotalSupply_BurnFromEarner_Decreases`: Verifies totalSupply decreases on burn from earner
+  - `test_TotalSupply_BurnFromNonEarner_Decreases`: Verifies totalSupply decreases on burn from non-earner
+  - `test_TotalEarningSupply_IncreasesOnMintToEarner`: Verifies totalEarningSupply increases
+  - `test_TotalEarningSupply_DecreasesOnBurnFromEarner`: Verifies totalEarningSupply decreases
+  - `test_TotalNonEarningSupply_IncreasesOnMintToNonEarner`: Verifies totalNonEarningSupply increases
+  - `test_TotalNonEarningSupply_DecreasesOnBurnFromNonEarner`: Verifies totalNonEarningSupply decreases
+
+**Gotchas:**
+- The test `test_TotalEarningSupply_IncreasesOnMintToEarner` initially failed because the account wasn't earning yet (whitelisted but not started earning)
+- Fixed by first minting, starting earning, then minting again to verify the supply tracking
+- The mint function only increases `totalEarningSupply` if `isEarning` is true, which requires calling `startEarningFor` after whitelisting
+
+**Verification:**
+- All 121 unit tests pass (113 from Phase 2.13 + 8 new totalSupply tests)
+- All 24 fuzz tests pass
+- `forge build`: Success with only expected warnings (unreachable code, unused params)
+- `forge fmt --check`: Pass
+- `forge test --match-path "test/unit/PYUSDXUnit.t.sol"`: 121 passed, 0 failed
+
+Date: 2025-01-27

@@ -378,9 +378,14 @@ contract PYUSDX is
         return $.totalEarningPrincipal;
     }
 
-    /// @notice Stub implementation - to be implemented in Phase 2.14
-    function totalSupply() external pure override returns (uint256) {
-        revert("TODO: Phase 2.14");
+    /**
+     * @notice Returns the total supply of PYUSDX tokens
+     * @dev Total supply is the sum of earning and non-earning supplies
+     * @return Total supply (totalEarningSupply + totalNonEarningSupply)
+     */
+    function totalSupply() external view override returns (uint256) {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        return uint256($.totalEarningSupply) + uint256($.totalNonEarningSupply);
     }
 
     /// @notice Stub implementation - to be implemented in Phase 2.14

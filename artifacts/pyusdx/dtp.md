@@ -763,7 +763,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Override `totalSupply` and related functions**
+- [x] **Override `totalSupply` and related functions**
   - Reference: SDD Section 3.1 (Primary Interface)
   - `function totalSupply() public view override returns (uint256)`: Return `totalEarningSupply + totalNonEarningSupply`
   - `function totalEarningSupply() public view returns (uint256)`: Return stored value
@@ -771,17 +771,17 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Unit Tests
 
-- [ ] **Add totalSupply tests to PYUSDXUnit.t.sol**
+- [x] **Add totalSupply tests to PYUSDXUnit.t.sol**
   - Add TODO list:
     ```solidity
-    * - [ ] totalSupply equals earning + non-earning
-    *   - [ ] always true
-    * - [ ] totalEarningSupply tracks earners
-    *   - [ ] increases on mint to earner
-    *   - [ ] decreases on burn from earner
-    * - [ ] totalNonEarningSupply tracks non-earners
-    *   - [ ] increases on mint to non-earner
-    *   - [ ] decreases on burn from non-earner
+    * - [x] totalSupply equals earning + non-earning
+    *   - [x] always true
+    * - [x] totalEarningSupply tracks earners
+    *   - [x] increases on mint to earner
+    *   - [x] decreases on burn from earner
+    * - [x] totalNonEarningSupply tracks non-earners
+    *   - [x] increases on mint to non-earner
+    *   - [x] decreases on burn from non-earner
     ```
 
 ### 2.15 Is Earning

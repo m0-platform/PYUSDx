@@ -236,6 +236,15 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  *   -   - [x] return custom address
  *   - [x] when set to address(0) (cleared)
  *   -   - [x] return account address
+ * - [x] totalSupply
+ *   - [x] equals earning + non-earning
+ *   - [x] always true
+ *   - [x] totalEarningSupply tracks earners
+ *   -   - [x] increases on mint to earner
+ *   -   - [x] decreases on burn from earner
+ *   - [x] totalNonEarningSupply tracks non-earners
+ *   -   - [x] increases on mint to non-earner
+ *   -   - [x] decreases on burn from non-earner
  */
 contract PYUSDXUnitTest is Test {
     /* ============ Test Variables ============ */
@@ -2462,5 +2471,200 @@ contract PYUSDXUnitTest is Test {
 
         // Verify allowance decreased
         assertEq(proxy.allowance(owner, spender), allowanceBefore - amount, "Allowance should decrease");
+    }
+
+    /* ============ TotalSupply Tests ============ */
+
+    function test_TotalSupply_EqualsEarningPlusNonEarning() public view {
+        uint256 totalEarning = proxy.totalEarningSupply();
+        uint256 totalNonEarning = proxy.totalNonEarningSupply();
+        uint256 total = proxy.totalSupply();
+
+        assertEq(total, totalEarning + totalNonEarning, "totalSupply should equal earning + non-earning");
+    }
+
+    function test_TotalSupply_MintToEarner_Increases() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        uint256 totalSupplyBefore = proxy.totalSupply();
+
+        // Mint and make earner
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+        proxy.startEarningFor(account);
+
+        uint256 totalSupplyAfter = proxy.totalSupply();
+
+        assertEq(totalSupplyAfter, totalSupplyBefore + amount, "totalSupply should increase by minted amount");
+    }
+
+    function test_TotalSupply_MintToNonEarner_Increases() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        uint256 totalSupplyBefore = proxy.totalSupply();
+
+        // Mint to non-earner
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        uint256 totalSupplyAfter = proxy.totalSupply();
+
+        assertEq(totalSupplyAfter, totalSupplyBefore + amount, "totalSupply should increase by minted amount");
+    }
+
+    function test_TotalSupply_BurnFromEarner_Decreases() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 300e6;
+
+        // Mint and make earner
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+        proxy.startEarningFor(account);
+
+        uint256 totalSupplyBefore = proxy.totalSupply();
+
+        // Burn
+        vm.prank(minterGateway);
+        proxy.burn(account, burnAmount);
+
+        uint256 totalSupplyAfter = proxy.totalSupply();
+
+        assertEq(
+            totalSupplyAfter,
+            totalSupplyBefore - burnAmount,
+            "totalSupply should decrease by burned amount"
+        );
+    }
+
+    function test_TotalSupply_BurnFromNonEarner_Decreases() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 300e6;
+
+        // Mint to non-earner
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        uint256 totalSupplyBefore = proxy.totalSupply();
+
+        // Burn
+        vm.prank(minterGateway);
+        proxy.burn(account, burnAmount);
+
+        uint256 totalSupplyAfter = proxy.totalSupply();
+
+        assertEq(
+            totalSupplyAfter,
+            totalSupplyBefore - burnAmount,
+            "totalSupply should decrease by burned amount"
+        );
+    }
+
+    function test_TotalEarningSupply_IncreasesOnMintToEarner() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        // Make earner and start earning first
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        proxy.startEarningFor(account);
+
+        uint256 totalEarningSupplyBefore = proxy.totalEarningSupply();
+
+        // Mint more to existing earner
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        uint256 totalEarningSupplyAfter = proxy.totalEarningSupply();
+
+        assertEq(
+            totalEarningSupplyAfter,
+            totalEarningSupplyBefore + amount,
+            "totalEarningSupply should increase by minted amount"
+        );
+    }
+
+    function test_TotalEarningSupply_DecreasesOnBurnFromEarner() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 300e6;
+
+        // Mint and make earner
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(account, true, 0, address(0));
+        proxy.startEarningFor(account);
+
+        uint256 totalEarningSupplyBefore = proxy.totalEarningSupply();
+
+        // Burn
+        vm.prank(minterGateway);
+        proxy.burn(account, burnAmount);
+
+        uint256 totalEarningSupplyAfter = proxy.totalEarningSupply();
+
+        assertEq(
+            totalEarningSupplyAfter,
+            totalEarningSupplyBefore - burnAmount,
+            "totalEarningSupply should decrease by burned amount"
+        );
+    }
+
+    function test_TotalNonEarningSupply_IncreasesOnMintToNonEarner() public {
+        address account = address(0x100);
+        uint256 amount = 1000e6;
+
+        uint256 totalNonEarningSupplyBefore = proxy.totalNonEarningSupply();
+
+        // Mint to non-earner
+        vm.prank(minterGateway);
+        proxy.mint(account, amount);
+
+        uint256 totalNonEarningSupplyAfter = proxy.totalNonEarningSupply();
+
+        assertEq(
+            totalNonEarningSupplyAfter,
+            totalNonEarningSupplyBefore + amount,
+            "totalNonEarningSupply should increase by minted amount"
+        );
+    }
+
+    function test_TotalNonEarningSupply_DecreasesOnBurnFromNonEarner() public {
+        address account = address(0x100);
+        uint256 mintAmount = 1000e6;
+        uint256 burnAmount = 300e6;
+
+        // Mint to non-earner
+        vm.prank(minterGateway);
+        proxy.mint(account, mintAmount);
+
+        uint256 totalNonEarningSupplyBefore = proxy.totalNonEarningSupply();
+
+        // Burn
+        vm.prank(minterGateway);
+        proxy.burn(account, burnAmount);
+
+        uint256 totalNonEarningSupplyAfter = proxy.totalNonEarningSupply();
+
+        assertEq(
+            totalNonEarningSupplyAfter,
+            totalNonEarningSupplyBefore - burnAmount,
+            "totalNonEarningSupply should decrease by burned amount"
+        );
     }
 }
