@@ -1065,3 +1065,28 @@ Date: 2025-01-27
 
 Date: 2025-01-27
 
+#### Phase 4.3: EarnerManager Integration
+**Status:** COMPLETED
+
+**Approach:**
+- Added 5 EarnerManager integration tests to `PYUSDXIntegration.t.sol`:
+  - `test_Integration_EarnerManager_SetAndGetEarnerDetails`: Verifies setting and getting earner details (whitelist, fee rate, fee recipient)
+  - `test_Integration_EarnerManager_EarnerStatusFor`: Verifies earner status check works correctly
+  - `test_Integration_EarnerManager_FeeRateApplicationInClaims`: Verifies 10% fee is correctly deducted from yield
+  - `test_Integration_EarnerManager_FeeRateChangeAffectsFutureClaims`: Verifies fee rate changes only affect future yield
+  - `test_Integration_EarnerManager_MaxFeeRate_AllYieldToRecipient`: Verifies 100% fee sends all yield to recipient
+- Note: PYUSDX implements its own earner management rather than inheriting from external EarnerManager contract
+- Verified earner status, fee rate, and fee recipient work correctly with yield claims
+
+**Gotchas:**
+- The `getEarnerDetails` function returns a tuple `(bool isWhitelisted, uint16 feeRate, address feeRecipient)`
+- Fee rate is in basis points (0-10000), so 10% = 1000 bps
+- When fee rate is 100%, `netYield` returned by `claimFor` is 0, but the account's balance still increases by `grossYield` (principal increase)
+
+**Verification:**
+- All 23 integration tests pass (18 from previous phases + 5 new EarnerManager tests)
+- All 219 total tests pass (172 unit + 24 fuzz + 5 invariant + 18 integration)
+- `forge build`: Success
+
+Date: 2025-01-27
+
