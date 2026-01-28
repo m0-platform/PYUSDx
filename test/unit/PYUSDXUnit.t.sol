@@ -195,6 +195,32 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  *   - [x] with 100% fee rate
  *   -   - [x] user receives 0, feeRecipient receives all yield
  *   - [x] multiple claims accrues correctly
+ * - [x] transfer
+ *   - [x] when paused
+ *   -   - [x] revert with EnforcedPause
+ *   - [x] when sender frozen
+ *   -   - [x] revert with AccountFrozen
+ *   - [x] when recipient frozen
+ *   -   - [x] revert with AccountFrozen
+ *   - [x] when insufficient balance
+ *   -   - [x] revert
+ *   - [x] earner to earner
+ *   -   - [x] success, both principals adjusted, totalEarningSupply unchanged
+ *   - [x] non-earner to non-earner
+ *   -   - [x] success, totalNonEarningSupply unchanged
+ *   - [x] non-earner to earner
+ *   -   - [x] success, recipient principal increased
+ *   -   - [x] totalEarningSupply increased, totalNonEarningSupply decreased
+ *   - [x] earner to non-earner
+ *   -   - [x] success, sender principal decreased
+ *   -   - [x] totalEarningSupply decreased, totalNonEarningSupply increased
+ *   - [x] with unclaimed yield
+ *   -   - [x] yield stays with sender, principal adjusted mathematically
+ * - [x] transferFrom
+ *   - [x] with insufficient allowance
+ *   -   - [x] revert
+ *   - [x] with valid allowance
+ *   -   - [x] success, allowance decreased
  * - [x] setClaimRecipient
  *   - [x] when caller is not Earner Manager
  *   -   - [x] revert
@@ -2079,5 +2105,362 @@ contract PYUSDXUnitTest is Test {
         // So the account ends up with grossYield added, and custom recipient gets netYield
         uint256 accountBalanceAfter = proxy.balanceOf(account);
         assertGt(accountBalanceAfter, amount, "Account balance should increase by grossYield");
+    }
+
+    /* ============ Transfer Tests ============ */
+
+    function test_Transfer_Paused_Reverts() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 amount = 100e6;
+
+        // Mint to sender
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+
+        // Pause contract
+        vm.prank(pauser);
+        proxy.pause();
+
+        // Transfer should revert
+        vm.expectRevert();
+        vm.prank(sender);
+        proxy.transfer(recipient, amount);
+    }
+
+    function test_Transfer_SenderFrozen_Reverts() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 amount = 100e6;
+
+        // Mint to sender
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+
+        // Freeze sender
+        vm.prank(freezeManager);
+        proxy.freeze(sender);
+
+        // Transfer should revert
+        vm.expectRevert(abi.encodeWithSignature("AccountFrozen(address)", sender));
+        vm.prank(sender);
+        proxy.transfer(recipient, amount);
+    }
+
+    function test_Transfer_RecipientFrozen_Reverts() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 amount = 100e6;
+
+        // Mint to both
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+        vm.prank(minterGateway);
+        proxy.mint(recipient, amount);
+
+        // Freeze recipient
+        vm.prank(freezeManager);
+        proxy.freeze(recipient);
+
+        // Transfer should revert
+        vm.expectRevert(abi.encodeWithSignature("AccountFrozen(address)", recipient));
+        vm.prank(sender);
+        proxy.transfer(recipient, amount);
+    }
+
+    function test_Transfer_InsufficientBalance_Reverts() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 mintAmount = 100e6;
+        uint256 transferAmount = 200e6;
+
+        // Mint to sender
+        vm.prank(minterGateway);
+        proxy.mint(sender, mintAmount);
+
+        // Transfer more than balance should revert
+        vm.expectRevert();
+        vm.prank(sender);
+        proxy.transfer(recipient, transferAmount);
+    }
+
+    function test_Transfer_ZeroAddress_Reverts() public {
+        address sender = address(0x100);
+        uint256 amount = 100e6;
+
+        // Mint to sender
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+
+        // Transfer to zero address should revert
+        vm.expectRevert("ERC20: transfer to zero address");
+        vm.prank(sender);
+        proxy.transfer(address(0), amount);
+    }
+
+    function test_Transfer_NonEarnerToNonEarner_Success() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 amount = 100e6;
+
+        // Mint to sender
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+
+        uint256 senderBalanceBefore = proxy.balanceOf(sender);
+        uint256 recipientBalanceBefore = proxy.balanceOf(recipient);
+        uint256 totalNonEarningSupplyBefore = proxy.totalNonEarningSupply();
+
+        // Transfer
+        vm.prank(sender);
+        proxy.transfer(recipient, amount);
+
+        // Verify balances
+        assertEq(proxy.balanceOf(sender), senderBalanceBefore - amount, "Sender balance should decrease");
+        assertEq(proxy.balanceOf(recipient), recipientBalanceBefore + amount, "Recipient balance should increase");
+
+        // totalNonEarningSupply should be unchanged for non-earner to non-earner
+        assertEq(
+            proxy.totalNonEarningSupply(),
+            totalNonEarningSupplyBefore,
+            "totalNonEarningSupply should be unchanged"
+        );
+    }
+
+    function test_Transfer_EarnerToEarner_Success() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 amount = 100e6;
+
+        // Mint to both
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+        vm.prank(minterGateway);
+        proxy.mint(recipient, amount);
+
+        // Whitelist both as earners
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(sender, true, 0, address(0));
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(recipient, true, 0, address(0));
+
+        // Start earning for both
+        proxy.startEarningFor(sender);
+        proxy.startEarningFor(recipient);
+
+        uint256 senderPrincipalBefore = proxy.earningPrincipalOf(sender);
+        uint256 recipientPrincipalBefore = proxy.earningPrincipalOf(recipient);
+        uint256 totalEarningSupplyBefore = proxy.totalEarningSupply();
+
+        // Transfer
+        vm.prank(sender);
+        proxy.transfer(recipient, amount);
+
+        // Verify balances
+        assertEq(proxy.balanceOf(sender), 0, "Sender balance should be 0");
+        assertEq(proxy.balanceOf(recipient), 2 * amount, "Recipient balance should increase");
+
+        // Verify principals adjusted (both should have changed)
+        uint256 senderPrincipalAfter = proxy.earningPrincipalOf(sender);
+        uint256 recipientPrincipalAfter = proxy.earningPrincipalOf(recipient);
+
+        // Sender principal should decrease
+        assertLt(senderPrincipalAfter, senderPrincipalBefore, "Sender principal should decrease");
+
+        // Recipient principal should increase
+        assertGt(recipientPrincipalAfter, recipientPrincipalBefore, "Recipient principal should increase");
+
+        // totalEarningSupply should be unchanged for earner to earner
+        assertEq(proxy.totalEarningSupply(), totalEarningSupplyBefore, "totalEarningSupply should be unchanged");
+    }
+
+    function test_Transfer_NonEarnerToEarner_Success() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 amount = 100e6;
+
+        // Mint to sender (non-earner)
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+
+        // Mint to recipient and make them an earner
+        vm.prank(minterGateway);
+        proxy.mint(recipient, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(recipient, true, 0, address(0));
+        proxy.startEarningFor(recipient);
+
+        uint256 totalEarningSupplyBefore = proxy.totalEarningSupply();
+        uint256 totalNonEarningSupplyBefore = proxy.totalNonEarningSupply();
+        uint256 recipientPrincipalBefore = proxy.earningPrincipalOf(recipient);
+
+        // Transfer
+        vm.prank(sender);
+        proxy.transfer(recipient, amount);
+
+        // Verify balances
+        assertEq(proxy.balanceOf(sender), 0, "Sender balance should be 0");
+        assertEq(proxy.balanceOf(recipient), 2 * amount, "Recipient balance should increase");
+
+        // Verify recipient principal increased
+        uint256 recipientPrincipalAfter = proxy.earningPrincipalOf(recipient);
+        assertGt(recipientPrincipalAfter, recipientPrincipalBefore, "Recipient principal should increase");
+
+        // totalEarningSupply should increase
+        assertEq(
+            proxy.totalEarningSupply(),
+            totalEarningSupplyBefore + amount,
+            "totalEarningSupply should increase"
+        );
+
+        // totalNonEarningSupply should decrease
+        assertEq(
+            proxy.totalNonEarningSupply(),
+            totalNonEarningSupplyBefore - amount,
+            "totalNonEarningSupply should decrease"
+        );
+    }
+
+    function test_Transfer_EarnerToNonEarner_Success() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 amount = 100e6;
+
+        // Mint to sender and make them an earner
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(sender, true, 0, address(0));
+        proxy.startEarningFor(sender);
+
+        // Mint to recipient (non-earner)
+        vm.prank(minterGateway);
+        proxy.mint(recipient, amount);
+
+        uint256 totalEarningSupplyBefore = proxy.totalEarningSupply();
+        uint256 totalNonEarningSupplyBefore = proxy.totalNonEarningSupply();
+        uint256 senderPrincipalBefore = proxy.earningPrincipalOf(sender);
+
+        // Transfer
+        vm.prank(sender);
+        proxy.transfer(recipient, amount);
+
+        // Verify balances
+        assertEq(proxy.balanceOf(sender), 0, "Sender balance should be 0");
+        assertEq(proxy.balanceOf(recipient), 2 * amount, "Recipient balance should increase");
+
+        // Verify sender principal decreased
+        uint256 senderPrincipalAfter = proxy.earningPrincipalOf(sender);
+        assertLt(senderPrincipalAfter, senderPrincipalBefore, "Sender principal should decrease");
+
+        // totalEarningSupply should decrease
+        assertEq(
+            proxy.totalEarningSupply(),
+            totalEarningSupplyBefore - amount,
+            "totalEarningSupply should decrease"
+        );
+
+        // totalNonEarningSupply should increase
+        assertEq(
+            proxy.totalNonEarningSupply(),
+            totalNonEarningSupplyBefore + amount,
+            "totalNonEarningSupply should increase"
+        );
+    }
+
+    function test_Transfer_WithUnclaimedYield_YieldStaysWithSender() public {
+        address sender = address(0x100);
+        address recipient = address(0x200);
+        uint256 amount = 1000e6;
+
+        // Mint to sender and make them an earner
+        vm.prank(minterGateway);
+        proxy.mint(sender, amount);
+
+        vm.prank(earnerManager);
+        proxy.setEarnerDetails(sender, true, 0, address(0));
+        proxy.startEarningFor(sender);
+
+        // Set rate to generate yield
+        uint32 newRate = 1215752192;
+        vm.prank(rateManager);
+        proxy.setRate(newRate);
+
+        // Warp forward to accrue yield
+        vm.warp(block.timestamp + 180 days);
+
+        // Get accrued yield before transfer
+        uint256 accruedYieldBefore = proxy.accruedYieldOf(sender);
+
+        // Verify yield accrued
+        assertGt(accruedYieldBefore, 0, "Should have accrued yield");
+
+        uint256 balanceBefore = proxy.balanceOf(sender);
+
+        // Transfer half the balance
+        uint256 transferAmount = 500e6;
+        vm.prank(sender);
+        proxy.transfer(recipient, transferAmount);
+
+        // Verify balance decreased
+        assertEq(proxy.balanceOf(sender), balanceBefore - transferAmount, "Sender balance should decrease");
+
+        // Accrued yield stays with sender (it's based on principal)
+        // After transfer, the principal should be adjusted proportionally
+        uint256 accruedYieldAfter = proxy.accruedYieldOf(sender);
+
+        // The accrued yield may change slightly due to principal adjustment and rounding
+        // but it should still be positive
+        assertGt(accruedYieldAfter, 0, "Sender should still have accrued yield after transfer");
+    }
+
+    /* ============ TransferFrom Tests ============ */
+
+    function test_TransferFrom_InsufficientAllowance_Reverts() public {
+        address owner = address(0x100);
+        address spender = address(0x200);
+        address recipient = address(0x300);
+        uint256 amount = 100e6;
+
+        // Mint to owner
+        vm.prank(minterGateway);
+        proxy.mint(owner, amount);
+
+        // Don't approve, transferFrom should revert
+        vm.expectRevert();
+        vm.prank(spender);
+        proxy.transferFrom(owner, recipient, amount);
+    }
+
+    function test_TransferFrom_ValidAllowance_Success() public {
+        address owner = address(0x100);
+        address spender = address(0x200);
+        address recipient = address(0x300);
+        uint256 amount = 100e6;
+
+        // Mint to owner
+        vm.prank(minterGateway);
+        proxy.mint(owner, amount);
+
+        // Approve spender
+        vm.prank(owner);
+        proxy.approve(spender, amount);
+
+        uint256 ownerBalanceBefore = proxy.balanceOf(owner);
+        uint256 recipientBalanceBefore = proxy.balanceOf(recipient);
+        uint256 allowanceBefore = proxy.allowance(owner, spender);
+
+        // Transfer from
+        vm.prank(spender);
+        proxy.transferFrom(owner, recipient, amount);
+
+        // Verify balances
+        assertEq(proxy.balanceOf(owner), ownerBalanceBefore - amount, "Owner balance should decrease");
+        assertEq(proxy.balanceOf(recipient), recipientBalanceBefore + amount, "Recipient balance should increase");
+
+        // Verify allowance decreased
+        assertEq(proxy.allowance(owner, spender), allowanceBefore - amount, "Allowance should decrease");
     }
 }

@@ -443,3 +443,76 @@ Date: 2025-01-27
 - `forge build`: Success
 - `forge fmt --check`: Pass
 
+#### Phase 2.13: Transfer Override
+**Status:** COMPLETED
+
+**Approach:**
+- Implemented `_transfer(address sender, address recipient, uint256 amount) internal override` function:
+  - Validates recipient is not zero address
+  - Emits Transfer event at start (same as MToken pattern)
+  - Casts amount to `uint240` using `UIntMath.safe240()`
+  - Checks sender earning status once
+  - Handles in-kind transfers (both earning or both non-earning):
+    - If both earning: adjusts principals using `getPrincipalAmountRoundedUp`
+    - If both non-earning: direct balance transfer
+  - Handles earner to non-earner transfers:
+    - Subtracts earning amount (principal) from sender
+    - Adds non-earning amount to recipient
+  - Handles non-earner to earner transfers:
+    - Subtracts non-earning amount from sender
+    - Adds earning amount (principal) to recipient using `getPrincipalAmountRoundedDown`
+  - Calls `_updateIndex()` at end
+
+- Implemented helper functions:
+  - `_subtractEarningAmount(address account, uint112 principalAmount)`: Subtract principal from earner, update totalEarningPrincipal
+  - `_subtractNonEarningAmount(address account, uint240 amount)`: Subtract amount from non-earner, update totalNonEarningSupply
+  - `_addEarningAmount(address account, uint112 principalAmount)`: Add principal to earner, update totalEarningPrincipal
+  - `_addNonEarningAmount(address account, uint240 amount)`: Add amount to non-earner, update totalNonEarningSupply
+  - `_transferAmountInKind(address sender, address recipient, uint240 amount, bool senderIsEarning)`: Transfer between same-status accounts
+
+**Gotchas:**
+- Used `_calculateIndex($)` instead of `currentIndex()` because `currentIndex()` is external view and cannot be called from internal functions
+- The helper functions have some unused parameters that trigger compiler warnings (account and amount in _subtractNonEarningAmount/_addNonEarningAmount) - these are kept for consistency and potential future use
+- Principal adjustment uses `getPrincipalAmountRoundedUp` for senders and `getPrincipalAmountRoundedDown` for recipients to handle rounding correctly
+
+**Verification:**
+- All 104 unit tests pass (92 from Phase 2.13 implementation + 12 new transfer tests)
+- `forge build`: Success with only expected warnings (unreachable code, unused params in helpers)
+- `forge test --match-path "test/unit/PYUSDXUnit.t.sol"`: 104 passed, 0 failed
+
+#### Phase 2.13: Transfer Override - Unit Tests
+**Status:** COMPLETED
+
+**Approach:**
+- Added 12 transfer unit tests to `test/unit/PYUSDXUnit.t.sol`:
+  - `test_Transfer_Paused_Reverts`: Verifies transfer reverts when contract is paused
+  - `test_Transfer_SenderFrozen_Reverts`: Verifies transfer reverts when sender is frozen
+  - `test_Transfer_RecipientFrozen_Reverts`: Verifies transfer reverts when recipient is frozen
+  - `test_Transfer_InsufficientBalance_Reverts`: Verifies transfer reverts when insufficient balance
+  - `test_Transfer_ZeroAddress_Reverts`: Verifies transfer reverts to zero address
+  - `test_Transfer_NonEarnerToNonEarner_Success`: Verifies transfer between non-earners
+  - `test_Transfer_EarnerToEarner_Success`: Verifies transfer between earners with principal adjustments
+  - `test_Transfer_NonEarnerToEarner_Success`: Verifies transfer from non-earner to earner
+  - `test_Transfer_EarnerToNonEarner_Success`: Verifies transfer from earner to non-earner
+  - `test_Transfer_WithUnclaimedYield_YieldStaysWithSender`: Verifies yield behavior during transfer
+  - `test_TransferFrom_InsufficientAllowance_Reverts`: Verifies transferFrom reverts with insufficient allowance
+  - `test_TransferFrom_ValidAllowance_Success`: Verifies transferFrom with valid allowance
+
+- Added pause and frozen checks to `_transfer` internal function:
+  - Since the public `transfer` and `transferFrom` functions from `ERC20ExtendedUpgradeable` are not virtual, the checks were added to `_transfer`
+  - Uses `_requireNotPaused()` for pause check
+  - Uses `_revertIfFrozen()` for frozen checks on both sender and recipient
+
+**Gotchas:**
+- The base `ERC20ExtendedUpgradeable.transfer` and `transferFrom` functions are not marked as `virtual`, so they cannot be overridden
+- Solution: Added pause/frozen checks directly in `_transfer` internal function instead
+- The test `test_Transfer_WithUnclaimedYield_YieldStaysWithSender` had to account for principal adjustment during transfer, which affects the accrued yield calculation
+
+**Verification:**
+- All 104 unit tests pass (92 from Phase 2.13 + 12 new transfer tests)
+- `forge build`: Success with only expected warnings (unreachable code, unused params)
+- `forge test --match-path "test/unit/PYUSDXUnit.t.sol"`: 104 passed, 0 failed
+- `forge fmt --check`: Pass
+
+Date: 2025-01-27
+

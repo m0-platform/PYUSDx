@@ -686,7 +686,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Implementation
 
-- [ ] **Override `_transfer` internal function**
+- [x] **Override `_transfer` internal function**
   - Reference: SDD Section 6.6 (Transfer Operations)
   - Signature: `function _transfer(address sender, address recipient, uint256 amount) internal override`
   - This hooks into both `transfer` and `transferFrom` from ERC20ExtendedUpgradeable
@@ -707,7 +707,7 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
       - Call `_addEarningAmount(recipient, _getPrincipalAmountRoundedDown(amount))`
     - Call `_updateIndex()` at end
 
-- [ ] **Implement helper functions** (follow MToken pattern):
+- [x] **Implement helper functions** (follow MToken pattern):
   - `_subtractEarningAmount(address account, uint112 principalAmount)`: Subtract principal from earner, update `totalEarningPrincipal`
   - `_subtractNonEarningAmount(address account, uint240 amount)`: Subtract amount from non-earner, update `totalNonEarningSupply`
   - `_addEarningAmount(address account, uint112 principalAmount)`: Add principal to earner, update `totalEarningPrincipal`
@@ -717,35 +717,35 @@ This plan implements PYUSDX, an upgradeable, non-rebasing ERC20 token with claim
 
 #### Unit Tests
 
-- [ ] **Add transfer tests to PYUSDXUnit.t.sol**
+- [x] **Add transfer tests to PYUSDXUnit.t.sol**
   - Add to TODO list:
     ```solidity
-     * - [ ] transfer
-     *   - [ ] when paused
+     * - [x] transfer
+     *   - [x] when paused
      *   -   - [x] revert with EnforcedPause
-     *   - [ ] when sender frozen
+     *   - [x] when sender frozen
      *   -   - [x] revert with AccountFrozen
-     *   - [ ] when recipient frozen
+     *   - [x] when recipient frozen
      *   -   - [x] revert with AccountFrozen
-     *   - [ ] when insufficient balance
-     *   -   - [ ] revert
-     *   - [ ] earner to earner
-     *   -   - [ ] success, both principals adjusted, totalEarningSupply unchanged
-     *   - [ ] non-earner to non-earner
-     *   -   - [ ] success, totalNonEarningSupply unchanged
-     *   - [ ] non-earner to earner
-     *   -   - [ ] success, recipient principal increased
+     *   - [x] when insufficient balance
+     *   -   - [x] revert
+     *   - [x] earner to earner
+     *   -   - [x] success, both principals adjusted, totalEarningSupply unchanged
+     *   - [x] non-earner to non-earner
+     *   -   - [x] success, totalNonEarningSupply unchanged
+     *   - [x] non-earner to earner
+     *   -   - [x] success, recipient principal increased
      *   -   - [x] totalEarningSupply increased, totalNonEarningSupply decreased
-     *   - [ ] earner to non-earner
-     *   -   - [ ] success, sender principal decreased
-     *   -   - [ ] totalEarningSupply decreased, totalNonEarningSupply increased
-     *   - [ ] with unclaimed yield
-     *   -   - [ ] yield stays with sender, principal adjusted mathematically
-     * - [ ] transferFrom
-     *   - [ ] with insufficient allowance
-     *   -   - [ ] revert
-     *   - [ ] with valid allowance
-     *   -   - [ ] success, allowance decreased
+     *   - [x] earner to non-earner
+     *   -   - [x] success, sender principal decreased
+     *   -   - [x] totalEarningSupply decreased, totalNonEarningSupply increased
+     *   - [x] with unclaimed yield
+     *   -   - [x] yield stays with sender, principal adjusted mathematically
+     * - [x] transferFrom
+     *   - [x] with insufficient allowance
+     *   -   - [x] revert
+     *   - [x] with valid allowance
+     *   -   - [x] success, allowance decreased
      */
 
 #### Fuzz Tests

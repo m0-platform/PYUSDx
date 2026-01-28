@@ -962,8 +962,170 @@ contract PYUSDX is
         emit ClaimRecipientSet(account, claimRecipient);
     }
 
-    /// @notice Internal transfer hook - to be implemented in Phase 2.13
-    function _transfer(address sender, address recipient, uint256 amount) internal virtual override {
-        revert("TODO: Phase 2.13");
+    /* ============ Internal Transfer Helpers ============ */
+
+    /**
+     * @notice Subtract earning amount from an account (for transfer out from earner)
+     * @param account Account to subtract from
+     * @param principalAmount Principal amount to subtract (pre-calculated from amount)
+     */
+    function _subtractEarningAmount(address account, uint112 principalAmount) private {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        unchecked {
+            $.totalEarningPrincipal -= principalAmount;
+            $.totalEarningSupply -= $.accounts[account].balance; // Balance is decreased after this
+        }
+    }
+
+    /**
+     * @notice Subtract non-earning amount from an account (for transfer out from non-earner)
+     * @param account Account to subtract from
+     * @param amount Amount to subtract
+     */
+    function _subtractNonEarningAmount(address account, uint240 amount) private {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        unchecked {
+            $.totalNonEarningSupply -= amount;
+        }
+    }
+
+    /**
+     * @notice Add earning amount to an account (for transfer in to earner)
+     * @param account Account to add to
+     * @param principalAmount Principal amount to add (pre-calculated from amount)
+     */
+    function _addEarningAmount(address account, uint112 principalAmount) private {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        unchecked {
+            $.totalEarningPrincipal += principalAmount;
+            $.totalEarningSupply += $.accounts[account].balance; // Balance is increased after this
+        }
+    }
+
+    /**
+     * @notice Add non-earning amount to an account (for transfer in to non-earner)
+     * @param account Account to add to
+     * @param amount Amount to add
+     */
+    function _addNonEarningAmount(address account, uint240 amount) private {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        unchecked {
+            $.totalNonEarningSupply += amount;
+        }
+    }
+
+    /**
+     * @notice Transfer amount in-kind between two earners or two non-earners
+     * @param sender Sender account
+     * @param recipient Recipient account
+     * @param amount Amount to transfer
+     * @param senderIsEarning Whether both are earning (if false, both are non-earning)
+     */
+    function _transferAmountInKind(
+        address sender,
+        address recipient,
+        uint240 amount,
+        bool senderIsEarning
+    ) private {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        // If both are earning, adjust principals
+        if (senderIsEarning) {
+            uint128 idx = _calculateIndex($);
+            uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedUp(amount, idx);
+
+            unchecked {
+                $.accounts[sender].earningPrincipal -= principalAmount;
+                // Recipient principal will be increased after balance update
+                $.accounts[recipient].earningPrincipal =
+                    uint112(uint256($.accounts[recipient].earningPrincipal) + uint256(principalAmount));
+            }
+        }
+
+        // Transfer balances (total supply unchanged for in-kind transfers)
+        $.accounts[sender].balance -= amount;
+        $.accounts[recipient].balance += amount;
+    }
+
+    /* ============ Transfer Override ============ */
+
+    /**
+     * @notice Internal transfer hook - handles transfers between earners and non-earners
+     * @dev This hooks into both transfer and transferFrom from ERC20ExtendedUpgradeable
+     *      Includes pause and frozen checks since the public functions are not virtual
+     * @param sender Sender address
+     * @param recipient Recipient address (must not be zero address)
+     * @param amount Amount to transfer
+     */
+    function _transfer(address sender, address recipient, uint256 amount) internal override {
+        // Pause check - contract must not be paused
+        _requireNotPaused();
+
+        // Frozen checks - both sender and recipient must not be frozen
+        _revertIfFrozen(sender);
+        _revertIfFrozen(recipient);
+        // Validate recipient is not zero address
+        if (recipient == address(0)) {
+            revert("ERC20: transfer to zero address");
+        }
+
+        // Cast amount to uint240 with overflow protection
+        uint240 amount240 = UIntMath.safe240(amount);
+
+        // Get storage
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        // Emit Transfer event at start (same as MToken pattern)
+        emit Transfer(sender, recipient, amount240);
+
+        // Check sender earning status once
+        bool senderIsEarning = $.accounts[sender].isEarning;
+        bool recipientIsEarning = $.accounts[recipient].isEarning;
+
+        // Handle transfer based on earning status
+        if (senderIsEarning == recipientIsEarning) {
+            // In-kind transfer (both earning or both non-earning)
+            _transferAmountInKind(sender, recipient, amount240, senderIsEarning);
+        } else if (senderIsEarning) {
+            // Earner to non-earner
+            uint128 idx = _calculateIndex($);
+            uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedUp(amount240, idx);
+
+            _subtractEarningAmount(sender, principalAmount);
+            _addNonEarningAmount(recipient, amount240);
+
+            // Transfer balances
+            $.accounts[sender].balance -= amount240;
+            $.accounts[recipient].balance += amount240;
+
+            // Adjust sender principal
+            unchecked {
+                $.accounts[sender].earningPrincipal -= principalAmount;
+            }
+        } else {
+            // Non-earner to earner
+            uint128 idx = _calculateIndex($);
+            uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedDown(amount240, idx);
+
+            _subtractNonEarningAmount(sender, amount240);
+            _addEarningAmount(recipient, principalAmount);
+
+            // Transfer balances
+            $.accounts[sender].balance -= amount240;
+            $.accounts[recipient].balance += amount240;
+
+            // Adjust recipient principal
+            unchecked {
+                $.accounts[recipient].earningPrincipal =
+                    uint112(uint256($.accounts[recipient].earningPrincipal) + uint256(principalAmount));
+            }
+        }
+
+        // Update index at end
+        _updateIndex();
     }
 }
