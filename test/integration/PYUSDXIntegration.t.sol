@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import {Test} from "forge-std/Test.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {PYUSDX} from "src/PYUSDX.sol";
-import {IPYUSDX} from "src/interfaces/IPYUSDX.sol";
-import {MinterGatewayMock} from "../mocks/MinterGatewayMock.sol";
+import { Test } from "forge-std/Test.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { PYUSDX } from "src/PYUSDX.sol";
+import { IPYUSDX } from "src/interfaces/IPYUSDX.sol";
+import { MinterGatewayMock } from "../mocks/MinterGatewayMock.sol";
 
 /**
  * @title PYUSDXIntegrationTest
@@ -228,7 +228,7 @@ contract PYUSDXIntegrationTest is Test {
 
         // Step 3: Set yield rate and accrue yield
         vm.prank(rateManager);
-        pyusdx.setRate(1215752192); // ~1.2% APY rate value
+        pyusdx.setRate(120); // 1.2% APY in BPS
         vm.warp(block.timestamp + 365 days); // Fast forward 1 year
 
         // Step 4: Claim yield
@@ -251,7 +251,11 @@ contract PYUSDXIntegrationTest is Test {
         vm.prank(alice);
         pyusdx.transfer(bob, transferAmount);
         assertEq(pyusdx.balanceOf(bob), transferAmount, "Step 5: Bob received transfer");
-        assertEq(pyusdx.balanceOf(alice), aliceBalanceBeforeTransfer - transferAmount, "Step 5: Alice balance decreased");
+        assertEq(
+            pyusdx.balanceOf(alice),
+            aliceBalanceBeforeTransfer - transferAmount,
+            "Step 5: Alice balance decreased"
+        );
         assertEq(pyusdx.totalSupply(), totalSupplyBeforeTransfer, "Step 5: Total supply unchanged");
 
         // Step 6: Stop earning for Alice
@@ -320,7 +324,11 @@ contract PYUSDXIntegrationTest is Test {
         vm.prank(authorizedUser);
         minterGateway.burn(bob, burnAmount);
         assertEq(pyusdx.totalEarningSupply(), mintAmount - burnAmount, "After burn from non-earner: Earning supply");
-        assertEq(pyusdx.totalNonEarningSupply(), mintAmount - burnAmount, "After burn from non-earner: Non-earning supply");
+        assertEq(
+            pyusdx.totalNonEarningSupply(),
+            mintAmount - burnAmount,
+            "After burn from non-earner: Non-earning supply"
+        );
         assertEq(pyusdx.totalSupply(), pyusdx.totalEarningSupply() + pyusdx.totalNonEarningSupply(), "Invariant holds");
     }
 
@@ -340,7 +348,7 @@ contract PYUSDXIntegrationTest is Test {
 
         // Set a rate and fast forward to accrue yield
         vm.prank(rateManager);
-        pyusdx.setRate(1215752192); // ~1.2% APY
+        pyusdx.setRate(120); // 1.2% APY in BPS
         vm.warp(block.timestamp + 365 days);
 
         // Get balance with yield (uses IndexingMath.getPresentAmountRoundedDown internally)
@@ -372,7 +380,7 @@ contract PYUSDXIntegrationTest is Test {
 
         // Set rate and fast forward to grow index
         vm.prank(rateManager);
-        pyusdx.setRate(1215752192); // ~1.2% APY
+        pyusdx.setRate(120); // 1.2% APY in BPS
         vm.warp(block.timestamp + 365 days);
 
         // Now start earning - principal should be calculated using current index
@@ -414,7 +422,7 @@ contract PYUSDXIntegrationTest is Test {
 
         // Edge case 3: Large index growth
         vm.prank(rateManager);
-        pyusdx.setRate(1215752192); // ~1.2% APY
+        pyusdx.setRate(120); // 1.2% APY in BPS
         vm.warp(block.timestamp + 365 days);
         assertTrue(pyusdx.currentIndex() > 1e12, "Index grew");
 
@@ -432,10 +440,9 @@ contract PYUSDXIntegrationTest is Test {
         // The uint128 bounds are used in _calculateIndex when computing newIndex
         // Let's verify that setting high rates doesn't cause overflow
 
-        // Set a high rate (uint32 max is about 4.29e9, but we use what fits in uint32)
-        // PRECISION = 1e12, so max rate allowed is 1e12
+        // Set a high rate (max BPS is 10000 = 100%)
         vm.prank(rateManager);
-        uint32 highRate = 3_000_000_000; // High rate but within uint32 and PRECISION bounds
+        uint32 highRate = 8000; // 80% APY in BPS
         pyusdx.setRate(highRate);
 
         // Fast forward significantly
@@ -526,7 +533,7 @@ contract PYUSDXIntegrationTest is Test {
 
         // Set rate and accrue yield
         vm.prank(rateManager);
-        pyusdx.setRate(1215752192); // ~1.2% APY
+        pyusdx.setRate(120); // 1.2% APY in BPS
         vm.warp(block.timestamp + 365 days);
 
         // Claim yield
@@ -558,7 +565,7 @@ contract PYUSDXIntegrationTest is Test {
 
         // Set rate and accrue some yield
         vm.prank(rateManager);
-        pyusdx.setRate(1215752192); // ~1.2% APY
+        pyusdx.setRate(120); // 1.2% APY in BPS
         vm.warp(block.timestamp + 180 days);
 
         // Claim first portion (0% fee)
@@ -598,7 +605,7 @@ contract PYUSDXIntegrationTest is Test {
 
         // Set rate and accrue yield
         vm.prank(rateManager);
-        pyusdx.setRate(1215752192); // ~1.2% APY
+        pyusdx.setRate(120); // 1.2% APY in BPS
         vm.warp(block.timestamp + 365 days);
 
         // Get Alice's balance before claim

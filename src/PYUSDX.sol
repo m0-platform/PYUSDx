@@ -4,13 +4,12 @@ pragma solidity 0.8.26;
 import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
 import { IERC20 } from "m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { ERC20ExtendedUpgradeable } from "m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
-import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import { Freezable } from "m-extensions/src/components/freezable/Freezable.sol";
 import { ForcedTransferable } from "m-extensions/src/components/forcedTransferable/ForcedTransferable.sol";
 import { Pausable } from "m-extensions/src/components/pausable/Pausable.sol";
 import { IndexingMath } from "m-extensions/lib/common/src/libs/IndexingMath.sol";
-import { ContinuousIndexingMath } from "m-extensions/lib/common/src/libs/ContinuousIndexingMath.sol";
 import { UIntMath } from "m-extensions/lib/common/src/libs/UIntMath.sol";
+import { ContinuousIndexing } from "./abstract/ContinuousIndexing.sol";
 
 /**
  * @title PYUSDXLayout
@@ -34,17 +33,6 @@ abstract contract PYUSDXLayout is IPYUSDX {
     }
 
     /**
-     * @notice Continuous indexing state
-     * @dev Stored in same storage struct to save slots
-     */
-    struct IndexingState {
-        uint128 latestIndex; // Current yield index (scaled by EXP_SCALED_ONE = 1e12)
-        uint40 latestUpdateTimestamp; // Timestamp of last index update
-        uint32 rate; // Current annual yield rate (basis points, scaled by 1e12)
-        uint32 _latestRate; // Previous rate for index calculation
-    }
-
-    /**
      * @notice Earner details for fee management
      */
     struct EarnerDetails {
@@ -64,7 +52,6 @@ abstract contract PYUSDXLayout is IPYUSDX {
         uint112 totalEarningPrincipal; // Sum of all earning principals
         uint240 totalEarningSupply; // Total supply of earning tokens
         uint240 totalNonEarningSupply; // Total supply of non-earning tokens
-        IndexingState indexing; // Yield index and rate
     }
 
     /* ============ Storage Layout ============ */
@@ -82,11 +69,6 @@ abstract contract PYUSDXLayout is IPYUSDX {
             $.slot := _PYUSDX_STORAGE_LOCATION
         }
     }
-
-    /* ============ Constants ============ */
-
-    /// @notice Precision scaling for index calculations (from IndexingMath)
-    uint256 internal constant PRECISION = IndexingMath.EXP_SCALED_ONE; // 1e12
 }
 
 /**
@@ -95,18 +77,8 @@ abstract contract PYUSDXLayout is IPYUSDX {
  * @dev Implements continuous indexing for yield accrual without balance rebase
  * @author M0 Labs
  */
-contract PYUSDX is
-    PYUSDXLayout,
-    ERC20ExtendedUpgradeable,
-    AccessControlUpgradeable,
-    Freezable,
-    ForcedTransferable,
-    Pausable
-{
+contract PYUSDX is PYUSDXLayout, ContinuousIndexing, ERC20ExtendedUpgradeable, Freezable, ForcedTransferable, Pausable {
     /* ============ Roles ============ */
-
-    /// @notice Role that can set the yield rate
-    bytes32 public constant RATE_MANAGER_ROLE = keccak256("RATE_MANAGER_ROLE");
 
     /// @notice Role that can manage earners
     bytes32 public constant EARNER_MANAGER_ROLE = keccak256("EARNER_MANAGER_ROLE");
@@ -120,9 +92,6 @@ contract PYUSDX is
     address public immutable pyusd;
 
     /* ============ Errors ============ */
-
-    /// @notice Thrown when rate exceeds maximum (100%)
-    error RateTooHigh();
 
     /// @notice Thrown when caller is not the minter gateway
     error NotMinterGateway();
@@ -175,84 +144,17 @@ contract PYUSDX is
         _grantRole(EARNER_MANAGER_ROLE, earnerManager);
 
         // Initialize indexing state
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        $.indexing.latestIndex = uint128(PRECISION); // Start at 1.0
-        $.indexing.latestUpdateTimestamp = uint40(block.timestamp);
-        $.indexing.rate = 0; // Start with 0% rate
-        $.indexing._latestRate = 0;
+        ContinuousIndexingStorageStruct storage indexing = _getContinuousIndexingStorageLocation();
+        indexing.latestIndex = uint128(PRECISION); // Start at 1.0
+        indexing.latestUpdateTimestamp = uint40(block.timestamp);
+        indexing.rate = 0; // Start with 0% rate
+        indexing.latestRate = 0;
     }
 
     /* ============ View Functions ============ */
-
-    /**
-     * @notice Returns the current yield index
-     * @return Current index value
-     */
-    function currentIndex() external view returns (uint128) {
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        return _calculateIndex($);
-    }
-
-    /**
-     * @notice Returns the current yield rate
-     * @return Current rate in basis points (scaled by 1e12)
-     */
-    function rate() external view returns (uint32) {
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        return $.indexing.rate;
-    }
+    // currentIndex() and rate() are inherited from ContinuousIndexing
 
     /* ============ Internal Functions ============ */
-
-    /**
-     * @notice Calculates the current index based on elapsed time and rate
-     * @dev Uses continuous compounding formula: e^(rate * time)
-     * @param $ Storage pointer
-     * @return The calculated index
-     */
-    function _calculateIndex(PYUSDXStorageStruct storage $) internal view returns (uint128) {
-        uint40 lastUpdate = $.indexing.latestUpdateTimestamp;
-        if (block.timestamp == lastUpdate) {
-            return $.indexing.latestIndex;
-        }
-
-        uint32 currentRate = $.indexing.rate;
-        if (currentRate == 0) {
-            return $.indexing.latestIndex;
-        }
-
-        // Calculate time elapsed in seconds
-        uint32 elapsedTime = uint32(block.timestamp - lastUpdate);
-
-        // Calculate delta index using continuous compounding
-        // getContinuousIndex returns e^(rate * time / seconds_per_year) scaled by 1e12
-        uint48 deltaIndex = ContinuousIndexingMath.getContinuousIndex(currentRate, elapsedTime);
-
-        // Multiply current index by delta index
-        uint144 newIndex = ContinuousIndexingMath.multiplyIndicesDown($.indexing.latestIndex, deltaIndex);
-
-        // Bound to uint128 max
-        return UIntMath.bound128(newIndex);
-    }
-
-    /**
-     * @notice Updates the index to the current value
-     * @dev Caches result in storage to avoid recalculation within the same block
-     * @return The new index value
-     */
-    function _updateIndex() internal returns (uint128) {
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        uint128 newIndex = _calculateIndex($);
-
-        if (newIndex != $.indexing.latestIndex) {
-            $.indexing.latestIndex = newIndex;
-            $.indexing.latestUpdateTimestamp = uint40(block.timestamp);
-            $.indexing._latestRate = $.indexing.rate;
-            emit IndexUpdated(newIndex, block.timestamp);
-        }
-
-        return newIndex;
-    }
 
     /**
      * @notice Calculates accrued yield for an earner
@@ -310,7 +212,7 @@ contract PYUSDX is
         }
 
         // Calculate accrued yield using internal helper
-        return _getAccruedYield(accountData.balance, accountData.earningPrincipal, _calculateIndex($));
+        return _getAccruedYield(accountData.balance, accountData.earningPrincipal, currentIndex());
     }
 
     /**
@@ -332,7 +234,7 @@ contract PYUSDX is
         }
 
         // Earners: add accrued yield
-        uint240 yield = _getAccruedYield(accountData.balance, accountData.earningPrincipal, _calculateIndex($));
+        uint240 yield = _getAccruedYield(accountData.balance, accountData.earningPrincipal, currentIndex());
         return balance + uint256(yield);
     }
 
@@ -564,7 +466,7 @@ contract PYUSDX is
         }
 
         // Update index to get current value
-        uint128 idx = _updateIndex();
+        uint128 idx = updateIndex();
 
         // Calculate accrued yield
         uint240 grossYield = _getAccruedYield(accountData.balance, accountData.earningPrincipal, idx);
@@ -658,7 +560,7 @@ contract PYUSDX is
         }
 
         // Calculate principal: balance × PRECISION / currentIndex
-        uint128 idx = _updateIndex();
+        uint128 idx = updateIndex();
         uint256 balance = uint256(accountData.balance);
 
         uint112 principal;
@@ -713,7 +615,7 @@ contract PYUSDX is
             // Calculate principal: balance × PRECISION / currentIndex
             // Note: _updateIndex is called each iteration to ensure fresh index
             // This could be optimized by caching, but keeping it simple for now
-            uint128 idx = _updateIndex();
+            uint128 idx = updateIndex();
             uint256 balance = uint256(accountData.balance);
 
             uint112 principal;
@@ -759,7 +661,7 @@ contract PYUSDX is
         }
 
         // Update index to get current value
-        uint128 idx = _updateIndex();
+        uint128 idx = updateIndex();
 
         // Calculate and claim accrued yield if any
         // Note: This inlines the claim logic since claimFor is implemented in Phase 2.11
@@ -868,7 +770,7 @@ contract PYUSDX is
             }
 
             // Update index
-            uint128 idx = _updateIndex();
+            uint128 idx = updateIndex();
 
             // Calculate and claim accrued yield if any
             uint256 balance = uint256(accountData.balance);
@@ -944,37 +846,7 @@ contract PYUSDX is
         }
     }
 
-    /* ============ Set Rate ============ */
-
-    /**
-     * @notice Sets the annual yield rate
-     * @dev Only callable by RATE_MANAGER_ROLE. Rate is in basis points (1e12 scaling = 100%).
-     *      This triggers an index update to apply the old rate for the elapsed period.
-     * @param newRate New annual yield rate (0 to 10000 basis points, scaled by 1e12)
-     */
-    function setRate(uint32 newRate) external {
-        // Access control: only rate manager can set rate
-        if (!hasRole(RATE_MANAGER_ROLE, msg.sender)) revert("not rate manager");
-
-        // Validate rate doesn't exceed 100% (10000 basis points)
-        // Validate rate doesn't exceed 100% (10000 basis points)
-        // Rate is in format: bps * PRECISION / 10000, so max 100% = 10000 * PRECISION / 10000 = PRECISION
-        if (newRate > uint32(PRECISION)) revert RateTooHigh();
-
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-
-        // Update index to apply old rate for elapsed period
-        _updateIndex();
-
-        // Early return if rate unchanged
-        if ($.indexing.rate == newRate) {
-            return;
-        }
-
-        // Set new rate
-        $.indexing.rate = newRate;
-        emit RateSet(newRate);
-    }
+    // setRate() is inherited from ContinuousIndexing
 
     /**
      * @notice Sets the claim recipient for an earner
@@ -1063,7 +935,7 @@ contract PYUSDX is
 
         // If both are earning, adjust principals
         if (senderIsEarning) {
-            uint128 idx = _calculateIndex($);
+            uint128 idx = currentIndex();
             uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedUp(amount, idx);
 
             unchecked {
@@ -1127,7 +999,7 @@ contract PYUSDX is
             _transferAmountInKind(sender, recipient, amount240, senderIsEarning);
         } else if (senderIsEarning) {
             // Earner to non-earner
-            uint128 idx = _calculateIndex($);
+            uint128 idx = currentIndex();
             uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedUp(amount240, idx);
 
             _subtractEarningAmount(sender, principalAmount);
@@ -1143,7 +1015,7 @@ contract PYUSDX is
             }
         } else {
             // Non-earner to earner
-            uint128 idx = _calculateIndex($);
+            uint128 idx = currentIndex();
             uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedDown(amount240, idx);
 
             _subtractNonEarningAmount(sender, amount240);
@@ -1162,7 +1034,7 @@ contract PYUSDX is
         }
 
         // Update index at end
-        _updateIndex();
+        updateIndex();
     }
 
     /* ============ Force Transfer ============ */
@@ -1208,7 +1080,7 @@ contract PYUSDX is
             _transferAmountInKind(frozenAccount, recipient, amount240, senderIsEarning);
         } else if (senderIsEarning) {
             // Earner to non-earner
-            uint128 idx = _calculateIndex($);
+            uint128 idx = currentIndex();
             uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedUp(amount240, idx);
 
             _subtractEarningAmount(frozenAccount, principalAmount);
@@ -1224,7 +1096,7 @@ contract PYUSDX is
             }
         } else {
             // Non-earner to earner
-            uint128 idx = _calculateIndex($);
+            uint128 idx = currentIndex();
             uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedDown(amount240, idx);
 
             _subtractNonEarningAmount(frozenAccount, amount240);
@@ -1246,6 +1118,6 @@ contract PYUSDX is
         emit ForcedTransfer(frozenAccount, recipient, msg.sender, amount);
 
         // Update index at end
-        _updateIndex();
+        updateIndex();
     }
 }

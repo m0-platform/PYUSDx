@@ -2,9 +2,9 @@
 pragma solidity 0.8.26;
 
 import "forge-std/Test.sol";
-import {PYUSDX} from "../../src/PYUSDX.sol";
-import {IPYUSDX} from "../../src/interfaces/IPYUSDX.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { PYUSDX } from "../../src/PYUSDX.sol";
+import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * Invariant test TODOs:
@@ -128,7 +128,13 @@ contract PYUSDXInvariantsTest is Test {
 
         // Deploy proxy pointing to implementation
         bytes memory initData = abi.encodeWithSelector(
-            PYUSDX.initialize.selector, admin, rateManager, earnerManager, freezeManager, forcedTransferManager, pauser
+            PYUSDX.initialize.selector,
+            admin,
+            rateManager,
+            earnerManager,
+            freezeManager,
+            forcedTransferManager,
+            pauser
         );
 
         erc1967Proxy = new ERC1967Proxy(address(implementation), initData);
@@ -172,7 +178,11 @@ contract PYUSDXInvariantsTest is Test {
             }
         }
 
-        assertEq(storedTotalPrincipal, calculatedSum, "Total earning principal must equal sum of individual principals");
+        assertEq(
+            storedTotalPrincipal,
+            calculatedSum,
+            "Total earning principal must equal sum of individual principals"
+        );
     }
 
     /* ============ Invariant 3: Index Monotonicity ============ */
@@ -193,7 +203,9 @@ contract PYUSDXInvariantsTest is Test {
                 uint256 accruedYield = proxy.accruedYieldOf(earner);
 
                 assertEq(
-                    balanceWithYield, balance + accruedYield, "Balance with yield must equal balance + accrued yield"
+                    balanceWithYield,
+                    balance + accruedYield,
+                    "Balance with yield must equal balance + accrued yield"
                 );
             }
         }
@@ -333,10 +345,12 @@ contract PYUSDXInvariantsTest is Test {
 
     /* ============ Additional Target Functions for Stateful Fuzzing ============ */
 
-    function Fuzz_setEarnerDetails(address account, bool isWhitelisted, uint16 feeRate, address feeRecipient)
-        public
-        onlyEarnerManagerActor
-    {
+    function Fuzz_setEarnerDetails(
+        address account,
+        bool isWhitelisted,
+        uint16 feeRate,
+        address feeRecipient
+    ) public onlyEarnerManagerActor {
         vm.assume(account != address(0));
         vm.assume(feeRate <= 10000);
         vm.assume(feeRecipient != address(0) || feeRate == 0);
@@ -380,10 +394,9 @@ contract PYUSDXInvariantsTest is Test {
 
         vm.prank(freezeManager);
         try proxy.unfreeze(account) {
-        // Post-condition: should not be frozen (or already unfrozen)
-        // Note: unfreeze may return early if already unfrozen
-        }
-            catch {}
+            // Post-condition: should not be frozen (or already unfrozen)
+            // Note: unfreeze may return early if already unfrozen
+        } catch {}
     }
 
     function Fuzz_pause() public onlyPauserActor {
@@ -397,16 +410,16 @@ contract PYUSDXInvariantsTest is Test {
     function Fuzz_unpause() public onlyPauserActor {
         vm.prank(pauser);
         try proxy.unpause() {
-        // Post-condition: should not be paused (or already unpaused)
-        // Note: unpause may return early if already unpaused
-        }
-            catch {}
+            // Post-condition: should not be paused (or already unpaused)
+            // Note: unpause may return early if already unpaused
+        } catch {}
     }
 
-    function Fuzz_forceTransfer(address frozenAccount, address recipient, uint256 amount)
-        public
-        onlyForcedTransferManagerActor
-    {
+    function Fuzz_forceTransfer(
+        address frozenAccount,
+        address recipient,
+        uint256 amount
+    ) public onlyForcedTransferManagerActor {
         vm.assume(frozenAccount != address(0) && recipient != address(0) && frozenAccount != recipient);
         vm.assume(amount > 0 && amount <= uint256(type(uint240).max));
 

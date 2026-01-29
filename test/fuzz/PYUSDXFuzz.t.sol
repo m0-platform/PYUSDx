@@ -54,9 +54,41 @@ contract PYUSDXFuzzTest is Test {
     address public minterGateway = address(0x7);
     address public pyusd = address(0x8);
 
+    /* ============ Test Address Pool ============ */
+
+    address[] internal testAddresses;
+
+    /// @dev Select an address from the test pool using a seed
+    function getAddress(uint256 seed) internal view returns (address) {
+        return testAddresses[seed % testAddresses.length];
+    }
+
     /* ============ Setup ============ */
 
     function setUp() public {
+        // Populate test address pool with named addresses
+        testAddresses = [
+            makeAddr("alice"),
+            makeAddr("bob"),
+            makeAddr("carol"),
+            makeAddr("dave"),
+            makeAddr("eve"),
+            makeAddr("frank"),
+            makeAddr("grace"),
+            makeAddr("heidi"),
+            makeAddr("ivan"),
+            makeAddr("judy"),
+            makeAddr("mallory"),
+            makeAddr("nia"),
+            makeAddr("olivia"),
+            makeAddr("peggy"),
+            makeAddr("sybil"),
+            makeAddr("trent"),
+            makeAddr("victor"),
+            makeAddr("walter"),
+            makeAddr("zoe")
+        ];
+
         // Deploy implementation contract
         implementation = new PYUSDX(minterGateway, pyusd);
 
@@ -74,14 +106,24 @@ contract PYUSDXFuzzTest is Test {
         erc1967Proxy = new ERC1967Proxy(address(implementation), initData);
 
         proxy = PYUSDX(address(erc1967Proxy));
+
+        // Setup roles and initial rate for proper index initialization
+        vm.startPrank(admin);
+        proxy.grantRole(proxy.RATE_MANAGER_ROLE(), rateManager);
+        proxy.grantRole(proxy.EARNER_MANAGER_ROLE(), earnerManager);
+        vm.stopPrank();
+
+        // Set initial rate to initialize global index (prevents underflow in claimFor)
+        vm.prank(rateManager);
+        proxy.setRate(1000); // 10% annual rate in BPS
     }
 
     /* ============ Mint Fuzz Tests ============ */
 
-    function testFuzz_Mint_AmountWithinBounds(address recipient, uint256 amount) public {
+    function testFuzz_Mint_AmountWithinBounds(uint256 recipientSeed, uint256 amount) public {
+        address recipient = getAddress(recipientSeed);
         // Bound amount to uint240 max and exclude zero
         vm.assume(amount > 0 && amount <= uint256(type(uint240).max));
-        vm.assume(recipient != address(0));
 
         uint256 balanceBefore = proxy.balanceOf(recipient);
 
@@ -96,19 +138,19 @@ contract PYUSDXFuzzTest is Test {
         // assertEq(proxy.totalSupply(), oldTotalSupply + amount);
     }
 
-    function testFuzz_Mint_AmountExceedsUint240(address recipient, uint256 amount) public {
-        // Assume amount exceeds uint240 max
-        vm.assume(amount > uint256(type(uint240).max));
-        vm.assume(recipient != address(0));
+    function testFuzz_Mint_AmountExceedsUint240(uint256 recipientSeed) public {
+        address recipient = getAddress(recipientSeed);
+        // Hardcode amount that exceeds uint240 max (avoids vm.assume rejection)
+        uint256 amount = uint256(type(uint240).max) + 1;
 
         vm.prank(minterGateway);
         vm.expectRevert(); // Safe240 will revert
         proxy.mint(recipient, amount);
     }
 
-    function testFuzz_Mint_TotalSupplyInvariant(address recipient, uint256 amount) public {
+    function testFuzz_Mint_TotalSupplyInvariant(uint256 recipientSeed, uint256 amount) public {
+        address recipient = getAddress(recipientSeed);
         vm.assume(amount > 0 && amount <= uint256(type(uint240).max));
-        vm.assume(recipient != address(0));
 
         uint256 earningSupplyBefore = proxy.totalEarningSupply();
         uint256 nonEarningSupplyBefore = proxy.totalNonEarningSupply();
@@ -143,8 +185,8 @@ contract PYUSDXFuzzTest is Test {
         proxy.mint(address(0), amount);
     }
 
-    function testFuzz_Mint_SameRecipientMultipleTimes(address recipient, uint256 amount1, uint256 amount2) public {
-        vm.assume(recipient != address(0));
+    function testFuzz_Mint_SameRecipientMultipleTimes(uint256 recipientSeed, uint256 amount1, uint256 amount2) public {
+        address recipient = getAddress(recipientSeed);
         vm.assume(amount1 > 0 && amount1 <= uint256(type(uint240).max));
         vm.assume(amount2 > 0 && amount2 <= uint256(type(uint240).max));
 
@@ -167,9 +209,9 @@ contract PYUSDXFuzzTest is Test {
 
     /* ============ Invariant Tests ============ */
 
-    function testFuzz_Invariant_BalanceNeverNegative(address recipient, uint256 mintAmount) public {
+    function testFuzz_Invariant_BalanceNeverNegative(uint256 recipientSeed, uint256 mintAmount) public {
+        address recipient = getAddress(recipientSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
-        vm.assume(recipient != address(0));
 
         uint256 balanceBefore = proxy.balanceOf(recipient);
 
@@ -183,11 +225,11 @@ contract PYUSDXFuzzTest is Test {
 
     /* ============ Burn Fuzz Tests ============ */
 
-    function testFuzz_Burn_AmountWithinBounds(address account, uint256 mintAmount, uint256 burnAmount) public {
+    function testFuzz_Burn_AmountWithinBounds(uint256 accountSeed, uint256 mintAmount, uint256 burnAmount) public {
+        address account = getAddress(accountSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount > 0 && burnAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount <= mintAmount); // Can't burn more than minted
-        vm.assume(account != address(0));
 
         // Mint first
         vm.prank(minterGateway);
@@ -219,11 +261,11 @@ contract PYUSDXFuzzTest is Test {
         }
     }
 
-    function testFuzz_Burn_InsufficientBalance(address account, uint256 mintAmount, uint256 burnAmount) public {
+    function testFuzz_Burn_InsufficientBalance(uint256 accountSeed, uint256 mintAmount, uint256 burnAmount) public {
+        address account = getAddress(accountSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount > mintAmount); // Burn more than minted
         vm.assume(burnAmount <= uint256(type(uint240).max));
-        vm.assume(account != address(0));
 
         // Mint first
         vm.prank(minterGateway);
@@ -236,13 +278,13 @@ contract PYUSDXFuzzTest is Test {
     }
 
     function testFuzz_Burn_Invariant_BalanceNeverNegative(
-        address account,
+        uint256 accountSeed,
         uint256 mintAmount,
         uint256 burnAmount
     ) public {
+        address account = getAddress(accountSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount > 0 && burnAmount <= uint256(type(uint240).max));
-        vm.assume(account != address(0));
 
         // Mint first
         vm.prank(minterGateway);
@@ -261,10 +303,10 @@ contract PYUSDXFuzzTest is Test {
         }
     }
 
-    function testFuzz_Burn_MintBurnCycle(address account, uint256 mintAmount, uint256 burnAmount) public {
+    function testFuzz_Burn_MintBurnCycle(uint256 accountSeed, uint256 mintAmount, uint256 burnAmount) public {
+        address account = getAddress(accountSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount > 0 && burnAmount <= uint256(type(uint240).max));
-        vm.assume(account != address(0));
 
         uint256 balanceBefore = proxy.balanceOf(account);
 
@@ -289,28 +331,21 @@ contract PYUSDXFuzzTest is Test {
     /* ============ Claim Fuzz Tests ============ */
 
     function testFuzz_ClaimFor_BalanceAndPrincipalIncrease(
-        address earner,
-        address feeRecipient,
+        uint256 earnerSeed,
+        uint256 feeRecipientSeed,
         uint16 feeRate,
         uint32 rate,
-        uint256 timeDelta
+        uint64 timeDelta
     ) public {
-        vm.assume(earner != address(0));
-        vm.assume(feeRecipient != address(0));
+        address earner = getAddress(earnerSeed);
+        // Offset by 2 to ensure distinct (handles wraparound)
+        address feeRecipient = getAddress((feeRecipientSeed & 0xFFFFFFFFFFFFFFF) + 1000);
         vm.assume(feeRate <= 10000);
-        // Rate must be <= PRECISION (1e12) to pass RateTooHigh check
-        // Using reasonable bounds
-        vm.assume(rate > 0 && rate <= 1000000000); // Up to 1% APY
+        vm.assume(rate > 0 && rate <= 10000); // BPS format: 10000 = 100% // Up to 1% APY
         vm.assume(timeDelta >= 1 hours && timeDelta <= 365 days);
 
         uint256 mintAmount = 1e18;
         vm.assume(mintAmount <= uint256(type(uint240).max));
-
-        // Setup: Grant roles and approve earner
-        vm.startPrank(admin);
-        proxy.grantRole(proxy.EARNER_MANAGER_ROLE(), earnerManager);
-        proxy.grantRole(proxy.RATE_MANAGER_ROLE(), rateManager);
-        vm.stopPrank();
 
         // Approve earner with fee details
         vm.prank(earnerManager);
@@ -356,26 +391,21 @@ contract PYUSDXFuzzTest is Test {
     }
 
     function testFuzz_ClaimFor_NetYieldPlusFeeEqualsGrossYield(
-        address earner,
-        address feeRecipient,
+        uint256 earnerSeed,
+        uint256 feeRecipientSeed,
         uint16 feeRate,
         uint32 rate,
-        uint256 timeDelta
+        uint64 timeDelta
     ) public {
-        vm.assume(earner != address(0));
-        vm.assume(feeRecipient != address(0) && feeRecipient != earner);
-        vm.assume(feeRate > 0 && feeRate < 10000); // Test with non-zero fee but not 100%
-        vm.assume(rate > 0 && rate <= 1000000000);
+        address earner = getAddress(earnerSeed);
+        address feeRecipient = getAddress((feeRecipientSeed & 0xFFFFFFFFFFFFFFF) + 1000);
+        vm.assume(earner != feeRecipient); // Ensure distinct addresses
+        vm.assume(feeRate > 0 && feeRate < 10000); // Non-zero fee but not 100%
+        vm.assume(rate > 0 && rate <= 10000); // BPS format: 10000 = 100%
         vm.assume(timeDelta >= 1 hours && timeDelta <= 365 days);
 
         uint256 mintAmount = 1e18;
         vm.assume(mintAmount <= uint256(type(uint240).max));
-
-        // Setup
-        vm.startPrank(admin);
-        proxy.grantRole(proxy.EARNER_MANAGER_ROLE(), earnerManager);
-        proxy.grantRole(proxy.RATE_MANAGER_ROLE(), rateManager);
-        vm.stopPrank();
 
         vm.prank(earnerManager);
         proxy.setEarnerDetails(earner, true, feeRate, feeRecipient);
@@ -412,26 +442,20 @@ contract PYUSDXFuzzTest is Test {
     }
 
     function testFuzz_ClaimFor_FeeNeverExceedsGrossYield(
-        address earner,
-        address feeRecipient,
+        uint256 earnerSeed,
+        uint256 feeRecipientSeed,
         uint16 feeRate,
         uint32 rate,
-        uint256 timeDelta
+        uint64 timeDelta
     ) public {
-        vm.assume(earner != address(0));
-        vm.assume(feeRecipient != address(0) && feeRecipient != earner);
+        address earner = getAddress(earnerSeed);
+        address feeRecipient = getAddress((feeRecipientSeed & 0xFFFFFFFFFFFFFFF) + 1000);
         vm.assume(feeRate <= 10000);
-        vm.assume(rate > 0 && rate <= 1000000000);
+        vm.assume(rate > 0 && rate <= 10000); // BPS format: 10000 = 100%
         vm.assume(timeDelta >= 1 hours && timeDelta <= 365 days);
 
         uint256 mintAmount = 1e18;
         vm.assume(mintAmount <= uint256(type(uint240).max));
-
-        // Setup
-        vm.startPrank(admin);
-        proxy.grantRole(proxy.EARNER_MANAGER_ROLE(), earnerManager);
-        proxy.grantRole(proxy.RATE_MANAGER_ROLE(), rateManager);
-        vm.stopPrank();
 
         vm.prank(earnerManager);
         proxy.setEarnerDetails(earner, true, feeRate, feeRecipient);
@@ -465,26 +489,20 @@ contract PYUSDXFuzzTest is Test {
     }
 
     function testFuzz_ClaimFor_EarningPrincipalIncreased(
-        address earner,
-        address feeRecipient,
+        uint256 earnerSeed,
+        uint256 feeRecipientSeed,
         uint16 feeRate,
         uint32 rate,
-        uint256 timeDelta
+        uint64 timeDelta
     ) public {
-        vm.assume(earner != address(0));
-        vm.assume(feeRecipient != address(0));
+        address earner = getAddress(earnerSeed);
+        address feeRecipient = getAddress((feeRecipientSeed & 0xFFFFFFFFFFFFFFF) + 1000);
         vm.assume(feeRate <= 10000);
-        vm.assume(rate > 0 && rate <= 1000000000);
+        vm.assume(rate > 0 && rate <= 10000); // BPS format: 10000 = 100%
         vm.assume(timeDelta >= 1 hours && timeDelta <= 365 days);
 
         uint256 mintAmount = 1e18;
         vm.assume(mintAmount <= uint256(type(uint240).max));
-
-        // Setup
-        vm.startPrank(admin);
-        proxy.grantRole(proxy.EARNER_MANAGER_ROLE(), earnerManager);
-        proxy.grantRole(proxy.RATE_MANAGER_ROLE(), rateManager);
-        vm.stopPrank();
 
         vm.prank(earnerManager);
         proxy.setEarnerDetails(earner, true, feeRate, feeRecipient);
@@ -521,19 +539,13 @@ contract PYUSDXFuzzTest is Test {
         }
     }
 
-    function testFuzz_ClaimFor_ZeroFeeRate_NoFeeDeduced(address earner, uint32 rate, uint256 timeDelta) public {
-        vm.assume(earner != address(0));
-        vm.assume(rate > 0 && rate <= 1000000000);
+    function testFuzz_ClaimFor_ZeroFeeRate_NoFeeDeduced(uint256 earnerSeed, uint32 rate, uint256 timeDelta) public {
+        address earner = getAddress(earnerSeed);
+        vm.assume(rate > 0 && rate <= 10000); // BPS format: 10000 = 100%
         vm.assume(timeDelta >= 1 hours && timeDelta <= 365 days);
 
         uint256 mintAmount = 1e18;
         uint16 feeRate = 0; // Zero fee rate
-
-        // Setup
-        vm.startPrank(admin);
-        proxy.grantRole(proxy.EARNER_MANAGER_ROLE(), earnerManager);
-        proxy.grantRole(proxy.RATE_MANAGER_ROLE(), rateManager);
-        vm.stopPrank();
 
         vm.prank(earnerManager);
         proxy.setEarnerDetails(earner, true, feeRate, address(0)); // No fee recipient
@@ -561,24 +573,18 @@ contract PYUSDXFuzzTest is Test {
     }
 
     function testFuzz_ClaimFor_MaxFeeRate_AllYieldToFeeRecipient(
-        address earner,
-        address feeRecipient,
+        uint256 earnerSeed,
+        uint256 feeRecipientSeed,
         uint32 rate,
-        uint256 timeDelta
+        uint64 timeDelta
     ) public {
-        vm.assume(earner != address(0));
-        vm.assume(feeRecipient != address(0) && feeRecipient != earner);
-        vm.assume(rate > 0 && rate <= 1000000000);
+        address earner = getAddress(earnerSeed);
+        address feeRecipient = getAddress((feeRecipientSeed & 0xFFFFFFFFFFFFFFF) + 1000);
+        vm.assume(rate > 0 && rate <= 10000); // BPS format: 10000 = 100%
         vm.assume(timeDelta >= 1 hours && timeDelta <= 365 days);
 
         uint256 mintAmount = 1e18;
         uint16 feeRate = 10000; // 100% fee rate
-
-        // Setup
-        vm.startPrank(admin);
-        proxy.grantRole(proxy.EARNER_MANAGER_ROLE(), earnerManager);
-        proxy.grantRole(proxy.RATE_MANAGER_ROLE(), rateManager);
-        vm.stopPrank();
 
         vm.prank(earnerManager);
         proxy.setEarnerDetails(earner, true, feeRate, feeRecipient);
@@ -618,14 +624,16 @@ contract PYUSDXFuzzTest is Test {
     /* ============ Transfer Fuzz Tests ============ */
 
     function testFuzz_Transfer_TotalSupplyUnchanged(
-        address sender,
-        address recipient,
+        uint256 senderSeed,
+        uint256 recipientSeed,
         uint256 mintAmount,
         uint256 transferAmount
     ) public {
+        address sender = getAddress(senderSeed);
+        address recipient = getAddress(recipientSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
-        vm.assume(sender != address(0) && recipient != address(0) && sender != recipient);
+        vm.assume(sender != recipient);
 
         // Setup: Grant earner manager role and approve both as earners
         vm.startPrank(admin);
@@ -657,14 +665,16 @@ contract PYUSDXFuzzTest is Test {
     }
 
     function testFuzz_Transfer_BalanceConservation(
-        address sender,
-        address recipient,
+        uint256 senderSeed,
+        uint256 recipientSeed,
         uint256 mintAmount,
         uint256 transferAmount
     ) public {
+        address sender = getAddress(senderSeed);
+        address recipient = getAddress(recipientSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
-        vm.assume(sender != address(0) && recipient != address(0) && sender != recipient);
+        vm.assume(sender != recipient);
 
         // Setup
         vm.startPrank(admin);
@@ -703,14 +713,16 @@ contract PYUSDXFuzzTest is Test {
     }
 
     function testFuzz_Transfer_BalanceNeverNegative(
-        address sender,
-        address recipient,
+        uint256 senderSeed,
+        uint256 recipientSeed,
         uint256 mintAmount,
         uint256 transferAmount
     ) public {
+        address sender = getAddress(senderSeed);
+        address recipient = getAddress(recipientSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > 0 && transferAmount <= uint256(type(uint240).max));
-        vm.assume(sender != address(0) && recipient != address(0) && sender != recipient);
+        vm.assume(sender != recipient);
 
         // Setup
         vm.startPrank(admin);
@@ -741,15 +753,17 @@ contract PYUSDXFuzzTest is Test {
     }
 
     function testFuzz_Transfer_EarnerToEarner(
-        address sender,
-        address recipient,
+        uint256 senderSeed,
+        uint256 recipientSeed,
         uint256 mintAmount,
         uint256 transferAmount
     ) public {
+        address sender = getAddress(senderSeed);
+        address recipient = getAddress(recipientSeed);
         // Use a smaller bound to avoid uint112 principal overflow issues
         vm.assume(mintAmount > 0 && mintAmount <= 1e18); // Reasonable bound
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
-        vm.assume(sender != address(0) && recipient != address(0) && sender != recipient);
+        vm.assume(sender != recipient);
 
         // Setup: Approve both as earners and start earning
         vm.startPrank(admin);
@@ -786,14 +800,16 @@ contract PYUSDXFuzzTest is Test {
     }
 
     function testFuzz_Transfer_NonEarnerToNonEarner(
-        address sender,
-        address recipient,
+        uint256 senderSeed,
+        uint256 recipientSeed,
         uint256 mintAmount,
         uint256 transferAmount
     ) public {
+        address sender = getAddress(senderSeed);
+        address recipient = getAddress(recipientSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
-        vm.assume(sender != address(0) && recipient != address(0) && sender != recipient);
+        vm.assume(sender != recipient);
 
         // Setup: Do NOT approve as earners (they remain non-earners)
         vm.prank(minterGateway);
@@ -820,15 +836,17 @@ contract PYUSDXFuzzTest is Test {
     // functions. See guardrails.md for details.
 
     function testFuzz_Transfer_InsufficientBalance(
-        address sender,
-        address recipient,
+        uint256 senderSeed,
+        uint256 recipientSeed,
         uint256 mintAmount,
         uint256 transferAmount
     ) public {
+        address sender = getAddress(senderSeed);
+        address recipient = getAddress(recipientSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > mintAmount); // Transfer more than balance
         vm.assume(transferAmount <= uint256(type(uint240).max));
-        vm.assume(sender != address(0) && recipient != address(0) && sender != recipient);
+        vm.assume(sender != recipient);
 
         // Setup
         vm.prank(minterGateway);
@@ -840,10 +858,10 @@ contract PYUSDXFuzzTest is Test {
         proxy.transfer(recipient, transferAmount);
     }
 
-    function testFuzz_Transfer_ToZeroAddress(address sender, uint256 mintAmount, uint256 transferAmount) public {
+    function testFuzz_Transfer_ToZeroAddress(uint256 senderSeed, uint256 mintAmount, uint256 transferAmount) public {
+        address sender = getAddress(senderSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
-        vm.assume(sender != address(0));
 
         // Setup
         vm.prank(minterGateway);
@@ -855,10 +873,14 @@ contract PYUSDXFuzzTest is Test {
         proxy.transfer(address(0), transferAmount);
     }
 
-    function testFuzz_Transfer_FromZeroAddress(address recipient, uint256 mintAmount, uint256 transferAmount) public {
+    function testFuzz_Transfer_FromZeroAddress(
+        uint256 recipientSeed,
+        uint256 mintAmount,
+        uint256 transferAmount
+    ) public {
+        address recipient = getAddress(recipientSeed);
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(transferAmount > 0 && transferAmount <= mintAmount);
-        vm.assume(recipient != address(0));
 
         // Transfer from zero address should fail (zero address has no balance)
         vm.expectRevert();
