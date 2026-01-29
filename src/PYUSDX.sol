@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import {IPYUSDX} from "./interfaces/IPYUSDX.sol";
-import {IERC20} from "m-extensions/lib/common/src/interfaces/IERC20.sol";
-import {ERC20ExtendedUpgradeable} from "m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {Freezable} from "m-extensions/src/components/freezable/Freezable.sol";
-import {ForcedTransferable} from "m-extensions/src/components/forcedTransferable/ForcedTransferable.sol";
-import {Pausable} from "m-extensions/src/components/pausable/Pausable.sol";
-import {IndexingMath} from "m-extensions/lib/common/src/libs/IndexingMath.sol";
-import {ContinuousIndexingMath} from "m-extensions/lib/common/src/libs/ContinuousIndexingMath.sol";
-import {UIntMath} from "m-extensions/lib/common/src/libs/UIntMath.sol";
+import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
+import { IERC20 } from "m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { ERC20ExtendedUpgradeable } from "m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
+import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import { Freezable } from "m-extensions/src/components/freezable/Freezable.sol";
+import { ForcedTransferable } from "m-extensions/src/components/forcedTransferable/ForcedTransferable.sol";
+import { Pausable } from "m-extensions/src/components/pausable/Pausable.sol";
+import { IndexingMath } from "m-extensions/lib/common/src/libs/IndexingMath.sol";
+import { ContinuousIndexingMath } from "m-extensions/lib/common/src/libs/ContinuousIndexingMath.sol";
+import { UIntMath } from "m-extensions/lib/common/src/libs/UIntMath.sol";
 
 /**
  * @title PYUSDXLayout
@@ -263,11 +263,11 @@ contract PYUSDX is
      * @param currentIndex_ Current yield index
      * @return Accrued yield amount (0 if no yield or negative)
      */
-    function _getAccruedYield(uint240 balance_, uint112 earningPrincipal_, uint128 currentIndex_)
-        internal
-        pure
-        returns (uint240)
-    {
+    function _getAccruedYield(
+        uint240 balance_,
+        uint112 earningPrincipal_,
+        uint128 currentIndex_
+    ) internal pure returns (uint240) {
         // If no principal, no yield can be accrued
         if (earningPrincipal_ == 0) {
             return 0;
@@ -416,8 +416,11 @@ contract PYUSDX is
         if (feeRate > 10000) revert("fee rate too high");
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        $.earnerDetails[account] =
-            EarnerDetails({isWhitelisted: isWhitelisted, feeRate: feeRate, feeRecipient: feeRecipient});
+        $.earnerDetails[account] = EarnerDetails({
+            isWhitelisted: isWhitelisted,
+            feeRate: feeRate,
+            feeRecipient: feeRecipient
+        });
         $.accounts[account].hasEarnerDetails = true;
     }
 
@@ -428,11 +431,9 @@ contract PYUSDX is
      * @return feeRate Fee rate in basis points
      * @return feeRecipient Recipient of fees
      */
-    function getEarnerDetails(address account)
-        external
-        view
-        returns (bool isWhitelisted, uint16 feeRate, address feeRecipient)
-    {
+    function getEarnerDetails(
+        address account
+    ) external view returns (bool isWhitelisted, uint16 feeRate, address feeRecipient) {
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
         EarnerDetails memory details = $.earnerDetails[account];
         return (details.isWhitelisted, details.feeRate, details.feeRecipient);
@@ -516,8 +517,9 @@ contract PYUSDX is
             if (principal > 0 && balance > 0) {
                 // Calculate principal to remove: amount * principal / balance
                 // Use round up to ensure we don't leave dust principal
-                uint112 principalToRemove =
-                    uint112((uint256(amount240) * uint256(principal) + uint256(balance) - 1) / uint256(balance));
+                uint112 principalToRemove = uint112(
+                    (uint256(amount240) * uint256(principal) + uint256(balance) - 1) / uint256(balance)
+                );
                 $.accounts[account].earningPrincipal = principal - principalToRemove;
                 $.totalEarningPrincipal -= principalToRemove;
             }
@@ -584,8 +586,9 @@ contract PYUSDX is
 
         // Update account state
         accountData.balance += grossYield;
-        accountData.earningPrincipal =
-            uint112(uint256(oldPrincipal) + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx));
+        accountData.earningPrincipal = uint112(
+            uint256(oldPrincipal) + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx)
+        );
 
         // Update totals
         $.totalEarningSupply += grossYield;
@@ -773,8 +776,9 @@ contract PYUSDX is
 
                 // Update account balance and principal
                 accountData.balance += grossYield;
-                accountData.earningPrincipal =
-                    uint112(uint256(principal) + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx));
+                accountData.earningPrincipal = uint112(
+                    uint256(principal) + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx)
+                );
 
                 // Update total earning supply
                 $.totalEarningSupply += grossYield;
@@ -880,8 +884,9 @@ contract PYUSDX is
 
                     // Update account balance and principal
                     accountData.balance += grossYield;
-                    accountData.earningPrincipal =
-                        uint112(uint256(principal) + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx));
+                    accountData.earningPrincipal = uint112(
+                        uint256(principal) + IndexingMath.getPrincipalAmountRoundedUp(grossYield, idx)
+                    );
 
                     // Update total earning supply
                     $.totalEarningSupply += grossYield;
@@ -1047,8 +1052,9 @@ contract PYUSDX is
             unchecked {
                 $.accounts[sender].earningPrincipal -= principalAmount;
                 // Recipient principal will be increased after balance update
-                $.accounts[recipient].earningPrincipal =
-                    uint112(uint256($.accounts[recipient].earningPrincipal) + uint256(principalAmount));
+                $.accounts[recipient].earningPrincipal = uint112(
+                    uint256($.accounts[recipient].earningPrincipal) + uint256(principalAmount)
+                );
             }
         }
 
@@ -1126,8 +1132,9 @@ contract PYUSDX is
 
             // Adjust recipient principal
             unchecked {
-                $.accounts[recipient].earningPrincipal =
-                    uint112(uint256($.accounts[recipient].earningPrincipal) + uint256(principalAmount));
+                $.accounts[recipient].earningPrincipal = uint112(
+                    uint256($.accounts[recipient].earningPrincipal) + uint256(principalAmount)
+                );
             }
         }
 
@@ -1206,8 +1213,9 @@ contract PYUSDX is
 
             // Adjust recipient principal
             unchecked {
-                $.accounts[recipient].earningPrincipal =
-                    uint112(uint256($.accounts[recipient].earningPrincipal) + uint256(principalAmount));
+                $.accounts[recipient].earningPrincipal = uint112(
+                    uint256($.accounts[recipient].earningPrincipal) + uint256(principalAmount)
+                );
             }
         }
 

@@ -2,9 +2,9 @@
 pragma solidity 0.8.26;
 
 import "forge-std/Test.sol";
-import {PYUSDX} from "../../src/PYUSDX.sol";
-import {IPYUSDX} from "../../src/interfaces/IPYUSDX.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { PYUSDX } from "../../src/PYUSDX.sol";
+import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * Fuzz test TODOs:
@@ -62,7 +62,13 @@ contract PYUSDXFuzzTest is Test {
 
         // Deploy proxy pointing to implementation
         bytes memory initData = abi.encodeWithSelector(
-            PYUSDX.initialize.selector, admin, rateManager, earnerManager, freezeManager, forcedTransferManager, pauser
+            PYUSDX.initialize.selector,
+            admin,
+            rateManager,
+            earnerManager,
+            freezeManager,
+            forcedTransferManager,
+            pauser
         );
 
         erc1967Proxy = new ERC1967Proxy(address(implementation), initData);
@@ -153,7 +159,9 @@ contract PYUSDXFuzzTest is Test {
         vm.stopPrank();
 
         assertEq(
-            proxy.balanceOf(recipient), balanceBefore + amount1 + amount2, "Balance should increase by sum of all mints"
+            proxy.balanceOf(recipient),
+            balanceBefore + amount1 + amount2,
+            "Balance should increase by sum of all mints"
         );
     }
 
@@ -203,7 +211,11 @@ contract PYUSDXFuzzTest is Test {
                 nonEarningSupplyBefore - burnAmount,
                 "Non-earning supply should decrease for non-earner"
             );
-            assertEq(proxy.totalEarningSupply(), earningSupplyBefore, "Earning supply should not change for non-earner");
+            assertEq(
+                proxy.totalEarningSupply(),
+                earningSupplyBefore,
+                "Earning supply should not change for non-earner"
+            );
         }
     }
 
@@ -223,9 +235,11 @@ contract PYUSDXFuzzTest is Test {
         proxy.burn(account, burnAmount);
     }
 
-    function testFuzz_Burn_Invariant_BalanceNeverNegative(address account, uint256 mintAmount, uint256 burnAmount)
-        public
-    {
+    function testFuzz_Burn_Invariant_BalanceNeverNegative(
+        address account,
+        uint256 mintAmount,
+        uint256 burnAmount
+    ) public {
         vm.assume(mintAmount > 0 && mintAmount <= uint256(type(uint240).max));
         vm.assume(burnAmount > 0 && burnAmount <= uint256(type(uint240).max));
         vm.assume(account != address(0));

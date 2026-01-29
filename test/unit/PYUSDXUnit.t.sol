@@ -2,11 +2,11 @@
 pragma solidity 0.8.26;
 
 import "forge-std/Test.sol";
-import {PYUSDX} from "../../src/PYUSDX.sol";
-import {IPYUSDX} from "../../src/interfaces/IPYUSDX.sol";
-import {IERC20} from "m-extensions/lib/common/src/interfaces/IERC20.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import { PYUSDX } from "../../src/PYUSDX.sol";
+import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { IERC20 } from "m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 /**
  * Branch coverage TODOs:
@@ -330,7 +330,13 @@ contract PYUSDXUnitTest is Test {
 
         // Deploy proxy pointing to implementation
         bytes memory initData = abi.encodeWithSelector(
-            PYUSDX.initialize.selector, admin, rateManager, earnerManager, freezeManager, forcedTransferManager, pauser
+            PYUSDX.initialize.selector,
+            admin,
+            rateManager,
+            earnerManager,
+            freezeManager,
+            forcedTransferManager,
+            pauser
         );
 
         erc1967Proxy = new ERC1967Proxy(address(implementation), initData);
@@ -420,7 +426,8 @@ contract PYUSDXUnitTest is Test {
 
     function test_Initialize_EARNER_MANAGER_ROLE_GrantedToEarnerManager() public view {
         assertTrue(
-            proxy.hasRole(proxy.EARNER_MANAGER_ROLE(), earnerManager), "Earner manager should have EARNER_MANAGER_ROLE"
+            proxy.hasRole(proxy.EARNER_MANAGER_ROLE(), earnerManager),
+            "Earner manager should have EARNER_MANAGER_ROLE"
         );
     }
 
@@ -448,10 +455,12 @@ contract PYUSDXUnitTest is Test {
     function test_Initialize_OnlyAdminHasDEFAULT_ADMIN_ROLE() public view {
         // Verify that non-admin addresses don't have DEFAULT_ADMIN_ROLE
         assertFalse(
-            proxy.hasRole(proxy.DEFAULT_ADMIN_ROLE(), rateManager), "Rate manager should not have DEFAULT_ADMIN_ROLE"
+            proxy.hasRole(proxy.DEFAULT_ADMIN_ROLE(), rateManager),
+            "Rate manager should not have DEFAULT_ADMIN_ROLE"
         );
         assertFalse(
-            proxy.hasRole(proxy.DEFAULT_ADMIN_ROLE(), address(this)), "Test contract should not have DEFAULT_ADMIN_ROLE"
+            proxy.hasRole(proxy.DEFAULT_ADMIN_ROLE(), address(this)),
+            "Test contract should not have DEFAULT_ADMIN_ROLE"
         );
     }
 
@@ -475,7 +484,7 @@ contract PYUSDXUnitTest is Test {
 
         // Try to mint as minterGateway
         vm.prank(minterGateway);
-        vm.expectRevert( /* EnforcedPause from OZ Pausable */ );
+        vm.expectRevert(/* EnforcedPause from OZ Pausable */);
         proxy.mint(recipient, amount);
     }
 
@@ -489,7 +498,7 @@ contract PYUSDXUnitTest is Test {
 
         // Try to mint as minterGateway
         vm.prank(minterGateway);
-        vm.expectRevert( /* AccountFrozen */ );
+        vm.expectRevert(/* AccountFrozen */);
         proxy.mint(recipient, amount);
     }
 
@@ -579,7 +588,7 @@ contract PYUSDXUnitTest is Test {
 
         // Try to burn
         vm.prank(minterGateway);
-        vm.expectRevert( /* EnforcedPause from OZ Pausable */ );
+        vm.expectRevert(/* EnforcedPause from OZ Pausable */);
         proxy.burn(account, burnAmount);
     }
 
@@ -598,7 +607,7 @@ contract PYUSDXUnitTest is Test {
 
         // Try to burn
         vm.prank(minterGateway);
-        vm.expectRevert( /* AccountFrozen */ );
+        vm.expectRevert(/* AccountFrozen */);
         proxy.burn(account, burnAmount);
     }
 
@@ -656,7 +665,9 @@ contract PYUSDXUnitTest is Test {
         assertEq(proxy.balanceOf(account), balanceBefore - burnAmount, "Balance should decrease");
         // Verify non-earning supply decreased
         assertEq(
-            proxy.totalNonEarningSupply(), nonEarningSupplyBefore - burnAmount, "Non-earning supply should decrease"
+            proxy.totalNonEarningSupply(),
+            nonEarningSupplyBefore - burnAmount,
+            "Non-earning supply should decrease"
         );
         // Verify earning supply unchanged
         assertEq(proxy.totalEarningSupply(), earningSupplyBefore, "Earning supply should not change");
@@ -1085,7 +1096,11 @@ contract PYUSDXUnitTest is Test {
         address account = address(0x100);
 
         // Account with no balance
-        assertEq(proxy.balanceWithYieldOf(account), 0, "balanceWithYieldOf should return 0 for account with no balance");
+        assertEq(
+            proxy.balanceWithYieldOf(account),
+            0,
+            "balanceWithYieldOf should return 0 for account with no balance"
+        );
     }
 
     function test_EarningPrincipalOf_NonEarner_ReturnsZero() public {
@@ -1105,7 +1120,9 @@ contract PYUSDXUnitTest is Test {
 
         // Account with no balance should have 0 earning principal
         assertEq(
-            proxy.earningPrincipalOf(account), uint112(0), "Account with no balance should have 0 earning principal"
+            proxy.earningPrincipalOf(account),
+            uint112(0),
+            "Account with no balance should have 0 earning principal"
         );
     }
 
@@ -1231,7 +1248,9 @@ contract PYUSDXUnitTest is Test {
         // Verify earning principal is set (should be balance * PRECISION / index)
         // Since index = PRECISION, principal should equal balance
         assertEq(
-            proxy.earningPrincipalOf(account), uint112(amount), "Principal should equal balance when index=PRECISION"
+            proxy.earningPrincipalOf(account),
+            uint112(amount),
+            "Principal should equal balance when index=PRECISION"
         );
 
         // Verify supply tracking
@@ -1302,10 +1321,14 @@ contract PYUSDXUnitTest is Test {
         uint256 totalAmount = amount1 + amount2 + amount3;
         assertEq(proxy.totalEarningSupply(), totalEarningBefore + totalAmount, "Earning supply should increase");
         assertEq(
-            proxy.totalNonEarningSupply(), totalNonEarningBefore - totalAmount, "Non-earning supply should decrease"
+            proxy.totalNonEarningSupply(),
+            totalNonEarningBefore - totalAmount,
+            "Non-earning supply should decrease"
         );
         assertEq(
-            proxy.totalEarningPrincipal(), totalPrincipalBefore + totalAmount, "Total earning principal should increase"
+            proxy.totalEarningPrincipal(),
+            totalPrincipalBefore + totalAmount,
+            "Total earning principal should increase"
         );
     }
 
@@ -1732,7 +1755,7 @@ contract PYUSDXUnitTest is Test {
         proxy.pause();
 
         // Try to claim - should revert
-        vm.expectRevert( /* EnforcedPause from OZ Pausable */ );
+        vm.expectRevert(/* EnforcedPause from OZ Pausable */);
         proxy.claimFor(account);
     }
 
@@ -1756,7 +1779,7 @@ contract PYUSDXUnitTest is Test {
         proxy.freeze(account);
 
         // Try to claim - should revert
-        vm.expectRevert( /* AccountFrozen */ );
+        vm.expectRevert(/* AccountFrozen */);
         proxy.claimFor(account);
     }
 
@@ -1830,12 +1853,16 @@ contract PYUSDXUnitTest is Test {
 
         // Verify total earning supply increased
         assertEq(
-            proxy.totalEarningSupply(), totalEarningSupplyBefore + grossYield, "Total earning supply should increase"
+            proxy.totalEarningSupply(),
+            totalEarningSupplyBefore + grossYield,
+            "Total earning supply should increase"
         );
 
         // Verify total earning principal increased
         assertGe(
-            proxy.totalEarningPrincipal(), totalPrincipalBefore, "Total earning principal should increase or stay same"
+            proxy.totalEarningPrincipal(),
+            totalPrincipalBefore,
+            "Total earning principal should increase or stay same"
         );
     }
 
@@ -2059,7 +2086,9 @@ contract PYUSDXUnitTest is Test {
 
         // Verify claimRecipientFor now returns account address
         assertEq(
-            proxy.claimRecipientFor(account), account, "claimRecipientFor should return account address after clearing"
+            proxy.claimRecipientFor(account),
+            account,
+            "claimRecipientFor should return account address after clearing"
         );
     }
 
@@ -2087,7 +2116,9 @@ contract PYUSDXUnitTest is Test {
 
         // Without setting a custom recipient, should return account address
         assertEq(
-            proxy.claimRecipientFor(account), account, "claimRecipientFor should return account address when not set"
+            proxy.claimRecipientFor(account),
+            account,
+            "claimRecipientFor should return account address when not set"
         );
     }
 
@@ -2116,7 +2147,9 @@ contract PYUSDXUnitTest is Test {
 
         // Verify it returns account address after clearing
         assertEq(
-            proxy.claimRecipientFor(account), account, "claimRecipientFor should return account address after clearing"
+            proxy.claimRecipientFor(account),
+            account,
+            "claimRecipientFor should return account address after clearing"
         );
     }
 
@@ -2282,7 +2315,9 @@ contract PYUSDXUnitTest is Test {
 
         // totalNonEarningSupply should be unchanged for non-earner to non-earner
         assertEq(
-            proxy.totalNonEarningSupply(), totalNonEarningSupplyBefore, "totalNonEarningSupply should be unchanged"
+            proxy.totalNonEarningSupply(),
+            totalNonEarningSupplyBefore,
+            "totalNonEarningSupply should be unchanged"
         );
     }
 
@@ -2371,7 +2406,9 @@ contract PYUSDXUnitTest is Test {
 
         // totalNonEarningSupply should decrease
         assertEq(
-            proxy.totalNonEarningSupply(), totalNonEarningSupplyBefore - amount, "totalNonEarningSupply should decrease"
+            proxy.totalNonEarningSupply(),
+            totalNonEarningSupplyBefore - amount,
+            "totalNonEarningSupply should decrease"
         );
     }
 
@@ -2413,7 +2450,9 @@ contract PYUSDXUnitTest is Test {
 
         // totalNonEarningSupply should increase
         assertEq(
-            proxy.totalNonEarningSupply(), totalNonEarningSupplyBefore + amount, "totalNonEarningSupply should increase"
+            proxy.totalNonEarningSupply(),
+            totalNonEarningSupplyBefore + amount,
+            "totalNonEarningSupply should increase"
         );
     }
 
@@ -2952,7 +2991,8 @@ contract PYUSDXUnitTest is Test {
 
         // Verify forced transfer manager has role
         assertTrue(
-            proxy.hasRole(forcedTransferManagerRole, forcedTransferManager), "Forced transfer manager should have role"
+            proxy.hasRole(forcedTransferManagerRole, forcedTransferManager),
+            "Forced transfer manager should have role"
         );
 
         // Forced transfer manager can call forceTransfer
