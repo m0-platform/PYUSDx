@@ -63,15 +63,19 @@ contract YieldManagementTest is Test {
         pyusdx.setRate(500);
 
         // Set up alice as an earner
-        uint112 principal = 1000e6;
         uint240 balance = 1000e6;
-        _setAccountState(alice, earnerManager, balance, true, principal, 0, address(0));
+        _setBalance(alice, balance);
+        _setTotalSupply(balance);
+        _setTotalNonEarningSupply(balance);
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Warp time to accrue yield
         vm.warp(block.timestamp + 365 days);
 
         // Calculate expected yield
         uint128 index = pyusdx.currentIndex();
+        uint112 principal = pyusdx.earningPrincipalOf(alice);
         uint240 expectedBalanceWithYield = IndexingMath.getPresentAmountRoundedDown(principal, index);
         uint240 expectedYield = expectedBalanceWithYield > balance ? expectedBalanceWithYield - balance : 0;
 
@@ -86,11 +90,14 @@ contract YieldManagementTest is Test {
     function test_balanceWithYieldOf() public {
         // Set a rate so index grows over time
         vm.prank(rateManager);
-        pyusdx.setRate(500); 
+        pyusdx.setRate(500);
 
         // Set up alice as an earner
-        _setAccountState(alice, earnerManager, 1000e6, true, 1000e6, 0, address(0));
         _setBalance(alice, 1000e6);
+        _setTotalSupply(1000e6);
+        _setTotalNonEarningSupply(1000e6);
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.warp(block.timestamp + 365 days);
 
@@ -106,12 +113,12 @@ contract YieldManagementTest is Test {
         vm.prank(rateManager);
         pyusdx.setRate(500);
 
-        uint112 principal = 1000e6;
         uint240 balance = 1000e6;
-        _setAccountState(alice, earnerManager, balance, true, principal, 0, address(0));
         _setBalance(alice, balance);
         _setTotalSupply(balance);
-        _setTotalEarningSupply(balance);
+        _setTotalNonEarningSupply(balance);
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.warp(block.timestamp + 365 days);
 
@@ -136,7 +143,11 @@ contract YieldManagementTest is Test {
     }
 
     function test_claimFor_revert_whenPaused() public {
-        _setAccountState(alice, earnerManager, 1000e6, true, 1000e6, 0, address(0));
+        _setBalance(alice, 1000e6);
+        _setTotalSupply(1000e6);
+        _setTotalNonEarningSupply(1000e6);
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.prank(pauser);
         pyusdx.pause();
@@ -146,7 +157,11 @@ contract YieldManagementTest is Test {
     }
 
     function test_claimFor_revert_whenFrozen() public {
-        _setAccountState(alice, earnerManager, 1000e6, true, 1000e6, 0, address(0));
+        _setBalance(alice, 1000e6);
+        _setTotalSupply(1000e6);
+        _setTotalNonEarningSupply(1000e6);
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.prank(freezeManager);
         pyusdx.freeze(alice);
@@ -156,31 +171,21 @@ contract YieldManagementTest is Test {
     }
 
     /* ============ Helper Functions ============ */
-    // TODO: Replace storage manipulation with setEarningDetails() once implemented
-    function _setAccountState(
-        address account,
-        address earnerManager_,
-        uint240 balance_,
-        bool isEarning_,
-        uint112 earningPrincipal_,
-        uint16 feeRate_,
-        address claimRecipient_
-    ) internal {
-        bytes32 storageLocation = 0xc1b8ab2f33ccbf01222f9cf35bd888d518c2bda5deec0a0df8b0cd454fcb8500;
-        bytes32 accountsSlot = bytes32(uint256(storageLocation) + 4);
-        bytes32 accountSlot = keccak256(abi.encode(account, accountsSlot));
-
-        vm.store(address(pyusdx), accountSlot, bytes32(uint256(uint160(earnerManager_))));
-        vm.store(address(pyusdx), bytes32(uint256(accountSlot) + 1), bytes32(uint256(balance_) | (uint256(isEarning_ ? 1 : 0) << 240)));
-        vm.store(address(pyusdx), bytes32(uint256(accountSlot) + 2), bytes32(uint256(earningPrincipal_) | (uint256(feeRate_) << 112)));
-        vm.store(address(pyusdx), bytes32(uint256(accountSlot) + 3), bytes32(uint256(uint160(claimRecipient_))));
-    }
 
     function _setBalance(address account, uint256 balance_) internal {
         bytes32 storageLocation = 0xc1b8ab2f33ccbf01222f9cf35bd888d518c2bda5deec0a0df8b0cd454fcb8500;
+
+        // Set Account.balance (accounts mapping at slot +4, balance is at offset +1 within struct)
+        bytes32 accountsSlot = bytes32(uint256(storageLocation) + 4);
+        bytes32 accountSlot = keccak256(abi.encode(account, accountsSlot));
+        // Account struct slot +1 contains: balance (uint240) | isEarning (bool at bit 240)
+        // We only set balance, preserving isEarning=false for non-earners
+        vm.store(address(pyusdx), bytes32(uint256(accountSlot) + 1), bytes32(balance_));
+
+        // Set balanceOf mapping (slot +5) for ERC20 compatibility
         bytes32 balanceOfSlot = bytes32(uint256(storageLocation) + 5);
-        bytes32 accountBalanceSlot = keccak256(abi.encode(account, balanceOfSlot));
-        vm.store(address(pyusdx), accountBalanceSlot, bytes32(balance_));
+        bytes32 balanceOfAccountSlot = keccak256(abi.encode(account, balanceOfSlot));
+        vm.store(address(pyusdx), balanceOfAccountSlot, bytes32(balance_));
     }
 
     function _setTotalSupply(uint256 totalSupply_) internal {
@@ -189,9 +194,9 @@ contract YieldManagementTest is Test {
         vm.store(address(pyusdx), totalSupplySlot, bytes32(totalSupply_));
     }
 
-    function _setTotalEarningSupply(uint240 totalEarningSupply_) internal {
+    function _setTotalNonEarningSupply(uint240 totalNonEarningSupply_) internal {
         bytes32 storageLocation = 0xc1b8ab2f33ccbf01222f9cf35bd888d518c2bda5deec0a0df8b0cd454fcb8500;
-        bytes32 slot1 = bytes32(uint256(storageLocation) + 1);
-        vm.store(address(pyusdx), slot1, bytes32(uint256(totalEarningSupply_)));
+        bytes32 slot2 = bytes32(uint256(storageLocation) + 2);
+        vm.store(address(pyusdx), slot2, bytes32(uint256(totalNonEarningSupply_)));
     }
 }
