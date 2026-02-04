@@ -157,63 +157,9 @@ contract PYUSDX is
         revert("TODO: burn");
     }
 
-    /// @notice Claims yield for an account.
+    /// @inheritdoc IPYUSDX
     function claimFor(address account) external returns (uint240 yield) {
-        _requireNotPaused();
-        _revertIfFrozen(account);
-
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        Account storage accountData = $.accounts[account];
-
-        if (!accountData.isEarning) return 0;
-
-        // Calculate accrued yield
-        uint128 index = currentIndex();
-        uint240 balanceWithYield = IndexingMath.getPresentAmountRoundedDown(accountData.earningPrincipal, index);
-
-        uint240 balance = accountData.balance;
-        unchecked {
-            yield = balanceWithYield > balance ? balanceWithYield - balance : 0;
-        }
-
-        if (yield == 0) return 0;
-
-        // Calculate fee
-        uint16 feeRate = accountData.feeRate;
-        uint240 fee;
-        if (feeRate > 0) {
-            unchecked {
-                fee = uint240((uint256(yield) * feeRate) / MAX_FEE_RATE);
-            }
-        }
-        uint240 netYield = yield - fee;
-
-        // Add full yield to balance
-        accountData.balance = balance + yield;
-        $.balanceOf[account] += yield;
-
-        $.totalEarningSupply += yield;
-        $.totalSupply += yield;
-
-        address claimRecipient = accountData.claimRecipient;
-        if (claimRecipient == address(0)) {
-            claimRecipient = account;
-        }
-
-        // Transfer fee to earner manager (if any)
-        if (fee > 0) {
-            address earnerManager = accountData.earnerManager;
-            _transfer(account, earnerManager, fee);
-        }
-
-        // Transfer net yield to claim recipient (if different from account)
-        if (claimRecipient != account && netYield > 0) {
-            _transfer(account, claimRecipient, netYield);
-        }
-
-        emit Claimed(account, claimRecipient, yield);
-
-        return yield;
+        return _claim(account, currentIndex());
     }
 
     /// @notice Sets earning details for a single account.
@@ -247,6 +193,66 @@ contract PYUSDX is
     function _checkEarnerManager(address account) internal view {
         address earnerManager = _getPYUSDXStorageLocation().accounts[account].earnerManager;
         if (earnerManager != address(0) && msg.sender != earnerManager) revert NotEarnerManager(account);
+    }
+
+    /// @dev Internal claim implementation.
+    function _claim(address account, uint128 currentIndex_) internal returns (uint240 yield) {
+        _requireNotPaused();
+        _revertIfFrozen(account);
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        if (!accountData.isEarning) return 0;
+
+        // Calculate accrued yield
+        uint240 balance = accountData.balance;
+        uint240 balanceWithYield = IndexingMath.getPresentAmountRoundedDown(accountData.earningPrincipal, currentIndex_);
+
+        unchecked {
+            yield = balanceWithYield > balance ? balanceWithYield - balance : 0;
+        }
+
+        if (yield == 0) return 0;
+
+        // Calculate fee
+        uint16 feeRate = accountData.feeRate;
+        uint240 fee;
+        if (feeRate > 0) {
+            unchecked {
+                fee = uint240((uint256(yield) * feeRate) / MAX_FEE_RATE);
+            }
+        }
+        uint240 netYield = yield - fee;
+
+        // Add full yield to balance (yield is minted)
+        unchecked {
+            accountData.balance = balance + yield;
+            $.balanceOf[account] += yield;
+            $.totalEarningSupply += yield;
+            $.totalSupply += yield;
+        }
+
+        address claimRecipient = accountData.claimRecipient;
+        if (claimRecipient == address(0)) {
+            claimRecipient = account;
+        }
+
+        emit Claimed(account, claimRecipient, yield);
+        emit Transfer(address(0), account, yield);
+
+        // Transfer fee to earner manager (if any)
+        if (fee > 0) {
+            address earnerManager = accountData.earnerManager;
+            _transfer(account, earnerManager, fee);
+        }
+
+        // Transfer net yield to claim recipient (if different from account)
+        if (claimRecipient != account && netYield > 0) {
+            _transfer(account, claimRecipient, netYield);
+        }
+
+        return yield;
     }
 
     /// @dev Internal force transfer implementation.
