@@ -232,6 +232,7 @@ contract PYUSDX is
 
         // Add full yield to balance
         accountData.balance = balance + yield;
+        $.balanceOf[account] += yield;
 
         $.totalEarningSupply += yield;
         $.totalSupply += yield;
