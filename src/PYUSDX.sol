@@ -162,37 +162,113 @@ contract PYUSDX is
         return _claim(account, currentIndex());
     }
 
-    /// @notice Sets earning details for a single account.
+    /// @inheritdoc IPYUSDX
     function setEarningDetails(
         address account,
         bool isEarning_,
         uint16 feeRate_,
         address claimRecipient_
     ) external onlyEarnerManager(account) {
-        revert("TODO: setEarningDetails single");
+        _setEarningDetails(account, isEarning_, feeRate_, claimRecipient_, currentIndex());
     }
 
-    /// @notice Sets earning details for multiple accounts.
+    /// @inheritdoc IPYUSDX
     function setEarningDetails(
         address[] calldata accounts,
         bool[] calldata isEarning_,
         uint16[] calldata feeRates_,
         address[] calldata claimRecipients_
     ) external {
-        // Check that caller is earner manager for all accounts
-        for (uint256 i = 0; i < accounts.length; i++) {
-            _checkEarnerManager(accounts[i]);
+        uint256 len = accounts.length;
+        if (len == 0) revert ArrayLengthZero();
+        if (len != isEarning_.length || len != feeRates_.length || len != claimRecipients_.length) {
+            revert ArrayLengthMismatch();
         }
-        revert("TODO: setEarningDetails batch");
+
+        uint128 currentIndex_ = currentIndex();
+
+        for (uint256 i; i < len; ++i) {
+            _checkEarnerManager(accounts[i]);
+            _setEarningDetails(accounts[i], isEarning_[i], feeRates_[i], claimRecipients_[i], currentIndex_);
+        }
     }
 
     /* ============ Internal Functions ============ */
 
     /// @dev Reverts if the caller is not the Earner Manager for the account.
-    /// @dev If no earner manager is assigned (address(0)), the check passes.
+    /// @dev If no earner manager is assigned (address(0)), the caller must have EARNER_MANAGER_ROLE.
+    /// @dev If an earner manager is assigned, only that manager can modify the account.
     function _checkEarnerManager(address account) internal view {
-        address earnerManager = _getPYUSDXStorageLocation().accounts[account].earnerManager;
-        if (earnerManager != address(0) && msg.sender != earnerManager) revert NotEarnerManager(account);
+        address storedManager = _getPYUSDXStorageLocation().accounts[account].earnerManager;
+
+        if (storedManager == address(0)) {
+            if (!hasRole(EARNER_MANAGER_ROLE, msg.sender)) revert NotEarnerManager(account);
+        } else if (msg.sender != storedManager) {
+            // Account already managed by a different earner manager
+            revert EarnerDetailsAlreadySet(account);
+        }
+    }
+
+    /// @dev Internal implementation for setting earning details.
+    function _setEarningDetails(
+        address account,
+        bool isEarning_,
+        uint16 feeRate_,
+        address claimRecipient_,
+        uint128 currentIndex_
+    ) internal {
+        if (account == address(0)) revert ZeroAccount();
+        if (feeRate_ > MAX_FEE_RATE) revert FeeRateTooHigh(feeRate_);
+        if (!isEarning_ && feeRate_ != 0) revert InvalidDetails();
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        bool wasEarning = accountData.isEarning;
+
+        if (!wasEarning && !isEarning_) return;
+
+        // same earning state with same settings
+        if (wasEarning && isEarning_
+            && accountData.feeRate == feeRate_
+            && accountData.claimRecipient == claimRecipient_) return;
+
+        emit EarningDetailsSet(account, isEarning_, msg.sender, feeRate_, claimRecipient_);
+
+        // Claim any accrued yield first
+        if (wasEarning) {
+            _claim(account, currentIndex_);
+        }
+
+        uint240 balance = accountData.balance;
+
+        // Enable earning (non-earner → earner)
+        if (isEarning_ && !wasEarning) {
+            accountData.earnerManager = msg.sender;
+            accountData.isEarning = true;
+
+            uint112 principal = IndexingMath.getPrincipalAmountRoundedDown(balance, currentIndex_);
+            accountData.earningPrincipal = principal;
+
+            $.totalEarningPrincipal += principal;
+            $.totalEarningSupply += balance;
+            $.totalNonEarningSupply -= balance;
+        }
+        // Disable earning (earner → non-earner)
+        else if (!isEarning_ && wasEarning) {
+            uint112 principal = accountData.earningPrincipal;
+
+            accountData.isEarning = false;
+            accountData.earningPrincipal = 0;
+            accountData.earnerManager = address(0);
+
+            $.totalEarningPrincipal -= principal;
+            $.totalEarningSupply -= balance;
+            $.totalNonEarningSupply += balance;
+        }
+
+        accountData.feeRate = feeRate_;
+        accountData.claimRecipient = claimRecipient_;
     }
 
     /// @dev Internal claim implementation.
