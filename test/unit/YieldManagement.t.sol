@@ -13,6 +13,8 @@ import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
 
 contract YieldManagementTest is Test {
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
     PYUSDX public pyusdx;
 
     address public admin = makeAddr("admin");
@@ -121,6 +123,9 @@ contract YieldManagementTest is Test {
 
         vm.expectEmit(true, true, false, true);
         emit IPYUSDX.Claimed(alice, alice, expectedYield);
+
+        vm.expectEmit(true, true, false, true);
+        emit Transfer(address(0), alice, expectedYield);
 
         uint240 claimed = pyusdx.claimFor(alice);
 
