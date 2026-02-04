@@ -5,6 +5,7 @@ import { ERC20ExtendedUpgradeable } from "../lib/m-extensions/lib/common/src/ERC
 import { Freezable } from "../lib/m-extensions/src/components/freezable/Freezable.sol";
 import { ForcedTransferable } from "../lib/m-extensions/src/components/forcedTransferable/ForcedTransferable.sol";
 import { Pausable } from "../lib/m-extensions/src/components/pausable/Pausable.sol";
+import { IndexingMath } from "../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
 
 import { ContinuousIndexing } from "./abstract/ContinuousIndexing.sol";
 import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
@@ -158,7 +159,60 @@ contract PYUSDX is
 
     /// @notice Claims yield for an account.
     function claimFor(address account) external returns (uint240 yield) {
-        revert("TODO: claimFor");
+        _requireNotPaused();
+        _revertIfFrozen(account);
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        if (!accountData.isEarning) return 0;
+
+        // Calculate accrued yield
+        uint128 index = currentIndex();
+        uint240 balanceWithYield = IndexingMath.getPresentAmountRoundedDown(accountData.earningPrincipal, index);
+
+        uint240 balance = accountData.balance;
+        unchecked {
+            yield = balanceWithYield > balance ? balanceWithYield - balance : 0;
+        }
+
+        if (yield == 0) return 0;
+
+        // Calculate fee
+        uint16 feeRate = accountData.feeRate;
+        uint240 fee;
+        if (feeRate > 0) {
+            unchecked {
+                fee = uint240((uint256(yield) * feeRate) / MAX_FEE_RATE);
+            }
+        }
+        uint240 netYield = yield - fee;
+
+        // Add full yield to balance
+        accountData.balance = balance + yield;
+
+        $.totalEarningSupply += yield;
+        $.totalSupply += yield;
+
+        address claimRecipient = accountData.claimRecipient;
+        if (claimRecipient == address(0)) {
+            claimRecipient = account;
+        }
+
+        // Transfer fee to earner manager (if any)
+        if (fee > 0) {
+            address earnerManager = accountData.earnerManager;
+            _transfer(account, earnerManager, fee);
+        }
+
+        // Transfer net yield to claim recipient (if different from account)
+        if (claimRecipient != account && netYield > 0) {
+            _transfer(account, claimRecipient, netYield);
+        }
+
+        emit Claimed(account, claimRecipient, yield);
+
+        return yield;
     }
 
     /// @notice Sets earning details for a single account.
@@ -293,13 +347,28 @@ contract PYUSDX is
     }
 
     /// @notice Returns the accrued yield for an account.
-    function accruedYieldOf(address) external view returns (uint240) {
-        return 0; // Dummy: no yield accrued
+    function accruedYieldOf(address account) public view returns (uint240) {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        if (!accountData.isEarning) return 0;
+
+        // Calculate present value from principal
+        uint240 balanceWithYield = IndexingMath.getPresentAmountRoundedDown(
+            accountData.earningPrincipal,
+            currentIndex()
+        );
+
+        // Yield = present value - stored balance
+        uint240 balance = accountData.balance;
+        unchecked {
+            return balanceWithYield > balance ? balanceWithYield - balance : 0;
+        }
     }
 
     /// @notice Returns the balance including yield for an account.
     function balanceWithYieldOf(address account) external view returns (uint256) {
-        return balanceOf(account); // Dummy: no yield included
+        return balanceOf(account) + accruedYieldOf(account);
     }
 
     /// @notice Returns the earning principal for an account.
