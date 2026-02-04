@@ -117,6 +117,7 @@ contract YieldManagementTest is Test {
         assertGt(expectedYield, 0, "Should have yield to claim");
 
         uint256 totalSupplyBefore = pyusdx.totalSupply();
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
 
         vm.expectEmit(true, true, false, true);
         emit IPYUSDX.Claimed(alice, alice, expectedYield);
@@ -125,6 +126,7 @@ contract YieldManagementTest is Test {
 
         assertEq(claimed, expectedYield, "Should return claimed yield");
         assertEq(pyusdx.totalSupply(), totalSupplyBefore + expectedYield, "Total supply should increase by yield");
+        assertEq(pyusdx.balanceOf(alice), balanceBefore + expectedYield, "balanceOf should increase by yield");
         assertEq(pyusdx.accruedYieldOf(alice), 0, "Accrued yield should be 0 after claim");
     }
 
