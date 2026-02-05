@@ -151,7 +151,6 @@ contract PYUSDX is
         _revertIfFrozen(account);
 
         uint240 safeAmount = UIntMath.safe240(amount);
-        uint128 index = currentIndex();
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 
@@ -160,8 +159,7 @@ contract PYUSDX is
         unchecked {
             if (
                 uint256($.totalNonEarningSupply) + safeAmount > type(uint240).max ||
-                uint256($.totalEarningPrincipal) +
-                    _getPrincipalAmountRoundedUp($.totalNonEarningSupply + safeAmount, index) >=
+                uint256($.totalEarningPrincipal) + _getPrincipalAmountRoundedUp($.totalNonEarningSupply + safeAmount) >=
                     type(uint112).max
             ) {
                 revert OverflowsPrincipalOfTotalSupply();
@@ -169,7 +167,7 @@ contract PYUSDX is
         }
 
         if ($.accounts[account].isEarning) {
-            _addEarningAmount($, account, safeAmount, index);
+            _addEarningAmount($, account, safeAmount);
             updateIndex();
         } else {
             _addNonEarningAmount($, account, safeAmount);
@@ -178,9 +176,23 @@ contract PYUSDX is
         emit Transfer(address(0), account, amount);
     }
 
-    /// @notice Burns tokens from an account (only Minter Gateway).
+    /// @inheritdoc IPYUSDX
     function burn(address account, uint256 amount) external onlyMinterGateway whenNotPaused {
-        revert("TODO: burn");
+        _revertIfZeroAmount(amount);
+        _revertIfFrozen(account);
+
+        uint240 safeAmount = UIntMath.safe240(amount);
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        if ($.accounts[account].isEarning) {
+            _subtractEarningAmount($, account, safeAmount);
+            updateIndex();
+        } else {
+            _subtractNonEarningAmount($, account, safeAmount);
+        }
+
+        emit Transfer(account, address(0), amount);
     }
 
     /// @notice Claims yield for an account.
@@ -351,21 +363,63 @@ contract PYUSDX is
     /// @param account The account to add the amount to.
     /// @param amount The amount to add (must be safe240).
     function _addNonEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount) internal {
-        $.accounts[account].balance += amount;
-        $.totalNonEarningSupply += amount;
+        // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `_mint`.
+        unchecked {
+            $.accounts[account].balance += amount;
+            $.totalNonEarningSupply += amount;
+        }
     }
 
     /// @dev Adds earning amount to an account's balance and total earning supply/principal.
     /// @param $ The storage pointer.
     /// @param account The account to add the amount to.
     /// @param amount The present amount to add (must be safe240).
-    /// @param index The current index for principal calculation.
-    function _addEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount, uint128 index) internal {
-        uint112 principal = _getPrincipalAmountRoundedDown(amount, index);
+    function _addEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount) internal {
+        uint112 principal = _getPrincipalAmountRoundedDown(amount);
 
-        $.accounts[account].balance += amount;
-        $.totalEarningPrincipal += principal;
-        $.accounts[account].earningPrincipal += principal;
+        // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `_mint`.
+        unchecked {
+            $.accounts[account].balance += amount;
+            $.totalEarningPrincipal += principal;
+            $.accounts[account].earningPrincipal += principal;
+        }
+    }
+
+    /// @dev Subtracts non-earning amount from an account's balance and total supply.
+    /// @param $ The storage pointer.
+    /// @param account The account to subtract the amount from.
+    /// @param amount The amount to subtract (must be safe240).
+    function _subtractNonEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount) internal {
+        if ($.accounts[account].balance < amount) {
+            revert InsufficientBalance(account, $.accounts[account].balance, amount);
+        }
+
+        unchecked {
+            $.accounts[account].balance -= amount;
+            $.totalNonEarningSupply -= amount;
+        }
+    }
+
+    /// @dev Subtracts earning amount from an account's balance and total earning supply/principal.
+    /// @param $ The storage pointer.
+    /// @param account The account to subtract the amount from.
+    /// @param amount The present amount to subtract (must be safe240).
+    function _subtractEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount) internal {
+        if ($.accounts[account].balance < amount) {
+            revert InsufficientBalance(account, $.accounts[account].balance, amount);
+        }
+
+        uint112 principal = _getPrincipalAmountRoundedUp(amount);
+        uint112 earningPrincipal = $.accounts[account].earningPrincipal;
+        uint112 totalEarningPrincipal = $.totalEarningPrincipal;
+
+        unchecked {
+            $.accounts[account].balance -= amount;
+
+            // NOTE: `min112` prevents underflow.
+            $.accounts[account].earningPrincipal = earningPrincipal - UIntMath.min112(principal, earningPrincipal);
+            $.totalEarningPrincipal = totalEarningPrincipal - UIntMath.min112(principal, totalEarningPrincipal);
+        }
     }
 
     /// @dev Required override for ERC20ExtendedUpgradeable.

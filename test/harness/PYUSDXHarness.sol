@@ -74,9 +74,9 @@ contract PYUSDXHarness is PYUSDX {
     }
 
     /// @notice Expose internal _addEarningAmount for testing
-    function addEarningAmount(address account, uint240 amount, uint128 index) external {
+    function addEarningAmount(address account, uint240 amount) external {
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        _addEarningAmount($, account, amount, index);
+        _addEarningAmount($, account, amount);
     }
 
     /// @notice Expose internal _addNonEarningAmount for testing

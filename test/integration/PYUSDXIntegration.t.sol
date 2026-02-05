@@ -9,6 +9,7 @@ import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
 contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
     uint256 public constant MINT_AMOUNT = 100e6; // 100 PYUSDX
+    uint256 public constant BURN_AMOUNT = 50e6; // 50 PYUSDX
 
     /* ============ Mint + Freeze Integration ============ */
 
@@ -131,34 +132,6 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalNonEarningSupply(), uint240(totalMinted));
     }
 
-    /* ============ Role-Based Integration ============ */
-
-    function testIntegration_freezeManagerCanFreezeMidMint() public {
-        // Start minting to alice
-        minterGateway.mint(alice, MINT_AMOUNT);
-
-        // Freeze manager freezes alice
-        vm.prank(freezeManager);
-        pyusdx.freeze(alice);
-
-        // Second mint should fail
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        minterGateway.mint(alice, MINT_AMOUNT);
-    }
-
-    function testIntegration_pauserCanPauseMidMint() public {
-        // Start minting
-        minterGateway.mint(alice, MINT_AMOUNT);
-
-        // Pauser pauses contract
-        vm.prank(pauser);
-        pyusdx.pause();
-
-        // Second mint should fail
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        minterGateway.mint(alice, MINT_AMOUNT);
-    }
-
     /* ============ Large Scale Integration ============ */
 
     function testIntegration_manySequentialMints() public {
@@ -198,5 +171,237 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
         }
 
         assertEq(pyusdx.balanceOf(alice), mintedTotal);
+    }
+
+    /* ============ Burn + Freeze Integration ============ */
+
+    function testIntegration_burnThenFreezeThenBurnReverts() public {
+        minterGateway.mint(alice, MINT_AMOUNT * 2);
+        minterGateway.burn(alice, MINT_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
+
+        // Freeze alice
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+        assertTrue(pyusdx.isFrozen(alice));
+
+        // Second burn should revert
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        minterGateway.burn(alice, MINT_AMOUNT);
+    }
+
+    function testIntegration_freezeThenBurnReverts() public {
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Freeze alice first
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+        assertTrue(pyusdx.isFrozen(alice));
+
+        // Burn should revert
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        minterGateway.burn(alice, MINT_AMOUNT);
+    }
+
+    function testIntegration_freezeThenUnfreezeThenBurn() public {
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Freeze alice first
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        // Burn should fail
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        minterGateway.burn(alice, MINT_AMOUNT);
+
+        // Unfreeze alice
+        vm.prank(freezeManager);
+        pyusdx.unfreeze(alice);
+        assertFalse(pyusdx.isFrozen(alice));
+
+        // Now burn should succeed
+        minterGateway.burn(alice, MINT_AMOUNT);
+        assertEq(pyusdx.balanceOf(alice), 0);
+    }
+
+    /* ============ Burn + Pause Integration ============ */
+
+    function testIntegration_pauseThenBurnReverts() public {
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Pause the contract
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        // Burn should revert
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        minterGateway.burn(alice, MINT_AMOUNT);
+
+        // Unpause
+        vm.prank(pauser);
+        pyusdx.unpause();
+
+        // Burn should now succeed
+        minterGateway.burn(alice, MINT_AMOUNT);
+        assertEq(pyusdx.balanceOf(alice), 0);
+    }
+
+    /* ============ Burn + Rate Manager Integration ============ */
+
+    function testIntegration_burnWithIndexGrowth() public {
+        vm.prank(rateManager);
+        pyusdx.setRate(1000); // 10% APY
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Warp forward to grow index
+        vm.warp(365 days);
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+        assertTrue(principalBefore > 0);
+
+        // Burn triggers index update
+        minterGateway.burn(alice, BURN_AMOUNT);
+
+        assertTrue(pyusdx.earningPrincipalOf(alice) < principalBefore);
+        assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT - BURN_AMOUNT);
+    }
+
+    /* ============ Multi-User Burn Integration ============ */
+
+    function testIntegration_mintBurnMultipleAccounts() public {
+        // Mint to multiple accounts
+        minterGateway.mint(alice, MINT_AMOUNT);
+        minterGateway.mint(bob, MINT_AMOUNT * 2);
+        minterGateway.mint(carol, MINT_AMOUNT * 3);
+
+        uint256 totalSupply = pyusdx.totalSupply();
+        assertEq(totalSupply, MINT_AMOUNT * 6);
+
+        // Verify all balances
+        assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
+        assertEq(pyusdx.balanceOf(bob), MINT_AMOUNT * 2);
+        assertEq(pyusdx.balanceOf(carol), MINT_AMOUNT * 3);
+
+        // Burn from multiple accounts
+        minterGateway.burn(alice, MINT_AMOUNT);
+        minterGateway.burn(bob, MINT_AMOUNT * 2);
+        minterGateway.burn(carol, MINT_AMOUNT * 3);
+
+        // Verify all balances are zero
+        assertEq(pyusdx.balanceOf(alice), 0);
+        assertEq(pyusdx.balanceOf(bob), 0);
+        assertEq(pyusdx.balanceOf(carol), 0);
+        assertEq(pyusdx.totalSupply(), 0);
+    }
+
+    /* ============ Mint/Burn Cycle Integration ============ */
+
+    function testIntegration_mintThenBurn() public {
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+
+        // Mint
+        minterGateway.mint(alice, MINT_AMOUNT);
+        assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore + MINT_AMOUNT);
+
+        // Burn
+        minterGateway.burn(alice, MINT_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), 0);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore);
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore);
+    }
+
+    function testIntegration_mintBurnEarningWithYield() public {
+        vm.prank(rateManager);
+        pyusdx.setRate(1000); // 10% APY
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+        uint112 principalAfterMint = pyusdx.earningPrincipalOf(alice);
+
+        vm.warp(365 days);
+
+        minterGateway.burn(alice, MINT_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), 0);
+
+        assertTrue(pyusdx.earningPrincipalOf(alice) != 0);
+        assertTrue(pyusdx.earningPrincipalOf(alice) < principalAfterMint);
+    }
+
+    function testIntegration_partialBurnFullBurn() public {
+        minterGateway.mint(alice, MINT_AMOUNT * 10);
+
+        // Partial burn
+        minterGateway.burn(alice, MINT_AMOUNT * 3);
+        assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT * 7);
+
+        // Full burn
+        minterGateway.burn(alice, MINT_AMOUNT * 7);
+        assertEq(pyusdx.balanceOf(alice), 0);
+        assertEq(pyusdx.totalSupply(), 0);
+    }
+
+    /* ============ Large Scale Burn Integration ============ */
+
+    function testIntegration_manySequentialBurns() public {
+        uint256 numBurns = 100;
+        uint256 totalAmount = 0;
+
+        // Calculate total amount needed
+        for (uint256 i = 0; i < numBurns; i++) {
+            totalAmount += (i + 1) * 1000;
+        }
+
+        // Mint total amount first
+        minterGateway.mint(alice, totalAmount);
+        assertEq(pyusdx.balanceOf(alice), totalAmount);
+
+        // Burn in sequence
+        for (uint256 i = 0; i < numBurns; i++) {
+            minterGateway.burn(alice, (i + 1) * 1000);
+        }
+
+        assertEq(pyusdx.balanceOf(alice), 0);
+        assertEq(pyusdx.totalSupply(), 0);
+    }
+
+    /* ============ Burn with Index Changes Integration ============ */
+
+    function testIntegration_burnWithMultipleIndexUpdates() public {
+        vm.prank(rateManager);
+        pyusdx.setRate(500); // 5% APY
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Initial mint
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Multiple index updates via operations over time
+        for (uint256 i = 0; i < 5; i++) {
+            vm.warp(30 days);
+            minterGateway.mint(alice, MINT_AMOUNT);
+        }
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        assertTrue(balanceBefore > 0);
+
+        // Final burn
+        minterGateway.burn(alice, MINT_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), balanceBefore - MINT_AMOUNT);
+
+        // Principal tracking remains consistent
+        assertTrue(pyusdx.earningPrincipalOf(alice) > 0);
     }
 }

@@ -6,6 +6,9 @@ import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
 contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
+    uint256 constant MINT_AMOUNT = 100e6; // 100 PYUSDX
+    uint256 constant BURN_AMOUNT = 50e6; // 50 PYUSDX
+
     /* ============ Fuzz: Non-Earning Account ============ */
 
     // TODO: improve fuzz tests by passing an index value
@@ -142,7 +145,46 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         return uint256(totalNonEarningSupply) + amount <= maxNewSupply;
     }
 
-    /* ============ Constants ============ */
+    /* ============ Fuzz: Burn Non-Earning Account ============ */
 
-    uint256 constant MINT_AMOUNT = 100e6; // 100 PYUSDX
+    // TODO: improve fuzz tests by passing mintAmount and burnAmount capped to type(uint240).max
+    function testFuzz_burn_nonEarningAccount(uint256 amount) public {
+        uint256 boundedAmount = bound(amount, 1, 1e15); // Reasonable bound to avoid overflow
+
+        // Mint enough balance first (more than boundedAmount)
+        minterGateway.mint(alice, 1e18);
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+
+        minterGateway.burn(alice, boundedAmount);
+
+        assertEq(pyusdx.balanceOf(alice), balanceBefore - boundedAmount);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore - boundedAmount);
+        assertEq(pyusdx.totalNonEarningSupply(), uint256(totalNonEarningSupplyBefore) - boundedAmount);
+    }
+
+    /* ============ Fuzz: Burn Earning Account ============ */
+
+    // TODO: improve fuzz tests by passing index value
+    function testFuzz_burn_earningAccount(uint256 amount) public {
+        // Set up alice as an earning account
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        uint256 boundedAmount = bound(amount, 1, 1e13); // Reasonable bound to avoid overflow
+
+        // Mint enough balance first
+        minterGateway.mint(alice, 1e16);
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        minterGateway.burn(alice, boundedAmount);
+
+        uint112 expectedPrincipalSubtracted = _getExpectedPrincipalRoundedUp(boundedAmount, indexBefore);
+        uint112 expectedPrincipalAfter = principalBefore - expectedPrincipalSubtracted;
+        assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipalAfter);
+    }
 }

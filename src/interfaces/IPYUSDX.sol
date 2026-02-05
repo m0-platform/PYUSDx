@@ -97,6 +97,9 @@ interface IPYUSDX is IContinuousIndexing {
     /// @notice Thrown when mint would overflow principal calculations.
     error OverflowsPrincipalOfTotalSupply();
 
+    /// @notice Thrown when burn amount exceeds account balance.
+    error InsufficientBalance(address account, uint256 balance, uint256 amount);
+
     /* ============ Interactive Functions ============ */
 
     /**
