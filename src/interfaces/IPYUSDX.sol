@@ -88,6 +88,18 @@ interface IPYUSDX is IContinuousIndexing {
     /// @notice Thrown when an input array is empty.
     error ArrayLengthZero();
 
+    /// @notice Thrown when an amount is zero.
+    error ZeroAmount();
+
+    /// @notice Thrown when a recipient address is zero.
+    error ZeroRecipient();
+
+    /// @notice Thrown when mint would overflow principal calculations.
+    error OverflowsPrincipalOfTotalSupply();
+
+    /// @notice Thrown when burn amount exceeds account balance.
+    error InsufficientBalance(address account, uint256 balance, uint256 amount);
+
     /* ============ Interactive Functions ============ */
 
     /**
