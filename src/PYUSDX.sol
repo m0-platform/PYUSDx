@@ -390,8 +390,10 @@ contract PYUSDX is
     /// @param account The account to subtract the amount from.
     /// @param amount The amount to subtract (must be safe240).
     function _subtractNonEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount) internal {
-        if ($.accounts[account].balance < amount) {
-            revert InsufficientBalance(account, $.accounts[account].balance, amount);
+        uint240 accountBalance = $.accounts[account].balance;
+
+        if (accountBalance < amount) {
+            revert InsufficientBalance(account, accountBalance, amount);
         }
 
         unchecked {
@@ -405,8 +407,10 @@ contract PYUSDX is
     /// @param account The account to subtract the amount from.
     /// @param amount The present amount to subtract (must be safe240).
     function _subtractEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount) internal {
-        if ($.accounts[account].balance < amount) {
-            revert InsufficientBalance(account, $.accounts[account].balance, amount);
+        uint240 accountBalance = $.accounts[account].balance;
+
+        if (accountBalance < amount) {
+            revert InsufficientBalance(account, accountBalance, amount);
         }
 
         uint112 principal = _getPrincipalAmountRoundedUp(amount);
@@ -423,15 +427,84 @@ contract PYUSDX is
     }
 
     /// @dev Required override for ERC20ExtendedUpgradeable.
-    function _transfer(address sender, address recipient, uint256 amount) internal override {
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+    /// @param sender    The sender's address.
+    /// @param recipient The recipient's address.
+    /// @param amount    The amount to be transferred.
+    function _transfer(address sender, address recipient, uint256 amount) internal override whenNotPaused {
+        _revertIfFrozen(msg.sender);
+        _revertIfFrozen(sender);
+        _revertIfFrozen(recipient);
 
-        // TODO: Add principal accounting for earners
-
-        // Update balances
-        $.accounts[sender].balance -= uint240(amount);
-        $.accounts[recipient].balance += uint240(amount);
+        _revertIfZeroRecipient(recipient);
 
         emit Transfer(sender, recipient, amount);
+
+        if (amount == 0) return;
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        bool senderIsEarning = $.accounts[sender].isEarning;
+        bool recipientIsEarning = $.accounts[recipient].isEarning;
+
+        uint240 safeAmount = UIntMath.safe240(amount);
+
+        // NOTE: Same earning status: direct updates (total supply unchanged)
+        if (senderIsEarning == recipientIsEarning) {
+            return _transferAmountInKind($, sender, senderIsEarning, recipient, safeAmount);
+        }
+
+        // NOTE: Different earning status: use internal functions (updates totals)
+        senderIsEarning
+            ? _subtractEarningAmount($, sender, safeAmount)
+            : _subtractNonEarningAmount($, sender, safeAmount);
+
+        recipientIsEarning
+            ? _addEarningAmount($, recipient, safeAmount)
+            : _addNonEarningAmount($, recipient, safeAmount);
+
+        updateIndex();
+    }
+
+    /// @dev   Transfer between same earning status accounts.
+    /// @param $               The storage pointer.
+    /// @param sender          The account to transfer from.
+    /// @param senderIsEarning Whether the sender is earning.
+    /// @param recipient       The account to transfer to.
+    /// @param amount          The amount to transfer.
+    function _transferAmountInKind(
+        PYUSDXStorageStruct storage $,
+        address sender,
+        bool senderIsEarning,
+        address recipient,
+        uint240 amount
+    ) internal {
+        uint240 senderBalance = $.accounts[sender].balance;
+
+        if (senderBalance < amount) revert InsufficientBalance(sender, senderBalance, amount);
+
+        // NOTE: When transferring an amount in kind, the `balance` can't overflow
+        //       since the total supply would have overflowed first when minting.
+        unchecked {
+            $.accounts[sender].balance -= amount;
+            $.accounts[recipient].balance += amount;
+        }
+
+        // NOTE: Both earning, transfer principal.
+        if (senderIsEarning) {
+            // NOTE: `min112` prevents underflow.
+            uint112 principal = UIntMath.min112(
+                _getPrincipalAmountRoundedUp(amount),
+                $.accounts[sender].earningPrincipal
+            );
+
+            unchecked {
+                $.accounts[sender].earningPrincipal -= principal;
+                $.accounts[recipient].earningPrincipal = UIntMath.safe112(
+                    uint256($.accounts[recipient].earningPrincipal) + principal
+                );
+            }
+
+            updateIndex();
+        }
     }
 }

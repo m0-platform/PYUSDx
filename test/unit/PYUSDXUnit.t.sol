@@ -6,11 +6,14 @@ import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFre
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
 import { PausableUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 
+import { IContinuousIndexing } from "../../src/interfaces/IContinuousIndexing.sol";
+
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
 contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     uint256 public constant MINT_AMOUNT = 100e6; // 100 PYUSDX (6 decimals)
     uint256 public constant BURN_AMOUNT = 50e6; // 50 PYUSDX (6 decimals)
+    uint256 public constant TRANSFER_AMOUNT = 30e6; // 30 PYUSDX (6 decimals)
 
     /* ============ mint ============ */
 
@@ -493,5 +496,412 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         // Balance should still decrease
         assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT - BURN_AMOUNT);
+    }
+
+    /* ============ transfer ============ */
+
+    function test_transfer_revertIfPaused() public {
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+    }
+
+    function test_transfer_revertIfFrozen_sender() public {
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        assertTrue(pyusdx.isFrozen(alice));
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+    }
+
+    function test_transfer_revertIfFrozen_recipient() public {
+        vm.prank(freezeManager);
+        pyusdx.freeze(bob);
+
+        assertTrue(pyusdx.isFrozen(bob));
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+    }
+
+    function test_transfer_revertIfFrozen_msgSender() public {
+        // Approve carol to spend alice's tokens
+        vm.prank(alice);
+        pyusdx.approve(carol, TRANSFER_AMOUNT);
+
+        vm.prank(freezeManager);
+        pyusdx.freeze(carol);
+
+        assertTrue(pyusdx.isFrozen(carol));
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, carol));
+
+        // Carol is the msg.sender in transferFrom
+        vm.prank(carol);
+        pyusdx.transferFrom(alice, bob, TRANSFER_AMOUNT);
+    }
+
+    function test_transfer_insufficientBalance() public {
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPYUSDX.InsufficientBalance.selector, alice, MINT_AMOUNT, MINT_AMOUNT + 1)
+        );
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, MINT_AMOUNT + 1);
+    }
+
+    function test_transfer_toZeroAddress() public {
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        vm.expectRevert(IPYUSDX.ZeroRecipient.selector);
+
+        vm.prank(alice);
+        pyusdx.transfer(address(0), TRANSFER_AMOUNT);
+    }
+
+    function test_transfer_nonEarningToNonEarning() public {
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+
+        vm.expectEmit();
+        emit IERC20.Transfer(alice, bob, TRANSFER_AMOUNT);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore - TRANSFER_AMOUNT);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + TRANSFER_AMOUNT);
+
+        // Unchanged totals (in-kind transfer)
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore);
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore);
+        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore);
+    }
+
+    function test_transfer_earningToEarning() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        vm.expectEmit();
+        emit IERC20.Transfer(alice, bob, TRANSFER_AMOUNT);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore - TRANSFER_AMOUNT);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + TRANSFER_AMOUNT);
+
+        // Principal transferred (rounded up)
+        uint112 expectedPrincipal = _getExpectedPrincipalRoundedUp(TRANSFER_AMOUNT, indexBefore);
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipal);
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
+
+        // Total earning principal unchanged (in-kind transfer)
+        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore);
+    }
+
+    function test_transfer_earningToEarning_withIndexGrowth() public {
+        vm.prank(rateManager);
+        pyusdx.setRate(500); // 5% APY
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        vm.warp(365 days);
+
+        uint128 indexAfterWarp = pyusdx.currentIndex();
+        assertTrue(indexAfterWarp > indexBefore);
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+
+        vm.expectEmit();
+        emit IContinuousIndexing.IndexUpdated(indexAfterWarp, 500);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+
+        // Principal calculated using indexAfterWarp (before updateIndex in _transfer)
+        uint112 expectedPrincipal = _getExpectedPrincipalRoundedUp(TRANSFER_AMOUNT, indexAfterWarp);
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipal);
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
+    }
+
+    function test_transfer_nonEarningToEarning() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        vm.expectEmit();
+        emit IERC20.Transfer(alice, bob, TRANSFER_AMOUNT);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+
+        // Non-earning supply decreased
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore - uint240(TRANSFER_AMOUNT));
+
+        // Earning principal increased (rounded down - protocol-favoring)
+        uint112 expectedPrincipal = _getExpectedPrincipal(TRANSFER_AMOUNT, indexBefore);
+        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore + expectedPrincipal);
+        assertEq(pyusdx.earningPrincipalOf(bob), expectedPrincipal);
+    }
+
+    function test_transfer_earningToNonEarning() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        vm.expectEmit();
+        emit IERC20.Transfer(alice, bob, TRANSFER_AMOUNT);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+
+        // Principal subtracted (rounded up - protocol-favoring)
+        uint112 expectedPrincipalSubtracted = _getExpectedPrincipalRoundedUp(TRANSFER_AMOUNT, indexBefore);
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipalSubtracted);
+
+        // Totals updated
+        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore - expectedPrincipalSubtracted);
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore + uint240(TRANSFER_AMOUNT));
+    }
+
+    function test_transfer_toSelf() public {
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+
+        vm.expectEmit();
+        emit IERC20.Transfer(alice, alice, TRANSFER_AMOUNT);
+
+        vm.prank(alice);
+        pyusdx.transfer(alice, TRANSFER_AMOUNT);
+
+        // Balance should be unchanged (subtracting and adding same amount)
+        assertEq(pyusdx.balanceOf(alice), balanceBefore);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore);
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore);
+    }
+
+    function test_transfer_zeroAmount() public {
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+
+        vm.expectEmit();
+        emit IERC20.Transfer(alice, bob, 0);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, 0);
+
+        // Balances unchanged
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore);
+    }
+
+    function test_transfer_fullBalance() public {
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint256 fullBalance = pyusdx.balanceOf(alice);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, fullBalance);
+
+        assertEq(pyusdx.balanceOf(alice), 0);
+        assertEq(pyusdx.balanceOf(bob), fullBalance);
+    }
+
+    function test_transfer_fullBalance_earningToEarning() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint256 fullBalance = pyusdx.balanceOf(alice);
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, fullBalance);
+
+        assertEq(pyusdx.balanceOf(alice), 0);
+        assertEq(pyusdx.balanceOf(bob), fullBalance);
+        assertEq(pyusdx.earningPrincipalOf(alice), 0);
+
+        // All principal transferred to bob
+        assertEq(pyusdx.earningPrincipalOf(bob), alicePrincipalBefore);
+    }
+
+    function test_transfer_earningToNonEarning_indexGrowth() public {
+        vm.prank(rateManager);
+        pyusdx.setRate(1000); // 10% APY
+
+        vm.warp(365 days);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint128 index = pyusdx.currentIndex();
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+
+        uint112 principalSubtracted = alicePrincipalBefore - pyusdx.earningPrincipalOf(alice);
+
+        // Calculate both rounded down and up
+        uint112 principalRoundedDown = _getExpectedPrincipal(TRANSFER_AMOUNT, index);
+        uint112 principalRoundedUp = _getExpectedPrincipalRoundedUp(TRANSFER_AMOUNT, index);
+
+        // Verify we used rounded up (protocol-favoring)
+        assertEq(principalSubtracted, principalRoundedUp);
+        assertTrue(principalSubtracted >= principalRoundedDown);
+
+        // Total earning principal decreased by rounded up amount
+        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore - principalRoundedUp);
+    }
+
+    function testFuzz_transfer_nonEarningToNonEarning(uint256 amount) public {
+        uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
+
+        minterGateway.mint(alice, boundedAmount);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, boundedAmount);
+
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore - boundedAmount);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + boundedAmount);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore);
+    }
+
+    // TODO: pass index
+    function testFuzz_transfer_earningToEarning(uint256 amount) public {
+        uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, boundedAmount);
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, boundedAmount);
+
+        uint112 expectedPrincipal = _getExpectedPrincipalRoundedUp(boundedAmount, indexBefore);
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipal);
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
+        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore);
+    }
+
+    function testFuzz_transfer_nonEarningToEarning(uint256 amount) public {
+        uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, boundedAmount);
+
+        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, boundedAmount);
+
+        uint112 expectedPrincipal = _getExpectedPrincipal(boundedAmount, indexBefore);
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore - uint240(boundedAmount));
+        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore + expectedPrincipal);
+        assertEq(pyusdx.earningPrincipalOf(bob), expectedPrincipal);
+    }
+
+    function testFuzz_transfer_earningToNonEarning(uint256 amount) public {
+        uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, boundedAmount);
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, boundedAmount);
+
+        uint112 expectedPrincipalSubtracted = _getExpectedPrincipalRoundedUp(boundedAmount, indexBefore);
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipalSubtracted);
+        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore - expectedPrincipalSubtracted);
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore + uint240(boundedAmount));
     }
 }
