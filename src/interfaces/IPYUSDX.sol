@@ -133,6 +133,23 @@ interface IPYUSDX is IContinuousIndexing {
     function claimFor(address account) external returns (uint240 yield);
 
     /**
+     * @notice Force transfers tokens with optional yield recipient override.
+     * @dev    MUST only be callable by FORCED_TRANSFER_MANAGER_ROLE.
+     * @dev    Always claims yield (no paused/frozen checks, no fee).
+     * @dev    Freezes account if not already frozen, then stops earning.
+     * @param account        The account to seize funds from.
+     * @param recipient      The recipient of the seized funds.
+     * @param amount         The amount to transfer.
+     * @param yieldRecipient If non-zero, yield is sent here; otherwise stays with account.
+     */
+    function forceTransferWithYieldRecipient(
+        address account,
+        address recipient,
+        uint256 amount,
+        address yieldRecipient
+    ) external;
+
+    /**
      * @notice Sets earning details for a single account.
      * @dev    MUST only be callable by an Earner Manager.
      * @dev    MUST revert if the account is already managed by a different earner manager.

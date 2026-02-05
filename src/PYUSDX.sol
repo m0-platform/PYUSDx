@@ -202,6 +202,16 @@ contract PYUSDX is
     }
 
     /// @inheritdoc IPYUSDX
+    function forceTransferWithYieldRecipient(
+        address account,
+        address recipient,
+        uint256 amount,
+        address yieldRecipient
+    ) external onlyRole(FORCED_TRANSFER_MANAGER_ROLE) {
+        _forceTransferInternal(account, recipient, amount, yieldRecipient);
+    }
+
+    /// @inheritdoc IPYUSDX
     function setEarningDetails(
         address account,
         bool isEarning_,
@@ -310,6 +320,28 @@ contract PYUSDX is
         accountData.claimRecipient = claimRecipient_;
     }
 
+    /// @dev Stops earning for an account, clearing state and updating totals.
+    function _stopEarning(
+        PYUSDXStorageStruct storage $,
+        Account storage accountData,
+        address account
+    ) internal {
+        uint112 principal = accountData.earningPrincipal;
+        uint240 balance = accountData.balance;
+
+        accountData.isEarning = false;
+        accountData.earningPrincipal = 0;
+        accountData.feeRate = 0;
+        accountData.claimRecipient = address(0);
+        accountData.earnerManager = address(0);
+
+        $.totalEarningPrincipal -= principal;
+        $.totalEarningSupply -= balance;
+        $.totalNonEarningSupply += balance;
+
+        emit EarningDetailsSet(account, false, address(0), 0, address(0));
+    }
+
     /// @dev Internal claim implementation.
     function _claim(address account, uint128 currentIndex_) internal returns (uint240 yield) {
         _requireNotPaused();
@@ -370,9 +402,97 @@ contract PYUSDX is
         return yield;
     }
 
-    /// @dev Internal force transfer implementation.
-    function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
-        revert("TODO: _forceTransfer");
+    /// @dev Internal force transfer implementation (override from ForcedTransferable).
+    function _forceTransfer(address account, address recipient, uint256 amount) internal override {
+        _forceTransferInternal(account, recipient, amount, address(0));
+    }
+
+    /// @dev Internal force transfer with optional yield recipient override.
+    /// @param account The account to seize funds from.
+    /// @param recipient The recipient of the seized funds.
+    /// @param amount The amount to transfer.
+    /// @param yieldRecipient If non-zero, yield is sent here instead of staying with account.
+    function _forceTransferInternal(
+        address account,
+        address recipient,
+        uint256 amount,
+        address yieldRecipient
+    ) internal {
+        if (recipient == address(0)) revert ZeroRecipient();
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        // 1. Claim yield if earning (no paused/frozen checks, no fee)
+        if (accountData.isEarning) {
+            uint128 currentIndex_ = currentIndex();
+            uint240 balance = accountData.balance;
+            uint240 balanceWithYield = IndexingMath.getPresentAmountRoundedDown(
+                accountData.earningPrincipal,
+                currentIndex_
+            );
+
+            uint240 yield;
+            unchecked {
+                yield = balanceWithYield > balance ? balanceWithYield - balance : 0;
+            }
+
+            if (yield > 0) {
+                // Mint yield to account
+                unchecked {
+                    accountData.balance = balance + yield;
+                    $.balanceOf[account] += yield;
+                    $.totalEarningSupply += yield;
+                    $.totalSupply += yield;
+                }
+
+                address effectiveYieldRecipient = yieldRecipient == address(0) ? account : yieldRecipient;
+
+                emit Claimed(account, effectiveYieldRecipient, yield);
+                emit Transfer(address(0), account, yield);
+
+                // Transfer yield to recipient if not staying with account
+                if (effectiveYieldRecipient != account) {
+                    _transfer(account, effectiveYieldRecipient, yield);
+                }
+            }
+
+            // 2. Stop earning
+            _stopEarning($, accountData, account);
+        }
+
+        // 3. Freeze if not already frozen
+        if (!isFrozen(account)) {
+            _freeze(_getFreezableStorageLocation(), account);
+        }
+
+        // 4. Transfer amount to recipient
+        uint256 senderBalance = $.balanceOf[account];
+        if (amount > senderBalance) revert InsufficientBalance(account, senderBalance, amount);
+
+        accountData.balance -= uint240(amount);
+        $.balanceOf[account] = senderBalance - amount;
+        $.totalNonEarningSupply -= uint240(amount);
+
+        Account storage recipientData = $.accounts[recipient];
+        uint240 amount240 = uint240(amount);
+
+        if (recipientData.isEarning) {
+            uint128 currentIndex_ = currentIndex();
+            uint112 principalAmount = IndexingMath.getPrincipalAmountRoundedDown(amount240, currentIndex_);
+
+            recipientData.balance += amount240;
+            recipientData.earningPrincipal += principalAmount;
+            $.balanceOf[recipient] += amount;
+            $.totalEarningPrincipal += principalAmount;
+            $.totalEarningSupply += amount240;
+        } else {
+            recipientData.balance += amount240;
+            $.balanceOf[recipient] += amount;
+            $.totalNonEarningSupply += amount240;
+        }
+
+        emit Transfer(account, recipient, amount);
     }
 
     /* ============ View Functions ============ */
