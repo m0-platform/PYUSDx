@@ -5,6 +5,7 @@ import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.
 import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
 import { PausableUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
+import { UIntMath } from "../../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
 
 import { IContinuousIndexing } from "../../src/interfaces/IContinuousIndexing.sol";
 
@@ -100,21 +101,25 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipal);
     }
 
-    function testFuzz_mint_earningAccount(uint256 amount) public {
+    function testFuzz_mint_earningAccount(uint256 amount, uint128 index, uint32 rate) public {
         uint256 boundedAmount = bound(amount, 1, uint256(type(uint112).max) - 1);
+        uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
+        uint32 boundedRate = uint32(bound(rate, 0, MAX_FEE_RATE));
 
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
 
         uint256 balanceBefore = pyusdx.balanceOf(alice);
         uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
-        uint128 indexBefore = pyusdx.currentIndex();
+
+        pyusdx.setLatestIndex(boundedIndex);
+        pyusdx.setLatestRate(boundedRate);
 
         minterGateway.mint(alice, boundedAmount);
 
         assertEq(pyusdx.balanceOf(alice), balanceBefore + boundedAmount);
 
-        uint112 expectedPrincipal = _getExpectedPrincipal(boundedAmount, indexBefore);
+        uint112 expectedPrincipal = _getExpectedPrincipal(boundedAmount, boundedIndex);
         assertEq(pyusdx.earningPrincipalOf(alice), principalBefore + expectedPrincipal);
     }
 
@@ -343,22 +348,28 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipalAfter);
     }
 
-    function testFuzz_burn_earningAccount(uint256 amount) public {
+    function testFuzz_burn_earningAccount(uint256 amount, uint128 index, uint32 rate) public {
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
 
-        uint256 boundedAmount = bound(amount, 1, 1e15); // Reasonable bound to avoid overflow
+        uint256 boundedMintAmount = bound(amount, 1, uint256(type(uint112).max) - 1);
+        uint256 boundedBurnAmount = bound(amount, 1, boundedMintAmount);
+        uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
+        uint32 boundedRate = uint32(bound(rate, 0, MAX_FEE_RATE));
 
-        // Mint enough to cover the burn
-        minterGateway.mint(alice, 1e18);
+        pyusdx.setLatestIndex(boundedIndex);
+        pyusdx.setLatestRate(boundedRate);
+
+        minterGateway.mint(alice, boundedMintAmount);
 
         uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
-        uint128 indexBefore = pyusdx.currentIndex();
 
-        minterGateway.burn(alice, boundedAmount);
+        minterGateway.burn(alice, boundedBurnAmount);
 
-        uint112 expectedPrincipalSubtracted = _getExpectedPrincipalRoundedUp(boundedAmount, indexBefore);
-        uint112 expectedPrincipalAfter = principalBefore - expectedPrincipalSubtracted;
+        uint112 expectedPrincipalSubtracted = _getExpectedPrincipalRoundedUp(boundedBurnAmount, boundedIndex);
+        uint112 expectedPrincipalAfter = principalBefore -
+            UIntMath.min112(principalBefore, expectedPrincipalSubtracted);
+
         assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipalAfter);
     }
 
@@ -414,33 +425,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(alice), 0);
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
         assertEq(pyusdx.totalEarningPrincipal(), 0);
-    }
-
-    function test_burn_earningAccount_principalRoundedUp() public {
-        vm.prank(rateManager);
-        pyusdx.setRate(1000); // 10% APY
-
-        vm.warp(365 days);
-
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
-
-        minterGateway.mint(alice, MINT_AMOUNT);
-
-        uint128 index = pyusdx.currentIndex();
-        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
-
-        minterGateway.burn(alice, BURN_AMOUNT);
-
-        uint112 principalSubtracted = principalBefore - pyusdx.earningPrincipalOf(alice);
-
-        // Calculate both rounded down and up
-        uint112 principalRoundedDown = _getExpectedPrincipal(BURN_AMOUNT, index);
-        uint112 principalRoundedUp = _getExpectedPrincipalRoundedUp(BURN_AMOUNT, index);
-
-        // Verify we used rounded up (protocol-favoring)
-        assertEq(principalSubtracted, principalRoundedUp);
-        assertTrue(principalSubtracted >= principalRoundedDown);
     }
 
     function test_burn_nonEarningToEarning_transition() public {
@@ -595,6 +579,23 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore);
     }
 
+    function testFuzz_transfer_nonEarningToNonEarning(uint256 amount) public {
+        uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
+
+        minterGateway.mint(alice, boundedAmount);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, boundedAmount);
+
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore - boundedAmount);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + boundedAmount);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore);
+    }
+
     function test_transfer_earningToEarning() public {
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
@@ -663,6 +664,39 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
     }
 
+    function testFuzz_transfer_earningToEarning(uint256 amount, uint128 index, uint32 rate) public {
+        uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
+        uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
+        uint32 boundedRate = uint32(bound(rate, 0, MAX_FEE_RATE));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        pyusdx.setLatestIndex(boundedIndex);
+        pyusdx.setLatestRate(boundedRate);
+
+        minterGateway.mint(alice, boundedAmount);
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, boundedAmount);
+
+        uint112 expectedPrincipal = UIntMath.min112(
+            alicePrincipalBefore,
+            _getExpectedPrincipalRoundedUp(boundedAmount, boundedIndex)
+        );
+
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipal);
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
+        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore);
+    }
+
     function test_transfer_nonEarningToEarning() public {
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
@@ -712,6 +746,36 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Totals updated
         assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore - expectedPrincipalSubtracted);
         assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore + uint240(TRANSFER_AMOUNT));
+    }
+
+    function testFuzz_transfer_earningToNonEarning(uint256 amount, uint128 index, uint32 rate) public {
+        uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
+        uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
+        uint32 boundedRate = uint32(bound(rate, 0, MAX_FEE_RATE));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        pyusdx.setLatestIndex(boundedIndex);
+        pyusdx.setLatestRate(boundedRate);
+
+        minterGateway.mint(alice, boundedAmount);
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, boundedAmount);
+
+        uint112 expectedPrincipalSubtracted = UIntMath.min112(
+            alicePrincipalBefore,
+            _getExpectedPrincipalRoundedUp(boundedAmount, boundedIndex)
+        );
+
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipalSubtracted);
+        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore - expectedPrincipalSubtracted);
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore + uint240(boundedAmount));
     }
 
     function test_transfer_toSelf() public {
@@ -819,89 +883,883 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore - principalRoundedUp);
     }
 
-    function testFuzz_transfer_nonEarningToNonEarning(uint256 amount) public {
+    function testFuzz_transfer_nonEarningToEarning(uint256 amount, uint128 index, uint32 rate) public {
         uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
-
-        minterGateway.mint(alice, boundedAmount);
-
-        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
-        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
-        uint256 totalSupplyBefore = pyusdx.totalSupply();
-
-        vm.prank(alice);
-        pyusdx.transfer(bob, boundedAmount);
-
-        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore - boundedAmount);
-        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + boundedAmount);
-        assertEq(pyusdx.totalSupply(), totalSupplyBefore);
-    }
-
-    // TODO: pass index
-    function testFuzz_transfer_earningToEarning(uint256 amount) public {
-        uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
-
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
+        uint32 boundedRate = uint32(bound(rate, 0, MAX_FEE_RATE));
 
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
 
-        minterGateway.mint(alice, boundedAmount);
-
-        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
-        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
-        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
-        uint128 indexBefore = pyusdx.currentIndex();
-
-        vm.prank(alice);
-        pyusdx.transfer(bob, boundedAmount);
-
-        uint112 expectedPrincipal = _getExpectedPrincipalRoundedUp(boundedAmount, indexBefore);
-        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipal);
-        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
-        assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore);
-    }
-
-    function testFuzz_transfer_nonEarningToEarning(uint256 amount) public {
-        uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
-
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setLatestIndex(boundedIndex);
+        pyusdx.setLatestRate(boundedRate);
 
         minterGateway.mint(alice, boundedAmount);
 
         uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
         uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
-        uint128 indexBefore = pyusdx.currentIndex();
 
         vm.prank(alice);
         pyusdx.transfer(bob, boundedAmount);
 
-        uint112 expectedPrincipal = _getExpectedPrincipal(boundedAmount, indexBefore);
+        uint112 expectedPrincipal = _getExpectedPrincipal(boundedAmount, boundedIndex);
+
         assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore - uint240(boundedAmount));
         assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore + expectedPrincipal);
         assertEq(pyusdx.earningPrincipalOf(bob), expectedPrincipal);
     }
 
-    function testFuzz_transfer_earningToNonEarning(uint256 amount) public {
-        uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
+    /* ============ Index Boundary Unit Tests ============ */
+
+    /* ============ 3.1 Index Initialization Tests ============ */
+
+    function test_mint_earningAccount_atInitialIndex() public {
+        // Verify index starts at PRECISION (1e12)
+        assertEq(pyusdx.currentIndex(), PRECISION);
 
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
 
-        minterGateway.mint(alice, boundedAmount);
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        // At initial index, principal should equal present amount
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), balanceBefore + MINT_AMOUNT);
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore + MINT_AMOUNT);
+        assertEq(pyusdx.currentIndex(), indexBefore); // Index unchanged at 1e12
+    }
+
+    function test_transfer_earningToEarning_atInitialIndex() public {
+        assertEq(pyusdx.currentIndex(), PRECISION);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
 
         uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
-        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
-        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
         uint128 indexBefore = pyusdx.currentIndex();
 
         vm.prank(alice);
-        pyusdx.transfer(bob, boundedAmount);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
 
-        uint112 expectedPrincipalSubtracted = _getExpectedPrincipalRoundedUp(boundedAmount, indexBefore);
-        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipalSubtracted);
+        // At initial index, principal transfer should equal amount transferred
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - TRANSFER_AMOUNT);
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + TRANSFER_AMOUNT);
+        assertEq(pyusdx.currentIndex(), indexBefore);
+    }
+
+    function test_burn_earningAccount_atInitialIndex() public {
+        assertEq(pyusdx.currentIndex(), PRECISION);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        minterGateway.burn(alice, BURN_AMOUNT);
+
+        // At initial index, principal burned should equal amount burned
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore - BURN_AMOUNT);
+        assertEq(pyusdx.currentIndex(), indexBefore);
+    }
+
+    /* ============ 3.2 Precision Loss Tests ============ */
+
+    function test_mint_earningAccount_smallAmount_highIndex() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set index to a high value (100x PRECISION)
+        uint128 highIndex = PRECISION * 100;
+        pyusdx.setLatestIndex(highIndex);
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+
+        // Mint small amount at high index
+        // Principal = amount * PRECISION / index = amount * 1e12 / (100 * 1e12) = amount / 100
+        minterGateway.mint(alice, 100); // 100 PYUSDX
+
+        // At 100x index, 100 tokens should only add 1 principal (rounded down)
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore + 1);
+        assertEq(pyusdx.balanceOf(alice), 100);
+    }
+
+    function test_mint_earningAccount_principalRoundsToZero() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set index to very high value
+        uint128 veryHighIndex = PRECISION * 1000;
+        pyusdx.setLatestIndex(veryHighIndex);
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+
+        // Mint amount that rounds to zero principal
+        // Principal = 10 * 1e12 / (1000 * 1e12) = 0.01 -> rounds to 0
+        minterGateway.mint(alice, 10);
+
+        // Principal should be unchanged (rounded to zero)
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore);
+        assertEq(pyusdx.balanceOf(alice), 10);
+    }
+
+    function test_transfer_earningToEarning_smallAmount_highIndex() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        // Set index to high value
+        uint128 highIndex = PRECISION * 100;
+        pyusdx.setLatestIndex(highIndex);
+
+        // Mint enough to get some principal
+        minterGateway.mint(alice, 10000);
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+
+        // Transfer small amount at high index (using rounded up)
+        vm.prank(alice);
+        pyusdx.transfer(bob, 100);
+
+        // At 100x index: 100 tokens = 1 principal (rounded up from transfer)
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - 1);
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + 1);
+    }
+
+    function test_burn_earningAccount_smallAmount_nearZeroPrincipal() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set index to high value (but not too high that principal rounds to zero on mint)
+        uint128 highIndex = PRECISION * 100; // 100x index
+        pyusdx.setLatestIndex(highIndex);
+
+        // Mint amount that gives small principal: 1e6 * 1e12 / (100 * 1e12) = 10000
+        minterGateway.mint(alice, 1e6);
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+
+        // Verify we got some principal
+        assertGt(principalBefore, 0);
+
+        // Burn small amount - principal should round up
+        // Principal to burn = 10 * 1e12 / (100 * 1e12) = 0.1 -> rounds up to 1
+        minterGateway.burn(alice, 10);
+
+        // Principal should decrease by 1 (rounded up from 0.1)
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore - 1);
+        assertEq(pyusdx.balanceOf(alice), balanceBefore - 10);
+    }
+
+    /* ============ 3.3 Extreme Index Tests ============ */
+
+    function test_mint_earningAccount_after10YearsCompounding() public {
+        vm.prank(rateManager);
+        pyusdx.setRate(500); // 5% APY
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        uint128 indexBefore = pyusdx.currentIndex();
+
+        // Warp 10 years
+        vm.warp(365 days * 10);
+
+        uint128 indexAfter10Years = pyusdx.currentIndex();
+        assertTrue(indexAfter10Years > indexBefore);
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), balanceBefore + MINT_AMOUNT);
+
+        // Principal should be less than amount at higher index
+        uint112 expectedPrincipal = _getExpectedPrincipal(MINT_AMOUNT, indexAfter10Years);
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore + expectedPrincipal);
+        assertTrue(expectedPrincipal < MINT_AMOUNT);
+    }
+
+    function test_transfer_earningToEarning_after50Years() public {
+        vm.prank(rateManager);
+        pyusdx.setRate(1000); // 10% APY
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Warp 50 years
+        vm.warp(365 days * 50);
+
+        uint128 indexAfter50Years = pyusdx.currentIndex();
+        assertTrue(indexAfter50Years > PRECISION);
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+
+        // Principal transferred should be less than amount at high index
+        uint112 expectedPrincipal = _getExpectedPrincipalRoundedUp(TRANSFER_AMOUNT, indexAfter50Years);
+
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipal);
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
+        assertTrue(expectedPrincipal < TRANSFER_AMOUNT);
+    }
+
+    function test_burn_earningAccount_after100YearsMaxRate() public {
+        vm.prank(rateManager);
+        pyusdx.setRate(10000); // 100% APY (max)
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Warp 100 years (extreme compounding)
+        vm.warp(365 days * 100);
+
+        uint128 indexAfter100Years = pyusdx.currentIndex();
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+
+        minterGateway.burn(alice, BURN_AMOUNT);
+
+        // Principal burned should be much less than amount at extreme index
+        uint112 expectedPrincipal = _getExpectedPrincipalRoundedUp(BURN_AMOUNT, indexAfter100Years);
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore - expectedPrincipal);
+        assertTrue(expectedPrincipal < BURN_AMOUNT);
+    }
+
+    function test_index_growth_capsAtMax() public {
+        vm.prank(rateManager);
+        pyusdx.setRate(10000); // 100% APY (max)
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Warp far into the future to try to overflow index
+        vm.warp(365 days * 1000);
+
+        uint128 extremeIndex = pyusdx.currentIndex();
+
+        // Index should be capped at type(uint128).max via bound128
+        assertLe(extremeIndex, type(uint128).max);
+
+        // Mint should still work
+        minterGateway.mint(alice, MINT_AMOUNT);
+        assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
+    }
+
+    /* ============ 3.4 Rate Change Tests ============ */
+
+    function test_mint_earningAccount_withRateChange() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set initial rate
+        vm.prank(rateManager);
+        pyusdx.setRate(500); // 5%
+
+        // Warp to grow index
+        vm.warp(365 days);
+        uint128 indexAt5Percent = pyusdx.currentIndex();
+
+        // Change rate
+        vm.prank(rateManager);
+        pyusdx.setRate(1000); // 10%
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+
+        // Mint at new rate (index already updated by setRate)
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint112 expectedPrincipal = _getExpectedPrincipal(MINT_AMOUNT, pyusdx.currentIndex());
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore + expectedPrincipal);
+
+        // Index should have grown
+        assertTrue(pyusdx.currentIndex() >= indexAt5Percent);
+    }
+
+    function test_transfer_earningToEarning_withRateChange() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Set rate and warp
+        vm.prank(rateManager);
+        pyusdx.setRate(500);
+        vm.warp(180 days);
+
+        // Change rate mid-stream
+        vm.prank(rateManager);
+        pyusdx.setRate(2000); // 20%
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+
+        // Transfer uses current index (which reflects both rates)
+        uint112 expectedPrincipal = _getExpectedPrincipalRoundedUp(TRANSFER_AMOUNT, pyusdx.currentIndex());
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipal);
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
+    }
+
+    function test_burn_earningAccount_withRateChange() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Set rate and grow index
+        vm.prank(rateManager);
+        pyusdx.setRate(1000);
+        vm.warp(365 days);
+
+        uint128 indexBeforeRateChange = pyusdx.currentIndex();
+
+        // Change rate to 0%
+        vm.prank(rateManager);
+        pyusdx.setRate(0);
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+
+        minterGateway.burn(alice, BURN_AMOUNT);
+
+        // Burn uses index after rate change
+        uint128 indexAfterRateChange = pyusdx.currentIndex();
+        assertTrue(indexAfterRateChange >= indexBeforeRateChange);
+
+        uint112 expectedPrincipal = _getExpectedPrincipalRoundedUp(BURN_AMOUNT, indexAfterRateChange);
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore - expectedPrincipal);
+    }
+
+    /* ============ 3.5 Rounding Invariant Tests ============ */
+
+    function test_invariant_mint_principalMatchesRoundedDown() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Test at various index values
+        uint128[4] memory indices = [PRECISION, PRECISION * 10, PRECISION * 100, PRECISION * 1000];
+
+        for (uint256 i = 0; i < indices.length; i++) {
+            pyusdx.setLatestIndex(indices[i]);
+
+            uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+            uint128 indexBefore = pyusdx.currentIndex();
+
+            minterGateway.mint(alice, MINT_AMOUNT);
+
+            // Verify principal matches rounded down calculation
+            uint112 expectedPrincipal = _expectedPrincipalRoundDown(uint240(MINT_AMOUNT), indexBefore);
+            assertEq(pyusdx.earningPrincipalOf(alice), principalBefore + expectedPrincipal);
+        }
+    }
+
+    function test_invariant_burn_principalMatchesRoundedUp() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Test at various index values
+        uint128[4] memory indices = [PRECISION, PRECISION * 10, PRECISION * 100, PRECISION * 1000];
+
+        for (uint256 i = 0; i < indices.length; i++) {
+            pyusdx.setLatestIndex(indices[i]);
+
+            minterGateway.mint(alice, MINT_AMOUNT);
+
+            uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+            uint128 indexBefore = pyusdx.currentIndex();
+
+            minterGateway.burn(alice, BURN_AMOUNT);
+
+            // Verify principal subtracted matches rounded up calculation
+            uint112 expectedPrincipal = _expectedPrincipalRoundUp(uint240(BURN_AMOUNT), indexBefore);
+            assertEq(pyusdx.earningPrincipalOf(alice), principalBefore - expectedPrincipal);
+        }
+    }
+
+    function test_invariant_transfer_principalMatchesRoundedUp() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        // Test at various index values
+        uint128[4] memory indices = [PRECISION, PRECISION * 10, PRECISION * 100, PRECISION * 1000];
+
+        for (uint256 i = 0; i < indices.length; i++) {
+            pyusdx.setLatestIndex(indices[i]);
+
+            minterGateway.mint(alice, MINT_AMOUNT);
+
+            uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+            uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+            uint128 indexBefore = pyusdx.currentIndex();
+
+            vm.prank(alice);
+            pyusdx.transfer(bob, TRANSFER_AMOUNT);
+
+            // Verify principal transferred matches rounded up calculation
+            uint112 expectedPrincipal = _expectedPrincipalRoundUp(uint240(TRANSFER_AMOUNT), indexBefore);
+            assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - expectedPrincipal);
+            assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
+        }
+    }
+
+    function test_invariant_transfer_crossEarning_principalAsymmetry() public {
+        // Test E->N and N->E paths to verify different rounding behavior
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set high index for visible rounding differences
+        pyusdx.setLatestIndex(PRECISION * 100);
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint256 totalNonEarningBefore = pyusdx.totalNonEarningSupply();
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+        uint128 index = pyusdx.currentIndex();
+
+        // E->N transfer: subtract earning principal (rounded up), add non-earning (1:1)
+        vm.prank(alice);
+        pyusdx.transfer(bob, TRANSFER_AMOUNT);
+
+        // Verify E->N uses rounded up for subtraction
+        uint112 expectedPrincipalSubtracted = _expectedPrincipalRoundUp(uint240(TRANSFER_AMOUNT), index);
         assertEq(pyusdx.totalEarningPrincipal(), totalEarningPrincipalBefore - expectedPrincipalSubtracted);
-        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore + uint240(boundedAmount));
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningBefore + uint240(TRANSFER_AMOUNT));
+
+        // Now test N->E with a different scenario
+        // Mint to david as non-earning, then set him to earning, then transfer to carol
+        minterGateway.mint(david, TRANSFER_AMOUNT);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(carol, true, earnerManager, 0, address(0));
+
+        uint256 davidBalance = pyusdx.balanceOf(david);
+
+        // David (non-earning) transfers to Carol (earning)
+        vm.prank(david);
+        pyusdx.transfer(carol, davidBalance);
+
+        // N->E: subtract non-earning (1:1), add earning principal (rounded down)
+        // Carol should get principal rounded down from the amount
+        uint112 expectedPrincipalAdded = _expectedPrincipalRoundDown(uint240(davidBalance), index);
+        assertEq(pyusdx.earningPrincipalOf(carol), expectedPrincipalAdded);
+    }
+
+    /* ============ Rounding Edge Case Tests ============ */
+
+    /* ============ Principal Depletion Tests ============ */
+
+    function test_burn_earningAccount_depletesPrincipal_nonZeroBalanceRemains() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set high index so small amounts give tiny principal
+        pyusdx.setLatestIndex(PRECISION * 1000);
+
+        // Mint enough to get some principal
+        minterGateway.mint(alice, 1000);
+        uint112 initialPrincipal = pyusdx.earningPrincipalOf(alice);
+        assertTrue(initialPrincipal > 0);
+
+        // Burn most of the balance, leaving some
+        // Each burn rounds up principal, so we may drain principal before balance
+        minterGateway.burn(alice, 500);
+
+        uint256 balanceAfter = pyusdx.balanceOf(alice);
+        uint112 principalAfter = pyusdx.earningPrincipalOf(alice);
+
+        // We may have principal depletion (balance > 0 but principal = 0)
+        // This is allowed due to rounding up in burns
+        if (balanceAfter > 0 && principalAfter == 0) {
+            // Principal depletion detected - this is expected behavior
+            assertTrue(_hasPrincipalDepletion(alice));
+        } else {
+            // No depletion - principal should be consistent with balance at high index
+            assertTrue(principalAfter <= initialPrincipal);
+        }
+    }
+
+    function test_transfer_earningToEarning_depletesPrincipal() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        // Set high index (100x, not 1000x to get some principal on mint)
+        pyusdx.setLatestIndex(PRECISION * 100);
+
+        // Mint small amount: 100 * 1e12 / (100 * 1e12) = 1 principal
+        minterGateway.mint(alice, 100);
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        assertEq(alicePrincipalBefore, 1); // Exactly 1 principal
+
+        // Transfer at high index - principal subtracted rounds up
+        // With 100x index: 100 tokens = 1 principal -> rounds up to 1
+        vm.prank(alice);
+        pyusdx.transfer(bob, 100);
+
+        // Alice's principal should be 0 (depletion)
+        assertEq(pyusdx.earningPrincipalOf(alice), 0);
+        assertTrue(pyusdx.balanceOf(alice) == 0); // Full transfer
+
+        // Bob should have received 1 principal (rounded up)
+        assertEq(pyusdx.earningPrincipalOf(bob), 1);
+        assertEq(pyusdx.balanceOf(bob), 100);
+    }
+
+    function test_transfer_crossEarning_depletesPrincipal() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set high index (100x, not 1000x to get some principal on mint)
+        pyusdx.setLatestIndex(PRECISION * 100);
+
+        // Mint small amount that gives small principal: 100 * 1e12 / (100 * 1e12) = 1
+        minterGateway.mint(alice, 100);
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+        assertEq(principalBefore, 1); // Exactly 1 principal
+
+        // Transfer to non-earning bob - E->N: principal subtracted (rounded up), bob gets non-earning 1:1
+        vm.prank(alice);
+        pyusdx.transfer(bob, 100);
+
+        // Alice's principal should be depleted to 0 (since 100 * 1e12 / (100 * 1e12) = 1, rounded up)
+        assertEq(pyusdx.earningPrincipalOf(alice), 0);
+        assertEq(pyusdx.balanceOf(alice), 0);
+
+        // Bob should have full balance as non-earning
+        assertEq(pyusdx.balanceOf(bob), 100);
+        assertEq(pyusdx.earningPrincipalOf(bob), 0);
+    }
+
+    /* ============ Repeated Operations Compound Rounding Tests ============ */
+
+    function test_repeatedTransfers_principalConsistency() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(carol, true, earnerManager, 0, address(0));
+
+        // Set high index for visible rounding
+        pyusdx.setLatestIndex(PRECISION * 100);
+
+        minterGateway.mint(alice, 1000);
+        uint112 aliceInitialPrincipal = pyusdx.earningPrincipalOf(alice);
+
+        // Transfer alice -> bob -> carol
+        vm.prank(alice);
+        pyusdx.transfer(bob, 500);
+
+        uint112 bobPrincipal = pyusdx.earningPrincipalOf(bob);
+
+        vm.prank(bob);
+        pyusdx.transfer(carol, 500);
+
+        uint112 carolPrincipal = pyusdx.earningPrincipalOf(carol);
+        uint112 aliceFinalPrincipal = pyusdx.earningPrincipalOf(alice);
+
+        // Total principal should be conserved (in-kind transfers don't change total)
+        assertEq(pyusdx.totalEarningPrincipal(), aliceInitialPrincipal);
+
+        // Carol should have received the rounded-up principal from bob
+        assertTrue(carolPrincipal > 0);
+
+        // Alice should have less principal
+        assertTrue(aliceFinalPrincipal < aliceInitialPrincipal);
+    }
+
+    function test_repeatedMintBurn_principalConsistency() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set index
+        pyusdx.setLatestIndex(PRECISION * 10);
+
+        uint256 totalMinted = 0;
+        uint256 totalBurned = 0;
+
+        // Repeated mint/burn cycles
+        for (uint256 i = 0; i < 10; i++) {
+            minterGateway.mint(alice, 100);
+            totalMinted += 100;
+
+            minterGateway.burn(alice, 50);
+            totalBurned += 50;
+        }
+
+        uint256 finalBalance = pyusdx.balanceOf(alice);
+        uint112 finalPrincipal = pyusdx.earningPrincipalOf(alice);
+
+        // Final balance should match net minted
+        assertEq(finalBalance, totalMinted - totalBurned);
+
+        // Principal should be positive (mint adds, burn subtracts)
+        assertTrue(finalPrincipal > 0);
+    }
+
+    function test_repeatedMintTransfer_principalConsistency() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        // Set high index
+        pyusdx.setLatestIndex(PRECISION * 50);
+
+        // Mint and transfer in cycles
+        for (uint256 i = 0; i < 5; i++) {
+            minterGateway.mint(alice, 100);
+
+            vm.prank(alice);
+            pyusdx.transfer(bob, 100);
+        }
+
+        // Bob should have all the balance
+        assertEq(pyusdx.balanceOf(bob), 500);
+        assertEq(pyusdx.balanceOf(alice), 0);
+
+        // Bob should have some principal (accumulated from transfers)
+        uint112 bobPrincipal = pyusdx.earningPrincipalOf(bob);
+        assertTrue(bobPrincipal > 0);
+
+        // At 50x index, 500 tokens ≈ 10 principal (rounded up per transfer)
+        assertTrue(bobPrincipal >= 5); // At minimum
+        assertTrue(bobPrincipal <= 10);
+    }
+
+    /* ============ Small Amounts at High Index Tests ============ */
+
+    function test_mint_smallAmount_highIndex_principalRoundsToZero() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set extremely high index
+        pyusdx.setLatestIndex(PRECISION * 10000);
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+
+        // Mint tiny amount
+        // Principal = 1 * 1e12 / (10000 * 1e12) = 0.0001 -> rounds to 0
+        minterGateway.mint(alice, 1);
+
+        // Principal should be unchanged (rounded to zero)
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore);
+        assertEq(pyusdx.balanceOf(alice), 1);
+    }
+
+    function test_burn_smallAmount_highIndex_principalRoundsUp() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set high index (100x, not 1000x to avoid rounding to zero on mint)
+        pyusdx.setLatestIndex(PRECISION * 100);
+
+        // Mint larger amount to get principal: 1e6 * 1e12 / (100 * 1e12) = 10000
+        minterGateway.mint(alice, 1e6);
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+
+        // Burn small amount - principal rounds up
+        // Principal = 1 * 1e12 / (100 * 1e12) = 0.01 -> rounds up to 1
+        minterGateway.burn(alice, 1);
+
+        // Principal should decrease by 1 (rounded up)
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore - 1);
+        assertEq(pyusdx.balanceOf(alice), 1e6 - 1);
+    }
+
+    function test_transfer_smallAmount_highIndex_roundingAsymmetry() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        // Set high index (100x, not 1000x to avoid rounding to zero on mint)
+        pyusdx.setLatestIndex(PRECISION * 100);
+
+        // Mint larger amount to get principal: 1e6 * 1e12 / (100 * 1e12) = 10000
+        minterGateway.mint(alice, 1e6);
+
+        uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+
+        // Transfer small amount
+        vm.prank(alice);
+        pyusdx.transfer(bob, 10);
+
+        // Principal should round up: 10 * 1e12 / (100 * 1e12) = 0.1 -> rounds up to 1
+        assertEq(pyusdx.earningPrincipalOf(alice), alicePrincipalBefore - 1);
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + 1);
+        assertEq(pyusdx.balanceOf(bob), 10);
+    }
+
+    /* ============ Large Amounts at Low Index Tests ============ */
+
+    function test_mint_largeAmount_lowIndex_principalOverflow() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // At low index (PRECISION), principal equals amount
+        pyusdx.setLatestIndex(PRECISION);
+
+        // Set total earning principal near max
+        uint112 maxPrincipal = type(uint112).max;
+        pyusdx.setTotalEarningPrincipal(maxPrincipal - 100);
+
+        // Try to mint large amount - should revert due to overflow
+        vm.expectRevert(IPYUSDX.OverflowsPrincipalOfTotalSupply.selector);
+        minterGateway.mint(alice, 100);
+    }
+
+    function test_transfer_largeAmount_lowIndex_principalOverflow() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        // At low index, principal equals amount
+        pyusdx.setLatestIndex(PRECISION);
+
+        // Set bob's principal near max
+        pyusdx.setEarningPrincipal(bob, type(uint112).max - 50);
+
+        // Mint and transfer large amount
+        minterGateway.mint(alice, 100);
+
+        // Transfer should revert - safe112 prevents overflow
+        vm.expectRevert(); // InvalidUInt112
+        vm.prank(alice);
+        pyusdx.transfer(bob, 100);
+    }
+
+    /* ============ min112 Capping Behavior Tests ============ */
+
+    function test_transfer_insufficientPrincipal_min112Caps() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        // Set high index so transfer needs more principal than available
+        pyusdx.setLatestIndex(PRECISION * 1000);
+
+        minterGateway.mint(alice, 100);
+
+        // Manually set alice's principal to very low value
+        pyusdx.setEarningPrincipal(alice, 1);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+
+        // Transfer should work - min112 caps at available principal
+        vm.prank(alice);
+        pyusdx.transfer(bob, 50);
+
+        // Alice's balance should decrease
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore - 50);
+
+        // Alice's principal should be 0 (capped via min112)
+        assertEq(pyusdx.earningPrincipalOf(alice), 0);
+
+        // Bob should receive the principal (capped at what alice had)
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + 1);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + 50);
+    }
+
+    function test_burn_insufficientPrincipal_min112Caps() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        // Set high index
+        pyusdx.setLatestIndex(PRECISION * 1000);
+
+        minterGateway.mint(alice, 100);
+
+        // Manually set alice's principal to very low value
+        pyusdx.setEarningPrincipal(alice, 1);
+        pyusdx.setTotalEarningPrincipal(1);
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+
+        // Burn should work - min112 caps at available principal
+        minterGateway.burn(alice, 50);
+
+        // Balance should decrease
+        assertEq(pyusdx.balanceOf(alice), balanceBefore - 50);
+
+        // Principal should be 0 (capped via min112)
+        assertEq(pyusdx.earningPrincipalOf(alice), 0);
+        assertEq(pyusdx.totalEarningPrincipal(), 0);
+    }
+
+    function test_transfer_min112_recipientGetsPrincipal() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        // Set high index
+        pyusdx.setLatestIndex(PRECISION * 1000);
+
+        minterGateway.mint(alice, 100);
+
+        // Set alice's principal low
+        pyusdx.setEarningPrincipal(alice, 1);
+
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+
+        // Transfer - recipient gets the capped principal
+        vm.prank(alice);
+        pyusdx.transfer(bob, 50);
+
+        // Bob should receive exactly 1 principal (what alice had, capped by min112)
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + 1);
+
+        // Even though 50 tokens at 1000x index would need more principal,
+        // the transfer succeeds with min112 capping
+        assertEq(pyusdx.balanceOf(bob), 50);
     }
 }

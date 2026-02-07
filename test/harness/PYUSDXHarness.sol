@@ -84,4 +84,19 @@ contract PYUSDXHarness is PYUSDX {
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
         _addNonEarningAmount($, account, amount);
     }
+
+    /// @notice Set the latest index directly for testing boundary conditions
+    /// @param newIndex The index value to set
+    function setLatestIndex(uint128 newIndex) external {
+        _getContinuousIndexingStorageLocation().latestIndex = newIndex;
+        _getContinuousIndexingStorageLocation().latestUpdateTimestamp = uint40(block.timestamp);
+    }
+
+    /// @notice Set the rate directly for testing boundary conditions
+    /// @param newRate The rate value to set (basis points, 10000 = 100%)
+    function setLatestRate(uint32 newRate) external {
+        _getContinuousIndexingStorageLocation().rate = newRate;
+        _getContinuousIndexingStorageLocation().latestRate = newRate;
+        _getContinuousIndexingStorageLocation().latestUpdateTimestamp = uint40(block.timestamp);
+    }
 }

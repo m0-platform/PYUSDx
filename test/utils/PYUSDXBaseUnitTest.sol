@@ -74,12 +74,53 @@ abstract contract PYUSDXBaseUnitTest is Test {
     }
 
     /// @dev Returns the expected present amount (rounded down) for a given principal amount and index
-    function _getExpectedPresentAmount(uint112 principalAmount, uint128 index) internal pure returns (uint256) {
-        return uint256(IndexingMath.getPresentAmountRoundedDown(principalAmount, index));
+    function _getExpectedPresentAmount(uint112 principalAmount, uint128 index) internal pure returns (uint240) {
+        return IndexingMath.getPresentAmountRoundedDown(principalAmount, index);
     }
 
     /// @dev Returns the expected principal amount (rounded up) for a given present amount and index
     function _getExpectedPrincipalRoundedUp(uint256 presentAmount, uint128 index) internal pure returns (uint112) {
         return IndexingMath.getPrincipalAmountRoundedUp(uint240(presentAmount), index);
+    }
+
+    /* ============ Additional Helper Functions ============ */
+
+    /// @notice Calculate max safe mint amount at current index
+    /// @param index The index to use for calculation
+    /// @return maxAmount Maximum amount that won't overflow principal
+    function _maxSafeAmount(uint128 index) internal view returns (uint256) {
+        uint112 maxPrincipal = type(uint112).max - pyusdx.totalEarningPrincipal() - 1;
+        return (uint256(maxPrincipal) * index) / PRECISION;
+    }
+
+    /// @notice Check if burning amount is safe
+    /// @param account The account to burn from
+    /// @param amount The amount to burn
+    /// @return True if account has sufficient balance
+    function _canSafelyBurn(address account, uint256 amount) internal view returns (bool) {
+        return pyusdx.balanceOf(account) >= amount;
+    }
+
+    /// @notice Calculate expected principal with round down (as used in mint)
+    /// @param presentAmount The present amount
+    /// @param index The current index
+    /// @return Principal amount rounded down
+    function _expectedPrincipalRoundDown(uint240 presentAmount, uint128 index) internal pure returns (uint112) {
+        return IndexingMath.getPrincipalAmountRoundedDown(presentAmount, index);
+    }
+
+    /// @notice Calculate expected principal with round up (as used in burn/transfer)
+    /// @param presentAmount The present amount
+    /// @param index The current index
+    /// @return Principal amount rounded up
+    function _expectedPrincipalRoundUp(uint240 presentAmount, uint128 index) internal pure returns (uint112) {
+        return IndexingMath.getPrincipalAmountRoundedUp(presentAmount, index);
+    }
+
+    /// @notice Check if account has principal depletion (balance with zero principal)
+    /// @param account The account to check
+    /// @return True if account has non-zero balance but zero principal
+    function _hasPrincipalDepletion(address account) internal view returns (bool) {
+        return pyusdx.balanceOf(account) > 0 && pyusdx.earningPrincipalOf(account) == 0;
     }
 }
