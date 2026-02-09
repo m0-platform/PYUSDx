@@ -489,7 +489,7 @@ contract PYUSDX is
 
         if (!accountData.isEarning) return;
 
-        // Claim any accrued yield first (will be no-op if paused/frozen via _claim checks)
+        // Claim any accrued yield first
         _claim(account);
 
         uint240 balance = accountData.balance;
@@ -507,9 +507,29 @@ contract PYUSDX is
         emit StoppedEarning(account);
     }
 
-    /// @dev Internal force transfer implementation.
+    /// @dev Internal force transfer implementation to seize funds from frozen accounts.
     function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
-        revert("TODO: _forceTransfer");
+        _revertIfZeroAccount(recipient);
+        _revertIfNotFrozen(frozenAccount);
+
+        emit Transfer(frozenAccount, recipient, amount);
+        emit ForcedTransfer(frozenAccount, recipient, msg.sender, amount);
+
+        if (amount == 0) return;
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        uint240 safeAmount = UIntMath.safe240(amount);
+
+        // Subtract from frozen (non-earning) account
+        _subtractNonEarningAmount($, frozenAccount, safeAmount);
+
+        // Add to recipient (can be earning or non-earning)
+        if ($.accounts[recipient].isEarning) {
+            _addEarningAmount($, recipient, safeAmount);
+            updateIndex();
+        } else {
+            _addNonEarningAmount($, recipient, safeAmount);
+        }
     }
 
     /// @dev Reverts if the caller is not authorized to manage earning details for the account.

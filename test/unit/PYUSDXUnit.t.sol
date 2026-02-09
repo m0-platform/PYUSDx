@@ -2396,4 +2396,183 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.prank(alice);
         pyusdx.freezeAccounts(accountsToFreeze);
     }
+
+    /* ============ forceTransfer ============ */
+
+    function test_forceTransfer_happyPath_nonEarningToNonEarning() public {
+        // Mint to alice
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Freeze alice
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+
+        // Force transfer from frozen alice to bob
+        vm.expectEmit();
+        emit Transfer(alice, bob, TRANSFER_AMOUNT);
+
+        vm.expectEmit();
+        emit IForcedTransferable.ForcedTransfer(alice, bob, forcedTransferManager, TRANSFER_AMOUNT);
+
+        vm.prank(forcedTransferManager);
+        pyusdx.forceTransfer(alice, bob, TRANSFER_AMOUNT);
+
+        // Verify balances
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore - TRANSFER_AMOUNT);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + TRANSFER_AMOUNT);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore);
+    }
+
+    function test_forceTransfer_happyPath_nonEarningToEarning() public {
+        // Make bob earning
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+
+        // Mint to alice (non-earning)
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Freeze alice
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
+        uint256 totalNonEarningBefore = pyusdx.totalNonEarningSupply();
+
+        // Force transfer from frozen alice to earning bob
+        vm.prank(forcedTransferManager);
+        pyusdx.forceTransfer(alice, bob, TRANSFER_AMOUNT);
+
+        // Verify balances
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore - TRANSFER_AMOUNT);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + TRANSFER_AMOUNT);
+
+        // Bob's principal should increase
+        uint112 expectedPrincipal = _getExpectedPrincipal(TRANSFER_AMOUNT, pyusdx.currentIndex());
+        assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
+
+        // Non-earning supply should decrease
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningBefore - uint240(TRANSFER_AMOUNT));
+    }
+
+    function test_forceTransfer_revert_accountNotFrozen() public {
+        // Mint to alice but don't freeze
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Attempt force transfer from non-frozen alice
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountNotFrozen.selector, alice));
+
+        vm.prank(forcedTransferManager);
+        pyusdx.forceTransfer(alice, bob, TRANSFER_AMOUNT);
+    }
+
+    function test_forceTransfer_revert_zeroRecipient() public {
+        // Mint and freeze alice
+        minterGateway.mint(alice, MINT_AMOUNT);
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        // Attempt force transfer to zero address
+        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
+
+        vm.prank(forcedTransferManager);
+        pyusdx.forceTransfer(alice, address(0), TRANSFER_AMOUNT);
+    }
+
+    function test_forceTransfer_revert_insufficientBalance() public {
+        // Mint small amount to alice
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        // Freeze alice
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        // Attempt to transfer more than balance
+        uint256 excessiveAmount = MINT_AMOUNT + 1;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPYUSDX.InsufficientBalance.selector, alice, uint240(MINT_AMOUNT), excessiveAmount)
+        );
+
+        vm.prank(forcedTransferManager);
+        pyusdx.forceTransfer(alice, bob, excessiveAmount);
+    }
+
+    function test_forceTransfer_zeroAmount() public {
+        // Mint and freeze alice
+        minterGateway.mint(alice, MINT_AMOUNT);
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+
+        // Zero amount should emit events but not change balances
+        vm.expectEmit();
+        emit Transfer(alice, bob, 0);
+
+        vm.expectEmit();
+        emit IForcedTransferable.ForcedTransfer(alice, bob, forcedTransferManager, 0);
+
+        vm.prank(forcedTransferManager);
+        pyusdx.forceTransfer(alice, bob, 0);
+
+        // Balances unchanged
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore);
+    }
+
+    function test_forceTransfer_revert_notForcedTransferManager() public {
+        // Mint and freeze alice
+        minterGateway.mint(alice, MINT_AMOUNT);
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        // Attempt force transfer without role
+        vm.expectRevert();
+        vm.prank(alice);
+        pyusdx.forceTransfer(alice, bob, TRANSFER_AMOUNT);
+    }
+
+    function test_forceTransfers_batch() public {
+        // Mint to alice and bob
+        minterGateway.mint(alice, MINT_AMOUNT);
+        minterGateway.mint(bob, MINT_AMOUNT);
+
+        // Freeze both
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+        vm.prank(freezeManager);
+        pyusdx.freeze(bob);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint256 carolBalanceBefore = pyusdx.balanceOf(carol);
+
+        // Batch force transfer
+        address[] memory frozenAccounts = new address[](2);
+        frozenAccounts[0] = alice;
+        frozenAccounts[1] = bob;
+
+        address[] memory recipients = new address[](2);
+        recipients[0] = carol;
+        recipients[1] = carol;
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = TRANSFER_AMOUNT;
+        amounts[1] = TRANSFER_AMOUNT;
+
+        vm.prank(forcedTransferManager);
+        pyusdx.forceTransfers(frozenAccounts, recipients, amounts);
+
+        // Verify balances
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore - TRANSFER_AMOUNT);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore - TRANSFER_AMOUNT);
+        assertEq(pyusdx.balanceOf(carol), carolBalanceBefore + 2 * TRANSFER_AMOUNT);
+    }
 }
