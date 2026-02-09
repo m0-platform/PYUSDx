@@ -230,13 +230,15 @@ contract PYUSDX is
         }
     }
 
-    /// @dev Overrides Freezable.freeze to stop earning before freezing.
+    /// @dev   Overrides Freezable.freeze to stop earning before freezing.
+    /// @param account The account to freeze.
     function freeze(address account) external override onlyRole(FREEZE_MANAGER_ROLE) {
         _stopEarningFor(account);
         _freeze(_getFreezableStorageLocation(), account);
     }
 
-    /// @dev Overrides Freezable.freezeAccounts to stop earning before freezing.
+    /// @dev   Overrides Freezable.freezeAccounts to stop earning before freezing.
+    /// @param accounts The accounts to freeze.
     function freezeAccounts(address[] calldata accounts) external override onlyRole(FREEZE_MANAGER_ROLE) {
         FreezableStorageStruct storage $ = _getFreezableStorageLocation();
         for (uint256 i; i < accounts.length; ++i) {
@@ -482,7 +484,8 @@ contract PYUSDX is
         return yield;
     }
 
-    /// @dev Stops earning for an account, claiming any accrued yield first.
+    /// @dev   Stops earning for an account, claiming any accrued yield first.
+    /// @param account The account to stop earning for.
     function _stopEarningFor(address account) internal {
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
         Account storage accountData = $.accounts[account];
@@ -507,7 +510,10 @@ contract PYUSDX is
         emit StoppedEarning(account);
     }
 
-    /// @dev Internal force transfer implementation to seize funds from frozen accounts.
+    /// @dev   Internal force transfer implementation to seize funds from frozen accounts.
+    /// @param frozenAccount The frozen account to transfer from.
+    /// @param recipient     The account to transfer to.
+    /// @param amount        The amount to transfer.
     function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
         _revertIfZeroAccount(recipient);
         _revertIfNotFrozen(frozenAccount);
