@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import { ContinuousIndexingMath } from "../../lib/m-extensions/lib/common/src/libs/ContinuousIndexingMath.sol";
+import { IndexingMath } from "../../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
 import { UIntMath } from "../../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
 import { AccessControlUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
@@ -161,5 +162,64 @@ abstract contract ContinuousIndexing is IContinuousIndexing, AccessControlUpgrad
      */
     function rate() public view virtual returns (uint32) {
         return _getContinuousIndexingStorageLocation().rate;
+    }
+
+    /* ============ Internal View/Pure Functions ============ */
+
+    /**
+     * @dev    Returns the present amount (rounded down) given the principal amount and an index.
+     * @param  principalAmount The principal amount.
+     * @param  index           An index.
+     * @return The present amount rounded down.
+     */
+    function _getPresentAmountRoundedDown(uint112 principalAmount, uint128 index) internal pure returns (uint240) {
+        return uint240(IndexingMath.getPresentAmountRoundedDown(principalAmount, index));
+    }
+
+    /**
+     * @dev    Returns the present amount (rounded down) given the principal amount, using the current index.
+     * @param  principalAmount The principal amount.
+     * @return The present amount rounded down.
+     */
+    function _getPresentAmountRoundedDown(uint112 principalAmount) internal view returns (uint240) {
+        return uint240(IndexingMath.getPresentAmountRoundedDown(principalAmount, currentIndex()));
+    }
+
+    /**
+     * @dev    Returns the principal amount (rounded down) given the present amount and an index.
+     * @param  presentAmount The present amount.
+     * @param  index         An index.
+     * @return The principal amount rounded down.
+     */
+    function _getPrincipalAmountRoundedDown(uint240 presentAmount, uint128 index) internal pure returns (uint112) {
+        return IndexingMath.getPrincipalAmountRoundedDown(presentAmount, index);
+    }
+
+    /**
+     * @dev    Returns the principal amount (rounded down) given the present amount, using the current index.
+     * @param  presentAmount The present amount.
+     * @return The principal amount rounded down.
+     */
+    function _getPrincipalAmountRoundedDown(uint240 presentAmount) internal view returns (uint112) {
+        return IndexingMath.getPrincipalAmountRoundedDown(presentAmount, currentIndex());
+    }
+
+    /**
+     * @dev    Returns the principal amount (rounded up) given the present amount and an index.
+     * @param  presentAmount The present amount.
+     * @param  index         An index.
+     * @return The principal amount rounded up.
+     */
+    function _getPrincipalAmountRoundedUp(uint240 presentAmount, uint128 index) internal pure returns (uint112) {
+        return IndexingMath.getPrincipalAmountRoundedUp(presentAmount, index);
+    }
+
+    /**
+     * @dev    Returns the principal amount given the present amount, using the current index.
+     * @param  presentAmount The present amount.
+     * @return The principal amount rounded up.
+     */
+    function _getPrincipalAmountRoundedUp(uint240 presentAmount) internal view returns (uint112) {
+        return IndexingMath.getPrincipalAmountRoundedUp(presentAmount, currentIndex());
     }
 }

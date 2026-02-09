@@ -5,7 +5,7 @@
   "lib/forge-std": {
     "branch": {
       "name": "v1",
-      "rev": "bb4ceea94d6f10eeb5b41dc2391c6c8bf8e734ef"
+      "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
     }
   },
   "lib/m-extensions": {
