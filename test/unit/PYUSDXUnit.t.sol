@@ -2126,4 +2126,274 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(storedManager, newEarnerManager);
         assertEq(feeRate, 1000);
     }
+
+    /* ============ freeze / freezeAccounts (earning stop) ============ */
+
+    function test_freeze_earningAccount_claimsYieldAndStopsEarning() public {
+        // Set a rate so index grows over time
+        vm.prank(rateManager);
+        pyusdx.setRate(500);
+
+        // Mint tokens to alice
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
+        // Set up alice as an earner with NO fee and NO claim recipient (yield stays with alice)
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        // Warp time to accrue yield
+        vm.warp(block.timestamp + 365 days);
+
+        uint240 expectedYield = pyusdx.accruedYieldOf(alice);
+        assertGt(expectedYield, 0, "Should have yield to claim");
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+        uint240 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+
+        // Expect both StoppedEarning and Frozen events
+        vm.expectEmit();
+        emit IPYUSDX.StoppedEarning(alice);
+
+        vm.expectEmit();
+        emit IFreezable.Frozen(alice, block.timestamp);
+
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        // Verify frozen
+        assertTrue(pyusdx.isFrozen(alice));
+
+        // Verify earning stopped
+        (bool isEarning, address storedManager, uint16 feeRate, address claimRecipient) = pyusdx.getEarningDetails(
+            alice
+        );
+        assertFalse(isEarning);
+        assertEq(storedManager, address(0));
+        assertEq(feeRate, 0);
+        assertEq(claimRecipient, address(0));
+
+        // Verify principal cleared
+        assertEq(pyusdx.earningPrincipalOf(alice), 0);
+
+        // Verify alice's balance increased from claimed yield (since no fee/redirect)
+        uint256 aliceBalanceAfter = pyusdx.balanceOf(alice);
+        assertEq(aliceBalanceAfter, aliceBalanceBefore + expectedYield);
+
+        // Verify supply totals updated (balance after claim moved to non-earning)
+        assertEq(pyusdx.totalEarningPrincipal(), 0);
+        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore + uint240(aliceBalanceAfter));
+    }
+
+    function test_freeze_earningAccount_clearsAllEarningData() public {
+        // Mint tokens to alice
+        minterGateway.mint(alice, 1000e6);
+
+        // Set up alice as an earner with all fields populated
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 5000, bob); // 50% fee, bob is recipient
+
+        // Verify earning data is set
+        (bool isEarning, address storedManager, uint16 feeRate, address claimRecipient) = pyusdx.getEarningDetails(
+            alice
+        );
+        assertTrue(isEarning);
+        assertEq(storedManager, earnerManager);
+        assertEq(feeRate, 5000);
+        assertEq(claimRecipient, bob);
+        assertGt(pyusdx.earningPrincipalOf(alice), 0);
+
+        // Freeze
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        // Verify ALL earning data cleared
+        (isEarning, storedManager, feeRate, claimRecipient) = pyusdx.getEarningDetails(alice);
+        assertFalse(isEarning);
+        assertEq(storedManager, address(0));
+        assertEq(feeRate, 0);
+        assertEq(claimRecipient, address(0));
+        assertEq(pyusdx.earningPrincipalOf(alice), 0);
+    }
+
+    function test_freeze_earningAccount_updatesSupplyTotals() public {
+        // Mint tokens to alice
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
+        // Set up alice as an earner
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+        uint112 totalEarningPrincipalBefore = pyusdx.totalEarningPrincipal();
+        uint240 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
+
+        assertGt(principalBefore, 0);
+        assertEq(totalEarningPrincipalBefore, principalBefore);
+        assertEq(totalNonEarningSupplyBefore, 0);
+
+        // Freeze
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        // Verify supply totals updated correctly
+        assertEq(pyusdx.totalEarningPrincipal(), 0);
+        assertEq(pyusdx.totalNonEarningSupply(), uint240(balance));
+    }
+
+    function test_freeze_nonEarningAccount_noStoppedEarningEvent() public {
+        // Mint tokens to alice (non-earner by default)
+        minterGateway.mint(alice, 1000e6);
+        assertFalse(pyusdx.isEarning(alice));
+
+        // Record logs to verify StoppedEarning is NOT emitted
+        vm.recordLogs();
+
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        // Verify frozen
+        assertTrue(pyusdx.isFrozen(alice));
+
+        // Verify no StoppedEarning event was emitted
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertNotEq(logs[i].topics[0], IPYUSDX.StoppedEarning.selector);
+        }
+    }
+
+    function test_freeze_alreadyFrozenAccount_noop() public {
+        // Mint and set up alice as earner
+        minterGateway.mint(alice, 1000e6);
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        // First freeze
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        assertTrue(pyusdx.isFrozen(alice));
+        assertFalse(pyusdx.isEarning(alice));
+
+        // Record logs for second freeze
+        vm.recordLogs();
+
+        // Second freeze should be a no-op (already frozen)
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        // Verify no events emitted (since account was already frozen and not earning)
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertNotEq(logs[i].topics[0], IPYUSDX.StoppedEarning.selector);
+            assertNotEq(logs[i].topics[0], IFreezable.Frozen.selector);
+        }
+    }
+
+    function test_freezeAccounts_batch_stopsEarningForAll() public {
+        // Set a rate so index grows over time
+        vm.prank(rateManager);
+        pyusdx.setRate(500);
+
+        // Mint tokens to alice, bob, carol
+        minterGateway.mint(alice, 1000e6);
+        minterGateway.mint(bob, 2000e6);
+        minterGateway.mint(carol, 3000e6);
+
+        // Set up alice and bob as earners (carol stays non-earner)
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 1000, david);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, 500, david);
+
+        // Warp time to accrue yield
+        vm.warp(block.timestamp + 180 days);
+
+        assertTrue(pyusdx.isEarning(alice));
+        assertTrue(pyusdx.isEarning(bob));
+        assertFalse(pyusdx.isEarning(carol));
+
+        address[] memory accountsToFreeze = new address[](3);
+        accountsToFreeze[0] = alice;
+        accountsToFreeze[1] = bob;
+        accountsToFreeze[2] = carol;
+
+        // Freeze all accounts
+        vm.prank(freezeManager);
+        pyusdx.freezeAccounts(accountsToFreeze);
+
+        // Verify all frozen
+        assertTrue(pyusdx.isFrozen(alice));
+        assertTrue(pyusdx.isFrozen(bob));
+        assertTrue(pyusdx.isFrozen(carol));
+
+        // Verify earning stopped for alice and bob
+        assertFalse(pyusdx.isEarning(alice));
+        assertFalse(pyusdx.isEarning(bob));
+        assertFalse(pyusdx.isEarning(carol));
+
+        // Verify all earning data cleared for alice and bob
+        (bool isEarning, address manager, uint16 feeRate, address recipient) = pyusdx.getEarningDetails(alice);
+        assertFalse(isEarning);
+        assertEq(manager, address(0));
+        assertEq(feeRate, 0);
+        assertEq(recipient, address(0));
+
+        (isEarning, manager, feeRate, recipient) = pyusdx.getEarningDetails(bob);
+        assertFalse(isEarning);
+        assertEq(manager, address(0));
+        assertEq(feeRate, 0);
+        assertEq(recipient, address(0));
+    }
+
+    function test_freezeAccounts_emitsEventsInOrder() public {
+        // Mint tokens
+        minterGateway.mint(alice, 1000e6);
+        minterGateway.mint(bob, 1000e6);
+
+        // Set up as earners
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
+        address[] memory accountsToFreeze = new address[](2);
+        accountsToFreeze[0] = alice;
+        accountsToFreeze[1] = bob;
+
+        // Expect events in order: StoppedEarning(alice), Frozen(alice), StoppedEarning(bob), Frozen(bob)
+        vm.expectEmit();
+        emit IPYUSDX.StoppedEarning(alice);
+
+        vm.expectEmit();
+        emit IFreezable.Frozen(alice, block.timestamp);
+
+        vm.expectEmit();
+        emit IPYUSDX.StoppedEarning(bob);
+
+        vm.expectEmit();
+        emit IFreezable.Frozen(bob, block.timestamp);
+
+        vm.prank(freezeManager);
+        pyusdx.freezeAccounts(accountsToFreeze);
+    }
+
+    function test_freeze_revert_notFreezeManager() public {
+        vm.expectRevert();
+        vm.prank(alice);
+        pyusdx.freeze(bob);
+    }
+
+    function test_freezeAccounts_revert_notFreezeManager() public {
+        address[] memory accountsToFreeze = new address[](1);
+        accountsToFreeze[0] = alice;
+
+        vm.expectRevert();
+        vm.prank(alice);
+        pyusdx.freezeAccounts(accountsToFreeze);
+    }
 }

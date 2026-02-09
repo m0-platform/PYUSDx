@@ -230,6 +230,21 @@ contract PYUSDX is
         }
     }
 
+    /// @dev Overrides Freezable.freeze to stop earning before freezing.
+    function freeze(address account) external override onlyRole(FREEZE_MANAGER_ROLE) {
+        _stopEarningFor(account);
+        _freeze(_getFreezableStorageLocation(), account);
+    }
+
+    /// @dev Overrides Freezable.freezeAccounts to stop earning before freezing.
+    function freezeAccounts(address[] calldata accounts) external override onlyRole(FREEZE_MANAGER_ROLE) {
+        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
+        for (uint256 i; i < accounts.length; ++i) {
+            _stopEarningFor(accounts[i]);
+            _freeze($, accounts[i]);
+        }
+    }
+
     /* ============ View Functions ============ */
 
     /// @notice Returns the balance of an account.
@@ -465,6 +480,31 @@ contract PYUSDX is
         }
 
         return yield;
+    }
+
+    /// @dev Stops earning for an account, claiming any accrued yield first.
+    function _stopEarningFor(address account) internal {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        if (!accountData.isEarning) return;
+
+        // Claim any accrued yield first (will be no-op if paused/frozen via _claim checks)
+        _claim(account);
+
+        uint240 balance = accountData.balance;
+        uint112 principal = accountData.earningPrincipal;
+
+        accountData.isEarning = false;
+        accountData.earningPrincipal = 0;
+        accountData.earnerManager = address(0);
+        accountData.feeRate = 0;
+        accountData.claimRecipient = address(0);
+
+        $.totalEarningPrincipal -= principal;
+        $.totalNonEarningSupply += balance;
+
+        emit StoppedEarning(account);
     }
 
     /// @dev Internal force transfer implementation.
