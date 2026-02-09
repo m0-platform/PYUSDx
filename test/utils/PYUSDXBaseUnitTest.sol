@@ -117,6 +117,18 @@ abstract contract PYUSDXBaseUnitTest is Test {
         return IndexingMath.getPrincipalAmountRoundedUp(presentAmount, index);
     }
 
+    /// @notice Calculate expected principal with round up, returning uint256 to avoid revert
+    /// @param presentAmount The present amount
+    /// @param index The current index
+    /// @return Principal amount rounded up (as uint256, may exceed uint112 max)
+    function _expectedPrincipalRoundUpSafe(uint256 presentAmount, uint128 index) internal pure returns (uint256) {
+        if (index == 0) return 0;
+
+        unchecked {
+            return ((presentAmount * 1e12) + index - 1) / index;
+        }
+    }
+
     /// @notice Check if account has principal depletion (balance with zero principal)
     /// @param account The account to check
     /// @return True if account has non-zero balance but zero principal
