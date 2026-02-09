@@ -1,38 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { Test, Vm } from "forge-std/Test.sol";
+import { VmSafe } from "../../lib/m-extensions/lib/forge-std/src/Vm.sol";
 
-import { ERC1967Proxy } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { IForcedTransferable } from "../../lib/m-extensions/src/components/forcedTransferable/IForcedTransferable.sol";
 
-import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
-contract EarnerConfigurationTest is Test {
-    PYUSDX public pyusdx;
-
-    address public admin = makeAddr("admin");
-    address public earnerManager = makeAddr("earnerManager");
-    address public alice = makeAddr("alice");
-    address public bob = makeAddr("bob");
-
-    function setUp() public {
-        PYUSDX impl = new PYUSDX(makeAddr("minterGateway"), makeAddr("pyusd"));
-        bytes memory initData = abi.encodeWithSelector(
-            PYUSDX.initialize.selector,
-            "PayPal USDX",
-            "PYUSDX",
-            admin,
-            address(1), // pauser
-            address(1), // freezeManager
-            address(1), // forcedTransferManager
-            earnerManager,
-            address(1) // rateManager
-        );
-        pyusdx = PYUSDX(address(new ERC1967Proxy(address(impl), initData)));
-    }
-
+contract EarnerConfigurationTest is PYUSDXBaseUnitTest {
     function test_setEarningDetails_enableEarning() public {
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 500, bob);
@@ -74,9 +50,9 @@ contract EarnerConfigurationTest is Test {
     }
 
     function test_setEarningDetails_batch() public {
-        address[] memory accounts = new address[](2);
-        accounts[0] = alice;
-        accounts[1] = bob;
+        address[] memory batchAccounts = new address[](2);
+        batchAccounts[0] = alice;
+        batchAccounts[1] = bob;
 
         bool[] memory isEarning = new bool[](2);
         isEarning[0] = true;
@@ -91,7 +67,7 @@ contract EarnerConfigurationTest is Test {
         recipients[1] = alice;
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(accounts, isEarning, feeRates, recipients);
+        pyusdx.setEarningDetails(batchAccounts, isEarning, feeRates, recipients);
 
         assertTrue(pyusdx.isEarning(alice));
         assertTrue(pyusdx.isEarning(bob));
@@ -120,9 +96,9 @@ contract EarnerConfigurationTest is Test {
         pyusdx.setEarningDetails(alice, false, 0, address(0));
 
         // Verify no EarningDetailsSet event was emitted
-        Vm.Log[] memory logs = vm.getRecordedLogs();
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
-            assertNotEq(logs[i].topics[0], keccak256("EarningDetailsSet(address,bool,address,uint16,address)"));
+            assertNotEq(logs[i].topics[0], IPYUSDX.EarningDetailsSet.selector);
         }
 
         // State should remain unchanged
@@ -146,9 +122,9 @@ contract EarnerConfigurationTest is Test {
         pyusdx.setEarningDetails(alice, true, 500, bob);
 
         // Verify no EarningDetailsSet event was emitted
-        Vm.Log[] memory logs = vm.getRecordedLogs();
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
-            assertNotEq(logs[i].topics[0], keccak256("EarningDetailsSet(address,bool,address,uint16,address)"));
+            assertNotEq(logs[i].topics[0], IPYUSDX.EarningDetailsSet.selector);
         }
 
         // State should remain unchanged
@@ -164,21 +140,11 @@ contract EarnerConfigurationTest is Test {
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 500, bob);
 
-        // Change fee rate - should NOT be a no-op
-        vm.recordLogs();
+        // Change fee rate - should emit event
+        vm.expectEmit();
+        emit IPYUSDX.EarningDetailsSet(alice, true, earnerManager, 1000, bob);
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 1000, bob);
-
-        // Verify EarningDetailsSet event WAS emitted
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bool eventFound = false;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == keccak256("EarningDetailsSet(address,bool,address,uint16,address)")) {
-                eventFound = true;
-                break;
-            }
-        }
-        assertTrue(eventFound, "EarningDetailsSet event should be emitted when fee rate changes");
 
         // Verify state updated
         (, , uint16 feeRate, ) = pyusdx.getEarningDetails(alice);
@@ -192,21 +158,11 @@ contract EarnerConfigurationTest is Test {
 
         address charlie = makeAddr("charlie");
 
-        // Change claim recipient - should NOT be a no-op
-        vm.recordLogs();
+        // Change claim recipient - should emit event
+        vm.expectEmit();
+        emit IPYUSDX.EarningDetailsSet(alice, true, earnerManager, 500, charlie);
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 500, charlie);
-
-        // Verify EarningDetailsSet event WAS emitted
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bool eventFound = false;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == keccak256("EarningDetailsSet(address,bool,address,uint16,address)")) {
-                eventFound = true;
-                break;
-            }
-        }
-        assertTrue(eventFound, "EarningDetailsSet event should be emitted when claim recipient changes");
 
         // Verify state updated
         (, , , address recipient) = pyusdx.getEarningDetails(alice);

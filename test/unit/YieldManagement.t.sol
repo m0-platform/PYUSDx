@@ -1,61 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { Test } from "forge-std/Test.sol";
-
-import { ERC1967Proxy } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { PausableUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 
 import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
 import { IndexingMath } from "../../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
 
-import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
-import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
+import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
-contract YieldManagementTest is Test {
+contract YieldManagementTest is PYUSDXBaseUnitTest {
     event Transfer(address indexed from, address indexed to, uint256 value);
-
-    PYUSDX public pyusdx;
-
-    address public admin = makeAddr("admin");
-    address public pauser = makeAddr("pauser");
-    address public freezeManager = makeAddr("freezeManager");
-    address public forcedTransferManager = makeAddr("forcedTransferManager");
-    address public earnerManager = makeAddr("earnerManager");
-    address public rateManager = makeAddr("rateManager");
-    MinterGatewayMock public minterGateway;
-    address public pyusd = makeAddr("pyusd");
-
-    address public alice = makeAddr("alice");
-    address public bob = makeAddr("bob");
-
-    uint256 public constant PRECISION = 1e12;
-
-    function setUp() public {
-        // Deploy minter gateway mock first with dummy address
-        minterGateway = new MinterGatewayMock(address(0));
-
-        PYUSDX implementation = new PYUSDX(address(minterGateway), pyusd);
-
-        bytes memory initData = abi.encodeWithSelector(
-            PYUSDX.initialize.selector,
-            "PYUSDX",
-            "PYUSDX",
-            admin,
-            pauser,
-            freezeManager,
-            forcedTransferManager,
-            earnerManager,
-            rateManager
-        );
-
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
-        pyusdx = PYUSDX(address(proxy));
-
-        // Update minter gateway with actual pyusdx address
-        minterGateway.setPyusdx(address(pyusdx));
-    }
 
     /* ============ accruedYieldOf ============ */
 
@@ -138,10 +93,10 @@ contract YieldManagementTest is Test {
         uint256 totalSupplyBefore = pyusdx.totalSupply();
         uint256 balanceBefore = pyusdx.balanceOf(alice);
 
-        vm.expectEmit(true, true, false, true);
+        vm.expectEmit();
         emit IPYUSDX.Claimed(alice, alice, expectedYield);
 
-        vm.expectEmit(true, true, false, true);
+        vm.expectEmit();
         emit Transfer(address(0), alice, expectedYield);
 
         uint240 claimed = pyusdx.claimFor(alice);
