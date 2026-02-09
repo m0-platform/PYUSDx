@@ -36,8 +36,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         minterGateway.mint(alice, 0);
     }
 
-    function test_mint_revertIfZeroAccount() public {
-        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
+    function test_mint_revertIfZeroRecipient() public {
+        vm.expectRevert(IPYUSDX.ZeroRecipient.selector);
 
         minterGateway.mint(address(0), MINT_AMOUNT);
     }

@@ -71,11 +71,11 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         minterGateway.mint(alice, amount);
     }
 
-    function testFuzz_Mint_revertIfZeroAccount(address recipient) public {
+    function testFuzz_Mint_revertIfZeroRecipient(address recipient) public {
         // Only test with zero address
         if (recipient != address(0)) return;
 
-        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
+        vm.expectRevert(IPYUSDX.ZeroRecipient.selector);
         minterGateway.mint(recipient, MINT_AMOUNT);
     }
 
