@@ -205,30 +205,30 @@ contract PYUSDX is
     function setEarningDetails(
         address account,
         bool isEarning_,
-        uint16 feeRate_,
-        address claimRecipient_
+        uint16 feeRate,
+        address claimRecipient
     ) external onlyEarnerManager(account) {
-        _setEarningDetails(account, isEarning_, feeRate_, claimRecipient_, currentIndex());
+        _setEarningDetails(account, isEarning_, feeRate, claimRecipient, currentIndex());
     }
 
     /// @inheritdoc IPYUSDX
     function setEarningDetails(
         address[] calldata accounts,
         bool[] calldata isEarning_,
-        uint16[] calldata feeRates_,
-        address[] calldata claimRecipients_
+        uint16[] calldata feeRates,
+        address[] calldata claimRecipients
     ) external {
         uint256 len = accounts.length;
         if (len == 0) revert ArrayLengthZero();
-        if (len != isEarning_.length || len != feeRates_.length || len != claimRecipients_.length) {
+        if (len != isEarning_.length || len != feeRates.length || len != claimRecipients.length) {
             revert ArrayLengthMismatch();
         }
 
         uint128 currentIndex_ = currentIndex();
 
         for (uint256 i; i < len; ++i) {
-            _checkEarnerManagerRestrictive(accounts[i]);
-            _setEarningDetails(accounts[i], isEarning_[i], feeRates_[i], claimRecipients_[i], currentIndex_);
+            _checkEarnerManager(accounts[i]);
+            _setEarningDetails(accounts[i], isEarning_[i], feeRates[i], claimRecipients[i], currentIndex_);
         }
     }
 
@@ -294,7 +294,7 @@ contract PYUSDX is
     /// @notice Returns earning details for a single account.
     function getEarningDetails(
         address account
-    ) external view returns (bool isEarning_, address earnerManager_, uint16 feeRate_, address claimRecipient_) {
+    ) external view returns (bool isEarning_, address earnerManager, uint16 feeRate, address claimRecipient) {
         Account memory accountData = _getPYUSDXStorageLocation().accounts[account];
         return (accountData.isEarning, accountData.earnerManager, accountData.feeRate, accountData.claimRecipient);
     }
@@ -307,23 +307,23 @@ contract PYUSDX is
         view
         returns (
             bool[] memory isEarning_,
-            address[] memory earnerManagers_,
-            uint16[] memory feeRates_,
-            address[] memory claimRecipients_
+            address[] memory earnerManagers,
+            uint16[] memory feeRates,
+            address[] memory claimRecipients
         )
     {
         uint256 len = accounts.length;
         isEarning_ = new bool[](len);
-        earnerManagers_ = new address[](len);
-        feeRates_ = new uint16[](len);
-        claimRecipients_ = new address[](len);
+        earnerManagers = new address[](len);
+        feeRates = new uint16[](len);
+        claimRecipients = new address[](len);
 
         for (uint256 i = 0; i < len; i++) {
             Account memory accountData = _getPYUSDXStorageLocation().accounts[accounts[i]];
             isEarning_[i] = accountData.isEarning;
-            earnerManagers_[i] = accountData.earnerManager;
-            feeRates_[i] = accountData.feeRate;
-            claimRecipients_[i] = accountData.claimRecipient;
+            earnerManagers[i] = accountData.earnerManager;
+            feeRates[i] = accountData.feeRate;
+            claimRecipients[i] = accountData.claimRecipient;
         }
     }
 
@@ -363,13 +363,13 @@ contract PYUSDX is
     function _setEarningDetails(
         address account,
         bool isEarning_,
-        uint16 feeRate_,
-        address claimRecipient_,
+        uint16 feeRate,
+        address claimRecipient,
         uint128 currentIndex_
     ) internal {
         if (account == address(0)) revert ZeroAccount();
-        if (feeRate_ > MAX_FEE_RATE) revert FeeRateTooHigh(feeRate_);
-        if (!isEarning_ && feeRate_ != 0) revert InvalidDetails();
+        if (feeRate > MAX_FEE_RATE) revert FeeRateTooHigh(feeRate);
+        if (!isEarning_ && feeRate != 0) revert InvalidDetails();
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
         Account storage accountData = $.accounts[account];
@@ -379,11 +379,10 @@ contract PYUSDX is
         if (!wasEarning && !isEarning_) return;
 
         // same earning state with same settings
-        if (
-            wasEarning && isEarning_ && accountData.feeRate == feeRate_ && accountData.claimRecipient == claimRecipient_
-        ) return;
+        if (wasEarning && isEarning_ && accountData.feeRate == feeRate && accountData.claimRecipient == claimRecipient)
+            return;
 
-        emit EarningDetailsSet(account, isEarning_, msg.sender, feeRate_, claimRecipient_);
+        emit EarningDetailsSet(account, isEarning_, msg.sender, feeRate, claimRecipient);
 
         // Claim any accrued yield first
         if (wasEarning) {
@@ -392,7 +391,7 @@ contract PYUSDX is
 
         uint240 balance = accountData.balance;
 
-        // Enable earning (non-earner → earner)
+        // Enable earning (non-earner to earner)
         if (isEarning_ && !wasEarning) {
             accountData.earnerManager = msg.sender;
             accountData.isEarning = true;
@@ -402,7 +401,13 @@ contract PYUSDX is
 
             $.totalEarningPrincipal += principal;
             $.totalNonEarningSupply -= balance;
+        } else if (isEarning_ && wasEarning) {
+            // Update manager if caller is different (takeover scenario)
+            if (accountData.earnerManager != msg.sender) {
+                accountData.earnerManager = msg.sender;
+            }
         }
+
         // Disable earning (earner → non-earner)
         else if (!isEarning_ && wasEarning) {
             uint112 principal = accountData.earningPrincipal;
@@ -415,8 +420,8 @@ contract PYUSDX is
             $.totalNonEarningSupply += balance;
         }
 
-        accountData.feeRate = feeRate_;
-        accountData.claimRecipient = claimRecipient_;
+        accountData.feeRate = feeRate;
+        accountData.claimRecipient = claimRecipient;
     }
 
     /// @dev Internal claim implementation.
@@ -484,27 +489,23 @@ contract PYUSDX is
         revert("TODO: _forceTransfer");
     }
 
-    // TODO: resolve difference in _checkEarnerManager permissiveness
-
-    /// @dev Reverts if the caller is not the Earner Manager for the account.
-    /// @dev If no earner manager is assigned (address(0)), the check passes.
+    /// @dev Reverts if the caller is not authorized to manage earning details for the account.
     function _checkEarnerManager(address account) internal view {
-        address earnerManager = _getPYUSDXStorageLocation().accounts[account].earnerManager;
-        if (earnerManager != address(0) && msg.sender != earnerManager) revert NotEarnerManager(account);
-    }
+        if (!hasRole(EARNER_MANAGER_ROLE, msg.sender)) revert NotEarnerManager();
 
-    /// @dev Reverts if the caller is not the Earner Manager for the account.
-    /// @dev If no earner manager is assigned (address(0)), the caller must have EARNER_MANAGER_ROLE.
-    /// @dev If an earner manager is assigned, only that manager can modify the account.
-    function _checkEarnerManagerRestrictive(address account) internal view {
         address storedManager = _getPYUSDXStorageLocation().accounts[account].earnerManager;
 
-        if (storedManager == address(0)) {
-            if (!hasRole(EARNER_MANAGER_ROLE, msg.sender)) revert NotEarnerManager(account);
-        } else if (msg.sender != storedManager) {
-            // Account already managed by a different earner manager
-            revert EarnerDetailsAlreadySet(account);
-        }
+        // No manager assigned: allow management takeover
+        if (storedManager == address(0)) return;
+
+        // Caller is this account's current manager
+        if (msg.sender == storedManager) return;
+
+        // Current manager lost their role: allow management takeover
+        if (!hasRole(EARNER_MANAGER_ROLE, storedManager)) return;
+
+        // Account is already managed by another active manager: revert
+        revert EarnerDetailsAlreadySet(account);
     }
 
     /// @dev Reverts if amount is zero.

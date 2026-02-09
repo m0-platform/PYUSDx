@@ -224,6 +224,7 @@ contract EarnerConfigurationTest is Test {
         vm.prank(admin);
         pyusdx.grantRole(earnerManagerRole, otherEarnerManager);
 
+        // EarnerDetailsAlreadySet is thrown because alice is managed by a different active earner manager
         vm.expectRevert(abi.encodeWithSelector(IPYUSDX.EarnerDetailsAlreadySet.selector, alice));
         vm.prank(otherEarnerManager);
         pyusdx.setEarningDetails(alice, true, 1000, bob);
@@ -239,6 +240,45 @@ contract EarnerConfigurationTest is Test {
         pyusdx.setEarningDetails(alice, true, 1000, bob);
 
         (, , uint16 feeRate, ) = pyusdx.getEarningDetails(alice);
+        assertEq(feeRate, 1000);
+    }
+
+    function test_setEarningDetails_revert_notEarnerManager() public {
+        // Random caller without EARNER_MANAGER_ROLE
+        address randomCaller = makeAddr("randomCaller");
+
+        vm.expectRevert(IPYUSDX.NotEarnerManager.selector);
+        vm.prank(randomCaller);
+        pyusdx.setEarningDetails(alice, true, 500, bob);
+    }
+
+    function test_setEarningDetails_takeover_whenStoredManagerLostRole() public {
+        // First earner manager sets earning details for alice
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 500, bob);
+
+        // Verify earnerManager is stored as alice's manager
+        (, address storedManager, , ) = pyusdx.getEarningDetails(alice);
+        assertEq(storedManager, earnerManager);
+
+        // Create a new earner manager
+        address newEarnerManager = makeAddr("newEarnerManager");
+        bytes32 earnerManagerRole = pyusdx.EARNER_MANAGER_ROLE();
+        vm.prank(admin);
+        pyusdx.grantRole(earnerManagerRole, newEarnerManager);
+
+        // Revoke role from original earner manager
+        vm.prank(admin);
+        pyusdx.revokeRole(earnerManagerRole, earnerManager);
+
+        // New earner manager can now take over alice's account (stored manager lost role)
+        vm.prank(newEarnerManager);
+        pyusdx.setEarningDetails(alice, true, 1000, bob);
+
+        // Verify new manager is now stored
+        uint16 feeRate;
+        (, storedManager, feeRate, ) = pyusdx.getEarningDetails(alice);
+        assertEq(storedManager, newEarnerManager);
         assertEq(feeRate, 1000);
     }
 }
