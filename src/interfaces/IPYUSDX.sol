@@ -53,6 +53,12 @@ interface IPYUSDX is IContinuousIndexing {
      */
     event Claimed(address indexed account, address indexed claimRecipient, uint240 yield);
 
+    /**
+     * @notice Emitted when earning is stopped for an account.
+     * @param account The account that stopped earning.
+     */
+    event StoppedEarning(address indexed account);
+
     /* ============ Custom Errors ============ */
 
     /// @notice Thrown when the minter gateway address is zero.

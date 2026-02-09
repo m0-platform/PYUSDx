@@ -230,6 +230,23 @@ contract PYUSDX is
         }
     }
 
+    /// @dev   Overrides Freezable.freeze to stop earning before freezing.
+    /// @param account The account to freeze.
+    function freeze(address account) external override onlyRole(FREEZE_MANAGER_ROLE) {
+        _stopEarningFor(account);
+        _freeze(_getFreezableStorageLocation(), account);
+    }
+
+    /// @dev   Overrides Freezable.freezeAccounts to stop earning before freezing.
+    /// @param accounts The accounts to freeze.
+    function freezeAccounts(address[] calldata accounts) external override onlyRole(FREEZE_MANAGER_ROLE) {
+        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
+        for (uint256 i; i < accounts.length; ++i) {
+            _stopEarningFor(accounts[i]);
+            _freeze($, accounts[i]);
+        }
+    }
+
     /* ============ View Functions ============ */
 
     /// @notice Returns the balance of an account.
@@ -467,9 +484,58 @@ contract PYUSDX is
         return yield;
     }
 
-    /// @dev Internal force transfer implementation.
+    /// @dev   Stops earning for an account, claiming any accrued yield first.
+    /// @param account The account to stop earning for.
+    function _stopEarningFor(address account) internal {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        if (!accountData.isEarning) return;
+
+        // Claim any accrued yield first
+        _claim(account);
+
+        uint240 balance = accountData.balance;
+        uint112 principal = accountData.earningPrincipal;
+
+        accountData.isEarning = false;
+        accountData.earningPrincipal = 0;
+        accountData.earnerManager = address(0);
+        accountData.feeRate = 0;
+        accountData.claimRecipient = address(0);
+
+        $.totalEarningPrincipal -= principal;
+        $.totalNonEarningSupply += balance;
+
+        emit StoppedEarning(account);
+    }
+
+    /// @dev   Internal force transfer implementation to seize funds from frozen accounts.
+    /// @param frozenAccount The frozen account to transfer from.
+    /// @param recipient     The account to transfer to.
+    /// @param amount        The amount to transfer.
     function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
-        revert("TODO: _forceTransfer");
+        _revertIfZeroAccount(recipient);
+        _revertIfNotFrozen(frozenAccount);
+
+        emit Transfer(frozenAccount, recipient, amount);
+        emit ForcedTransfer(frozenAccount, recipient, msg.sender, amount);
+
+        if (amount == 0) return;
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        uint240 safeAmount = UIntMath.safe240(amount);
+
+        // Subtract from frozen (non-earning) account
+        _subtractNonEarningAmount($, frozenAccount, safeAmount);
+
+        // Add to recipient (can be earning or non-earning)
+        if ($.accounts[recipient].isEarning) {
+            _addEarningAmount($, recipient, safeAmount);
+            updateIndex();
+        } else {
+            _addNonEarningAmount($, recipient, safeAmount);
+        }
     }
 
     /// @dev Reverts if the caller is not authorized to manage earning details for the account.
