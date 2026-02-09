@@ -196,7 +196,7 @@ contract PYUSDX is
 
     /// @inheritdoc IPYUSDX
     function claimFor(address account) external returns (uint240 yield) {
-        return _claim(account, currentIndex());
+        return _claim(account);
     }
 
     /// @inheritdoc IPYUSDX
@@ -381,7 +381,7 @@ contract PYUSDX is
 
         // Claim any accrued yield first
         if (wasEarning) {
-            _claim(account, currentIndex_);
+            _claim(account);
         }
 
         uint240 balance = accountData.balance;
@@ -420,24 +420,15 @@ contract PYUSDX is
     }
 
     /// @dev Internal claim implementation.
-    function _claim(address account, uint128 currentIndex_) internal returns (uint240 yield) {
+    function _claim(address account) internal returns (uint240 yield) {
         _requireNotPaused();
         _revertIfFrozen(account);
 
+        yield = accruedYieldOf(account);
+        if (yield == 0) return 0;
+
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
         Account storage accountData = $.accounts[account];
-
-        if (!accountData.isEarning) return 0;
-
-        // Calculate accrued yield
-        uint240 balance = accountData.balance;
-        uint240 balanceWithYield = _getPresentAmountRoundedDown(accountData.earningPrincipal, currentIndex_);
-
-        unchecked {
-            yield = balanceWithYield > balance ? balanceWithYield - balance : 0;
-        }
-
-        if (yield == 0) return 0;
 
         // Calculate fee
         uint16 feeRate = accountData.feeRate;
