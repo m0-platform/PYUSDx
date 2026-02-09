@@ -451,7 +451,7 @@ contract PYUSDX is
 
         // Add full yield to balance (yield is minted)
         unchecked {
-            accountData.balance = balance + yield;
+            accountData.balance += yield;
         }
 
         address claimRecipient = accountData.claimRecipient;
