@@ -91,9 +91,6 @@ interface IPYUSDX is IContinuousIndexing {
     /// @notice Thrown when an amount is zero.
     error ZeroAmount();
 
-    /// @notice Thrown when a recipient address is zero.
-    error ZeroRecipient();
-
     /// @notice Thrown when mint would overflow principal calculations.
     error OverflowsPrincipalOfTotalSupply();
 

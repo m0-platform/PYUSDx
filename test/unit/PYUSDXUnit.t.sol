@@ -40,8 +40,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         minterGateway.mint(alice, 0);
     }
 
-    function test_mint_revertIfZeroRecipient() public {
-        vm.expectRevert(IPYUSDX.ZeroRecipient.selector);
+    function test_mint_revertIfZeroAccount() public {
+        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
 
         minterGateway.mint(address(0), MINT_AMOUNT);
     }
@@ -549,7 +549,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_transfer_toZeroAddress() public {
         minterGateway.mint(alice, MINT_AMOUNT);
 
-        vm.expectRevert(IPYUSDX.ZeroRecipient.selector);
+        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
 
         vm.prank(alice);
         pyusdx.transfer(address(0), TRANSFER_AMOUNT);

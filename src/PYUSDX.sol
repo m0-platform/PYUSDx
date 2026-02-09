@@ -148,7 +148,7 @@ contract PYUSDX is
     /// @inheritdoc IPYUSDX
     function mint(address account, uint256 amount) external onlyMinterGateway whenNotPaused {
         _revertIfZeroAmount(amount);
-        _revertIfZeroRecipient(account);
+        _revertIfZeroAccount(account);
         _revertIfFrozen(account);
 
         uint240 safeAmount = UIntMath.safe240(amount);
@@ -367,7 +367,7 @@ contract PYUSDX is
         address claimRecipient,
         uint128 currentIndex_
     ) internal {
-        if (account == address(0)) revert ZeroAccount();
+        _revertIfZeroAccount(account);
         if (feeRate > MAX_FEE_RATE) revert FeeRateTooHigh(feeRate);
         if (!isEarning_ && feeRate != 0) revert InvalidDetails();
 
@@ -513,9 +513,9 @@ contract PYUSDX is
         if (amount == 0) revert ZeroAmount();
     }
 
-    /// @dev Reverts if recipient is zero address.
-    function _revertIfZeroRecipient(address recipient) internal pure {
-        if (recipient == address(0)) revert ZeroRecipient();
+    /// @dev Reverts if account is zero address.
+    function _revertIfZeroAccount(address account) internal pure {
+        if (account == address(0)) revert ZeroAccount();
     }
 
     /// @dev Adds non-earning amount to an account's balance and total supply.
@@ -595,7 +595,7 @@ contract PYUSDX is
         _revertIfFrozen(sender);
         _revertIfFrozen(recipient);
 
-        _revertIfZeroRecipient(recipient);
+        _revertIfZeroAccount(recipient);
 
         emit Transfer(sender, recipient, amount);
 
