@@ -53,6 +53,12 @@ interface IPYUSDX is IContinuousIndexing {
      */
     event Claimed(address indexed account, address indexed claimRecipient, uint240 yield);
 
+    /**
+     * @notice Emitted when earning is stopped for an account.
+     * @param account The account that stopped earning.
+     */
+    event StoppedEarning(address indexed account);
+
     /* ============ Custom Errors ============ */
 
     /// @notice Thrown when the minter gateway address is zero.
@@ -70,8 +76,8 @@ interface IPYUSDX is IContinuousIndexing {
     /// @notice Thrown when an account address is zero.
     error ZeroAccount();
 
-    /// @notice Thrown when the caller is not an earner manager for the account.
-    error NotEarnerManager(address account);
+    /// @notice Thrown when the caller does not have the EARNER_MANAGER_ROLE.
+    error NotEarnerManager();
 
     /// @notice Thrown when the caller is not the Minter Gateway.
     error NotMinterGateway();
@@ -90,9 +96,6 @@ interface IPYUSDX is IContinuousIndexing {
 
     /// @notice Thrown when an amount is zero.
     error ZeroAmount();
-
-    /// @notice Thrown when a recipient address is zero.
-    error ZeroRecipient();
 
     /// @notice Thrown when mint would overflow principal calculations.
     error OverflowsPrincipalOfTotalSupply();
