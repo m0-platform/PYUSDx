@@ -28,7 +28,7 @@ contract EarnerConfigurationTest is Test {
             address(1), // freezeManager
             address(1), // forcedTransferManager
             earnerManager,
-            address(1)  // rateManager
+            address(1) // rateManager
         );
         pyusdx = PYUSDX(address(new ERC1967Proxy(address(impl), initData)));
     }
@@ -51,7 +51,7 @@ contract EarnerConfigurationTest is Test {
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, false, 0, address(0));
 
-        (bool isEarning,,,) = pyusdx.getEarningDetails(alice);
+        (bool isEarning, , , ) = pyusdx.getEarningDetails(alice);
         assertFalse(isEarning);
     }
 
@@ -111,7 +111,7 @@ contract EarnerConfigurationTest is Test {
 
     function test_setEarningDetails_noop_alreadyDisabled() public {
         // Alice is not earning (default state)
-        (bool isEarning,,,) = pyusdx.getEarningDetails(alice);
+        (bool isEarning, , , ) = pyusdx.getEarningDetails(alice);
         assertFalse(isEarning);
 
         // Calling setEarningDetails with isEarning=false should be a no-op (no event)
@@ -126,7 +126,7 @@ contract EarnerConfigurationTest is Test {
         }
 
         // State should remain unchanged
-        (isEarning,,,) = pyusdx.getEarningDetails(alice);
+        (isEarning, , , ) = pyusdx.getEarningDetails(alice);
         assertFalse(isEarning);
     }
 
@@ -181,7 +181,7 @@ contract EarnerConfigurationTest is Test {
         assertTrue(eventFound, "EarningDetailsSet event should be emitted when fee rate changes");
 
         // Verify state updated
-        (,, uint16 feeRate,) = pyusdx.getEarningDetails(alice);
+        (, , uint16 feeRate, ) = pyusdx.getEarningDetails(alice);
         assertEq(feeRate, 1000);
     }
 
@@ -209,7 +209,7 @@ contract EarnerConfigurationTest is Test {
         assertTrue(eventFound, "EarningDetailsSet event should be emitted when claim recipient changes");
 
         // Verify state updated
-        (,,, address recipient) = pyusdx.getEarningDetails(alice);
+        (, , , address recipient) = pyusdx.getEarningDetails(alice);
         assertEq(recipient, charlie);
     }
 
@@ -238,7 +238,7 @@ contract EarnerConfigurationTest is Test {
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 1000, bob);
 
-        (,, uint16 feeRate,) = pyusdx.getEarningDetails(alice);
+        (, , uint16 feeRate, ) = pyusdx.getEarningDetails(alice);
         assertEq(feeRate, 1000);
     }
 }

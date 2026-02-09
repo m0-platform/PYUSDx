@@ -227,157 +227,11 @@ contract PYUSDX is
         uint128 currentIndex_ = currentIndex();
 
         for (uint256 i; i < len; ++i) {
-            _checkEarnerManager(accounts[i]);
+            _checkEarnerManagerRestrictive(accounts[i]);
             _setEarningDetails(accounts[i], isEarning_[i], feeRates_[i], claimRecipients_[i], currentIndex_);
         }
     }
 
-<<<<<<< HEAD
-=======
-    /* ============ Internal Functions ============ */
-
-    /// @dev Reverts if the caller is not the Earner Manager for the account.
-    /// @dev If no earner manager is assigned (address(0)), the caller must have EARNER_MANAGER_ROLE.
-    /// @dev If an earner manager is assigned, only that manager can modify the account.
-    function _checkEarnerManager(address account) internal view {
-        address storedManager = _getPYUSDXStorageLocation().accounts[account].earnerManager;
-
-        if (storedManager == address(0)) {
-            if (!hasRole(EARNER_MANAGER_ROLE, msg.sender)) revert NotEarnerManager(account);
-        } else if (msg.sender != storedManager) {
-            // Account already managed by a different earner manager
-            revert EarnerDetailsAlreadySet(account);
-        }
-    }
-
-    /// @dev Internal implementation for setting earning details.
-    function _setEarningDetails(
-        address account,
-        bool isEarning_,
-        uint16 feeRate_,
-        address claimRecipient_,
-        uint128 currentIndex_
-    ) internal {
-        if (account == address(0)) revert ZeroAccount();
-        if (feeRate_ > MAX_FEE_RATE) revert FeeRateTooHigh(feeRate_);
-        if (!isEarning_ && feeRate_ != 0) revert InvalidDetails();
-
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        Account storage accountData = $.accounts[account];
-
-        bool wasEarning = accountData.isEarning;
-
-        if (!wasEarning && !isEarning_) return;
-
-        // same earning state with same settings
-        if (wasEarning && isEarning_
-            && accountData.feeRate == feeRate_
-            && accountData.claimRecipient == claimRecipient_) return;
-
-        emit EarningDetailsSet(account, isEarning_, msg.sender, feeRate_, claimRecipient_);
-
-        // Claim any accrued yield first
-        if (wasEarning) {
-            _claim(account, currentIndex_);
-        }
-
-        uint240 balance = accountData.balance;
-
-        // Enable earning (non-earner → earner)
-        if (isEarning_ && !wasEarning) {
-            accountData.earnerManager = msg.sender;
-            accountData.isEarning = true;
-
-            uint112 principal = IndexingMath.getPrincipalAmountRoundedDown(balance, currentIndex_);
-            accountData.earningPrincipal = principal;
-
-            $.totalEarningPrincipal += principal;
-            $.totalEarningSupply += balance;
-            $.totalNonEarningSupply -= balance;
-        }
-        // Disable earning (earner → non-earner)
-        else if (!isEarning_ && wasEarning) {
-            uint112 principal = accountData.earningPrincipal;
-
-            accountData.isEarning = false;
-            accountData.earningPrincipal = 0;
-            accountData.earnerManager = address(0);
-
-            $.totalEarningPrincipal -= principal;
-            $.totalEarningSupply -= balance;
-            $.totalNonEarningSupply += balance;
-        }
-
-        accountData.feeRate = feeRate_;
-        accountData.claimRecipient = claimRecipient_;
-    }
-
-    /// @dev Internal claim implementation.
-    function _claim(address account, uint128 currentIndex_) internal returns (uint240 yield) {
-        _requireNotPaused();
-        _revertIfFrozen(account);
-
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        Account storage accountData = $.accounts[account];
-
-        if (!accountData.isEarning) return 0;
-
-        // Calculate accrued yield
-        uint240 balance = accountData.balance;
-        uint240 balanceWithYield = IndexingMath.getPresentAmountRoundedDown(accountData.earningPrincipal, currentIndex_);
-
-        unchecked {
-            yield = balanceWithYield > balance ? balanceWithYield - balance : 0;
-        }
-
-        if (yield == 0) return 0;
-
-        // Calculate fee
-        uint16 feeRate = accountData.feeRate;
-        uint240 fee;
-        if (feeRate > 0) {
-            unchecked {
-                fee = uint240((uint256(yield) * feeRate) / MAX_FEE_RATE);
-            }
-        }
-        uint240 netYield = yield - fee;
-
-        // Add full yield to balance (yield is minted)
-        unchecked {
-            accountData.balance = balance + yield;
-            $.balanceOf[account] += yield;
-            $.totalEarningSupply += yield;
-            $.totalSupply += yield;
-        }
-
-        address claimRecipient = accountData.claimRecipient;
-        if (claimRecipient == address(0)) {
-            claimRecipient = account;
-        }
-
-        emit Claimed(account, claimRecipient, yield);
-        emit Transfer(address(0), account, yield);
-
-        // Transfer fee to earner manager (if any)
-        if (fee > 0) {
-            address earnerManager = accountData.earnerManager;
-            _transfer(account, earnerManager, fee);
-        }
-
-        // Transfer net yield to claim recipient (if different from account)
-        if (claimRecipient != account && netYield > 0) {
-            _transfer(account, claimRecipient, netYield);
-        }
-
-        return yield;
-    }
-
-    /// @dev Internal force transfer implementation.
-    function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
-        revert("TODO: _forceTransfer");
-    }
-
->>>>>>> 5168e43 (move claim functionality to helper, emit Transfer event)
     /* ============ View Functions ============ */
 
     /// @notice Returns the balance of an account.
@@ -505,6 +359,133 @@ contract PYUSDX is
 
     /* ============ Internal Functions ============ */
 
+    /// @dev Internal implementation for setting earning details.
+    function _setEarningDetails(
+        address account,
+        bool isEarning_,
+        uint16 feeRate_,
+        address claimRecipient_,
+        uint128 currentIndex_
+    ) internal {
+        if (account == address(0)) revert ZeroAccount();
+        if (feeRate_ > MAX_FEE_RATE) revert FeeRateTooHigh(feeRate_);
+        if (!isEarning_ && feeRate_ != 0) revert InvalidDetails();
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        bool wasEarning = accountData.isEarning;
+
+        if (!wasEarning && !isEarning_) return;
+
+        // same earning state with same settings
+        if (
+            wasEarning && isEarning_ && accountData.feeRate == feeRate_ && accountData.claimRecipient == claimRecipient_
+        ) return;
+
+        emit EarningDetailsSet(account, isEarning_, msg.sender, feeRate_, claimRecipient_);
+
+        // Claim any accrued yield first
+        if (wasEarning) {
+            _claim(account, currentIndex_);
+        }
+
+        uint240 balance = accountData.balance;
+
+        // Enable earning (non-earner → earner)
+        if (isEarning_ && !wasEarning) {
+            accountData.earnerManager = msg.sender;
+            accountData.isEarning = true;
+
+            uint112 principal = IndexingMath.getPrincipalAmountRoundedDown(balance, currentIndex_);
+            accountData.earningPrincipal = principal;
+
+            $.totalEarningPrincipal += principal;
+            $.totalNonEarningSupply -= balance;
+        }
+        // Disable earning (earner → non-earner)
+        else if (!isEarning_ && wasEarning) {
+            uint112 principal = accountData.earningPrincipal;
+
+            accountData.isEarning = false;
+            accountData.earningPrincipal = 0;
+            accountData.earnerManager = address(0);
+
+            $.totalEarningPrincipal -= principal;
+            $.totalNonEarningSupply += balance;
+        }
+
+        accountData.feeRate = feeRate_;
+        accountData.claimRecipient = claimRecipient_;
+    }
+
+    /// @dev Internal claim implementation.
+    function _claim(address account, uint128 currentIndex_) internal returns (uint240 yield) {
+        _requireNotPaused();
+        _revertIfFrozen(account);
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        if (!accountData.isEarning) return 0;
+
+        // Calculate accrued yield
+        uint240 balance = accountData.balance;
+        uint240 balanceWithYield = IndexingMath.getPresentAmountRoundedDown(
+            accountData.earningPrincipal,
+            currentIndex_
+        );
+
+        unchecked {
+            yield = balanceWithYield > balance ? balanceWithYield - balance : 0;
+        }
+
+        if (yield == 0) return 0;
+
+        // Calculate fee
+        uint16 feeRate = accountData.feeRate;
+        uint240 fee;
+        if (feeRate > 0) {
+            unchecked {
+                fee = uint240((uint256(yield) * feeRate) / MAX_FEE_RATE);
+            }
+        }
+        uint240 netYield = yield - fee;
+
+        // Add full yield to balance (yield is minted)
+        unchecked {
+            accountData.balance = balance + yield;
+        }
+
+        address claimRecipient = accountData.claimRecipient;
+        if (claimRecipient == address(0)) {
+            claimRecipient = account;
+        }
+
+        emit Claimed(account, claimRecipient, yield);
+        emit Transfer(address(0), account, yield);
+
+        // Transfer fee to earner manager (if any)
+        if (fee > 0) {
+            address earnerManager = accountData.earnerManager;
+            _transfer(account, earnerManager, fee);
+        }
+
+        // Transfer net yield to claim recipient (if different from account)
+        if (claimRecipient != account && netYield > 0) {
+            _transfer(account, claimRecipient, netYield);
+        }
+
+        return yield;
+    }
+
+    /// @dev Internal force transfer implementation.
+    function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
+        revert("TODO: _forceTransfer");
+    }
+
+    // TODO: resolve difference in _checkEarnerManager permissiveness
+
     /// @dev Reverts if the caller is not the Earner Manager for the account.
     /// @dev If no earner manager is assigned (address(0)), the check passes.
     function _checkEarnerManager(address account) internal view {
@@ -512,9 +493,18 @@ contract PYUSDX is
         if (earnerManager != address(0) && msg.sender != earnerManager) revert NotEarnerManager(account);
     }
 
-    /// @dev Internal force transfer implementation.
-    function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
-        revert("TODO: _forceTransfer");
+    /// @dev Reverts if the caller is not the Earner Manager for the account.
+    /// @dev If no earner manager is assigned (address(0)), the caller must have EARNER_MANAGER_ROLE.
+    /// @dev If an earner manager is assigned, only that manager can modify the account.
+    function _checkEarnerManagerRestrictive(address account) internal view {
+        address storedManager = _getPYUSDXStorageLocation().accounts[account].earnerManager;
+
+        if (storedManager == address(0)) {
+            if (!hasRole(EARNER_MANAGER_ROLE, msg.sender)) revert NotEarnerManager(account);
+        } else if (msg.sender != storedManager) {
+            // Account already managed by a different earner manager
+            revert EarnerDetailsAlreadySet(account);
+        }
     }
 
     /// @dev Reverts if amount is zero.
@@ -584,14 +574,14 @@ contract PYUSDX is
 
         uint112 principal = _getPrincipalAmountRoundedUp(amount);
         uint112 earningPrincipal = $.accounts[account].earningPrincipal;
-        uint112 totalEarningPrincipal = $.totalEarningPrincipal;
+        uint112 totalPrincipal = $.totalEarningPrincipal;
 
         unchecked {
             $.accounts[account].balance -= amount;
 
             // NOTE: `min112` prevents underflow.
             $.accounts[account].earningPrincipal = earningPrincipal - UIntMath.min112(principal, earningPrincipal);
-            $.totalEarningPrincipal = totalEarningPrincipal - UIntMath.min112(principal, totalEarningPrincipal);
+            $.totalEarningPrincipal = totalPrincipal - UIntMath.min112(principal, totalPrincipal);
         }
     }
 

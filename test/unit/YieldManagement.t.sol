@@ -11,6 +11,7 @@ import { IndexingMath } from "../../lib/m-extensions/lib/common/src/libs/Indexin
 
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 
 contract YieldManagementTest is Test {
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -23,7 +24,7 @@ contract YieldManagementTest is Test {
     address public forcedTransferManager = makeAddr("forcedTransferManager");
     address public earnerManager = makeAddr("earnerManager");
     address public rateManager = makeAddr("rateManager");
-    address public minterGateway = makeAddr("minterGateway");
+    MinterGatewayMock public minterGateway;
     address public pyusd = makeAddr("pyusd");
 
     address public alice = makeAddr("alice");
@@ -32,7 +33,10 @@ contract YieldManagementTest is Test {
     uint256 public constant PRECISION = 1e12;
 
     function setUp() public {
-        PYUSDX implementation = new PYUSDX(minterGateway, pyusd);
+        // Deploy minter gateway mock first with dummy address
+        minterGateway = new MinterGatewayMock(address(0));
+
+        PYUSDX implementation = new PYUSDX(address(minterGateway), pyusd);
 
         bytes memory initData = abi.encodeWithSelector(
             PYUSDX.initialize.selector,
@@ -48,6 +52,9 @@ contract YieldManagementTest is Test {
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
         pyusdx = PYUSDX(address(proxy));
+
+        // Update minter gateway with actual pyusdx address
+        minterGateway.setPyusdx(address(pyusdx));
     }
 
     /* ============ accruedYieldOf ============ */
@@ -62,11 +69,11 @@ contract YieldManagementTest is Test {
         vm.prank(rateManager);
         pyusdx.setRate(500);
 
+        // Mint tokens to alice first (as non-earner)
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
         // Set up alice as an earner
-        uint240 balance = 1000e6;
-        _setBalance(alice, balance);
-        _setTotalSupply(balance);
-        _setTotalNonEarningSupply(balance);
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 0, address(0));
 
@@ -77,7 +84,9 @@ contract YieldManagementTest is Test {
         uint128 index = pyusdx.currentIndex();
         uint112 principal = pyusdx.earningPrincipalOf(alice);
         uint240 expectedBalanceWithYield = IndexingMath.getPresentAmountRoundedDown(principal, index);
-        uint240 expectedYield = expectedBalanceWithYield > balance ? expectedBalanceWithYield - balance : 0;
+        uint240 expectedYield = expectedBalanceWithYield > uint240(balance)
+            ? expectedBalanceWithYield - uint240(balance)
+            : 0;
 
         // Verify yield calculation
         uint240 actualYield = pyusdx.accruedYieldOf(alice);
@@ -92,10 +101,10 @@ contract YieldManagementTest is Test {
         vm.prank(rateManager);
         pyusdx.setRate(500);
 
+        // Mint tokens to alice first (as non-earner)
+        minterGateway.mint(alice, 1000e6);
+
         // Set up alice as an earner
-        _setBalance(alice, 1000e6);
-        _setTotalSupply(1000e6);
-        _setTotalNonEarningSupply(1000e6);
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 0, address(0));
 
@@ -113,10 +122,11 @@ contract YieldManagementTest is Test {
         vm.prank(rateManager);
         pyusdx.setRate(500);
 
-        uint240 balance = 1000e6;
-        _setBalance(alice, balance);
-        _setTotalSupply(balance);
-        _setTotalNonEarningSupply(balance);
+        // Mint tokens to alice first (as non-earner)
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
+        // Set up alice as an earner
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 0, address(0));
 
@@ -137,15 +147,20 @@ contract YieldManagementTest is Test {
         uint240 claimed = pyusdx.claimFor(alice);
 
         assertEq(claimed, expectedYield, "Should return claimed yield");
-        assertEq(pyusdx.totalSupply(), totalSupplyBefore + expectedYield, "Total supply should increase by yield");
+        // Note: totalSupply doesn't change because yield was already included in totalEarningSupply (calculated from principal * index)
+        assertEq(
+            pyusdx.totalSupply(),
+            totalSupplyBefore,
+            "Total supply should remain unchanged (yield already in totalEarningSupply)"
+        );
         assertEq(pyusdx.balanceOf(alice), balanceBefore + expectedYield, "balanceOf should increase by yield");
         assertEq(pyusdx.accruedYieldOf(alice), 0, "Accrued yield should be 0 after claim");
     }
 
     function test_claimFor_revert_whenPaused() public {
-        _setBalance(alice, 1000e6);
-        _setTotalSupply(1000e6);
-        _setTotalNonEarningSupply(1000e6);
+        // Mint tokens to alice first (as non-earner)
+        minterGateway.mint(alice, 1000e6);
+
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 0, address(0));
 
@@ -157,9 +172,9 @@ contract YieldManagementTest is Test {
     }
 
     function test_claimFor_revert_whenFrozen() public {
-        _setBalance(alice, 1000e6);
-        _setTotalSupply(1000e6);
-        _setTotalNonEarningSupply(1000e6);
+        // Mint tokens to alice first (as non-earner)
+        minterGateway.mint(alice, 1000e6);
+
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 0, address(0));
 
@@ -168,35 +183,5 @@ contract YieldManagementTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
         pyusdx.claimFor(alice);
-    }
-
-    /* ============ Helper Functions ============ */
-
-    function _setBalance(address account, uint256 balance_) internal {
-        bytes32 storageLocation = 0xc1b8ab2f33ccbf01222f9cf35bd888d518c2bda5deec0a0df8b0cd454fcb8500;
-
-        // Set Account.balance (accounts mapping at slot +4, balance is at offset +1 within struct)
-        bytes32 accountsSlot = bytes32(uint256(storageLocation) + 4);
-        bytes32 accountSlot = keccak256(abi.encode(account, accountsSlot));
-        // Account struct slot +1 contains: balance (uint240) | isEarning (bool at bit 240)
-        // We only set balance, preserving isEarning=false for non-earners
-        vm.store(address(pyusdx), bytes32(uint256(accountSlot) + 1), bytes32(balance_));
-
-        // Set balanceOf mapping (slot +5) for ERC20 compatibility
-        bytes32 balanceOfSlot = bytes32(uint256(storageLocation) + 5);
-        bytes32 balanceOfAccountSlot = keccak256(abi.encode(account, balanceOfSlot));
-        vm.store(address(pyusdx), balanceOfAccountSlot, bytes32(balance_));
-    }
-
-    function _setTotalSupply(uint256 totalSupply_) internal {
-        bytes32 storageLocation = 0xc1b8ab2f33ccbf01222f9cf35bd888d518c2bda5deec0a0df8b0cd454fcb8500;
-        bytes32 totalSupplySlot = bytes32(uint256(storageLocation) + 3);
-        vm.store(address(pyusdx), totalSupplySlot, bytes32(totalSupply_));
-    }
-
-    function _setTotalNonEarningSupply(uint240 totalNonEarningSupply_) internal {
-        bytes32 storageLocation = 0xc1b8ab2f33ccbf01222f9cf35bd888d518c2bda5deec0a0df8b0cd454fcb8500;
-        bytes32 slot2 = bytes32(uint256(storageLocation) + 2);
-        vm.store(address(pyusdx), slot2, bytes32(uint256(totalNonEarningSupply_)));
     }
 }
