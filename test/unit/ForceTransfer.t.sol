@@ -188,8 +188,8 @@ contract ForceTransferTest is Test {
         pyusdx.forceTransfer(alice, bob, 100);
     }
 
-    function test_forceTransfer_revertsOnZeroRecipient() public {
-        vm.expectRevert(IPYUSDX.ZeroRecipient.selector);
+    function test_forceTransfer_revertsOnZeroAccount() public {
+        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
         vm.prank(forcedTransferManager);
         pyusdx.forceTransfer(alice, address(0), 0);
     }
@@ -269,8 +269,8 @@ contract ForceTransferTest is Test {
         pyusdx.forceTransferWithYieldRecipient(alice, bob, 0, charlie);
     }
 
-    function test_forceTransferWithYieldRecipient_revertsOnZeroRecipient() public {
-        vm.expectRevert(IPYUSDX.ZeroRecipient.selector);
+    function test_forceTransferWithYieldRecipient_revertsOnZeroAccount() public {
+        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
         vm.prank(forcedTransferManager);
         pyusdx.forceTransferWithYieldRecipient(alice, address(0), 0, charlie);
     }
