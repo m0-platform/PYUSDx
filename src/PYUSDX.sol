@@ -6,8 +6,6 @@ import { Freezable } from "../lib/m-extensions/src/components/freezable/Freezabl
 import { ForcedTransferable } from "../lib/m-extensions/src/components/forcedTransferable/ForcedTransferable.sol";
 import { Pausable } from "../lib/m-extensions/src/components/pausable/Pausable.sol";
 import { UIntMath } from "../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
-import { IndexingMath } from "../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
-
 import { ContinuousIndexing } from "./abstract/ContinuousIndexing.sol";
 import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
 
@@ -335,10 +333,7 @@ contract PYUSDX is
         if (!accountData.isEarning) return 0;
 
         // Calculate present value from principal
-        uint240 balanceWithYield = IndexingMath.getPresentAmountRoundedDown(
-            accountData.earningPrincipal,
-            currentIndex()
-        );
+        uint240 balanceWithYield = _getPresentAmountRoundedDown(accountData.earningPrincipal);
 
         // Yield = present value - stored balance
         uint240 balance = accountData.balance;
@@ -396,7 +391,7 @@ contract PYUSDX is
             accountData.earnerManager = msg.sender;
             accountData.isEarning = true;
 
-            uint112 principal = IndexingMath.getPrincipalAmountRoundedDown(balance, currentIndex_);
+            uint112 principal = _getPrincipalAmountRoundedDown(balance, currentIndex_);
             accountData.earningPrincipal = principal;
 
             $.totalEarningPrincipal += principal;
@@ -436,10 +431,7 @@ contract PYUSDX is
 
         // Calculate accrued yield
         uint240 balance = accountData.balance;
-        uint240 balanceWithYield = IndexingMath.getPresentAmountRoundedDown(
-            accountData.earningPrincipal,
-            currentIndex_
-        );
+        uint240 balanceWithYield = _getPresentAmountRoundedDown(accountData.earningPrincipal, currentIndex_);
 
         unchecked {
             yield = balanceWithYield > balance ? balanceWithYield - balance : 0;
