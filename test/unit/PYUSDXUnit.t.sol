@@ -1497,8 +1497,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.prank(alice);
         pyusdx.transfer(bob, 500);
 
-        uint112 bobPrincipal = pyusdx.earningPrincipalOf(bob);
-
         vm.prank(bob);
         pyusdx.transfer(carol, 500);
 
@@ -1861,11 +1859,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         uint240 claimed = pyusdx.claimFor(alice);
 
         assertEq(claimed, expectedYield, "Should return claimed yield");
-        assertEq(
-            pyusdx.totalSupply(),
-            totalSupplyBefore + expectedYield,
-            "Total supply should increase by yield"
-        );
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore + expectedYield, "Total supply should increase by yield");
         assertEq(pyusdx.balanceOf(alice), balanceBefore + expectedYield, "balanceOf should increase by yield");
         assertEq(pyusdx.accruedYieldOf(alice), 0, "Accrued yield should be 0 after claim");
     }
@@ -2148,7 +2142,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertGt(expectedYield, 0, "Should have yield to claim");
 
         uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
-        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
 
         // Expect both StoppedEarning and Frozen events
         vm.expectEmit();
@@ -2178,7 +2171,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Verify alice's balance increased from claimed yield (since no fee/redirect)
         uint256 aliceBalanceAfter = pyusdx.balanceOf(alice);
         assertEq(aliceBalanceAfter, aliceBalanceBefore + expectedYield);
-
     }
 
     function test_freeze_earningAccount_clearsAllEarningData() public {
@@ -2559,5 +2551,339 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore - TRANSFER_AMOUNT);
         assertEq(pyusdx.balanceOf(bob), bobBalanceBefore - TRANSFER_AMOUNT);
         assertEq(pyusdx.balanceOf(carol), carolBalanceBefore + 2 * TRANSFER_AMOUNT);
+    }
+
+    /* ============ setEarnerRate / setEarnerRateBatch ============ */
+
+    function test_setEarnerRate_happyPath() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        vm.expectEmit();
+        emit IPYUSDX.EarnerRateSet(alice, 0, 500);
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 500);
+    }
+
+    function test_setEarnerRate_revert_notRateManager() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        vm.expectRevert(IPYUSDX.NotRateManager.selector);
+        vm.prank(alice);
+        pyusdx.setEarnerRate(alice, 500);
+    }
+
+    function test_setEarnerRate_revert_notEarning() public {
+        vm.expectRevert(IPYUSDX.NotEarning.selector);
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 500);
+    }
+
+    function test_setEarnerRate_revert_rateTooHigh() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        vm.expectRevert(IPYUSDX.RateTooHigh.selector);
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 10001);
+    }
+
+    function test_setEarnerRate_noop_sameRate() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 500);
+
+        vm.recordLogs();
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 500);
+
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertNotEq(logs[i].topics[0], IPYUSDX.EarnerRateSet.selector);
+        }
+    }
+
+    function test_setEarnerRate_snapshotsIndex() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 500);
+
+        minterGateway.mint(alice, 1000e6);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint128 indexBeforeChange = pyusdx.currentAccountIndex(alice);
+        assertTrue(indexBeforeChange > PRECISION);
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 1000);
+
+        // Index immediately after should equal the snapshotted value
+        uint128 indexAfterChange = pyusdx.currentAccountIndex(alice);
+        assertEq(indexAfterChange, indexBeforeChange);
+
+        vm.warp(block.timestamp + 365 days);
+
+        // Index should grow at the new 10% rate
+        uint128 indexAfterSecondYear = pyusdx.currentAccountIndex(alice);
+        assertTrue(indexAfterSecondYear > indexBeforeChange);
+        // Must have grown by more than 5% (old rate), confirming new rate is active
+        assertTrue(
+            indexAfterSecondYear > indexBeforeChange + ((indexBeforeChange * 5) / 100),
+            "Should grow by more than 5% at 10% rate"
+        );
+    }
+
+    function test_setEarnerRateBatch_happyPath() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
+        address[] memory batchAccounts = new address[](2);
+        batchAccounts[0] = alice;
+        batchAccounts[1] = bob;
+
+        uint24[] memory rates = new uint24[](2);
+        rates[0] = 500;
+        rates[1] = 1000;
+
+        vm.expectEmit();
+        emit IPYUSDX.EarnerRateSet(alice, 0, 500);
+        vm.expectEmit();
+        emit IPYUSDX.EarnerRateSet(bob, 0, 1000);
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRateBatch(batchAccounts, rates);
+    }
+
+    function test_setEarnerRateBatch_revert_arrayLengthMismatch() public {
+        address[] memory batchAccounts = new address[](2);
+        batchAccounts[0] = alice;
+        batchAccounts[1] = bob;
+
+        uint24[] memory rates = new uint24[](1);
+        rates[0] = 500;
+
+        vm.expectRevert(IForcedTransferable.ArrayLengthMismatch.selector);
+        vm.prank(rateManager);
+        pyusdx.setEarnerRateBatch(batchAccounts, rates);
+    }
+
+    /* ============ claimFor (fee and recipient paths) ============ */
+
+    function test_claimFor_withFee() public {
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 1000, address(0));
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint240 expectedYield = pyusdx.accruedYieldOf(alice);
+        assertGt(expectedYield, 0);
+
+        uint240 expectedFee = uint240((uint256(expectedYield) * 1000) / 10_000);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 earnerManagerBalanceBefore = pyusdx.balanceOf(earnerManager);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+
+        uint240 claimed = pyusdx.claimFor(alice);
+
+        assertEq(claimed, expectedYield);
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore + expectedYield - expectedFee);
+        assertEq(pyusdx.balanceOf(earnerManager), earnerManagerBalanceBefore + expectedFee);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore + expectedYield);
+    }
+
+    function test_claimFor_withFeeAndClaimRecipient() public {
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 500, bob);
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint240 expectedYield = pyusdx.accruedYieldOf(alice);
+        assertGt(expectedYield, 0);
+
+        uint240 expectedFee = uint240((uint256(expectedYield) * 500) / 10_000);
+        uint240 expectedNetYield = expectedYield - expectedFee;
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint256 earnerManagerBalanceBefore = pyusdx.balanceOf(earnerManager);
+
+        vm.expectEmit();
+        emit IPYUSDX.Claimed(alice, bob, expectedYield);
+
+        pyusdx.claimFor(alice);
+
+        // Alice: yield minted then fee + net yield transferred out
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + expectedNetYield);
+        assertEq(pyusdx.balanceOf(earnerManager), earnerManagerBalanceBefore + expectedFee);
+    }
+
+    function test_claimFor_withClaimRecipient_noFee() public {
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, bob);
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint240 expectedYield = pyusdx.accruedYieldOf(alice);
+        assertGt(expectedYield, 0);
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint256 earnerManagerBalanceBefore = pyusdx.balanceOf(earnerManager);
+
+        pyusdx.claimFor(alice);
+
+        // Alice: yield minted then full yield transferred to bob
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + expectedYield);
+        assertEq(pyusdx.balanceOf(earnerManager), earnerManagerBalanceBefore);
+    }
+
+    function test_claimFor_zeroYield() public {
+        minterGateway.mint(alice, 1000e6);
+
+        // Enable earning but don't set a rate (rate stays 0, no yield accrues)
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+
+        uint240 claimed = pyusdx.claimFor(alice);
+
+        assertEq(claimed, 0);
+        assertEq(pyusdx.balanceOf(alice), balanceBefore);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore);
+    }
+
+    function test_claimFor_nonEarner() public {
+        minterGateway.mint(alice, 1000e6);
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+
+        uint240 claimed = pyusdx.claimFor(alice);
+
+        assertEq(claimed, 0);
+        assertEq(pyusdx.balanceOf(alice), balanceBefore);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore);
+    }
+
+    /* ============ Per-account index isolation ============ */
+
+    function test_perAccountIndexIsolation() public {
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 500);
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(bob, 1000);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint128 aliceIndex = pyusdx.currentAccountIndex(alice);
+        uint128 bobIndex = pyusdx.currentAccountIndex(bob);
+
+        assertTrue(aliceIndex != bobIndex, "Indices should differ with different rates");
+        assertTrue(bobIndex > aliceIndex, "Higher rate should produce higher index");
+
+        // Changing alice's rate should NOT affect bob's index
+        uint128 bobIndexBefore = bobIndex;
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 2000);
+
+        assertEq(pyusdx.currentAccountIndex(bob), bobIndexBefore, "Bob's index unchanged");
+    }
+
+    /* ============ setEarningDetails: yield claim on update ============ */
+
+    function test_setEarningDetails_claimsYieldOnUpdate() public {
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint240 expectedYield = pyusdx.accruedYieldOf(alice);
+        assertGt(expectedYield, 0);
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+
+        // Updating feeRate triggers _claim internally (using old feeRate=0)
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 500, address(0));
+
+        assertEq(pyusdx.balanceOf(alice), balanceBefore + expectedYield);
+        assertEq(pyusdx.accruedYieldOf(alice), 0);
+
+        (, , uint16 feeRate, ) = pyusdx.getEarningDetails(alice);
+        assertEq(feeRate, 500);
+    }
+
+    /* ============ setEarningDetails: disable earning clears all fields ============ */
+
+    function test_setEarningDetails_disableEarning_clearsAllFields() public {
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, true, 500, bob);
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(alice, 1000);
+
+        vm.warp(block.timestamp + 365 days);
+
+        assertTrue(pyusdx.isEarning(alice));
+        assertGt(pyusdx.earningPrincipalOf(alice), 0);
+        assertGt(pyusdx.accruedYieldOf(alice), 0);
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(alice, false, 0, address(0));
+
+        (bool isEarning, address manager, uint16 feeRate, address claimRecipient) = pyusdx.getEarningDetails(alice);
+        assertFalse(isEarning);
+        assertEq(manager, address(0));
+        assertEq(feeRate, 0);
+        assertEq(claimRecipient, address(0));
+        assertEq(pyusdx.earningPrincipalOf(alice), 0);
+        assertEq(pyusdx.currentAccountIndex(alice), uint128(PRECISION));
     }
 }
