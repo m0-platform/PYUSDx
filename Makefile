@@ -31,7 +31,7 @@ invariant:
 	@./test.sh -d test/invariant -p $(profile)
 
 coverage:
-	FOUNDRY_PROFILE=$(profile) forge coverage --report lcov && lcov --extract lcov.info -o lcov.info 'src/*' && genhtml lcov.info -o coverage
+	FOUNDRY_PROFILE=$(profile) forge coverage --report lcov && lcov --ignore-errors inconsistent --extract lcov.info -o lcov.info 'src/*' && genhtml lcov.info -o coverage
 
 gas-report:
 	FOUNDRY_PROFILE=$(profile) forge test --gas-report > gasreport.ansi
