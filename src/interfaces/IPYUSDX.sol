@@ -182,15 +182,6 @@ interface IPYUSDX is IContinuousIndexing {
     /// @notice The maximum fee rate (10000 = 100%).
     function MAX_FEE_RATE() external view returns (uint16);
 
-    /// @notice The total principal amount of earning accounts.
-    function totalEarningPrincipal() external view returns (uint112);
-
-    /// @notice The total supply of tokens in earning state.
-    function totalEarningSupply() external view returns (uint240);
-
-    /// @notice The total supply of tokens not earning yield.
-    function totalNonEarningSupply() external view returns (uint240);
-
     /**
      * @notice Returns whether an account is earning.
      * @param account The account to query.

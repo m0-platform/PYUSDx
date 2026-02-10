@@ -15,8 +15,7 @@ abstract contract PYUSDXStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.PYUSDX
     struct PYUSDXStorageStruct {
         // Supply tracking
-        uint112 totalEarningPrincipal;
-        uint240 totalNonEarningSupply;
+        uint240 totalSupply;
         // Account data
         mapping(address account => Account) accounts;
     }
@@ -149,16 +148,12 @@ contract PYUSDX is
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 
-        // NOTE: Overflow check: prevent a mint that would overflow `totalEarningPrincipal`
-        //       if all tokens (earning and non-earning) were converted to a principal earning amount
         unchecked {
-            if (
-                uint256($.totalNonEarningSupply) + safeAmount > type(uint240).max ||
-                uint256($.totalEarningPrincipal) + _getPrincipalAmountRoundedUp($.totalNonEarningSupply + safeAmount) >=
-                    type(uint112).max
-            ) {
+            if (uint256($.totalSupply) + safeAmount > type(uint240).max) {
                 revert OverflowsPrincipalOfTotalSupply();
             }
+
+            $.totalSupply += safeAmount;
         }
 
         if ($.accounts[account].isEarning) {
@@ -179,6 +174,10 @@ contract PYUSDX is
         uint240 safeAmount = UIntMath.safe240(amount);
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        unchecked {
+            $.totalSupply -= safeAmount;
+        }
 
         if ($.accounts[account].isEarning) {
             _subtractEarningAmount($, account, safeAmount);
@@ -252,24 +251,7 @@ contract PYUSDX is
 
     /// @notice Returns the total supply of tokens.
     function totalSupply() public view override returns (uint256) {
-        unchecked {
-            return totalEarningSupply() + totalNonEarningSupply();
-        }
-    }
-
-    /// @inheritdoc IPYUSDX
-    function totalEarningPrincipal() public view returns (uint112) {
-        return _getPYUSDXStorageLocation().totalEarningPrincipal;
-    }
-
-    /// @inheritdoc IPYUSDX
-    function totalEarningSupply() public view returns (uint240) {
-        return _getPresentAmountRoundedDown(totalEarningPrincipal());
-    }
-
-    /// @inheritdoc IPYUSDX
-    function totalNonEarningSupply() public view returns (uint240) {
-        return _getPYUSDXStorageLocation().totalNonEarningSupply;
+        return _getPYUSDXStorageLocation().totalSupply;
     }
 
     /// @notice Returns whether an account is earning yield.
@@ -440,9 +422,6 @@ contract PYUSDX is
 
             uint112 principal = _getPrincipalAmountRoundedDown(balance, currentIndex_);
             accountData.earningPrincipal = principal;
-
-            $.totalEarningPrincipal += principal;
-            $.totalNonEarningSupply -= balance;
         } else if (isEarning_ && wasEarning) {
             // Update manager if caller is different (takeover scenario)
             if (accountData.earnerManager != msg.sender) {
@@ -452,17 +431,12 @@ contract PYUSDX is
 
         // Disable earning (earner → non-earner)
         else if (!isEarning_ && wasEarning) {
-            uint112 principal = accountData.earningPrincipal;
-
             accountData.isEarning = false;
             accountData.earningPrincipal = 0;
             accountData.earnerManager = address(0);
             accountData.lastIndex = 0;
             accountData.lastIndexUpdate = 0;
             accountData.rateBps = 0;
-
-            $.totalEarningPrincipal -= principal;
-            $.totalNonEarningSupply += balance;
         }
 
         accountData.feeRate = feeRate;
@@ -525,6 +499,7 @@ contract PYUSDX is
         // Add full yield to balance (yield is minted)
         unchecked {
             accountData.balance += yield;
+            $.totalSupply += yield;
         }
 
         address claimRecipient = accountData.claimRecipient;
@@ -560,9 +535,6 @@ contract PYUSDX is
         // Claim any accrued yield first
         _claim(account);
 
-        uint240 balance = accountData.balance;
-        uint112 principal = accountData.earningPrincipal;
-
         accountData.isEarning = false;
         accountData.earningPrincipal = 0;
         accountData.earnerManager = address(0);
@@ -571,9 +543,6 @@ contract PYUSDX is
         accountData.lastIndex = 0;
         accountData.lastIndexUpdate = 0;
         accountData.rateBps = 0;
-
-        $.totalEarningPrincipal -= principal;
-        $.totalNonEarningSupply += balance;
 
         emit StoppedEarning(account);
     }
@@ -643,7 +612,6 @@ contract PYUSDX is
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `_mint`.
         unchecked {
             $.accounts[account].balance += amount;
-            $.totalNonEarningSupply += amount;
         }
     }
 
@@ -657,7 +625,6 @@ contract PYUSDX is
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `_mint`.
         unchecked {
             $.accounts[account].balance += amount;
-            $.totalEarningPrincipal += principal;
             $.accounts[account].earningPrincipal += principal;
         }
     }
@@ -675,7 +642,6 @@ contract PYUSDX is
 
         unchecked {
             $.accounts[account].balance -= amount;
-            $.totalNonEarningSupply -= amount;
         }
     }
 
@@ -692,14 +658,12 @@ contract PYUSDX is
 
         uint112 principal = _getPrincipalAmountRoundedUp(amount);
         uint112 earningPrincipal = $.accounts[account].earningPrincipal;
-        uint112 totalPrincipal = $.totalEarningPrincipal;
 
         unchecked {
             $.accounts[account].balance -= amount;
 
             // NOTE: `min112` prevents underflow.
             $.accounts[account].earningPrincipal = earningPrincipal - UIntMath.min112(principal, earningPrincipal);
-            $.totalEarningPrincipal = totalPrincipal - UIntMath.min112(principal, totalPrincipal);
         }
     }
 
@@ -730,7 +694,7 @@ contract PYUSDX is
             return _transferAmountInKind($, sender, senderIsEarning, recipient, safeAmount);
         }
 
-        // NOTE: Different earning status: use internal functions (updates totals)
+        // NOTE: Different earning status: use internal functions
         senderIsEarning
             ? _subtractEarningAmount($, sender, safeAmount)
             : _subtractNonEarningAmount($, sender, safeAmount);
@@ -768,6 +732,8 @@ contract PYUSDX is
 
         // NOTE: Both earning, transfer principal.
         if (senderIsEarning) {
+            // TODO: Per-earner principal conversion — sender and recipient have different indices.
+            // Should compute: senderPrincipal = amount / senderIndex, recipientPrincipal = amount / recipientIndex
             // NOTE: `min112` prevents underflow.
             uint112 principal = UIntMath.min112(
                 _getPrincipalAmountRoundedUp(amount),
