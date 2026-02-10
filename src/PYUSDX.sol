@@ -7,7 +7,8 @@ import { ForcedTransferable } from "../lib/m-extensions/src/components/forcedTra
 import { Pausable } from "../lib/m-extensions/src/components/pausable/Pausable.sol";
 import { UIntMath } from "../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
 import { ContinuousIndexingMath } from "../lib/m-extensions/lib/common/src/libs/ContinuousIndexingMath.sol";
-import { ContinuousIndexing } from "./abstract/ContinuousIndexing.sol";
+import { IndexingMath } from "../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
+import { AccessControlUpgradeable } from "../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
 
 /// @notice ERC-7201 namespaced storage layout for PYUSDX.
@@ -53,7 +54,7 @@ abstract contract PYUSDXStorageLayout {
 contract PYUSDX is
     PYUSDXStorageLayout,
     IPYUSDX,
-    ContinuousIndexing,
+    AccessControlUpgradeable,
     ERC20ExtendedUpgradeable,
     Freezable,
     ForcedTransferable,
@@ -69,6 +70,12 @@ contract PYUSDX is
 
     /// @notice The role that can manage earners.
     bytes32 public constant EARNER_MANAGER_ROLE = keccak256("EARNER_MANAGER_ROLE");
+
+    /// @notice The role that can set yield rates.
+    bytes32 public constant RATE_MANAGER_ROLE = keccak256("RATE_MANAGER_ROLE");
+
+    /// @notice Precision scaling for index calculations (1e12).
+    uint256 public constant PRECISION = 1e12;
 
     /* ============ Immutable Variables ============ */
 
@@ -91,6 +98,12 @@ contract PYUSDX is
     /// @notice Restricts access to only the Minter Gateway contract.
     modifier onlyMinterGateway() {
         if (msg.sender != minterGateway) revert NotMinterGateway();
+        _;
+    }
+
+    /// @notice Restricts access to accounts with RATE_MANAGER_ROLE.
+    modifier onlyRateManager() {
+        if (!hasRole(RATE_MANAGER_ROLE, msg.sender)) revert NotRateManager();
         _;
     }
 
@@ -128,7 +141,8 @@ contract PYUSDX is
         // Initialize ERC20Extended with 6 decimals (PYUSD standard)
         __ERC20ExtendedUpgradeable_init(name, symbol, 6);
 
-        __ContinuousIndexing_init(rateManager);
+        if (rateManager == address(0)) revert ZeroRateManager();
+        _grantRole(RATE_MANAGER_ROLE, rateManager);
         __ForcedTransferable_init(forcedTransferManager);
         __Freezable_init(freezeManager);
         __Pausable_init(pauser);
@@ -203,7 +217,7 @@ contract PYUSDX is
         uint16 feeRate,
         address claimRecipient
     ) external onlyEarnerManager(account) {
-        _setEarningDetails(account, isEarning_, feeRate, claimRecipient, currentIndex());
+        _setEarningDetails(account, isEarning_, feeRate, claimRecipient);
     }
 
     /// @inheritdoc IPYUSDX
@@ -219,11 +233,9 @@ contract PYUSDX is
             revert ArrayLengthMismatch();
         }
 
-        uint128 currentIndex_ = currentIndex();
-
         for (uint256 i; i < len; ++i) {
             _checkEarnerManager(accounts[i]);
-            _setEarningDetails(accounts[i], isEarning_[i], feeRates[i], claimRecipients[i], currentIndex_);
+            _setEarningDetails(accounts[i], isEarning_[i], feeRates[i], claimRecipients[i]);
         }
     }
 
@@ -388,8 +400,7 @@ contract PYUSDX is
         address account,
         bool isEarning_,
         uint16 feeRate,
-        address claimRecipient,
-        uint128 currentIndex_
+        address claimRecipient
     ) internal {
         _revertIfZeroAccount(account);
         if (feeRate > MAX_FEE_RATE) revert FeeRateTooHigh(feeRate);
@@ -422,7 +433,7 @@ contract PYUSDX is
             accountData.lastIndex = uint128(PRECISION);
             accountData.lastIndexUpdate = uint32(block.timestamp);
 
-            uint112 principal = _getPrincipalAmountRoundedDown(balance, currentIndex_);
+            uint112 principal = _getPrincipalAmountRoundedDown(balance, uint128(PRECISION));
             accountData.earningPrincipal = principal;
         } else if (isEarning_ && wasEarning) {
             // Update manager if caller is different (takeover scenario)
@@ -669,6 +680,23 @@ contract PYUSDX is
             // NOTE: `min112` prevents underflow.
             $.accounts[account].earningPrincipal = earningPrincipal - UIntMath.min112(principal, earningPrincipal);
         }
+    }
+
+    /* ============ Internal View/Pure Functions ============ */
+
+    /// @dev Returns the present amount (rounded down) given the principal amount and an index.
+    function _getPresentAmountRoundedDown(uint112 principalAmount, uint128 index) internal pure returns (uint240) {
+        return uint240(IndexingMath.getPresentAmountRoundedDown(principalAmount, index));
+    }
+
+    /// @dev Returns the principal amount (rounded down) given the present amount and an index.
+    function _getPrincipalAmountRoundedDown(uint240 presentAmount, uint128 index) internal pure returns (uint112) {
+        return IndexingMath.getPrincipalAmountRoundedDown(presentAmount, index);
+    }
+
+    /// @dev Returns the principal amount (rounded up) given the present amount and an index.
+    function _getPrincipalAmountRoundedUp(uint240 presentAmount, uint128 index) internal pure returns (uint112) {
+        return IndexingMath.getPrincipalAmountRoundedUp(presentAmount, index);
     }
 
     /// @dev Required override for ERC20ExtendedUpgradeable.

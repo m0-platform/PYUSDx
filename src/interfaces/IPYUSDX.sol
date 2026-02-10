@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { IContinuousIndexing } from "./IContinuousIndexing.sol";
-
 /**
  * @title IPYUSDX
  * @author M0 Labs
@@ -12,7 +10,7 @@ import { IContinuousIndexing } from "./IContinuousIndexing.sol";
  *         - Built-in pausing and compliance functionalities
  *         - Earner Manager controlled yield distribution
  */
-interface IPYUSDX is IContinuousIndexing {
+interface IPYUSDX {
     /* ============ Events ============ */
 
     /**
@@ -96,6 +94,15 @@ interface IPYUSDX is IContinuousIndexing {
 
     /// @notice Thrown when trying to set a rate for a non-earning account.
     error NotEarning();
+
+    /// @notice Thrown when caller lacks RATE_MANAGER_ROLE.
+    error NotRateManager();
+
+    /// @notice Thrown when rate exceeds maximum (100%).
+    error RateTooHigh();
+
+    /// @notice Thrown when the rate manager address is zero.
+    error ZeroRateManager();
 
     /* ============ Interactive Functions ============ */
 
@@ -284,4 +291,10 @@ interface IPYUSDX is IContinuousIndexing {
      * @return The MINTER_ROLE bytes32 value.
      */
     function MINTER_ROLE() external view returns (bytes32);
+
+    /**
+     * @notice The role that can set yield rates.
+     * @return The RATE_MANAGER_ROLE bytes32 value.
+     */
+    function RATE_MANAGER_ROLE() external view returns (bytes32);
 }
