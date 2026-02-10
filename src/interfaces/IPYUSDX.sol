@@ -16,20 +16,6 @@ interface IPYUSDX is IContinuousIndexing {
     /* ============ Events ============ */
 
     /**
-     * @notice Emitted when PYUSDX is minted to an account.
-     * @param account The account receiving the minted PYUSDX.
-     * @param amount  The amount of PYUSDX minted.
-     */
-    event Minted(address indexed account, uint256 amount);
-
-    /**
-     * @notice Emitted when PYUSDX is burnt from an account.
-     * @param account The account from which PYUSDX is burnt.
-     * @param amount  The amount of PYUSDX burnt.
-     */
-    event Burned(address indexed account, uint256 amount);
-
-    /**
      * @notice Emitted when earning details are set for an account.
      * @param account        The account whose earning details are being set.
      * @param isEarning      Whether the account is earning.
@@ -63,9 +49,6 @@ interface IPYUSDX is IContinuousIndexing {
 
     /// @notice Thrown when the minter gateway address is zero.
     error ZeroMinterGateway();
-
-    /// @notice Thrown when the PYUSD token address is zero.
-    error ZeroPYUSD();
 
     /// @notice Thrown when the admin address is zero.
     error ZeroAdmin();
@@ -166,9 +149,6 @@ interface IPYUSDX is IContinuousIndexing {
 
     /// @notice The Minter Gateway contract address.
     function minterGateway() external view returns (address);
-
-    /// @notice The PYUSD token contract address.
-    function pyusd() external view returns (address);
 
     /// @notice The maximum fee rate (10000 = 100%).
     function MAX_FEE_RATE() external view returns (uint16);

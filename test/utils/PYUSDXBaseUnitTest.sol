@@ -13,8 +13,6 @@ import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 /// @title PYUSDX Base Unit Test
 /// @notice Base test contract with common setup for PYUSDX tests
 abstract contract PYUSDXBaseUnitTest is Test {
-    address public pyusd = makeAddr("pyusd");
-
     MinterGatewayMock public minterGateway;
 
     PYUSDXHarness public pyusdx;
@@ -43,7 +41,7 @@ abstract contract PYUSDXBaseUnitTest is Test {
         // TODO: figure out how to avoid this circular dependency
         minterGateway = new MinterGatewayMock(address(0));
 
-        address implementation = address(new PYUSDXHarness(address(minterGateway), pyusd));
+        address implementation = address(new PYUSDXHarness(address(minterGateway)));
 
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
@@ -115,6 +113,18 @@ abstract contract PYUSDXBaseUnitTest is Test {
     /// @return Principal amount rounded up
     function _expectedPrincipalRoundUp(uint240 presentAmount, uint128 index) internal pure returns (uint112) {
         return IndexingMath.getPrincipalAmountRoundedUp(presentAmount, index);
+    }
+
+    /// @notice Calculate expected principal with round up, returning uint256 to avoid revert
+    /// @param presentAmount The present amount
+    /// @param index The current index
+    /// @return Principal amount rounded up (as uint256, may exceed uint112 max)
+    function _expectedPrincipalRoundUpSafe(uint256 presentAmount, uint128 index) internal pure returns (uint256) {
+        if (index == 0) return 0;
+
+        unchecked {
+            return ((presentAmount * 1e12) + index - 1) / index;
+        }
     }
 
     /// @notice Check if account has principal depletion (balance with zero principal)
