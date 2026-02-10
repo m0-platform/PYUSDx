@@ -67,42 +67,6 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
     }
 
-    /* ============ Mint + Rate Manager Integration ============ */
-
-    function testIntegration_setRateThenMint() public {
-        // Set a yield rate
-        vm.prank(rateManager);
-        pyusdx.setRate(500); // 5% APY
-
-        assertEq(pyusdx.rate(), 500);
-
-        // Mint should still work
-        minterGateway.mint(alice, MINT_AMOUNT);
-        assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
-
-        // Index should have been updated
-        uint128 index = pyusdx.currentIndex();
-        assertTrue(index >= 1e12);
-    }
-
-    function testIntegration_mintWithIndexGrowth() public {
-        // Set a yield rate
-        vm.prank(rateManager);
-        pyusdx.setRate(1000); // 10% APY
-
-        uint128 indexBefore = pyusdx.currentIndex();
-        assertEq(indexBefore, 1e12);
-
-        // Warp forward to grow index
-        vm.warp(365 days);
-
-        // Mint triggers index update
-        minterGateway.mint(alice, MINT_AMOUNT);
-
-        uint128 indexAfter = pyusdx.currentIndex();
-        assertTrue(indexAfter > indexBefore);
-    }
-
     /* ============ Multi-User Integration ============ */
 
     function testIntegration_mintToMultipleAccounts() public {
@@ -129,7 +93,6 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
 
         // Verify totals
         assertEq(pyusdx.totalSupply(), totalMinted);
-        assertEq(pyusdx.totalNonEarningSupply(), uint240(totalMinted));
     }
 
     /* ============ Large Scale Integration ============ */
@@ -146,16 +109,11 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
 
         assertEq(pyusdx.balanceOf(alice), totalAmount);
         assertEq(pyusdx.totalSupply(), totalAmount);
-        assertEq(pyusdx.totalNonEarningSupply(), uint240(totalAmount));
     }
 
     /* ============ Edge Case Integration ============ */
 
     function testIntegration_mintToSameAccountAcrossTime() public {
-        // Set a rate so index can grow
-        vm.prank(rateManager);
-        pyusdx.setRate(500);
-
         uint256 balanceBefore;
         uint256 mintedTotal;
 
@@ -250,11 +208,9 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
     /* ============ Burn + Rate Manager Integration ============ */
 
     function testIntegration_burnWithIndexGrowth() public {
-        vm.prank(rateManager);
-        pyusdx.setRate(1000); // 10% APY
-
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setAccountRateBps(alice, uint24(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -303,7 +259,6 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
 
     function testIntegration_mintThenBurn() public {
         uint256 totalSupplyBefore = pyusdx.totalSupply();
-        uint256 totalNonEarningSupplyBefore = pyusdx.totalNonEarningSupply();
 
         // Mint
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -315,15 +270,12 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
 
         assertEq(pyusdx.balanceOf(alice), 0);
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
-        assertEq(pyusdx.totalNonEarningSupply(), totalNonEarningSupplyBefore);
     }
 
     function testIntegration_mintBurnEarningWithYield() public {
-        vm.prank(rateManager);
-        pyusdx.setRate(1000); // 10% APY
-
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setAccountRateBps(alice, uint24(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
         uint112 principalAfterMint = pyusdx.earningPrincipalOf(alice);
@@ -378,11 +330,9 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
     /* ============ Burn with Index Changes Integration ============ */
 
     function testIntegration_burnWithMultipleIndexUpdates() public {
-        vm.prank(rateManager);
-        pyusdx.setRate(500); // 5% APY
-
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setAccountRateBps(alice, uint24(500));
 
         // Initial mint
         minterGateway.mint(alice, MINT_AMOUNT);

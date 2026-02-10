@@ -83,12 +83,10 @@ abstract contract PYUSDXBaseUnitTest is Test {
 
     /* ============ Additional Helper Functions ============ */
 
-    /// @notice Calculate max safe mint amount at current index
-    /// @param index The index to use for calculation
-    /// @return maxAmount Maximum amount that won't overflow principal
-    function _maxSafeAmount(uint128 index) internal view returns (uint256) {
-        uint112 maxPrincipal = type(uint112).max - pyusdx.totalEarningPrincipal() - 1;
-        return (uint256(maxPrincipal) * index) / PRECISION;
+    /// @notice Calculate max safe mint amount that won't overflow totalSupply (uint240)
+    /// @return maxAmount Maximum amount that can be minted
+    function _maxSafeAmount() internal view returns (uint256) {
+        return type(uint240).max - pyusdx.totalSupply();
     }
 
     /// @notice Check if burning amount is safe

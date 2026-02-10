@@ -22,13 +22,24 @@ contract PYUSDXHarness is PYUSDX {
         uint16 feeRate,
         address claimRecipient
     ) external {
+        Account storage existing = _getPYUSDXStorageLocation().accounts[account];
+        // Initialize lastIndex to PRECISION when enabling earning for a new account
+        uint128 lastIndex_ = isEarning
+            ? (existing.lastIndex == 0 ? uint128(PRECISION) : existing.lastIndex)
+            : uint128(0);
+        uint32 lastIndexUpdate_ = isEarning
+            ? (existing.lastIndexUpdate == 0 ? uint32(block.timestamp) : existing.lastIndexUpdate)
+            : uint32(0);
         _getPYUSDXStorageLocation().accounts[account] = Account({
-            earnerManager: isEarning ? earnerManager : address(0),
-            balance: _getPYUSDXStorageLocation().accounts[account].balance,
-            isEarning: isEarning,
-            earningPrincipal: isEarning ? _getPYUSDXStorageLocation().accounts[account].earningPrincipal : uint112(0),
+            balance: existing.balance,
             feeRate: feeRate,
-            claimRecipient: claimRecipient
+            earnerManager: isEarning ? earnerManager : address(0),
+            lastIndexUpdate: lastIndexUpdate_,
+            rateBps: isEarning ? existing.rateBps : uint24(0),
+            isEarning: isEarning,
+            claimRecipient: claimRecipient,
+            lastIndex: lastIndex_,
+            earningPrincipal: isEarning ? existing.earningPrincipal : uint112(0)
         });
 
         emit EarningDetailsSet(account, isEarning, earnerManager, feeRate, claimRecipient);
@@ -41,16 +52,10 @@ contract PYUSDXHarness is PYUSDX {
         _getPYUSDXStorageLocation().accounts[account].earningPrincipal = principal;
     }
 
-    /// @notice Sets the total earning principal directly
-    /// @param principal The total earning principal to set
-    function setTotalEarningPrincipal(uint112 principal) external {
-        _getPYUSDXStorageLocation().totalEarningPrincipal = principal;
-    }
-
-    /// @notice Sets the total non-earning supply directly
-    /// @param supply The total non-earning supply to set
-    function setTotalNonEarningSupply(uint240 supply) external {
-        _getPYUSDXStorageLocation().totalNonEarningSupply = supply;
+    /// @notice Sets the total supply directly
+    /// @param supply The total supply to set
+    function setTotalSupply(uint240 supply) external {
+        _getPYUSDXStorageLocation().totalSupply = supply;
     }
 
     /// @notice Sets an account's balance directly
@@ -74,9 +79,9 @@ contract PYUSDXHarness is PYUSDX {
     }
 
     /// @notice Expose internal _addEarningAmount for testing
-    function addEarningAmount(address account, uint240 amount) external {
+    function addEarningAmount(address account, uint240 amount, uint128 accountIndex) external {
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        _addEarningAmount($, account, amount);
+        _addEarningAmount($, account, amount, accountIndex);
     }
 
     /// @notice Expose internal _addNonEarningAmount for testing
@@ -85,18 +90,19 @@ contract PYUSDXHarness is PYUSDX {
         _addNonEarningAmount($, account, amount);
     }
 
-    /// @notice Set the latest index directly for testing boundary conditions
+    /// @notice Set the per-account lastIndex directly for testing
+    /// @param account The account to configure
     /// @param newIndex The index value to set
-    function setLatestIndex(uint128 newIndex) external {
-        _getContinuousIndexingStorageLocation().latestIndex = newIndex;
-        _getContinuousIndexingStorageLocation().latestUpdateTimestamp = uint40(block.timestamp);
+    function setAccountLastIndex(address account, uint128 newIndex) external {
+        _getPYUSDXStorageLocation().accounts[account].lastIndex = newIndex;
+        _getPYUSDXStorageLocation().accounts[account].lastIndexUpdate = uint32(block.timestamp);
     }
 
-    /// @notice Set the rate directly for testing boundary conditions
-    /// @param newRate The rate value to set (basis points, 10000 = 100%)
-    function setLatestRate(uint32 newRate) external {
-        _getContinuousIndexingStorageLocation().rate = newRate;
-        _getContinuousIndexingStorageLocation().latestRate = newRate;
-        _getContinuousIndexingStorageLocation().latestUpdateTimestamp = uint40(block.timestamp);
+    /// @notice Set the per-account earner rate directly for testing
+    /// @param account The account to configure
+    /// @param newRateBps The rate in basis points
+    function setAccountRateBps(address account, uint24 newRateBps) external {
+        _getPYUSDXStorageLocation().accounts[account].rateBps = newRateBps;
     }
+
 }
