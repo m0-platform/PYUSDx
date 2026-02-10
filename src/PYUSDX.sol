@@ -33,7 +33,6 @@ abstract contract PYUSDXStorageLayout {
         uint128 lastIndex;
         uint32 lastIndexUpdate;
         uint24 rateBps;
-        bool hasClaimRecipient;
     }
 
     // keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDX")) - 1)) & ~bytes32(uint256(0xff))
@@ -436,6 +435,8 @@ contract PYUSDX is
         if (isEarning_ && !wasEarning) {
             accountData.earnerManager = msg.sender;
             accountData.isEarning = true;
+            accountData.lastIndex = uint128(PRECISION);
+            accountData.lastIndexUpdate = uint32(block.timestamp);
 
             uint112 principal = _getPrincipalAmountRoundedDown(balance, currentIndex_);
             accountData.earningPrincipal = principal;
@@ -456,6 +457,9 @@ contract PYUSDX is
             accountData.isEarning = false;
             accountData.earningPrincipal = 0;
             accountData.earnerManager = address(0);
+            accountData.lastIndex = 0;
+            accountData.lastIndexUpdate = 0;
+            accountData.rateBps = 0;
 
             $.totalEarningPrincipal -= principal;
             $.totalNonEarningSupply += balance;
@@ -564,6 +568,9 @@ contract PYUSDX is
         accountData.earnerManager = address(0);
         accountData.feeRate = 0;
         accountData.claimRecipient = address(0);
+        accountData.lastIndex = 0;
+        accountData.lastIndexUpdate = 0;
+        accountData.rateBps = 0;
 
         $.totalEarningPrincipal -= principal;
         $.totalNonEarningSupply += balance;
