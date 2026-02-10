@@ -157,8 +157,8 @@ contract PYUSDX is
         }
 
         if ($.accounts[account].isEarning) {
-            _addEarningAmount($, account, safeAmount);
-            _updateAccountIndex(account);
+            uint128 accountIndex = _updateAccountIndex(account);
+            _addEarningAmount($, account, safeAmount, accountIndex);
         } else {
             _addNonEarningAmount($, account, safeAmount);
         }
@@ -180,8 +180,8 @@ contract PYUSDX is
         }
 
         if ($.accounts[account].isEarning) {
-            _subtractEarningAmount($, account, safeAmount);
-            _updateAccountIndex(account);
+            uint128 accountIndex = _updateAccountIndex(account);
+            _subtractEarningAmount($, account, safeAmount, accountIndex);
         } else {
             _subtractNonEarningAmount($, account, safeAmount);
         }
@@ -327,8 +327,8 @@ contract PYUSDX is
 
         if (!accountData.isEarning) return 0;
 
-        // Calculate present value from principal
-        uint240 balanceWithYield = _getPresentAmountRoundedDown(accountData.earningPrincipal);
+        // Calculate present value from principal using per-account index
+        uint240 balanceWithYield = _getPresentAmountRoundedDown(accountData.earningPrincipal, currentAccountIndex(account));
 
         // Yield = present value - stored balance
         uint240 balance = accountData.balance;
@@ -568,8 +568,8 @@ contract PYUSDX is
 
         // Add to recipient (can be earning or non-earning)
         if ($.accounts[recipient].isEarning) {
-            _addEarningAmount($, recipient, safeAmount);
-            _updateAccountIndex(recipient);
+            uint128 recipientIndex = _updateAccountIndex(recipient);
+            _addEarningAmount($, recipient, safeAmount, recipientIndex);
         } else {
             _addNonEarningAmount($, recipient, safeAmount);
         }
@@ -619,8 +619,9 @@ contract PYUSDX is
     /// @param $ The storage pointer.
     /// @param account The account to add the amount to.
     /// @param amount The present amount to add (must be safe240).
-    function _addEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount) internal {
-        uint112 principal = _getPrincipalAmountRoundedDown(amount);
+    /// @param accountIndex The per-account index to use for principal conversion.
+    function _addEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount, uint128 accountIndex) internal {
+        uint112 principal = _getPrincipalAmountRoundedDown(amount, accountIndex);
 
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `_mint`.
         unchecked {
@@ -649,14 +650,15 @@ contract PYUSDX is
     /// @param $ The storage pointer.
     /// @param account The account to subtract the amount from.
     /// @param amount The present amount to subtract (must be safe240).
-    function _subtractEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount) internal {
+    /// @param accountIndex The per-account index to use for principal conversion.
+    function _subtractEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount, uint128 accountIndex) internal {
         uint240 accountBalance = $.accounts[account].balance;
 
         if (accountBalance < amount) {
             revert InsufficientBalance(account, accountBalance, amount);
         }
 
-        uint112 principal = _getPrincipalAmountRoundedUp(amount);
+        uint112 principal = _getPrincipalAmountRoundedUp(amount, accountIndex);
         uint112 earningPrincipal = $.accounts[account].earningPrincipal;
 
         unchecked {
@@ -675,7 +677,6 @@ contract PYUSDX is
         _revertIfFrozen(msg.sender);
         _revertIfFrozen(sender);
         _revertIfFrozen(recipient);
-
         _revertIfZeroAccount(recipient);
 
         emit Transfer(sender, recipient, amount);
@@ -683,72 +684,22 @@ contract PYUSDX is
         if (amount == 0) return;
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-
-        bool senderIsEarning = $.accounts[sender].isEarning;
-        bool recipientIsEarning = $.accounts[recipient].isEarning;
-
         uint240 safeAmount = UIntMath.safe240(amount);
 
-        // NOTE: Same earning status: direct updates (total supply unchanged)
-        if (senderIsEarning == recipientIsEarning) {
-            return _transferAmountInKind($, sender, senderIsEarning, recipient, safeAmount);
+        // Subtract from sender
+        if ($.accounts[sender].isEarning) {
+            uint128 senderIndex = _updateAccountIndex(sender);
+            _subtractEarningAmount($, sender, safeAmount, senderIndex);
+        } else {
+            _subtractNonEarningAmount($, sender, safeAmount);
         }
 
-        // NOTE: Different earning status: use internal functions
-        senderIsEarning
-            ? _subtractEarningAmount($, sender, safeAmount)
-            : _subtractNonEarningAmount($, sender, safeAmount);
-
-        recipientIsEarning
-            ? _addEarningAmount($, recipient, safeAmount)
-            : _addNonEarningAmount($, recipient, safeAmount);
-
-        _updateAccountIndex(senderIsEarning ? sender : recipient);
-    }
-
-    /// @dev   Transfer between same earning status accounts.
-    /// @param $               The storage pointer.
-    /// @param sender          The account to transfer from.
-    /// @param senderIsEarning Whether the sender is earning.
-    /// @param recipient       The account to transfer to.
-    /// @param amount          The amount to transfer.
-    function _transferAmountInKind(
-        PYUSDXStorageStruct storage $,
-        address sender,
-        bool senderIsEarning,
-        address recipient,
-        uint240 amount
-    ) internal {
-        uint240 senderBalance = $.accounts[sender].balance;
-
-        if (senderBalance < amount) revert InsufficientBalance(sender, senderBalance, amount);
-
-        // NOTE: When transferring an amount in kind, the `balance` can't overflow
-        //       since the total supply would have overflowed first when minting.
-        unchecked {
-            $.accounts[sender].balance -= amount;
-            $.accounts[recipient].balance += amount;
-        }
-
-        // NOTE: Both earning, transfer principal.
-        if (senderIsEarning) {
-            // TODO: Per-earner principal conversion — sender and recipient have different indices.
-            // Should compute: senderPrincipal = amount / senderIndex, recipientPrincipal = amount / recipientIndex
-            // NOTE: `min112` prevents underflow.
-            uint112 principal = UIntMath.min112(
-                _getPrincipalAmountRoundedUp(amount),
-                $.accounts[sender].earningPrincipal
-            );
-
-            unchecked {
-                $.accounts[sender].earningPrincipal -= principal;
-                $.accounts[recipient].earningPrincipal = UIntMath.safe112(
-                    uint256($.accounts[recipient].earningPrincipal) + principal
-                );
-            }
-
-            _updateAccountIndex(sender);
-            _updateAccountIndex(recipient);
+        // Add to recipient
+        if ($.accounts[recipient].isEarning) {
+            uint128 recipientIndex = _updateAccountIndex(recipient);
+            _addEarningAmount($, recipient, safeAmount, recipientIndex);
+        } else {
+            _addNonEarningAmount($, recipient, safeAmount);
         }
     }
 }
