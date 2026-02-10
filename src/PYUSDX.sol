@@ -342,7 +342,10 @@ contract PYUSDX is
         if (!accountData.isEarning) return 0;
 
         // Calculate present value from principal using per-account index
-        uint240 balanceWithYield = _getPresentAmountRoundedDown(accountData.earningPrincipal, currentAccountIndex(account));
+        uint240 balanceWithYield = _getPresentAmountRoundedDown(
+            accountData.earningPrincipal,
+            currentAccountIndex(account)
+        );
 
         // Yield = present value - stored balance
         uint240 balance = accountData.balance;
@@ -368,15 +371,16 @@ contract PYUSDX is
         if (!accountData.isEarning) return uint128(PRECISION);
 
         unchecked {
-            return UIntMath.bound128(
-                ContinuousIndexingMath.multiplyIndicesDown(
-                    accountData.lastIndex,
-                    ContinuousIndexingMath.getContinuousIndex(
-                        ContinuousIndexingMath.convertFromBasisPoints(accountData.rateBps),
-                        uint32(block.timestamp - accountData.lastIndexUpdate)
+            return
+                UIntMath.bound128(
+                    ContinuousIndexingMath.multiplyIndicesDown(
+                        accountData.lastIndex,
+                        ContinuousIndexingMath.getContinuousIndex(
+                            ContinuousIndexingMath.convertFromBasisPoints(accountData.rateBps),
+                            uint32(block.timestamp - accountData.lastIndexUpdate)
+                        )
                     )
-                )
-            );
+                );
         }
     }
 
@@ -396,12 +400,7 @@ contract PYUSDX is
     /* ============ Internal Functions ============ */
 
     /// @dev Internal implementation for setting earning details.
-    function _setEarningDetails(
-        address account,
-        bool isEarning_,
-        uint16 feeRate,
-        address claimRecipient
-    ) internal {
+    function _setEarningDetails(address account, bool isEarning_, uint16 feeRate, address claimRecipient) internal {
         _revertIfZeroAccount(account);
         if (feeRate > MAX_FEE_RATE) revert FeeRateTooHigh(feeRate);
         if (!isEarning_ && feeRate != 0) revert InvalidDetails();
@@ -633,7 +632,12 @@ contract PYUSDX is
     /// @param account The account to add the amount to.
     /// @param amount The present amount to add (must be safe240).
     /// @param accountIndex The per-account index to use for principal conversion.
-    function _addEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount, uint128 accountIndex) internal {
+    function _addEarningAmount(
+        PYUSDXStorageStruct storage $,
+        address account,
+        uint240 amount,
+        uint128 accountIndex
+    ) internal {
         uint112 principal = _getPrincipalAmountRoundedDown(amount, accountIndex);
 
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `_mint`.
@@ -664,7 +668,12 @@ contract PYUSDX is
     /// @param account The account to subtract the amount from.
     /// @param amount The present amount to subtract (must be safe240).
     /// @param accountIndex The per-account index to use for principal conversion.
-    function _subtractEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount, uint128 accountIndex) internal {
+    function _subtractEarningAmount(
+        PYUSDXStorageStruct storage $,
+        address account,
+        uint240 amount,
+        uint128 accountIndex
+    ) internal {
         uint240 accountBalance = $.accounts[account].balance;
 
         if (accountBalance < amount) {

@@ -177,7 +177,6 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
         bool amountExceedsUInt240 = boundedAmount > type(uint240).max;
 
-
         // Check reverts before executing transfer
         if (amountExceedsUInt240) {
             vm.expectRevert(UIntMath.InvalidUInt240.selector);

@@ -104,5 +104,4 @@ contract PYUSDXHarness is PYUSDX {
     function setAccountRateBps(address account, uint24 newRateBps) external {
         _getPYUSDXStorageLocation().accounts[account].rateBps = newRateBps;
     }
-
 }
