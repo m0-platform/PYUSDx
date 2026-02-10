@@ -6,6 +6,7 @@ import { Freezable } from "../lib/m-extensions/src/components/freezable/Freezabl
 import { ForcedTransferable } from "../lib/m-extensions/src/components/forcedTransferable/ForcedTransferable.sol";
 import { Pausable } from "../lib/m-extensions/src/components/pausable/Pausable.sol";
 import { UIntMath } from "../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
+import { ContinuousIndexingMath } from "../lib/m-extensions/lib/common/src/libs/ContinuousIndexingMath.sol";
 import { ContinuousIndexing } from "./abstract/ContinuousIndexing.sol";
 import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
 
@@ -163,7 +164,7 @@ contract PYUSDX is
 
         if ($.accounts[account].isEarning) {
             _addEarningAmount($, account, safeAmount);
-            updateIndex();
+            _updateAccountIndex(account);
         } else {
             _addNonEarningAmount($, account, safeAmount);
         }
@@ -182,7 +183,7 @@ contract PYUSDX is
 
         if ($.accounts[account].isEarning) {
             _subtractEarningAmount($, account, safeAmount);
-            updateIndex();
+            _updateAccountIndex(account);
         } else {
             _subtractNonEarningAmount($, account, safeAmount);
         }
@@ -365,6 +366,38 @@ contract PYUSDX is
         return _getPYUSDXStorageLocation().accounts[account].earningPrincipal;
     }
 
+    /// @inheritdoc IPYUSDX
+    function currentAccountIndex(address account) public view returns (uint128) {
+        Account storage accountData = _getPYUSDXStorageLocation().accounts[account];
+
+        if (!accountData.isEarning) return uint128(PRECISION);
+
+        unchecked {
+            return UIntMath.bound128(
+                ContinuousIndexingMath.multiplyIndicesDown(
+                    accountData.lastIndex,
+                    ContinuousIndexingMath.getContinuousIndex(
+                        ContinuousIndexingMath.convertFromBasisPoints(accountData.rateBps),
+                        uint32(block.timestamp - accountData.lastIndexUpdate)
+                    )
+                )
+            );
+        }
+    }
+
+    /// @inheritdoc IPYUSDX
+    function setEarnerRate(address account, uint24 newRateBps) external onlyRateManager {
+        _setEarnerRate(account, newRateBps);
+    }
+
+    /// @inheritdoc IPYUSDX
+    function setEarnerRateBatch(address[] calldata accounts, uint24[] calldata rates) external onlyRateManager {
+        if (accounts.length != rates.length) revert ArrayLengthMismatch();
+        for (uint256 i; i < accounts.length; ++i) {
+            _setEarnerRate(accounts[i], rates[i]);
+        }
+    }
+
     /* ============ Internal Functions ============ */
 
     /// @dev Internal implementation for setting earning details.
@@ -430,6 +463,38 @@ contract PYUSDX is
 
         accountData.feeRate = feeRate;
         accountData.claimRecipient = claimRecipient;
+    }
+
+    /// @dev Snapshots the account's current index into storage. Returns the new index value.
+    function _updateAccountIndex(address account) internal returns (uint128 newIndex) {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        if (!accountData.isEarning) return uint128(PRECISION);
+
+        newIndex = currentAccountIndex(account);
+        accountData.lastIndex = newIndex;
+        accountData.lastIndexUpdate = uint32(block.timestamp);
+    }
+
+    /// @dev Internal implementation for setting an individual earner's yield rate.
+    function _setEarnerRate(address account, uint24 newRateBps) internal {
+        if (newRateBps > 10_000) revert RateTooHigh();
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        if (!accountData.isEarning) revert NotEarning();
+
+        // Snapshot index at old rate before changing
+        _updateAccountIndex(account);
+
+        uint24 oldRate = accountData.rateBps;
+        if (oldRate == newRateBps) return;
+
+        accountData.rateBps = newRateBps;
+
+        emit EarnerRateSet(account, oldRate, newRateBps);
     }
 
     /// @dev Internal claim implementation.
@@ -528,7 +593,7 @@ contract PYUSDX is
         // Add to recipient (can be earning or non-earning)
         if ($.accounts[recipient].isEarning) {
             _addEarningAmount($, recipient, safeAmount);
-            updateIndex();
+            _updateAccountIndex(recipient);
         } else {
             _addNonEarningAmount($, recipient, safeAmount);
         }
@@ -667,7 +732,7 @@ contract PYUSDX is
             ? _addEarningAmount($, recipient, safeAmount)
             : _addNonEarningAmount($, recipient, safeAmount);
 
-        updateIndex();
+        _updateAccountIndex(senderIsEarning ? sender : recipient);
     }
 
     /// @dev   Transfer between same earning status accounts.
@@ -709,7 +774,8 @@ contract PYUSDX is
                 );
             }
 
-            updateIndex();
+            _updateAccountIndex(sender);
+            _updateAccountIndex(recipient);
         }
     }
 }

@@ -45,6 +45,14 @@ interface IPYUSDX is IContinuousIndexing {
      */
     event StoppedEarning(address indexed account);
 
+    /**
+     * @notice Emitted when an earner's individual yield rate is set.
+     * @param account The earner account.
+     * @param oldRate The previous rate in basis points.
+     * @param newRate The new rate in basis points.
+     */
+    event EarnerRateSet(address indexed account, uint24 oldRate, uint24 newRate);
+
     /* ============ Custom Errors ============ */
 
     /// @notice Thrown when the minter gateway address is zero.
@@ -85,6 +93,9 @@ interface IPYUSDX is IContinuousIndexing {
 
     /// @notice Thrown when burn amount exceeds account balance.
     error InsufficientBalance(address account, uint256 balance, uint256 amount);
+
+    /// @notice Thrown when trying to set a rate for a non-earning account.
+    error NotEarning();
 
     /* ============ Interactive Functions ============ */
 
@@ -144,6 +155,24 @@ interface IPYUSDX is IContinuousIndexing {
         uint16[] calldata feeRates,
         address[] calldata claimRecipients
     ) external;
+
+    /**
+     * @notice Sets the yield rate for a single earner.
+     * @dev    MUST only be callable by RATE_MANAGER_ROLE.
+     * @dev    MUST revert if the account is not earning.
+     * @param account    The earner account.
+     * @param newRateBps The new yield rate in basis points.
+     */
+    function setEarnerRate(address account, uint24 newRateBps) external;
+
+    /**
+     * @notice Sets yield rates for multiple earners.
+     * @dev    MUST only be callable by RATE_MANAGER_ROLE.
+     * @dev    MUST revert if array lengths do not match.
+     * @param accounts The earner accounts.
+     * @param rates    The new yield rates in basis points.
+     */
+    function setEarnerRateBatch(address[] calldata accounts, uint24[] calldata rates) external;
 
     /* ============ View/Pure Functions ============ */
 
@@ -244,6 +273,14 @@ interface IPYUSDX is IContinuousIndexing {
      * @return The principal amount used for yield calculations.
      */
     function earningPrincipalOf(address account) external view returns (uint112);
+
+    /**
+     * @notice Returns the current per-account yield index.
+     * @dev    Returns PRECISION (1e12) for non-earners.
+     * @param account The account to query.
+     * @return The current index for the account.
+     */
+    function currentAccountIndex(address account) external view returns (uint128);
 
     /**
      * @notice The role that can manage earners.
