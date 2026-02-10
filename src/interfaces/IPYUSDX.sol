@@ -16,20 +16,6 @@ interface IPYUSDX is IContinuousIndexing {
     /* ============ Events ============ */
 
     /**
-     * @notice Emitted when PYUSDX is minted to an account.
-     * @param account The account receiving the minted PYUSDX.
-     * @param amount  The amount of PYUSDX minted.
-     */
-    event Minted(address indexed account, uint256 amount);
-
-    /**
-     * @notice Emitted when PYUSDX is burnt from an account.
-     * @param account The account from which PYUSDX is burnt.
-     * @param amount  The amount of PYUSDX burnt.
-     */
-    event Burned(address indexed account, uint256 amount);
-
-    /**
      * @notice Emitted when earning details are set for an account.
      * @param account        The account whose earning details are being set.
      * @param isEarning      Whether the account is earning.
