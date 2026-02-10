@@ -13,8 +13,6 @@ import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 /// @title PYUSDX Base Unit Test
 /// @notice Base test contract with common setup for PYUSDX tests
 abstract contract PYUSDXBaseUnitTest is Test {
-    address public pyusd = makeAddr("pyusd");
-
     MinterGatewayMock public minterGateway;
 
     PYUSDXHarness public pyusdx;
@@ -43,7 +41,7 @@ abstract contract PYUSDXBaseUnitTest is Test {
         // TODO: figure out how to avoid this circular dependency
         minterGateway = new MinterGatewayMock(address(0));
 
-        address implementation = address(new PYUSDXHarness(address(minterGateway), pyusd));
+        address implementation = address(new PYUSDXHarness(address(minterGateway)));
 
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(

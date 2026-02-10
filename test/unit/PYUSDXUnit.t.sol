@@ -5,6 +5,7 @@ import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.
 import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
 import { IForcedTransferable } from "../../lib/m-extensions/src/components/forcedTransferable/IForcedTransferable.sol";
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { AccessControlUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import { PausableUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { UIntMath } from "../../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
 import { IndexingMath } from "../../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
@@ -12,7 +13,11 @@ import { VmSafe } from "../../lib/m-extensions/lib/forge-std/src/Vm.sol";
 
 import { IContinuousIndexing } from "../../src/interfaces/IContinuousIndexing.sol";
 
+import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
+import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
+import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 
 contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -20,6 +25,84 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     uint256 public constant MINT_AMOUNT = 100e6; // 100 PYUSDX (6 decimals)
     uint256 public constant BURN_AMOUNT = 50e6; // 50 PYUSDX (6 decimals)
     uint256 public constant TRANSFER_AMOUNT = 30e6; // 30 PYUSDX (6 decimals)
+
+    /* ============ constructor ============ */
+
+    function test_constructor_revertIfZeroMinterGateway() public {
+        vm.expectRevert(IPYUSDX.ZeroMinterGateway.selector);
+
+        new PYUSDXHarness(address(0));
+    }
+
+    function test_constructor() public {
+        address expectedMinterGateway = makeAddr("expectedMinterGateway");
+
+        PYUSDXHarness newPyusdx = new PYUSDXHarness(expectedMinterGateway);
+
+        assertEq(address(newPyusdx.minterGateway()), expectedMinterGateway);
+    }
+
+    /* ============ initialize ============ */
+
+    function test_initialize_revertIfZeroAdmin() public {
+        address implementation = address(new PYUSDXHarness(makeAddr("MinterGateway")));
+        PYUSDXHarness newPyusdx = PYUSDXHarness(UnsafeUpgrades.deployTransparentProxy(implementation, admin, ""));
+
+        vm.expectRevert(IPYUSDX.ZeroAdmin.selector);
+
+        newPyusdx.initialize(
+            "PayPal USD Yield",
+            "PYUSDX",
+            address(0),
+            pauser,
+            freezeManager,
+            forcedTransferManager,
+            earnerManager,
+            makeAddr("rateManager")
+        );
+    }
+
+    function test_initialize_revertIfZeroEarnerManager() public {
+        address implementation = address(new PYUSDXHarness(makeAddr("MinterGateway")));
+        PYUSDXHarness newPyusdx = PYUSDXHarness(UnsafeUpgrades.deployTransparentProxy(implementation, admin, ""));
+
+        vm.expectRevert(IPYUSDX.ZeroEarnerManager.selector);
+
+        newPyusdx.initialize(
+            "PayPal USD Yield",
+            "PYUSDX",
+            admin,
+            pauser,
+            freezeManager,
+            forcedTransferManager,
+            address(0),
+            makeAddr("rateManager")
+        );
+    }
+
+    function test_initialize_cannotReinitialize() public {
+        vm.expectRevert();
+
+        pyusdx.initialize(
+            "PayPal USD Yield",
+            "PYUSDX",
+            admin,
+            pauser,
+            freezeManager,
+            forcedTransferManager,
+            earnerManager,
+            rateManager
+        );
+    }
+
+    function test_initialize() public {
+        assertEq(pyusdx.name(), "PayPal USD Yield");
+        assertEq(pyusdx.symbol(), "PYUSDX");
+        assertEq(pyusdx.decimals(), 6);
+        assertTrue(pyusdx.hasRole(pyusdx.DEFAULT_ADMIN_ROLE(), admin));
+        assertTrue(pyusdx.hasRole(pyusdx.MINTER_ROLE(), address(minterGateway)));
+        assertTrue(pyusdx.hasRole(pyusdx.EARNER_MANAGER_ROLE(), earnerManager));
+    }
 
     /* ============ mint ============ */
 

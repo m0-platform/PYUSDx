@@ -7,7 +7,7 @@ import { PYUSDX } from "../../src/PYUSDX.sol";
 /// @notice Test harness that exposes internal state and functions for testing
 contract PYUSDXHarness is PYUSDX {
     /// @notice Constructs the harness with the same parameters as PYUSDX
-    constructor(address minterGateway_, address pyusd_) PYUSDX(minterGateway_, pyusd_) {}
+    constructor(address minterGateway_) PYUSDX(minterGateway_) {}
 
     /// @notice Sets earning details for an account directly (bypassing normal checks)
     /// @param account The account to configure

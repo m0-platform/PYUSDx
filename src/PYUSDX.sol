@@ -43,7 +43,6 @@ abstract contract PYUSDXStorageLayout {
 /// @title PYUSDX
 /// @author M0 Labs
 /// @notice PYUSDX upgradeable ERC20 non-rebasing token with claimable yield.
-/// @dev    DUMMY IMPLEMENTATION - Functions return placeholder values.
 contract PYUSDX is
     PYUSDXStorageLayout,
     IPYUSDX,
@@ -69,24 +68,15 @@ contract PYUSDX is
     /// @notice The Minter Gateway contract address.
     address public immutable minterGateway;
 
-    /// @notice The PYUSD token contract address.
-    address public immutable pyusd;
-
     /* ============ Constructor ============ */
 
     /// @notice Constructs the PYUSDX implementation contract.
     /// @param minterGateway_ The Minter Gateway contract address.
-    /// @param pyusd_ The PYUSD token contract address.
-    constructor(address minterGateway_, address pyusd_) {
-        if (minterGateway_ == address(0)) revert ZeroMinterGateway();
-        if (pyusd_ == address(0)) revert ZeroPYUSD();
-
-        minterGateway = minterGateway_;
-
-        // TODO: is PYUSD needed? We may only need it in the Minter Gateway to check balances before minting/burning.
-        pyusd = pyusd_;
-
+    constructor(address minterGateway_) {
         _disableInitializers();
+
+        if (minterGateway_ == address(0)) revert ZeroMinterGateway();
+        minterGateway = minterGateway_;
     }
 
     /* ============ Modifiers ============ */
@@ -141,7 +131,7 @@ contract PYUSDX is
         _grantRole(EARNER_MANAGER_ROLE, earnerManager);
     }
 
-    /* ============ Interactive Functions (TODO Dummies) ============ */
+    /* ============ Interactive Functions ============ */
 
     /// @inheritdoc IPYUSDX
     function mint(address account, uint256 amount) external onlyMinterGateway whenNotPaused {

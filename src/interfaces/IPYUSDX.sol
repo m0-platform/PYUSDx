@@ -64,9 +64,6 @@ interface IPYUSDX is IContinuousIndexing {
     /// @notice Thrown when the minter gateway address is zero.
     error ZeroMinterGateway();
 
-    /// @notice Thrown when the PYUSD token address is zero.
-    error ZeroPYUSD();
-
     /// @notice Thrown when the admin address is zero.
     error ZeroAdmin();
 
@@ -166,9 +163,6 @@ interface IPYUSDX is IContinuousIndexing {
 
     /// @notice The Minter Gateway contract address.
     function minterGateway() external view returns (address);
-
-    /// @notice The PYUSD token contract address.
-    function pyusd() external view returns (address);
 
     /// @notice The maximum fee rate (10000 = 100%).
     function MAX_FEE_RATE() external view returns (uint16);
