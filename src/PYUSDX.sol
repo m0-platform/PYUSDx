@@ -21,17 +21,19 @@ abstract contract PYUSDXStorageLayout {
     }
 
     struct Account {
-        // Existing fields
-        address earnerManager;
+        // Slot 0
         uint240 balance;
-        bool isEarning;
-        uint112 earningPrincipal;
         uint16 feeRate;
-        address claimRecipient;
-        // New fields
-        uint128 lastIndex;
+        // Slot 1
+        address earnerManager;
         uint32 lastIndexUpdate;
         uint24 rateBps;
+        bool isEarning;
+        // Slot 2
+        address claimRecipient;
+        // Slot 3
+        uint128 lastIndex;
+        uint112 earningPrincipal;
     }
 
     // keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDX")) - 1)) & ~bytes32(uint256(0xff))
