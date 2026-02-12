@@ -6,7 +6,9 @@ import { Freezable } from "../lib/m-extensions/src/components/freezable/Freezabl
 import { ForcedTransferable } from "../lib/m-extensions/src/components/forcedTransferable/ForcedTransferable.sol";
 import { Pausable } from "../lib/m-extensions/src/components/pausable/Pausable.sol";
 import { UIntMath } from "../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
-import { ContinuousIndexing } from "./abstract/ContinuousIndexing.sol";
+import { ContinuousIndexingMath } from "../lib/m-extensions/lib/common/src/libs/ContinuousIndexingMath.sol";
+import { IndexingMath } from "../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
+import { AccessControlUpgradeable } from "../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
 
 /// @notice ERC-7201 namespaced storage layout for PYUSDX.
@@ -14,19 +16,25 @@ abstract contract PYUSDXStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.PYUSDX
     struct PYUSDXStorageStruct {
         // Supply tracking
-        uint112 totalEarningPrincipal;
-        uint240 totalNonEarningSupply;
+        uint240 totalSupply;
         // Account data
         mapping(address account => Account) accounts;
     }
 
     struct Account {
-        address earnerManager;
+        // Slot 0
         uint240 balance;
-        bool isEarning;
-        uint112 earningPrincipal;
         uint16 feeRate;
+        // Slot 1
+        address earnerManager;
+        uint32 lastIndexUpdate;
+        uint24 rateBps;
+        bool isEarning;
+        // Slot 2
         address claimRecipient;
+        // Slot 3
+        uint128 lastIndex;
+        uint112 earningPrincipal;
     }
 
     // keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDX")) - 1)) & ~bytes32(uint256(0xff))
@@ -46,7 +54,7 @@ abstract contract PYUSDXStorageLayout {
 contract PYUSDX is
     PYUSDXStorageLayout,
     IPYUSDX,
-    ContinuousIndexing,
+    AccessControlUpgradeable,
     ERC20ExtendedUpgradeable,
     Freezable,
     ForcedTransferable,
@@ -62,6 +70,12 @@ contract PYUSDX is
 
     /// @notice The role that can manage earners.
     bytes32 public constant EARNER_MANAGER_ROLE = keccak256("EARNER_MANAGER_ROLE");
+
+    /// @notice The role that can set yield rates.
+    bytes32 public constant RATE_MANAGER_ROLE = keccak256("RATE_MANAGER_ROLE");
+
+    /// @notice Precision scaling for index calculations (1e12).
+    uint256 public constant PRECISION = 1e12;
 
     /* ============ Immutable Variables ============ */
 
@@ -84,6 +98,12 @@ contract PYUSDX is
     /// @notice Restricts access to only the Minter Gateway contract.
     modifier onlyMinterGateway() {
         if (msg.sender != minterGateway) revert NotMinterGateway();
+        _;
+    }
+
+    /// @notice Restricts access to accounts with RATE_MANAGER_ROLE.
+    modifier onlyRateManager() {
+        if (!hasRole(RATE_MANAGER_ROLE, msg.sender)) revert NotRateManager();
         _;
     }
 
@@ -121,7 +141,8 @@ contract PYUSDX is
         // Initialize ERC20Extended with 6 decimals (PYUSD standard)
         __ERC20ExtendedUpgradeable_init(name, symbol, 6);
 
-        __ContinuousIndexing_init(rateManager);
+        if (rateManager == address(0)) revert ZeroRateManager();
+        _grantRole(RATE_MANAGER_ROLE, rateManager);
         __ForcedTransferable_init(forcedTransferManager);
         __Freezable_init(freezeManager);
         __Pausable_init(pauser);
@@ -143,21 +164,17 @@ contract PYUSDX is
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 
-        // NOTE: Overflow check: prevent a mint that would overflow `totalEarningPrincipal`
-        //       if all tokens (earning and non-earning) were converted to a principal earning amount
         unchecked {
-            if (
-                uint256($.totalNonEarningSupply) + safeAmount > type(uint240).max ||
-                uint256($.totalEarningPrincipal) + _getPrincipalAmountRoundedUp($.totalNonEarningSupply + safeAmount) >=
-                    type(uint112).max
-            ) {
+            if (uint256($.totalSupply) + safeAmount > type(uint240).max) {
                 revert OverflowsPrincipalOfTotalSupply();
             }
+
+            $.totalSupply += safeAmount;
         }
 
         if ($.accounts[account].isEarning) {
-            _addEarningAmount($, account, safeAmount);
-            updateIndex();
+            uint128 accountIndex = _updateAccountIndex(account);
+            _addEarningAmount($, account, safeAmount, accountIndex);
         } else {
             _addNonEarningAmount($, account, safeAmount);
         }
@@ -174,9 +191,13 @@ contract PYUSDX is
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 
+        unchecked {
+            $.totalSupply -= safeAmount;
+        }
+
         if ($.accounts[account].isEarning) {
-            _subtractEarningAmount($, account, safeAmount);
-            updateIndex();
+            uint128 accountIndex = _updateAccountIndex(account);
+            _subtractEarningAmount($, account, safeAmount, accountIndex);
         } else {
             _subtractNonEarningAmount($, account, safeAmount);
         }
@@ -196,7 +217,7 @@ contract PYUSDX is
         uint16 feeRate,
         address claimRecipient
     ) external onlyEarnerManager(account) {
-        _setEarningDetails(account, isEarning_, feeRate, claimRecipient, currentIndex());
+        _setEarningDetails(account, isEarning_, feeRate, claimRecipient);
     }
 
     /// @inheritdoc IPYUSDX
@@ -212,11 +233,9 @@ contract PYUSDX is
             revert ArrayLengthMismatch();
         }
 
-        uint128 currentIndex_ = currentIndex();
-
         for (uint256 i; i < len; ++i) {
             _checkEarnerManager(accounts[i]);
-            _setEarningDetails(accounts[i], isEarning_[i], feeRates[i], claimRecipients[i], currentIndex_);
+            _setEarningDetails(accounts[i], isEarning_[i], feeRates[i], claimRecipients[i]);
         }
     }
 
@@ -246,24 +265,7 @@ contract PYUSDX is
 
     /// @notice Returns the total supply of tokens.
     function totalSupply() public view override returns (uint256) {
-        unchecked {
-            return totalEarningSupply() + totalNonEarningSupply();
-        }
-    }
-
-    /// @inheritdoc IPYUSDX
-    function totalEarningPrincipal() public view returns (uint112) {
-        return _getPYUSDXStorageLocation().totalEarningPrincipal;
-    }
-
-    /// @inheritdoc IPYUSDX
-    function totalEarningSupply() public view returns (uint240) {
-        return _getPresentAmountRoundedDown(totalEarningPrincipal());
-    }
-
-    /// @inheritdoc IPYUSDX
-    function totalNonEarningSupply() public view returns (uint240) {
-        return _getPYUSDXStorageLocation().totalNonEarningSupply;
+        return _getPYUSDXStorageLocation().totalSupply;
     }
 
     /// @notice Returns whether an account is earning yield.
@@ -339,8 +341,11 @@ contract PYUSDX is
 
         if (!accountData.isEarning) return 0;
 
-        // Calculate present value from principal
-        uint240 balanceWithYield = _getPresentAmountRoundedDown(accountData.earningPrincipal);
+        // Calculate present value from principal using per-account index
+        uint240 balanceWithYield = _getPresentAmountRoundedDown(
+            accountData.earningPrincipal,
+            currentAccountIndex(account)
+        );
 
         // Yield = present value - stored balance
         uint240 balance = accountData.balance;
@@ -359,16 +364,43 @@ contract PYUSDX is
         return _getPYUSDXStorageLocation().accounts[account].earningPrincipal;
     }
 
+    /// @inheritdoc IPYUSDX
+    function currentAccountIndex(address account) public view returns (uint128) {
+        Account storage accountData = _getPYUSDXStorageLocation().accounts[account];
+
+        if (!accountData.isEarning) return uint128(PRECISION);
+
+        unchecked {
+            return
+                UIntMath.bound128(
+                    ContinuousIndexingMath.multiplyIndicesDown(
+                        accountData.lastIndex,
+                        ContinuousIndexingMath.getContinuousIndex(
+                            ContinuousIndexingMath.convertFromBasisPoints(accountData.rateBps),
+                            uint32(block.timestamp - accountData.lastIndexUpdate)
+                        )
+                    )
+                );
+        }
+    }
+
+    /// @inheritdoc IPYUSDX
+    function setEarnerRate(address account, uint24 newRateBps) external onlyRateManager {
+        _setEarnerRate(account, newRateBps);
+    }
+
+    /// @inheritdoc IPYUSDX
+    function setEarnerRateBatch(address[] calldata accounts, uint24[] calldata rates) external onlyRateManager {
+        if (accounts.length != rates.length) revert ArrayLengthMismatch();
+        for (uint256 i; i < accounts.length; ++i) {
+            _setEarnerRate(accounts[i], rates[i]);
+        }
+    }
+
     /* ============ Internal Functions ============ */
 
     /// @dev Internal implementation for setting earning details.
-    function _setEarningDetails(
-        address account,
-        bool isEarning_,
-        uint16 feeRate,
-        address claimRecipient,
-        uint128 currentIndex_
-    ) internal {
+    function _setEarningDetails(address account, bool isEarning_, uint16 feeRate, address claimRecipient) internal {
         _revertIfZeroAccount(account);
         if (feeRate > MAX_FEE_RATE) revert FeeRateTooHigh(feeRate);
         if (!isEarning_ && feeRate != 0) revert InvalidDetails();
@@ -397,12 +429,11 @@ contract PYUSDX is
         if (isEarning_ && !wasEarning) {
             accountData.earnerManager = msg.sender;
             accountData.isEarning = true;
+            accountData.lastIndex = uint128(PRECISION);
+            accountData.lastIndexUpdate = uint32(block.timestamp);
 
-            uint112 principal = _getPrincipalAmountRoundedDown(balance, currentIndex_);
+            uint112 principal = _getPrincipalAmountRoundedDown(balance, uint128(PRECISION));
             accountData.earningPrincipal = principal;
-
-            $.totalEarningPrincipal += principal;
-            $.totalNonEarningSupply -= balance;
         } else if (isEarning_ && wasEarning) {
             // Update manager if caller is different (takeover scenario)
             if (accountData.earnerManager != msg.sender) {
@@ -412,18 +443,48 @@ contract PYUSDX is
 
         // Disable earning (earner → non-earner)
         else if (!isEarning_ && wasEarning) {
-            uint112 principal = accountData.earningPrincipal;
-
             accountData.isEarning = false;
             accountData.earningPrincipal = 0;
             accountData.earnerManager = address(0);
-
-            $.totalEarningPrincipal -= principal;
-            $.totalNonEarningSupply += balance;
+            accountData.lastIndex = 0;
+            accountData.lastIndexUpdate = 0;
+            accountData.rateBps = 0;
         }
 
         accountData.feeRate = feeRate;
         accountData.claimRecipient = claimRecipient;
+    }
+
+    /// @dev Snapshots the account's current index into storage. Returns the new index value.
+    function _updateAccountIndex(address account) internal returns (uint128 newIndex) {
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        if (!accountData.isEarning) return uint128(PRECISION);
+
+        newIndex = currentAccountIndex(account);
+        accountData.lastIndex = newIndex;
+        accountData.lastIndexUpdate = uint32(block.timestamp);
+    }
+
+    /// @dev Internal implementation for setting an individual earner's yield rate.
+    function _setEarnerRate(address account, uint24 newRateBps) internal {
+        if (newRateBps > 10_000) revert RateTooHigh();
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        Account storage accountData = $.accounts[account];
+
+        if (!accountData.isEarning) revert NotEarning();
+
+        // Snapshot index at old rate before changing
+        _updateAccountIndex(account);
+
+        uint24 oldRate = accountData.rateBps;
+        if (oldRate == newRateBps) return;
+
+        accountData.rateBps = newRateBps;
+
+        emit EarnerRateSet(account, oldRate, newRateBps);
     }
 
     /// @dev Internal claim implementation.
@@ -450,6 +511,7 @@ contract PYUSDX is
         // Add full yield to balance (yield is minted)
         unchecked {
             accountData.balance += yield;
+            $.totalSupply += yield;
         }
 
         address claimRecipient = accountData.claimRecipient;
@@ -485,17 +547,14 @@ contract PYUSDX is
         // Claim any accrued yield first
         _claim(account);
 
-        uint240 balance = accountData.balance;
-        uint112 principal = accountData.earningPrincipal;
-
         accountData.isEarning = false;
         accountData.earningPrincipal = 0;
         accountData.earnerManager = address(0);
         accountData.feeRate = 0;
         accountData.claimRecipient = address(0);
-
-        $.totalEarningPrincipal -= principal;
-        $.totalNonEarningSupply += balance;
+        accountData.lastIndex = 0;
+        accountData.lastIndexUpdate = 0;
+        accountData.rateBps = 0;
 
         emit StoppedEarning(account);
     }
@@ -521,8 +580,8 @@ contract PYUSDX is
 
         // Add to recipient (can be earning or non-earning)
         if ($.accounts[recipient].isEarning) {
-            _addEarningAmount($, recipient, safeAmount);
-            updateIndex();
+            uint128 recipientIndex = _updateAccountIndex(recipient);
+            _addEarningAmount($, recipient, safeAmount, recipientIndex);
         } else {
             _addNonEarningAmount($, recipient, safeAmount);
         }
@@ -565,7 +624,6 @@ contract PYUSDX is
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `_mint`.
         unchecked {
             $.accounts[account].balance += amount;
-            $.totalNonEarningSupply += amount;
         }
     }
 
@@ -573,13 +631,18 @@ contract PYUSDX is
     /// @param $ The storage pointer.
     /// @param account The account to add the amount to.
     /// @param amount The present amount to add (must be safe240).
-    function _addEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount) internal {
-        uint112 principal = _getPrincipalAmountRoundedDown(amount);
+    /// @param accountIndex The per-account index to use for principal conversion.
+    function _addEarningAmount(
+        PYUSDXStorageStruct storage $,
+        address account,
+        uint240 amount,
+        uint128 accountIndex
+    ) internal {
+        uint112 principal = _getPrincipalAmountRoundedDown(amount, accountIndex);
 
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `_mint`.
         unchecked {
             $.accounts[account].balance += amount;
-            $.totalEarningPrincipal += principal;
             $.accounts[account].earningPrincipal += principal;
         }
     }
@@ -597,7 +660,6 @@ contract PYUSDX is
 
         unchecked {
             $.accounts[account].balance -= amount;
-            $.totalNonEarningSupply -= amount;
         }
     }
 
@@ -605,24 +667,45 @@ contract PYUSDX is
     /// @param $ The storage pointer.
     /// @param account The account to subtract the amount from.
     /// @param amount The present amount to subtract (must be safe240).
-    function _subtractEarningAmount(PYUSDXStorageStruct storage $, address account, uint240 amount) internal {
+    /// @param accountIndex The per-account index to use for principal conversion.
+    function _subtractEarningAmount(
+        PYUSDXStorageStruct storage $,
+        address account,
+        uint240 amount,
+        uint128 accountIndex
+    ) internal {
         uint240 accountBalance = $.accounts[account].balance;
 
         if (accountBalance < amount) {
             revert InsufficientBalance(account, accountBalance, amount);
         }
 
-        uint112 principal = _getPrincipalAmountRoundedUp(amount);
+        uint112 principal = _getPrincipalAmountRoundedUp(amount, accountIndex);
         uint112 earningPrincipal = $.accounts[account].earningPrincipal;
-        uint112 totalPrincipal = $.totalEarningPrincipal;
 
         unchecked {
             $.accounts[account].balance -= amount;
 
             // NOTE: `min112` prevents underflow.
             $.accounts[account].earningPrincipal = earningPrincipal - UIntMath.min112(principal, earningPrincipal);
-            $.totalEarningPrincipal = totalPrincipal - UIntMath.min112(principal, totalPrincipal);
         }
+    }
+
+    /* ============ Internal View/Pure Functions ============ */
+
+    /// @dev Returns the present amount (rounded down) given the principal amount and an index.
+    function _getPresentAmountRoundedDown(uint112 principalAmount, uint128 index) internal pure returns (uint240) {
+        return uint240(IndexingMath.getPresentAmountRoundedDown(principalAmount, index));
+    }
+
+    /// @dev Returns the principal amount (rounded down) given the present amount and an index.
+    function _getPrincipalAmountRoundedDown(uint240 presentAmount, uint128 index) internal pure returns (uint112) {
+        return IndexingMath.getPrincipalAmountRoundedDown(presentAmount, index);
+    }
+
+    /// @dev Returns the principal amount (rounded up) given the present amount and an index.
+    function _getPrincipalAmountRoundedUp(uint240 presentAmount, uint128 index) internal pure returns (uint112) {
+        return IndexingMath.getPrincipalAmountRoundedUp(presentAmount, index);
     }
 
     /// @dev Required override for ERC20ExtendedUpgradeable.
@@ -633,7 +716,6 @@ contract PYUSDX is
         _revertIfFrozen(msg.sender);
         _revertIfFrozen(sender);
         _revertIfFrozen(recipient);
-
         _revertIfZeroAccount(recipient);
 
         emit Transfer(sender, recipient, amount);
@@ -641,69 +723,22 @@ contract PYUSDX is
         if (amount == 0) return;
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-
-        bool senderIsEarning = $.accounts[sender].isEarning;
-        bool recipientIsEarning = $.accounts[recipient].isEarning;
-
         uint240 safeAmount = UIntMath.safe240(amount);
 
-        // NOTE: Same earning status: direct updates (total supply unchanged)
-        if (senderIsEarning == recipientIsEarning) {
-            return _transferAmountInKind($, sender, senderIsEarning, recipient, safeAmount);
+        // Subtract from sender
+        if ($.accounts[sender].isEarning) {
+            uint128 senderIndex = _updateAccountIndex(sender);
+            _subtractEarningAmount($, sender, safeAmount, senderIndex);
+        } else {
+            _subtractNonEarningAmount($, sender, safeAmount);
         }
 
-        // NOTE: Different earning status: use internal functions (updates totals)
-        senderIsEarning
-            ? _subtractEarningAmount($, sender, safeAmount)
-            : _subtractNonEarningAmount($, sender, safeAmount);
-
-        recipientIsEarning
-            ? _addEarningAmount($, recipient, safeAmount)
-            : _addNonEarningAmount($, recipient, safeAmount);
-
-        updateIndex();
-    }
-
-    /// @dev   Transfer between same earning status accounts.
-    /// @param $               The storage pointer.
-    /// @param sender          The account to transfer from.
-    /// @param senderIsEarning Whether the sender is earning.
-    /// @param recipient       The account to transfer to.
-    /// @param amount          The amount to transfer.
-    function _transferAmountInKind(
-        PYUSDXStorageStruct storage $,
-        address sender,
-        bool senderIsEarning,
-        address recipient,
-        uint240 amount
-    ) internal {
-        uint240 senderBalance = $.accounts[sender].balance;
-
-        if (senderBalance < amount) revert InsufficientBalance(sender, senderBalance, amount);
-
-        // NOTE: When transferring an amount in kind, the `balance` can't overflow
-        //       since the total supply would have overflowed first when minting.
-        unchecked {
-            $.accounts[sender].balance -= amount;
-            $.accounts[recipient].balance += amount;
-        }
-
-        // NOTE: Both earning, transfer principal.
-        if (senderIsEarning) {
-            // NOTE: `min112` prevents underflow.
-            uint112 principal = UIntMath.min112(
-                _getPrincipalAmountRoundedUp(amount),
-                $.accounts[sender].earningPrincipal
-            );
-
-            unchecked {
-                $.accounts[sender].earningPrincipal -= principal;
-                $.accounts[recipient].earningPrincipal = UIntMath.safe112(
-                    uint256($.accounts[recipient].earningPrincipal) + principal
-                );
-            }
-
-            updateIndex();
+        // Add to recipient
+        if ($.accounts[recipient].isEarning) {
+            uint128 recipientIndex = _updateAccountIndex(recipient);
+            _addEarningAmount($, recipient, safeAmount, recipientIndex);
+        } else {
+            _addNonEarningAmount($, recipient, safeAmount);
         }
     }
 }

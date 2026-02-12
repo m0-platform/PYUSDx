@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { IContinuousIndexing } from "./IContinuousIndexing.sol";
-
 /**
  * @title IPYUSDX
  * @author M0 Labs
@@ -12,7 +10,7 @@ import { IContinuousIndexing } from "./IContinuousIndexing.sol";
  *         - Built-in pausing and compliance functionalities
  *         - Earner Manager controlled yield distribution
  */
-interface IPYUSDX is IContinuousIndexing {
+interface IPYUSDX {
     /* ============ Events ============ */
 
     /**
@@ -44,6 +42,14 @@ interface IPYUSDX is IContinuousIndexing {
      * @param account The account that stopped earning.
      */
     event StoppedEarning(address indexed account);
+
+    /**
+     * @notice Emitted when an earner's individual yield rate is set.
+     * @param account The earner account.
+     * @param oldRate The previous rate in basis points.
+     * @param newRate The new rate in basis points.
+     */
+    event EarnerRateSet(address indexed account, uint24 oldRate, uint24 newRate);
 
     /* ============ Custom Errors ============ */
 
@@ -85,6 +91,18 @@ interface IPYUSDX is IContinuousIndexing {
 
     /// @notice Thrown when burn amount exceeds account balance.
     error InsufficientBalance(address account, uint256 balance, uint256 amount);
+
+    /// @notice Thrown when trying to set a rate for a non-earning account.
+    error NotEarning();
+
+    /// @notice Thrown when caller lacks RATE_MANAGER_ROLE.
+    error NotRateManager();
+
+    /// @notice Thrown when rate exceeds maximum (100%).
+    error RateTooHigh();
+
+    /// @notice Thrown when the rate manager address is zero.
+    error ZeroRateManager();
 
     /* ============ Interactive Functions ============ */
 
@@ -145,6 +163,24 @@ interface IPYUSDX is IContinuousIndexing {
         address[] calldata claimRecipients
     ) external;
 
+    /**
+     * @notice Sets the yield rate for a single earner.
+     * @dev    MUST only be callable by RATE_MANAGER_ROLE.
+     * @dev    MUST revert if the account is not earning.
+     * @param account    The earner account.
+     * @param newRateBps The new yield rate in basis points.
+     */
+    function setEarnerRate(address account, uint24 newRateBps) external;
+
+    /**
+     * @notice Sets yield rates for multiple earners.
+     * @dev    MUST only be callable by RATE_MANAGER_ROLE.
+     * @dev    MUST revert if array lengths do not match.
+     * @param accounts The earner accounts.
+     * @param rates    The new yield rates in basis points.
+     */
+    function setEarnerRateBatch(address[] calldata accounts, uint24[] calldata rates) external;
+
     /* ============ View/Pure Functions ============ */
 
     /// @notice The Minter Gateway contract address.
@@ -152,15 +188,6 @@ interface IPYUSDX is IContinuousIndexing {
 
     /// @notice The maximum fee rate (10000 = 100%).
     function MAX_FEE_RATE() external view returns (uint16);
-
-    /// @notice The total principal amount of earning accounts.
-    function totalEarningPrincipal() external view returns (uint112);
-
-    /// @notice The total supply of tokens in earning state.
-    function totalEarningSupply() external view returns (uint240);
-
-    /// @notice The total supply of tokens not earning yield.
-    function totalNonEarningSupply() external view returns (uint240);
 
     /**
      * @notice Returns whether an account is earning.
@@ -246,6 +273,14 @@ interface IPYUSDX is IContinuousIndexing {
     function earningPrincipalOf(address account) external view returns (uint112);
 
     /**
+     * @notice Returns the current per-account yield index.
+     * @dev    Returns PRECISION (1e12) for non-earners.
+     * @param account The account to query.
+     * @return The current index for the account.
+     */
+    function currentAccountIndex(address account) external view returns (uint128);
+
+    /**
      * @notice The role that can manage earners.
      * @return The EARNER_MANAGER_ROLE bytes32 value.
      */
@@ -256,4 +291,10 @@ interface IPYUSDX is IContinuousIndexing {
      * @return The MINTER_ROLE bytes32 value.
      */
     function MINTER_ROLE() external view returns (bytes32);
+
+    /**
+     * @notice The role that can set yield rates.
+     * @return The RATE_MANAGER_ROLE bytes32 value.
+     */
+    function RATE_MANAGER_ROLE() external view returns (bytes32);
 }

@@ -8,25 +8,15 @@ import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 /// @title PYUSDX Invariant Tests
 /// @notice Invariant tests for PYUSDX
 contract PYUSDXInvariants is PYUSDXBaseUnitTest {
-    /* ============ Invariant: Total Supply Equality ============ */
+    /* ============ Invariant: Total Supply >= Sum of Balances ============ */
 
-    function inv_totalSupplyEqualsSumOfEarningAndNonEarning() public view {
-        assertEq(
-            pyusdx.totalSupply(),
-            uint256(pyusdx.totalEarningSupply()) + uint256(pyusdx.totalNonEarningSupply()),
-            "totalSupply != totalEarningSupply + totalNonEarningSupply"
-        );
-    }
+    function inv_totalSupplyGeSumOfBalances() public view {
+        uint256 sumOfBalances = pyusdx.balanceOf(alice) +
+            pyusdx.balanceOf(bob) +
+            pyusdx.balanceOf(carol) +
+            pyusdx.balanceOf(david);
 
-    /* ============ Invariant: Index Never Decreases ============ */
-
-    uint128 private lastIndex = 1e12; // PRECISION
-
-    function inv_indexNeverDecreases() public {
-        uint128 currentIndex = pyusdx.currentIndex();
-
-        assertTrue(currentIndex >= lastIndex, "Index decreased");
-        lastIndex = currentIndex;
+        assertTrue(pyusdx.totalSupply() >= sumOfBalances, "totalSupply < sum of balances");
     }
 
     /* ============ Invariant: Non-Earning Principal Zero ============ */
@@ -84,11 +74,9 @@ contract PYUSDXInvariants is PYUSDXBaseUnitTest {
     /* ============ Invariant Handlers ============ */
 
     // TODO: improve invariant testing by adding more handlers for different state-changing actions
-    function inv_mintPreservesSupplyEquality() public {
+    function inv_mintPreservesTotalSupply() public {
         uint256 amount = 100e6; // Fixed amount for invariant testing
 
-        uint256 totalEarningBefore = pyusdx.totalEarningSupply();
-        uint256 totalNonEarningBefore = pyusdx.totalNonEarningSupply();
         uint256 totalSupplyBefore = pyusdx.totalSupply();
 
         // Mint to non-earning account
@@ -96,13 +84,7 @@ contract PYUSDXInvariants is PYUSDXBaseUnitTest {
 
         // Check invariants still hold
         assertEq(pyusdx.totalSupply(), totalSupplyBefore + amount, "Total supply increased by amount");
-        assertEq(
-            pyusdx.totalNonEarningSupply(),
-            totalNonEarningBefore + uint240(amount),
-            "Non-earning supply increased by amount"
-        );
-        assertEq(pyusdx.totalEarningSupply(), totalEarningBefore, "Earning supply unchanged");
 
-        inv_totalSupplyEqualsSumOfEarningAndNonEarning();
+        inv_totalSupplyGeSumOfBalances();
     }
 }
