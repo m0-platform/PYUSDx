@@ -1,0 +1,511 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.26;
+
+import { Test } from "../../lib/m-extensions/lib/forge-std/src/Test.sol";
+import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+
+import { PYUSDX } from "../../src/PYUSDX.sol";
+import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
+import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
+import { MultiMint } from "../../src/MultiMint.sol";
+import { IMultiMint } from "../../src/interfaces/IMultiMint.sol";
+import { YieldToOne } from "../../src/YieldToOne.sol";
+import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IERC20Extended } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
+import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
+import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
+import { MockERC20 } from "../mock/MockERC20.sol";
+import { FeeOnTransferMock } from "../mock/FeeOnTransferMock.sol";
+
+contract MultiMintTest is Test {
+    MinterGatewayMock public minterGateway;
+    PYUSDXHarness public pyusdx;
+    MultiMint public extension;
+
+    MockERC20 public usdc; // 6 decimals
+    MockERC20 public dai; // 18 decimals
+    MockERC20 public fourDec; // 4 decimals
+
+    address public admin = makeAddr("admin");
+    address public pauser = makeAddr("pauser");
+    address public freezeManager = makeAddr("freezeManager");
+    address public earnerManager = makeAddr("earnerManager");
+    address public rateManager = makeAddr("rateManager");
+    address public assetCapManager = makeAddr("assetCapManager");
+    address public yieldRecipientManager = makeAddr("yieldRecipientManager");
+
+    address public yieldRecipient = makeAddr("yieldRecipient");
+    address public alice = makeAddr("alice");
+    address public bob = makeAddr("bob");
+
+    uint256 public constant MINT_AMOUNT = 1000e6;
+
+    function setUp() public {
+        minterGateway = new MinterGatewayMock(address(0));
+        address pyusdxImpl = address(new PYUSDXHarness(address(minterGateway)));
+        pyusdx = PYUSDXHarness(
+            UnsafeUpgrades.deployTransparentProxy(
+                pyusdxImpl,
+                admin,
+                abi.encodeWithSelector(
+                    PYUSDX.initialize.selector,
+                    "PayPal USD Yield",
+                    "PYUSDX",
+                    admin,
+                    pauser,
+                    freezeManager,
+                    address(1),
+                    earnerManager,
+                    rateManager
+                )
+            )
+        );
+        minterGateway.setPyusdx(address(pyusdx));
+
+        address extensionImpl = address(new MultiMint(address(pyusdx)));
+        extension = MultiMint(
+            UnsafeUpgrades.deployTransparentProxy(
+                extensionImpl,
+                admin,
+                abi.encodeWithSelector(
+                    MultiMint.initialize.selector,
+                    "MultiMint",
+                    "MM",
+                    yieldRecipient,
+                    admin,
+                    assetCapManager,
+                    freezeManager,
+                    pauser,
+                    yieldRecipientManager
+                )
+            )
+        );
+
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(address(extension), true, earnerManager, 0, address(0));
+        pyusdx.setAccountRateBps(address(extension), uint24(500));
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(address(extension), 500);
+
+        usdc = new MockERC20("USD Coin", "USDC", 6);
+        dai = new MockERC20("Dai", "DAI", 18);
+        fourDec = new MockERC20("FourDec", "4DEC", 4);
+
+        vm.startPrank(assetCapManager);
+        extension.setAssetCap(address(usdc), 1_000_000e6);
+        extension.setAssetCap(address(dai), 1_000_000e18);
+        extension.setAssetCap(address(fourDec), 1_000_000e4);
+        vm.stopPrank();
+    }
+
+    /* ============ Helpers ============ */
+
+    function _wrapPyusdxFor(address to, address recipient, uint256 amount) internal {
+        minterGateway.mint(to, amount);
+
+        vm.prank(to);
+        IERC20(address(pyusdx)).approve(address(extension), amount);
+
+        vm.prank(to);
+        extension.wrap(recipient, amount);
+    }
+
+    function _wrapAssetFor(address user, address asset, uint256 amount) internal {
+        MockERC20(asset).mint(user, amount);
+
+        vm.prank(user);
+        IERC20(asset).approve(address(extension), amount);
+
+        vm.prank(user);
+        extension.wrap(asset, user, amount);
+    }
+
+    /* ============ Initialization ============ */
+
+    function test_initialize() public view {
+        assertEq(extension.name(), "MultiMint");
+        assertEq(extension.symbol(), "MM");
+        assertEq(extension.decimals(), 6);
+        assertEq(extension.yieldRecipient(), yieldRecipient);
+        assertEq(extension.pyusdx(), address(pyusdx));
+        assertTrue(extension.hasRole(extension.DEFAULT_ADMIN_ROLE(), admin));
+        assertTrue(extension.hasRole(extension.ASSET_CAP_MANAGER_ROLE(), assetCapManager));
+        assertTrue(extension.hasRole(extension.YIELD_RECIPIENT_MANAGER_ROLE(), yieldRecipientManager));
+    }
+
+    /* ============ PYUSDX Wrapping (inherited) ============ */
+
+    function test_wrap_pyusdx() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        assertEq(extension.balanceOf(alice), MINT_AMOUNT);
+        assertEq(extension.totalSupply(), MINT_AMOUNT);
+        assertEq(pyusdx.balanceOf(address(extension)), MINT_AMOUNT);
+    }
+
+    /* ============ Multi-Asset Wrapping ============ */
+
+    function test_wrap_asset_6decimals() public {
+        _wrapAssetFor(alice, address(usdc), 500e6);
+
+        assertEq(extension.balanceOf(alice), 500e6);
+        assertEq(extension.totalSupply(), 500e6);
+        assertEq(extension.totalAssets(), 500e6);
+        assertEq(extension.assetBalanceOf(address(usdc)), 500e6);
+        assertEq(usdc.balanceOf(address(extension)), 500e6);
+    }
+
+    function test_wrap_asset_18decimals() public {
+        _wrapAssetFor(alice, address(dai), 500e18);
+
+        assertEq(extension.balanceOf(alice), 500e6);
+        assertEq(extension.totalSupply(), 500e6);
+        assertEq(extension.totalAssets(), 500e6);
+        assertEq(extension.assetBalanceOf(address(dai)), 500e18);
+    }
+
+    function test_wrap_asset_4decimals() public {
+        _wrapAssetFor(alice, address(fourDec), 500e4);
+
+        assertEq(extension.balanceOf(alice), 500e6);
+        assertEq(extension.totalSupply(), 500e6);
+        assertEq(extension.totalAssets(), 500e6);
+        assertEq(extension.assetBalanceOf(address(fourDec)), 500e4);
+    }
+
+    function test_wrap_asset_revert_invalidAsset_zero() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
+        extension.wrap(address(0), alice, 100e6);
+    }
+
+    function test_wrap_asset_revert_invalidAsset_pyusdx() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
+        extension.wrap(address(pyusdx), alice, 100e6);
+    }
+
+    function test_wrap_asset_revert_capReached() public {
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(usdc), 100e6);
+
+        usdc.mint(alice, 200e6);
+        vm.prank(alice);
+        usdc.approve(address(extension), 200e6);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.AssetCapReached.selector, address(usdc)));
+        extension.wrap(address(usdc), alice, 200e6);
+    }
+
+    function test_wrap_asset_revert_feeOnTransfer() public {
+        FeeOnTransferMock feeToken = new FeeOnTransferMock("FeeToken", "FEE", 6);
+
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(feeToken), 1_000_000e6);
+
+        feeToken.mint(alice, 200e6);
+        vm.prank(alice);
+        feeToken.approve(address(extension), 200e6);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(IMultiMint.InsufficientAssetReceived.selector, address(feeToken), 200e6, 198e6)
+        );
+        extension.wrap(address(feeToken), alice, 200e6);
+    }
+
+    function test_wrap_asset_revert_zeroAmount() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IERC20Extended.InsufficientAmount.selector, 0));
+        extension.wrap(address(usdc), alice, 0);
+    }
+
+    function test_wrap_asset_revert_frozen() public {
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        usdc.mint(alice, 100e6);
+        vm.prank(alice);
+        usdc.approve(address(extension), 100e6);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        extension.wrap(address(usdc), alice, 100e6);
+    }
+
+    function test_wrap_asset_revert_paused() public {
+        vm.prank(pauser);
+        extension.pause();
+
+        usdc.mint(alice, 100e6);
+        vm.prank(alice);
+        usdc.approve(address(extension), 100e6);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        extension.wrap(address(usdc), alice, 100e6);
+    }
+
+    function test_wrap_asset_revert_truncatesToZero() public {
+        dai.mint(alice, 1);
+        vm.prank(alice);
+        dai.approve(address(extension), 1);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IERC20Extended.InsufficientAmount.selector, 0));
+        extension.wrap(address(dai), alice, 1);
+    }
+
+    /* ============ Unwrap with Backing Constraint ============ */
+
+    function test_unwrap_revert_insufficientPYUSDXBacking() public {
+        _wrapPyusdxFor(alice, alice, 60e6);
+        _wrapAssetFor(alice, address(usdc), 40e6);
+
+        assertEq(extension.totalSupply(), 100e6);
+        assertEq(extension.totalAssets(), 40e6);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InsufficientPYUSDXBacking.selector, 70e6, 60e6));
+        extension.unwrap(70e6);
+    }
+
+    function test_unwrap_fullPYUSDXBacking() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(alice);
+        extension.unwrap(MINT_AMOUNT);
+
+        assertEq(extension.balanceOf(alice), 0);
+        assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
+    }
+
+    function test_unwrap_partialWithAltAssets() public {
+        _wrapPyusdxFor(alice, alice, 60e6);
+        _wrapAssetFor(alice, address(usdc), 40e6);
+
+        vm.prank(alice);
+        extension.unwrap(60e6);
+
+        assertEq(extension.balanceOf(alice), 40e6);
+        assertEq(pyusdx.balanceOf(alice), 60e6);
+    }
+
+    /* ============ Replace Asset with PYUSDX ============ */
+
+    function test_replaceAssetWithPYUSDX() public {
+        _wrapAssetFor(alice, address(usdc), 100e6);
+
+        minterGateway.mint(bob, 50e6);
+        vm.prank(bob);
+        IERC20(address(pyusdx)).approve(address(extension), 50e6);
+
+        vm.prank(bob);
+        extension.replaceAssetWithPYUSDX(address(usdc), bob, 50e6);
+
+        assertEq(usdc.balanceOf(bob), 50e6);
+        assertEq(extension.assetBalanceOf(address(usdc)), 50e6);
+        assertEq(pyusdx.balanceOf(address(extension)), 50e6);
+        assertEq(extension.totalAssets(), 50e6);
+        assertEq(extension.totalSupply(), 100e6);
+    }
+
+    function test_replaceAssetWithPYUSDX_revert_insufficientAssetBacking() public {
+        _wrapAssetFor(alice, address(usdc), 50e6);
+
+        minterGateway.mint(bob, 100e6);
+        vm.prank(bob);
+        IERC20(address(pyusdx)).approve(address(extension), 100e6);
+
+        vm.prank(bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(IMultiMint.InsufficientAssetBacking.selector, address(usdc), 100e6, 50e6)
+        );
+        extension.replaceAssetWithPYUSDX(address(usdc), bob, 100e6);
+    }
+
+    function test_replaceAssetWithPYUSDX_revert_invalidAsset() public {
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
+        extension.replaceAssetWithPYUSDX(address(0), bob, 50e6);
+    }
+
+    function test_replaceAssetWithPYUSDX_crossDecimal() public {
+        _wrapAssetFor(alice, address(dai), 500e18);
+
+        minterGateway.mint(bob, 200e6);
+        vm.prank(bob);
+        IERC20(address(pyusdx)).approve(address(extension), 200e6);
+
+        vm.prank(bob);
+        extension.replaceAssetWithPYUSDX(address(dai), bob, 200e6);
+
+        assertEq(dai.balanceOf(bob), 200e18);
+        assertEq(extension.assetBalanceOf(address(dai)), 300e18);
+        assertEq(extension.totalAssets(), 300e6);
+    }
+
+    function test_replaceAssetWithPYUSDX_revert_paused() public {
+        _wrapAssetFor(alice, address(usdc), 100e6);
+
+        minterGateway.mint(bob, 50e6);
+        vm.prank(bob);
+        IERC20(address(pyusdx)).approve(address(extension), 50e6);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        vm.prank(bob);
+        vm.expectRevert();
+        extension.replaceAssetWithPYUSDX(address(usdc), bob, 50e6);
+    }
+
+    function test_replaceAssetWithPYUSDX_emitsEvent() public {
+        _wrapAssetFor(alice, address(usdc), 100e6);
+
+        minterGateway.mint(bob, 50e6);
+        vm.prank(bob);
+        IERC20(address(pyusdx)).approve(address(extension), 50e6);
+
+        vm.prank(bob);
+        vm.expectEmit(true, true, false, true, address(extension));
+        emit IMultiMint.AssetReplacedWithPYUSDX(address(usdc), 50e6, bob, 50e6);
+        extension.replaceAssetWithPYUSDX(address(usdc), bob, 50e6);
+    }
+
+    /* ============ Asset Cap Management ============ */
+
+    function test_setAssetCap() public {
+        MockERC20 newToken = new MockERC20("New", "NEW", 8);
+
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(newToken), 500e8);
+
+        assertEq(extension.assetCap(address(newToken)), 500e8);
+        assertEq(extension.assetDecimals(address(newToken)), 8);
+        assertTrue(extension.isAllowedAsset(address(newToken)));
+    }
+
+    function test_setAssetCap_revert_unauthorized() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        extension.setAssetCap(address(usdc), 999e6);
+    }
+
+    function test_setAssetCap_revert_invalidAsset() public {
+        vm.prank(assetCapManager);
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
+        extension.setAssetCap(address(0), 100e6);
+    }
+
+    function test_setAssetCap_disableAsset() public {
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(usdc), 0);
+
+        assertFalse(extension.isAllowedAsset(address(usdc)));
+
+        usdc.mint(alice, 100e6);
+        vm.prank(alice);
+        usdc.approve(address(extension), 100e6);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.AssetCapReached.selector, address(usdc)));
+        extension.wrap(address(usdc), alice, 100e6);
+    }
+
+    /* ============ Yield ============ */
+
+    function test_yield_withAltAssets() public {
+        _wrapPyusdxFor(alice, alice, 60e6);
+        _wrapAssetFor(alice, address(usdc), 40e6);
+
+        assertEq(extension.yield(), 0);
+
+        vm.warp(block.timestamp + 365 days);
+        pyusdx.claimFor(address(extension));
+
+        uint256 yield_ = extension.yield();
+        assertGt(yield_, 0);
+
+        // pyusdxBacking = totalSupply - totalAssets = 100e6 - 40e6 = 60e6
+        assertEq(yield_, pyusdx.balanceOf(address(extension)) - 60e6);
+    }
+
+    function test_claimYield() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 claimed = extension.claimYield();
+
+        assertGt(claimed, 0);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
+        assertEq(extension.yield(), 0);
+    }
+
+    function test_setYieldRecipient() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        address newRecipient = makeAddr("newRecipient");
+
+        vm.prank(yieldRecipientManager);
+        extension.setYieldRecipient(newRecipient);
+
+        assertEq(extension.yieldRecipient(), newRecipient);
+        assertGt(extension.balanceOf(yieldRecipient), 0);
+    }
+
+    /* ============ WrapFrom Interop ============ */
+
+    function test_wrapFrom_withMultiMint() public {
+        address extensionBImpl = address(new YieldToOne(address(pyusdx)));
+        YieldToOne extensionB = YieldToOne(
+            UnsafeUpgrades.deployTransparentProxy(
+                extensionBImpl,
+                admin,
+                abi.encodeWithSelector(
+                    YieldToOne.initialize.selector,
+                    "Branded USD B",
+                    "bUSDB",
+                    yieldRecipient,
+                    admin,
+                    freezeManager,
+                    yieldRecipientManager,
+                    pauser
+                )
+            )
+        );
+
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(alice);
+        IERC20(address(extension)).approve(address(extensionB), MINT_AMOUNT);
+
+        vm.prank(alice);
+        extensionB.wrapFrom(address(extension), MINT_AMOUNT);
+
+        assertEq(extension.balanceOf(alice), 0);
+        assertEq(extensionB.balanceOf(alice), MINT_AMOUNT);
+    }
+
+    /* ============ View Functions ============ */
+
+    function test_isAllowedAsset() public {
+        assertTrue(extension.isAllowedAsset(address(usdc)));
+        assertFalse(extension.isAllowedAsset(makeAddr("randomToken")));
+    }
+
+    function test_isAllowedToWrap() public {
+        assertTrue(extension.isAllowedToWrap(address(usdc), 100e6));
+        assertFalse(extension.isAllowedToWrap(address(usdc), 0));
+    }
+
+    function test_isAllowedToUnwrap() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+        assertTrue(extension.isAllowedToUnwrap(500e6));
+        assertFalse(extension.isAllowedToUnwrap(0));
+    }
+}
