@@ -196,6 +196,8 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
     /// @notice Updates the mint TTL
     /// @param mintTTL_ The mint TTL in seconds
     function _setMintTTL(uint32 mintTTL_) internal {
+        if (mintTTL_ == 0) revert ZeroMintTTL();
+
         MinterGatewayStorageStruct storage $ = _getMinterGatewayStorageLocation();
         $.mintTTL = mintTTL_;
         emit MintTTLSet(mintTTL_);

@@ -59,6 +59,9 @@ interface IMinterGateway {
     /// @notice Thrown when attempting to burn zero amount
     error ZeroBurnAmount();
 
+    /// @notice Thrown when attempting to set a zero mint TTL
+    error ZeroMintTTL();
+
     /// @notice Thrown when a mint proposal is invalid or does not exist
     error InvalidMintProposal();
 

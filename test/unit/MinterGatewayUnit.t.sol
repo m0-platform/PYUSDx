@@ -61,6 +61,23 @@ contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
         minterGateway.initialize(admin, minter, DEFAULT_MINT_DELAY, DEFAULT_MINT_TTL);
     }
 
+    function test_initialize_revertIfZeroMintTTL() public {
+        MinterGateway newImpl = new MinterGateway(address(pyusdx));
+
+        vm.expectRevert(IMinterGateway.ZeroMintTTL.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            address(newImpl),
+            admin,
+            abi.encodeWithSelector(
+                MinterGateway.initialize.selector,
+                admin,
+                minter,
+                DEFAULT_MINT_DELAY,
+                0 // zero TTL
+            )
+        );
+    }
+
     function test_initialize() public view {
         assertTrue(minterGateway.hasRole(minterGateway.DEFAULT_ADMIN_ROLE(), admin));
         assertTrue(minterGateway.hasRole(minterGateway.MINTER_ROLE(), minter));
@@ -378,6 +395,13 @@ contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
 
         vm.prank(other);
         minterGateway.setMintTTL(14 days);
+    }
+
+    function test_setMintTTL_revertIfZero() public {
+        vm.expectRevert(IMinterGateway.ZeroMintTTL.selector);
+
+        vm.prank(admin);
+        minterGateway.setMintTTL(0);
     }
 
     function test_setMintTTL() public {
