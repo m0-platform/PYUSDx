@@ -44,6 +44,12 @@ interface IMinterGateway {
     /// @notice Thrown when the PYUSDX token address is zero
     error ZeroPYUSDXToken();
 
+    /// @notice Thrown when the admin address is zero
+    error ZeroAdminAddress();
+
+    /// @notice Thrown when the minter address is zero
+    error ZeroMinterAddress();
+
     /// @notice Thrown when attempting to propose a mint with zero amount
     error ZeroMintAmount();
 

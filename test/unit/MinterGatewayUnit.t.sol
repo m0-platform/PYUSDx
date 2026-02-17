@@ -5,6 +5,7 @@ import { MinterGatewayBaseUnitTest } from "../utils/MinterGatewayBaseUnitTest.so
 import { IMinterGateway } from "../../src/interfaces/IMinterGateway.sol";
 import { IAccessControl } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { Initializable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 import { MinterGateway } from "../../src/MinterGateway.sol";
 
 contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
@@ -20,6 +21,40 @@ contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
     }
 
     /* ============ Initialize ============ */
+
+    function test_initialize_revertIfZeroAdmin() public {
+        MinterGateway newImpl = new MinterGateway(address(pyusdx));
+
+        vm.expectRevert(IMinterGateway.ZeroAdminAddress.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            address(newImpl),
+            admin,
+            abi.encodeWithSelector(
+                MinterGateway.initialize.selector,
+                address(0), // zero admin
+                minter,
+                DEFAULT_MINT_DELAY,
+                DEFAULT_MINT_TTL
+            )
+        );
+    }
+
+    function test_initialize_revertIfZeroMinter() public {
+        MinterGateway newImpl = new MinterGateway(address(pyusdx));
+
+        vm.expectRevert(IMinterGateway.ZeroMinterAddress.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            address(newImpl),
+            admin,
+            abi.encodeWithSelector(
+                MinterGateway.initialize.selector,
+                admin,
+                address(0), // zero minter
+                DEFAULT_MINT_DELAY,
+                DEFAULT_MINT_TTL
+            )
+        );
+    }
 
     function test_initialize_revertIfCalledTwice() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);

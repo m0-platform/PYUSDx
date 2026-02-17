@@ -9,17 +9,19 @@ import { AccessControlUpgradeable } from "../lib/m-extensions/lib/common/lib/ope
 abstract contract MinterGatewayStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.MinterGateway
     struct MinterGatewayStorageStruct {
-        uint32 mintDelay;
-        uint32 mintTTL;
-        uint48 mintNonce;
+        uint32 mintDelay; // ──╮ Delay in seconds before a mint can be executed.
+        uint32 mintTTL; //     │ Time to live in seconds for a mint proposal.
+        uint48 mintNonce; // ──╯ Incremental counter for generating unique mint IDs.
         mapping(uint48 mintId => MintProposal) mintProposals;
     }
 
     struct MintProposal {
-        uint40 createdAt;
-        address minter;
-        address recipient;
-        uint256 amount;
+        uint40 createdAt; // ──╮ Timestamp when the proposal was created, good for 100+ years.
+        uint32 mintDelay; //   │ Delay in seconds before the mint can be executed.
+        uint32 mintTTL; // ────╯ Time to live in seconds for the proposal.
+        address minter; //       Address that proposed the mint.
+        address recipient; //    Address that will receive the minted tokens.
+        uint256 amount; //       Amount of PYUSDX to mint.
     }
 
     // keccak256(abi.encode(uint256(keccak256("M0.storage.MinterGateway")) - 1)) & ~bytes32(uint256(0xff))
@@ -62,6 +64,9 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
     /// @inheritdoc IMinterGateway
     function initialize(address admin, address minter, uint32 mintDelay_, uint32 mintTTL_) external initializer {
+        if (admin == address(0)) revert ZeroAdminAddress();
+        if (minter == address(0)) revert ZeroMinterAddress();
+
         __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -83,6 +88,8 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
         $.mintProposals[mintId] = MintProposal({
             createdAt: uint40(block.timestamp),
+            mintDelay: $.mintDelay,
+            mintTTL: $.mintTTL,
             minter: msg.sender,
             recipient: recipient,
             amount: amount
@@ -98,10 +105,10 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
         if (proposal.createdAt == 0) revert InvalidMintProposal();
 
-        uint40 activeAt = proposal.createdAt + $.mintDelay;
+        uint40 activeAt = proposal.createdAt + proposal.mintDelay;
         if (block.timestamp < activeAt) revert PendingMintProposal(activeAt);
 
-        uint40 expiresAt = activeAt + $.mintTTL;
+        uint40 expiresAt = activeAt + proposal.mintTTL;
         if (block.timestamp > expiresAt) revert ExpiredMintProposal(expiresAt);
 
         address recipient = proposal.recipient;
@@ -131,7 +138,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
         if (proposal.createdAt == 0) revert InvalidMintProposal();
         if (proposal.minter != msg.sender) revert NotMintProposalCreator();
 
-        uint40 activeAt = proposal.createdAt + $.mintDelay;
+        uint40 activeAt = proposal.createdAt + proposal.mintDelay;
         if (block.timestamp >= activeAt) revert ActiveMintProposal(activeAt);
 
         delete $.mintProposals[mintId];
