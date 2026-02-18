@@ -10,7 +10,6 @@ import { UIntMath } from "../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
 
 import { IERC20 } from "../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { IYieldToOne } from "./interfaces/IYieldToOne.sol";
 import { YieldToOne } from "./YieldToOne.sol";
 import { IMultiMint } from "./interfaces/IMultiMint.sol";
 
@@ -205,14 +204,9 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         return assetAmount_ != 0 && assetBalanceOf(asset) >= assetAmount_;
     }
 
-    /// @inheritdoc IYieldToOne
-    function yield() public view override(IYieldToOne, YieldToOne) returns (uint256) {
-        uint256 pyusdxBalance_ = _pyusdxBalanceOf(address(this));
-        uint256 pyusdxBacking_ = _pyusdxBacking();
-
-        unchecked {
-            return pyusdxBalance_ > pyusdxBacking_ ? pyusdxBalance_ - pyusdxBacking_ : 0;
-        }
+    /// @inheritdoc IERC20
+    function totalSupply() public view override returns (uint256) {
+        return _pyusdxBalanceOf(address(this)) + totalAssets();
     }
 
     /* ============ Hooks ============ */
@@ -326,12 +320,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
     /// @dev Returns the current supply of PYUSDX backing the extension token.
     function _pyusdxBacking() internal view returns (uint256) {
-        uint256 totalSupply_ = totalSupply();
-        uint256 totalAssets_ = totalAssets();
-
-        unchecked {
-            return totalSupply_ > totalAssets_ ? totalSupply_ - totalAssets_ : 0;
-        }
+        return _pyusdxBalanceOf(address(this));
     }
 
     /**

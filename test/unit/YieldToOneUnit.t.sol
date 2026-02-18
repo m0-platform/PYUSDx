@@ -306,7 +306,7 @@ contract YieldToOneUnitTests is Test {
         vm.warp(block.timestamp + 365 days);
 
         assertGt(pyusdx.accruedYieldOf(address(extension)), 0);
-        assertEq(extension.yield(), 0);
+        assertGt(extension.yield(), 0);
 
         uint256 claimed = extension.claimYield();
 
@@ -364,19 +364,19 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Yield View ============ */
 
-    function test_yield_zeroBeforeClaim() public {
+    function test_yield_nonzeroBeforeClaim() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
-        assertEq(extension.yield(), 0);
+        assertGt(extension.yield(), 0);
     }
 
-    function test_yield_nonzeroAfterPyusdxClaim() public {
+    function test_yield_zeroAfterExternalClaim() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
         pyusdx.claimFor(address(extension));
 
-        assertGt(extension.yield(), 0);
+        assertEq(extension.yield(), 0);
     }
 }

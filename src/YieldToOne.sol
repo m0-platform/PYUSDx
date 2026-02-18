@@ -14,7 +14,6 @@ import { PYUSDXExtension } from "./PYUSDXExtension.sol";
 abstract contract YieldToOneStorageLayout {
     /// @custom:storage-location erc7201:PYUSDX.storage.YieldToOne
     struct YieldToOneStorageStruct {
-        uint256 totalSupply;
         address yieldRecipient;
         mapping(address account => uint256 balance) balanceOf;
     }
@@ -117,10 +116,11 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
     function claimYield() public virtual returns (uint256) {
         _beforeClaimYield();
 
-        // Realize pending yield from PYUSDX into this contract's balance.
+        uint256 totalSupplyBefore_ = totalSupply();
+
         IPYUSDX(pyusdx).claimFor(address(this));
 
-        uint256 yield_ = yield();
+        uint256 yield_ = totalSupply() - totalSupplyBefore_;
 
         if (yield_ == 0) return 0;
 
@@ -147,18 +147,13 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
     }
 
     /// @inheritdoc IERC20
-    function totalSupply() public view returns (uint256) {
-        return _getYieldToOneStorage().totalSupply;
+    function totalSupply() public view virtual returns (uint256) {
+        return _pyusdxBalanceOf(address(this));
     }
 
     /// @inheritdoc IYieldToOne
     function yield() public view virtual returns (uint256) {
-        unchecked {
-            uint256 balance_ = _pyusdxBalanceOf(address(this));
-            uint256 totalSupply_ = totalSupply();
-
-            return balance_ > totalSupply_ ? balance_ - totalSupply_ : 0;
-        }
+        return IPYUSDX(pyusdx).accruedYieldOf(address(this));
     }
 
     /// @inheritdoc IYieldToOne
@@ -224,11 +219,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
      * @param amount    The amount of tokens to mint.
      */
     function _mint(address recipient, uint256 amount) internal override {
-        YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
-
         unchecked {
-            $.balanceOf[recipient] += amount;
-            $.totalSupply += amount;
+            _getYieldToOneStorage().balanceOf[recipient] += amount;
         }
 
         emit Transfer(address(0), recipient, amount);
@@ -240,11 +232,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
      * @param amount  The amount of tokens to burn.
      */
     function _burn(address account, uint256 amount) internal override {
-        YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
-
         unchecked {
-            $.balanceOf[account] -= amount;
-            $.totalSupply -= amount;
+            _getYieldToOneStorage().balanceOf[account] -= amount;
         }
 
         emit Transfer(account, address(0), amount);

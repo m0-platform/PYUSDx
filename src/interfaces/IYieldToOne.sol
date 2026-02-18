@@ -36,8 +36,8 @@ interface IYieldToOne {
 
     /**
      * @notice Claims accrued yield to the yield recipient.
-     * @dev    First calls `pyusdx.claimFor(address(this))` to realize pending yield,
-     *         then mints extension tokens for the gap between PYUSDX balance and totalSupply.
+     * @dev    Calls `pyusdx.claimFor(address(this))` to realize pending yield,
+     *         then mints extension tokens for the resulting increase in totalSupply.
      */
     function claimYield() external returns (uint256);
 
@@ -55,7 +55,7 @@ interface IYieldToOne {
     /// @notice The role that can manage the yield recipient.
     function YIELD_RECIPIENT_MANAGER_ROLE() external view returns (bytes32);
 
-    /// @notice The amount of realized accrued yield (PYUSDX balance minus extension totalSupply).
+    /// @notice The amount of pending accrued yield from PYUSDX.
     function yield() external view returns (uint256);
 
     /// @notice The address of the yield recipient.

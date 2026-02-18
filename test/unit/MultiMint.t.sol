@@ -423,13 +423,13 @@ contract MultiMintTest is Test {
         assertEq(extension.yield(), 0);
 
         vm.warp(block.timestamp + 365 days);
+
+        // Yield is visible before claim via accruedYieldOf.
+        assertGt(extension.yield(), 0);
+
+        // After external claim, accruedYieldOf resets to 0.
         pyusdx.claimFor(address(extension));
-
-        uint256 yield_ = extension.yield();
-        assertGt(yield_, 0);
-
-        // pyusdxBacking = totalSupply - totalAssets = 100e6 - 40e6 = 60e6
-        assertEq(yield_, pyusdx.balanceOf(address(extension)) - 60e6);
+        assertEq(extension.yield(), 0);
     }
 
     function test_claimYield() public {
