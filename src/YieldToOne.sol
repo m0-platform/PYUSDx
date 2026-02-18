@@ -99,6 +99,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
     ) internal onlyInitializing {
         if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
         if (admin == address(0)) revert ZeroAdmin();
+        if (IPYUSDX(pyusdx).claimRecipientFor(address(this)) != address(this)) revert InvalidClaimRecipient();
 
         __PYUSDXExtension_init(name, symbol);
         __Freezable_init(freezeManager);
@@ -208,8 +209,10 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
         _revertIfFrozen($, recipient);
     }
 
-    /// @dev Hook called before claiming yield. Override for additional checks.
-    function _beforeClaimYield() internal view virtual {}
+    /// @dev Hook called before claiming yield. Reverts if the PYUSDX claimRecipient is misconfigured.
+    function _beforeClaimYield() internal view virtual {
+        if (IPYUSDX(pyusdx).claimRecipientFor(address(this)) != address(this)) revert InvalidClaimRecipient();
+    }
 
     /* ============ Internal Functions ============ */
 
