@@ -165,10 +165,10 @@ contract MultiMintTest is Test {
         extension.wrap(address(usdc), alice, MINT_AMOUNT);
     }
 
-    function test_replaceAssetWithPYUSDX_revert_notSwapFacility() public {
+    function test_replaceAsset_revert_notSwapFacility() public {
         vm.prank(alice);
         vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
-        extension.replaceAssetWithPYUSDX(address(usdc), alice, MINT_AMOUNT);
+        extension.replaceAsset(address(usdc), alice, MINT_AMOUNT);
     }
 
     /* ============ Multi-Asset Wrapping ============ */
@@ -323,7 +323,7 @@ contract MultiMintTest is Test {
 
     /* ============ Replace Asset with PYUSDX ============ */
 
-    function test_replaceAssetWithPYUSDX() public {
+    function test_replaceAsset() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         minterGateway.mint(bob, 50e6);
@@ -339,7 +339,7 @@ contract MultiMintTest is Test {
         assertEq(extension.totalSupply(), 100e6);
     }
 
-    function test_replaceAssetWithPYUSDX_revert_insufficientAssetBacking() public {
+    function test_replaceAsset_revert_insufficientAssetBacking() public {
         _wrapAssetFor(alice, address(usdc), 50e6);
 
         minterGateway.mint(bob, 100e6);
@@ -352,13 +352,13 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function test_replaceAssetWithPYUSDX_revert_invalidAsset() public {
+    function test_replaceAsset_revert_invalidAsset() public {
         vm.prank(address(swapFacility));
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
-        extension.replaceAssetWithPYUSDX(address(0), bob, 50e6);
+        extension.replaceAsset(address(0), bob, 50e6);
     }
 
-    function test_replaceAssetWithPYUSDX_crossDecimal() public {
+    function test_replaceAsset_crossDecimal() public {
         _wrapAssetFor(alice, address(dai), 500e18);
 
         minterGateway.mint(bob, 200e6);
@@ -372,7 +372,7 @@ contract MultiMintTest is Test {
         assertEq(extension.totalAssets(), 300e6);
     }
 
-    function test_replaceAssetWithPYUSDX_revert_paused() public {
+    function test_replaceAsset_revert_paused() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         minterGateway.mint(bob, 50e6);
@@ -388,7 +388,7 @@ contract MultiMintTest is Test {
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
     }
 
-    function test_replaceAssetWithPYUSDX_emitsEvent() public {
+    function test_replaceAsset_emitsEvent() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         minterGateway.mint(bob, 50e6);
@@ -516,7 +516,7 @@ contract MultiMintTest is Test {
         swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
     }
 
-    function test_replaceAssetWithPYUSDX_revert_frozen() public {
+    function test_replaceAsset_revert_frozen() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         minterGateway.mint(bob, 50e6);

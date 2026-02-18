@@ -3,11 +3,10 @@ pragma solidity ^0.8.26;
 
 import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { ISwapFacility } from "../../src/interfaces/ISwapFacility.sol";
 import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
 import { IMultiMint } from "../../src/interfaces/IMultiMint.sol";
 
-contract MockSwapFacility is ISwapFacility {
+contract MockSwapFacility {
     address public pyusdx;
     address private _locker;
 
@@ -57,7 +56,7 @@ contract MockSwapFacility is ISwapFacility {
         _locker = msg.sender;
         IERC20(pyusdx).transferFrom(msg.sender, address(this), amount);
         IERC20(pyusdx).approve(extension, amount);
-        IMultiMint(extension).replaceAssetWithPYUSDX(asset, recipient, amount);
+        IMultiMint(extension).replaceAsset(asset, recipient, amount);
         _locker = address(0);
     }
 }

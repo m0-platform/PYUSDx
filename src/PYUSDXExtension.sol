@@ -7,7 +7,7 @@ import { ERC20ExtendedUpgradeable } from "../lib/m-extensions/lib/common/src/ERC
 import { IERC20 } from "../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { IPYUSDXExtension } from "./interfaces/IPYUSDXExtension.sol";
-import { ISwapFacility } from "./interfaces/ISwapFacility.sol";
+import { ISwapFacility } from "./swap/interfaces/ISwapFacility.sol";
 
 /**
  * @title  PYUSDXExtension
