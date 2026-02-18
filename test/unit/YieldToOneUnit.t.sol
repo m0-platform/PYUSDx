@@ -7,20 +7,18 @@ import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
+import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { YieldToOne } from "../../src/YieldToOne.sol";
 import { IYieldToOne } from "../../src/interfaces/IYieldToOne.sol";
 import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
 import { IERC20Extended } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
-import { MaliciousExtensionMock } from "../mock/MaliciousExtensionMock.sol";
-import { ReentrantExtensionMock } from "../mock/ReentrantExtensionMock.sol";
-import { WrongPyusdxExtensionMock } from "../mock/WrongPyusdxExtensionMock.sol";
 import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
-import { ReentrancyGuardTransientUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/ReentrancyGuardTransientUpgradeable.sol";
 
 contract YieldToOneUnitTests is Test {
     MinterGatewayMock public minterGateway;
     PYUSDXHarness public pyusdx;
+    MockSwapFacility public swapFacility;
     YieldToOne public extension;
 
     address public admin = makeAddr("admin");
@@ -59,7 +57,9 @@ contract YieldToOneUnitTests is Test {
         );
         minterGateway.setPyusdx(address(pyusdx));
 
-        address extensionImpl = address(new YieldToOne(address(pyusdx)));
+        swapFacility = new MockSwapFacility(address(pyusdx));
+
+        address extensionImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
         extension = YieldToOne(
             UnsafeUpgrades.deployTransparentProxy(
                 extensionImpl,
@@ -90,11 +90,10 @@ contract YieldToOneUnitTests is Test {
     function _wrapFor(address to, address recipient, uint256 amount) internal {
         minterGateway.mint(to, amount);
 
-        vm.prank(to);
-        IERC20(address(pyusdx)).approve(address(extension), amount);
-
-        vm.prank(to);
-        extension.wrap(recipient, amount);
+        vm.startPrank(to);
+        IERC20(address(pyusdx)).approve(address(swapFacility), amount);
+        swapFacility.swapIn(address(extension), amount, recipient);
+        vm.stopPrank();
     }
 
     /* ============ Initialization ============ */
@@ -105,6 +104,7 @@ contract YieldToOneUnitTests is Test {
         assertEq(extension.decimals(), 6);
         assertEq(extension.yieldRecipient(), yieldRecipient);
         assertEq(extension.pyusdx(), address(pyusdx));
+        assertEq(extension.swapFacility(), address(swapFacility));
         assertTrue(extension.hasRole(extension.DEFAULT_ADMIN_ROLE(), admin));
         assertTrue(extension.hasRole(extension.YIELD_RECIPIENT_MANAGER_ROLE(), yieldRecipientManager));
     }
@@ -127,149 +127,64 @@ contract YieldToOneUnitTests is Test {
         assertEq(extension.balanceOf(bob), MINT_AMOUNT);
     }
 
+    function test_wrap_revert_notSwapFacility() public {
+        vm.prank(alice);
+        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        extension.wrap(alice, MINT_AMOUNT);
+    }
+
     /* ============ Unwrap ============ */
 
     function test_unwrap() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
-        vm.prank(alice);
-        extension.unwrap(MINT_AMOUNT);
+        vm.startPrank(alice);
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
 
         assertEq(extension.balanceOf(alice), 0);
         assertEq(extension.totalSupply(), 0);
         assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
     }
 
-    /* ============ WrapFrom ============ */
-
-    function _deployExtensionB() internal returns (YieldToOne) {
-        address extensionBImpl = address(new YieldToOne(address(pyusdx)));
-        return
-            YieldToOne(
-                UnsafeUpgrades.deployTransparentProxy(
-                    extensionBImpl,
-                    admin,
-                    abi.encodeWithSelector(
-                        YieldToOne.initialize.selector,
-                        "Branded USD B",
-                        "bUSDB",
-                        yieldRecipient,
-                        admin,
-                        freezeManager,
-                        yieldRecipientManager,
-                        pauser
-                    )
-                )
-            );
+    function test_unwrap_revert_notSwapFacility() public {
+        vm.prank(alice);
+        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        extension.unwrap(MINT_AMOUNT);
     }
 
-    function test_wrapFrom() public {
-        YieldToOne extensionB = _deployExtensionB();
+    /* ============ Swap Extensions ============ */
+
+    function test_swapExtensions() public {
+        // Deploy a second extension sharing the same swap facility.
+        address extensionBImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        YieldToOne extensionB = YieldToOne(
+            UnsafeUpgrades.deployTransparentProxy(
+                extensionBImpl,
+                admin,
+                abi.encodeWithSelector(
+                    YieldToOne.initialize.selector,
+                    "Branded USD B",
+                    "bUSDB",
+                    yieldRecipient,
+                    admin,
+                    freezeManager,
+                    yieldRecipientManager,
+                    pauser
+                )
+            )
+        );
 
         _wrapFor(alice, alice, MINT_AMOUNT);
 
-        vm.prank(alice);
-        IERC20(address(extension)).approve(address(extensionB), MINT_AMOUNT);
-
-        vm.prank(alice);
-        extensionB.wrapFrom(address(extension), MINT_AMOUNT);
+        vm.startPrank(alice);
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+        swapFacility.swapExtensions(address(extension), address(extensionB), MINT_AMOUNT, alice);
+        vm.stopPrank();
 
         assertEq(extension.balanceOf(alice), 0);
         assertEq(extensionB.balanceOf(alice), MINT_AMOUNT);
-    }
-
-    function test_wrapFrom_revert_frozenOnSourceExtension() public {
-        YieldToOne extensionB = _deployExtensionB();
-
-        _wrapFor(alice, alice, MINT_AMOUNT);
-
-        vm.prank(alice);
-        IERC20(address(extension)).approve(address(extensionB), MINT_AMOUNT);
-
-        vm.prank(freezeManager);
-        extension.freeze(alice);
-
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        extensionB.wrapFrom(address(extension), MINT_AMOUNT);
-    }
-
-    function test_wrapFrom_revert_frozenOnDestinationExtension() public {
-        YieldToOne extensionB = _deployExtensionB();
-
-        _wrapFor(alice, alice, MINT_AMOUNT);
-
-        vm.prank(alice);
-        IERC20(address(extension)).approve(address(extensionB), MINT_AMOUNT);
-
-        vm.prank(freezeManager);
-        extensionB.freeze(alice);
-
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        extensionB.wrapFrom(address(extension), MINT_AMOUNT);
-    }
-
-    function test_wrapFrom_revert_frozenOnBothExtensions() public {
-        YieldToOne extensionB = _deployExtensionB();
-
-        _wrapFor(alice, alice, MINT_AMOUNT);
-
-        vm.prank(alice);
-        IERC20(address(extension)).approve(address(extensionB), MINT_AMOUNT);
-
-        vm.startPrank(freezeManager);
-        extension.freeze(alice);
-        extensionB.freeze(alice);
-        vm.stopPrank();
-
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        extensionB.wrapFrom(address(extension), MINT_AMOUNT);
-    }
-
-    function test_wrapFrom_emitsSwappedFrom() public {
-        YieldToOne extensionB = _deployExtensionB();
-
-        _wrapFor(alice, alice, MINT_AMOUNT);
-
-        vm.prank(alice);
-        IERC20(address(extension)).approve(address(extensionB), MINT_AMOUNT);
-
-        vm.prank(alice);
-        vm.expectEmit(true, true, false, true, address(extensionB));
-        emit IPYUSDXExtension.SwappedFrom(address(extension), alice, MINT_AMOUNT);
-        extensionB.wrapFrom(address(extension), MINT_AMOUNT);
-    }
-
-    function test_wrapFrom_revert_zeroExtension() public {
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IPYUSDXExtension.InvalidExtension.selector, address(0)));
-        extension.wrapFrom(address(0), MINT_AMOUNT);
-    }
-
-    function test_wrapFrom_revert_wrongPyusdx() public {
-        WrongPyusdxExtensionMock wrongExtension = new WrongPyusdxExtensionMock();
-
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IPYUSDXExtension.InvalidExtension.selector, address(wrongExtension)));
-        extension.wrapFrom(address(wrongExtension), MINT_AMOUNT);
-    }
-
-    function test_wrapFrom_revert_maliciousExtension() public {
-        MaliciousExtensionMock malicious = new MaliciousExtensionMock(address(pyusdx));
-
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IERC20Extended.InsufficientAmount.selector, 0));
-        extension.wrapFrom(address(malicious), MINT_AMOUNT);
-    }
-
-    function test_wrapFrom_revert_reentrancy() public {
-        ReentrantExtensionMock reentrant = new ReentrantExtensionMock(address(extension), address(pyusdx));
-
-        vm.prank(alice);
-        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
-        extension.wrapFrom(address(reentrant), MINT_AMOUNT);
     }
 
     /* ============ Transfer ============ */
@@ -378,5 +293,34 @@ contract YieldToOneUnitTests is Test {
         pyusdx.claimFor(address(extension));
 
         assertEq(extension.yield(), 0);
+    }
+
+    /* ============ Freeze via SwapFacility ============ */
+
+    function test_unwrap_revert_frozen() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(alice);
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+    }
+
+    function test_wrap_revert_frozen() public {
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        vm.startPrank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), MINT_AMOUNT);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
     }
 }

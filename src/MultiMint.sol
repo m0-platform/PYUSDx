@@ -12,6 +12,7 @@ import { IERC20 } from "../lib/m-extensions/lib/common/src/interfaces/IERC20.sol
 
 import { YieldToOne } from "./YieldToOne.sol";
 import { IMultiMint } from "./interfaces/IMultiMint.sol";
+import { ISwapFacility } from "./interfaces/ISwapFacility.sol";
 
 abstract contract MultiMintStorageLayout {
     struct Asset {
@@ -62,9 +63,10 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
     /**
      * @custom:oz-upgrades-unsafe-allow constructor
-     * @param pyusdx_ The address of the PYUSDX token.
+     * @param pyusdx_       The address of the PYUSDX token.
+     * @param swapFacility_ The address of the swap facility.
      */
-    constructor(address pyusdx_) YieldToOne(pyusdx_) {}
+    constructor(address pyusdx_, address swapFacility_) YieldToOne(pyusdx_, swapFacility_) {}
 
     /* ============ Initializer ============ */
 
@@ -133,13 +135,13 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     /* ============ Interactive Functions ============ */
 
     /// @inheritdoc IMultiMint
-    function wrap(address asset, address recipient, uint256 amount) external {
-        _wrapAsset(asset, recipient, amount);
+    function wrap(address asset, address recipient, uint256 amount) external onlySwapFacility {
+        _wrapAsset(asset, ISwapFacility(msg.sender).msgSender(), recipient, amount);
     }
 
     /// @inheritdoc IMultiMint
-    function replaceAssetWithPYUSDX(address asset, address recipient, uint256 amount) external {
-        _replaceAssetWithPYUSDX(asset, recipient, amount);
+    function replaceAssetWithPYUSDX(address asset, address recipient, uint256 amount) external onlySwapFacility {
+        _replaceAssetWithPYUSDX(asset, ISwapFacility(msg.sender).msgSender(), recipient, amount);
     }
 
     /// @inheritdoc IMultiMint
@@ -239,16 +241,17 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
      * @dev   Mints extension tokens by pulling `asset` from `msg.sender`.
      *        Reverts on fee-on-transfer tokens or if the asset cap is reached.
      * @param asset     Address of the asset to deposit.
+     * @param account   The original caller (resolved via swap facility).
      * @param recipient Address that will receive the extension tokens.
      * @param amount    Amount of `asset` tokens to deposit (in asset decimals).
      */
-    function _wrapAsset(address asset, address recipient, uint256 amount) internal virtual {
+    function _wrapAsset(address asset, address account, address recipient, uint256 amount) internal virtual {
         _revertIfInvalidAsset(asset);
         _revertIfZeroAccount(recipient);
         _revertIfZeroAmount(amount);
 
         // Checks asset cap + pause + freeze via 4-arg hook.
-        _beforeWrap(asset, msg.sender, recipient, amount);
+        _beforeWrap(asset, account, recipient, amount);
 
         uint256 assetBalanceBefore_ = IERC20Metadata(asset).balanceOf(address(this));
 
@@ -278,14 +281,20 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
      * @dev   Pulls PYUSDX from `msg.sender` and sends `asset` from reserves
      *        to `recipient`.
      * @param asset     Address of the asset to receive from reserves.
+     * @param account   The original caller (resolved via swap facility).
      * @param recipient Address that will receive the `asset` tokens.
      * @param amount    Amount of PYUSDX to deposit (in PYUSDX decimals).
      */
-    function _replaceAssetWithPYUSDX(address asset, address recipient, uint256 amount) internal virtual {
+    function _replaceAssetWithPYUSDX(
+        address asset,
+        address account,
+        address recipient,
+        uint256 amount
+    ) internal virtual {
         _requireNotPaused();
 
         FreezableStorageStruct storage $f = _getFreezableStorageLocation();
-        _revertIfFrozen($f, msg.sender);
+        _revertIfFrozen($f, account);
         _revertIfFrozen($f, recipient);
 
         _revertIfInvalidAsset(asset);

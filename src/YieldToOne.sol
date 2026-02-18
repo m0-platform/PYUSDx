@@ -49,9 +49,10 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
 
     /**
      * @custom:oz-upgrades-unsafe-allow constructor
-     * @param pyusdx_ The address of the PYUSDX token.
+     * @param pyusdx_       The address of the PYUSDX token.
+     * @param swapFacility_ The address of the swap facility.
      */
-    constructor(address pyusdx_) PYUSDXExtension(pyusdx_) {}
+    constructor(address pyusdx_, address swapFacility_) PYUSDXExtension(pyusdx_, swapFacility_) {}
 
     /* ============ Initializer ============ */
 

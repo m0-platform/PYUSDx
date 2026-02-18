@@ -3,24 +3,34 @@
 pragma solidity 0.8.26;
 
 import { ERC20ExtendedUpgradeable } from "../lib/m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
-import { ReentrancyGuardTransientUpgradeable } from "../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/ReentrancyGuardTransientUpgradeable.sol";
 
 import { IERC20 } from "../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { IPYUSDXExtension } from "./interfaces/IPYUSDXExtension.sol";
-import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
+import { ISwapFacility } from "./interfaces/ISwapFacility.sol";
 
 /**
  * @title  PYUSDXExtension
  * @notice Upgradeable ERC20 base contract for wrapping PYUSDX into a branded extension token.
  * @author M0 Labs
  */
-abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable, ReentrancyGuardTransientUpgradeable {
+abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable {
     /* ============ Variables ============ */
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     /// @inheritdoc IPYUSDXExtension
     address public immutable pyusdx;
+
+    /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
+    /// @inheritdoc IPYUSDXExtension
+    address public immutable swapFacility;
+
+    /* ============ Modifiers ============ */
+
+    modifier onlySwapFacility() {
+        if (msg.sender != swapFacility) revert NotSwapFacility();
+        _;
+    }
 
     /* ============ Constructor ============ */
 
@@ -28,12 +38,14 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
      * @custom:oz-upgrades-unsafe-allow constructor
      * @notice Constructs PYUSDXExtension Implementation contract.
      * @dev    Sets immutable storage.
-     * @param  pyusdx_ The address of the PYUSDX token.
+     * @param  pyusdx_       The address of the PYUSDX token.
+     * @param  swapFacility_ The address of the swap facility.
      */
-    constructor(address pyusdx_) {
+    constructor(address pyusdx_, address swapFacility_) {
         _disableInitializers();
 
         if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDX();
+        if ((swapFacility = swapFacility_) == address(0)) revert ZeroSwapFacility();
     }
 
     /* ============ Initializer ============ */
@@ -45,41 +57,18 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
      */
     function __PYUSDXExtension_init(string memory name, string memory symbol) internal onlyInitializing {
         __ERC20ExtendedUpgradeable_init(name, symbol, 6);
-        __ReentrancyGuardTransient_init();
     }
 
     /* ============ Interactive Functions ============ */
 
     /// @inheritdoc IPYUSDXExtension
-    function wrap(address recipient, uint256 amount) external {
-        _wrap(msg.sender, recipient, amount);
+    function wrap(address recipient, uint256 amount) external onlySwapFacility {
+        _wrap(ISwapFacility(msg.sender).msgSender(), recipient, amount);
     }
 
     /// @inheritdoc IPYUSDXExtension
-    function unwrap(uint256 amount) external {
-        _unwrap(msg.sender, amount);
-    }
-
-    /// @inheritdoc IPYUSDXExtension
-    function wrapFrom(address otherExtension, uint256 amount) external nonReentrant {
-        _revertIfInvalidExtension(otherExtension);
-        _revertIfZeroAmount(amount);
-
-        // Pull source extension tokens from caller.
-        IERC20(otherExtension).transferFrom(msg.sender, address(this), amount);
-
-        // Unwrap source tokens into PYUSDX.
-        uint256 pyusdxBefore = IERC20(pyusdx).balanceOf(address(this));
-        IPYUSDXExtension(otherExtension).unwrap(amount);
-        uint256 received = IERC20(pyusdx).balanceOf(address(this)) - pyusdxBefore;
-
-        if (received < amount) revert InsufficientAmount(received);
-
-        // Wrap the received PYUSDX into this extension for the caller.
-        _beforeWrap(msg.sender, msg.sender, received);
-        _mint(msg.sender, received);
-
-        emit SwappedFrom(otherExtension, msg.sender, received);
+    function unwrap(uint256 amount) external onlySwapFacility {
+        _unwrap(ISwapFacility(msg.sender).msgSender(), amount);
     }
 
     /* ============ View/Pure Functions ============ */
@@ -107,7 +96,7 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
 
     /**
      * @dev   Hook called before unwrapping PYUSDX Extension token.
-     * @param account The account from which PYUSDX Extension token is burned.
+     * @param account The original caller (resolved via swap facility).
      * @param amount  The amount of PYUSDX Extension token burned.
      */
     function _beforeUnwrap(address account, uint256 amount) internal virtual {}
@@ -135,7 +124,7 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
 
     /**
      * @dev    Wraps `amount` PYUSDX from `account` into extension token for `recipient`.
-     * @param  account   The account depositing PYUSDX (msg.sender).
+     * @param  account   The original caller (resolved via swap facility).
      * @param  recipient The account receiving the minted extension token.
      * @param  amount    The amount of PYUSDX deposited.
      */
@@ -151,7 +140,7 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
 
     /**
      * @dev   Unwraps `amount` extension token from `account` into PYUSDX.
-     * @param account The account burning extension tokens (msg.sender).
+     * @param account The original caller (resolved via swap facility).
      * @param amount  The amount of extension token burned.
      */
     function _unwrap(address account, uint256 amount) internal {
@@ -222,15 +211,6 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
      */
     function _revertIfZeroAccount(address recipient) internal pure {
         if (recipient == address(0)) revert ZeroAccount();
-    }
-
-    /**
-     * @dev   Reverts if `otherExtension` is address(0) or doesn't wrap the same PYUSDX.
-     * @param otherExtension The extension address to validate.
-     */
-    function _revertIfInvalidExtension(address otherExtension) internal view {
-        if (otherExtension == address(0)) revert InvalidExtension(otherExtension);
-        if (IPYUSDXExtension(otherExtension).pyusdx() != pyusdx) revert InvalidExtension(otherExtension);
     }
 
     /**
