@@ -63,7 +63,7 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
     /// @inheritdoc IPYUSDXExtension
     function wrapFrom(address otherExtension, uint256 amount) external nonReentrant {
         _revertIfInvalidExtension(otherExtension);
-        _revertIfInsufficientAmount(amount);
+        _revertIfZeroAmount(amount);
 
         // Pull source extension tokens from caller.
         IERC20(otherExtension).transferFrom(msg.sender, address(this), amount);
@@ -140,8 +140,8 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
      * @param  amount    The amount of PYUSDX deposited.
      */
     function _wrap(address account, address recipient, uint256 amount) internal {
-        _revertIfInvalidRecipient(recipient);
-        _revertIfInsufficientAmount(amount);
+        _revertIfZeroAccount(recipient);
+        _revertIfZeroAmount(amount);
         _beforeWrap(account, recipient, amount);
 
         IERC20(pyusdx).transferFrom(msg.sender, address(this), amount);
@@ -155,7 +155,7 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
      * @param amount  The amount of extension token burned.
      */
     function _unwrap(address account, uint256 amount) internal {
-        _revertIfInsufficientAmount(amount);
+        _revertIfZeroAmount(amount);
         _beforeUnwrap(account, amount);
         _revertIfInsufficientBalance(msg.sender, amount);
 
@@ -193,7 +193,7 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
      * @param amount    The amount to be transferred.
      */
     function _transfer(address sender, address recipient, uint256 amount) internal override {
-        _revertIfInvalidRecipient(recipient);
+        _revertIfZeroAccount(recipient);
         _beforeTransfer(sender, recipient, amount);
 
         emit Transfer(sender, recipient, amount);
@@ -220,8 +220,8 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
      * @dev   Reverts if `recipient` is address(0).
      * @param recipient Address of a recipient.
      */
-    function _revertIfInvalidRecipient(address recipient) internal pure {
-        if (recipient == address(0)) revert InvalidRecipient(recipient);
+    function _revertIfZeroAccount(address recipient) internal pure {
+        if (recipient == address(0)) revert ZeroAccount();
     }
 
     /**
@@ -237,8 +237,8 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable,
      * @dev   Reverts if `amount` is equal to 0.
      * @param amount Amount of token.
      */
-    function _revertIfInsufficientAmount(uint256 amount) internal pure {
-        if (amount == 0) revert InsufficientAmount(amount);
+    function _revertIfZeroAmount(uint256 amount) internal pure {
+        if (amount == 0) revert ZeroAmount();
     }
 
     /**

@@ -19,6 +19,12 @@ interface IPYUSDXExtension is IERC20Extended {
      */
     error InsufficientBalance(address account, uint256 balance, uint256 amount);
 
+    /// @notice Emitted when the account is address(0).
+    error ZeroAccount();
+
+    /// @notice Emitted when the amount is 0.
+    error ZeroAmount();
+
     /// @notice Emitted in constructor if PYUSDX is 0x0.
     error ZeroPYUSDX();
 

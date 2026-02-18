@@ -11,7 +11,6 @@ import { MultiMint } from "../../src/MultiMint.sol";
 import { IMultiMint } from "../../src/interfaces/IMultiMint.sol";
 import { YieldToOne } from "../../src/YieldToOne.sol";
 import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IERC20Extended } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
 import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
 import { MockERC20 } from "../mock/MockERC20.sol";
@@ -218,7 +217,7 @@ contract MultiMintTest is Test {
 
     function test_wrap_asset_revert_zeroAmount() public {
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IERC20Extended.InsufficientAmount.selector, 0));
+        vm.expectRevert(IPYUSDXExtension.ZeroAmount.selector);
         extension.wrap(address(usdc), alice, 0);
     }
 
@@ -254,7 +253,7 @@ contract MultiMintTest is Test {
         dai.approve(address(extension), 1);
 
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IERC20Extended.InsufficientAmount.selector, 0));
+        vm.expectRevert(IPYUSDXExtension.ZeroAmount.selector);
         extension.wrap(address(dai), alice, 1);
     }
 

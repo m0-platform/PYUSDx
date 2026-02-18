@@ -254,8 +254,8 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
      */
     function _wrapAsset(address asset, address recipient, uint256 amount) internal virtual {
         _revertIfInvalidAsset(asset);
-        _revertIfInvalidRecipient(recipient);
-        _revertIfInsufficientAmount(amount);
+        _revertIfZeroAccount(recipient);
+        _revertIfZeroAmount(amount);
 
         // Checks asset cap + pause + freeze via 4-arg hook.
         _beforeWrap(asset, msg.sender, recipient, amount);
@@ -271,7 +271,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
         // Convert to extension decimals and revert if it truncates to zero.
         uint256 extensionAmount_ = _fromAssetToExtensionAmount(asset, amount);
-        _revertIfInsufficientAmount(extensionAmount_);
+        _revertIfZeroAmount(extensionAmount_);
 
         MultiMintStorage storage $ = _getMultiMintStorage();
 
@@ -299,12 +299,12 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         _revertIfFrozen($f, recipient);
 
         _revertIfInvalidAsset(asset);
-        _revertIfInvalidRecipient(recipient);
-        _revertIfInsufficientAmount(amount);
+        _revertIfZeroAccount(recipient);
+        _revertIfZeroAmount(amount);
 
         // Convert PYUSDX amount to asset decimals and revert if truncates to zero.
         uint256 assetAmount_ = _fromExtensionToAssetAmount(asset, amount);
-        _revertIfInsufficientAmount(assetAmount_);
+        _revertIfZeroAmount(assetAmount_);
         _revertIfInsufficientAssetBacking(asset, assetAmount_);
 
         MultiMintStorage storage $ = _getMultiMintStorage();
