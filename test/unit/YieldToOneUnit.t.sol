@@ -279,16 +279,11 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Yield View ============ */
 
-    function test_yield_nonzeroBeforeClaim() public {
+    function test_yield_resetToZeroAfterClaim() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
         assertGt(extension.yield(), 0);
-    }
-
-    function test_yield_zeroAfterExternalClaim() public {
-        _wrapFor(alice, alice, MINT_AMOUNT);
-        vm.warp(block.timestamp + 365 days);
 
         pyusdx.claimFor(address(extension));
 
