@@ -210,7 +210,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
         _revertIfFrozen($, recipient);
     }
 
-    /// @dev Hook called before claiming yield. Reverts if the PYUSDX claimRecipient is misconfigured.
+    /// @dev   Hook called before claiming yield. Reverts if the PYUSDX claimRecipient is misconfigured.
+    ///        Inheriting contracts that override this function MUST call `super._beforeClaimYield()`.
     function _beforeClaimYield() internal view virtual {
         if (IPYUSDX(pyusdx).claimRecipientFor(address(this)) != address(this)) revert InvalidClaimRecipient();
     }
