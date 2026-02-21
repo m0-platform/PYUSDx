@@ -37,7 +37,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
     function testFuzz_mint_earningAccount(uint256 amount, uint128 index) public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         uint256 boundedAmount = bound(amount, 1, uint256(type(uint240).max) + 1);
         uint128 boundedIndex = uint128(bound(index, 1e12, 1e18)); // From 1x to 1,000,000x index
@@ -117,7 +117,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         uint128 boundedIndex = uint128(bound(index, 1e12, 1e15)); // From 1x to 1,000x index
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.assume(_canSafelyMint(mintAmount));
 
@@ -205,9 +205,13 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             }
         } else if (boundedPath == 1) {
             // E -> E (0% fee)
-            vm.prank(earnerManager);
-            pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
-            pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+            vm.startPrank(earnerManager);
+
+            pyusdx.setEarningDetails(alice, true, 0, address(0));
+            pyusdx.setEarningDetails(bob, true, 0, address(0));
+
+            vm.stopPrank();
+
             pyusdx.setAccountLastIndex(alice, boundedIndex);
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
@@ -240,7 +244,8 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         } else if (boundedPath == 2) {
             // N -> E
             vm.prank(earnerManager);
-            pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+            pyusdx.setEarningDetails(bob, true, 0, address(0));
+
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
             minterGateway.mint(alice, boundedAmount);
@@ -272,7 +277,8 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         } else if (boundedPath == 3) {
             // E -> N
             vm.prank(earnerManager);
-            pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+            pyusdx.setEarningDetails(alice, true, 0, address(0));
+
             pyusdx.setAccountLastIndex(alice, boundedIndex);
 
             minterGateway.mint(alice, boundedAmount);
@@ -301,9 +307,13 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             }
         } else if (boundedPath == 4) {
             // E -> E with same 1% fee
-            vm.prank(earnerManager);
-            pyusdx.setEarningDetails(alice, true, earnerManager, 100, address(0));
-            pyusdx.setEarningDetails(bob, true, earnerManager, 100, address(0));
+            vm.startPrank(earnerManager);
+
+            pyusdx.setEarningDetails(alice, true, 100, address(0));
+            pyusdx.setEarningDetails(bob, true, 100, address(0));
+
+            vm.stopPrank();
+
             pyusdx.setAccountLastIndex(alice, boundedIndex);
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
@@ -334,9 +344,13 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             }
         } else if (boundedPath == 5) {
             // E -> E with different fees (1% alice, 5% bob)
-            vm.prank(earnerManager);
-            pyusdx.setEarningDetails(alice, true, earnerManager, 100, address(0));
-            pyusdx.setEarningDetails(bob, true, earnerManager, 500, address(0));
+            vm.startPrank(earnerManager);
+
+            pyusdx.setEarningDetails(alice, true, 100, address(0));
+            pyusdx.setEarningDetails(bob, true, 500, address(0));
+
+            vm.stopPrank();
+
             pyusdx.setAccountLastIndex(alice, boundedIndex);
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 

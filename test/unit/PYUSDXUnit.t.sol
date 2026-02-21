@@ -160,7 +160,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_mint_earningAccount() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         assertTrue(pyusdx.isEarning(alice));
 
@@ -185,7 +185,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         uint256 balanceBefore = pyusdx.balanceOf(alice);
         uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
@@ -202,7 +202,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_mint_earningAccount_withIndexGrowth() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(500));
 
         uint128 indexBefore = pyusdx.currentAccountIndex(alice);
@@ -258,7 +259,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         // Set alice as earning
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         assertTrue(pyusdx.isEarning(alice));
 
         // Mint again - should now go to earning balance
@@ -277,7 +279,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_mint_earningToNonEarning_transition() public {
         // Set alice as earning first
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Mint to alice as earning
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -291,7 +293,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         // Set alice as non-earning
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, false, address(0), 0, address(0));
+        pyusdx.setEarningDetails(alice, false, 0, address(0));
 
         assertFalse(pyusdx.isEarning(alice));
 
@@ -373,7 +375,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_earningAccount() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -399,7 +401,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function testFuzz_burn_earningAccount(uint256 amount, uint128 index) public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         uint256 boundedMintAmount = bound(amount, 1, uint256(type(uint112).max) - 1);
         uint256 boundedBurnAmount = bound(amount, 1, boundedMintAmount);
@@ -422,7 +424,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_earningAccount_withIndexGrowth() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
         pyusdx.setAccountRateBps(alice, uint24(500));
 
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -459,7 +461,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_fullBalance_earning() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -479,7 +481,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         // Set alice as earning
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         assertTrue(pyusdx.isEarning(alice));
 
         // Mint again as earning
@@ -506,7 +509,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_earningAccount_principalUnderflowProtection() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -636,10 +639,10 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_earningToEarning() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -666,11 +669,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_earningToEarning_withIndexGrowth() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(500));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
         pyusdx.setAccountRateBps(bob, uint24(500));
 
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -700,10 +705,10 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
 
         pyusdx.setAccountLastIndex(alice, boundedIndex);
         pyusdx.setAccountLastIndex(bob, boundedIndex);
@@ -727,7 +732,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_nonEarningToEarning() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -750,7 +755,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_earningToNonEarning() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -777,7 +782,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         pyusdx.setAccountLastIndex(alice, boundedIndex);
 
@@ -848,10 +853,10 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_fullBalance_earningToEarning() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -873,7 +878,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.warp(365 days);
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
         pyusdx.setAccountRateBps(alice, uint24(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -900,7 +905,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
 
         pyusdx.setAccountLastIndex(bob, boundedIndex);
 
@@ -923,7 +928,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_mint_earningAccount_atInitialIndex() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Verify index starts at PRECISION (1e12)
         assertEq(pyusdx.currentAccountIndex(alice), PRECISION);
@@ -942,10 +947,10 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_earningToEarning_atInitialIndex() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
 
         assertEq(pyusdx.currentAccountIndex(alice), PRECISION);
 
@@ -966,7 +971,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_earningAccount_atInitialIndex() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         assertEq(pyusdx.currentAccountIndex(alice), PRECISION);
 
@@ -986,7 +991,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_mint_earningAccount_smallAmount_highIndex() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set index to a high value (100x PRECISION)
         uint128 highIndex = PRECISION * 100;
@@ -1005,7 +1010,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_mint_earningAccount_principalRoundsToZero() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set index to very high value
         uint128 veryHighIndex = PRECISION * 1000;
@@ -1024,10 +1029,10 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_earningToEarning_smallAmount_highIndex() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
 
         // Set index to high value
         uint128 highIndex = PRECISION * 100;
@@ -1051,7 +1056,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_earningAccount_smallAmount_nearZeroPrincipal() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set index to high value (but not too high that principal rounds to zero on mint)
         uint128 highIndex = PRECISION * 100; // 100x index
@@ -1079,7 +1084,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_mint_earningAccount_after10YearsCompounding() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(500));
 
         uint128 indexBefore = pyusdx.currentAccountIndex(alice);
@@ -1105,10 +1111,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_earningToEarning_after50Years() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(1000));
+
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
         pyusdx.setAccountRateBps(bob, uint24(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -1136,7 +1145,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_earningAccount_after100YearsMaxRate() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(10000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -1158,7 +1168,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_index_growth_capsAtMax() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(10000));
 
         // Warp far into the future to try to overflow index
@@ -1178,7 +1189,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_mint_earningAccount_withRateChange() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(500));
 
         // Warp to grow index
@@ -1203,10 +1215,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_earningToEarning_withRateChange() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(500));
+
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
         pyusdx.setAccountRateBps(bob, uint24(500));
 
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -1238,7 +1253,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_earningAccount_withRateChange() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -1268,7 +1284,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_invariant_mint_principalMatchesRoundedDown() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Test at various index values
         uint128[4] memory indices = [PRECISION, PRECISION * 10, PRECISION * 100, PRECISION * 1000];
@@ -1289,7 +1305,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_invariant_burn_principalMatchesRoundedUp() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Test at various index values
         uint128[4] memory indices = [PRECISION, PRECISION * 10, PRECISION * 100, PRECISION * 1000];
@@ -1311,10 +1327,12 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     }
 
     function test_invariant_transfer_principalMatchesRoundedUp() public {
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        vm.startPrank(earnerManager);
+
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
+        vm.stopPrank();
 
         // Test at various index values
         uint128[4] memory indices = [PRECISION, PRECISION * 10, PRECISION * 100, PRECISION * 1000];
@@ -1342,7 +1360,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_invariant_transfer_crossEarning_principalAsymmetry() public {
         // Test E->N and N->E paths to verify different rounding behavior
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set high index for visible rounding differences
         pyusdx.setAccountLastIndex(alice, PRECISION * 100);
@@ -1367,7 +1385,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         minterGateway.mint(david, TRANSFER_AMOUNT);
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(carol, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(carol, true, 0, address(0));
+
         pyusdx.setAccountLastIndex(carol, PRECISION * 100);
 
         uint256 davidBalance = pyusdx.balanceOf(david);
@@ -1388,7 +1407,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_earningAccount_depletesPrincipal_nonZeroBalanceRemains() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set high index so small amounts give tiny principal
         pyusdx.setAccountLastIndex(alice, PRECISION * 1000);
@@ -1418,10 +1437,10 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_earningToEarning_depletesPrincipal() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
 
         // Set high index (100x, not 1000x to get some principal on mint)
         pyusdx.setAccountLastIndex(alice, PRECISION * 100);
@@ -1449,7 +1468,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_transfer_crossEarning_depletesPrincipal() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set high index (100x, not 1000x to get some principal on mint)
         pyusdx.setAccountLastIndex(alice, PRECISION * 100);
@@ -1476,14 +1495,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     /* ============ Repeated Operations Compound Rounding Tests ============ */
 
     function test_repeatedTransfers_principalConsistency() public {
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        vm.startPrank(earnerManager);
 
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+        pyusdx.setEarningDetails(carol, true, 0, address(0));
 
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(carol, true, earnerManager, 0, address(0));
+        vm.stopPrank();
 
         // Set high index for visible rounding
         pyusdx.setAccountLastIndex(alice, PRECISION * 100);
@@ -1512,7 +1530,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_repeatedMintBurn_principalConsistency() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set index
         pyusdx.setAccountLastIndex(alice, PRECISION * 10);
@@ -1541,10 +1559,10 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_repeatedMintTransfer_principalConsistency() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
 
         // Set high index
         pyusdx.setAccountLastIndex(alice, PRECISION * 50);
@@ -1575,7 +1593,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_mint_smallAmount_highIndex_principalRoundsToZero() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set extremely high index
         pyusdx.setAccountLastIndex(alice, PRECISION * 10000);
@@ -1593,7 +1611,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_smallAmount_highIndex_principalRoundsUp() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set high index (100x, not 1000x to avoid rounding to zero on mint)
         pyusdx.setAccountLastIndex(alice, PRECISION * 100);
@@ -1613,11 +1631,12 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     }
 
     function test_transfer_smallAmount_highIndex_roundingAsymmetry() public {
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        vm.startPrank(earnerManager);
 
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
+        vm.stopPrank();
 
         // Set high index (100x, not 1000x to avoid rounding to zero on mint)
         pyusdx.setAccountLastIndex(alice, PRECISION * 100);
@@ -1644,7 +1663,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_mint_largeAmount_totalSupplyOverflow() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set total supply near max
         pyusdx.setTotalSupply(type(uint240).max - 50);
@@ -1655,11 +1674,12 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     }
 
     function test_transfer_largeAmount_lowIndex_principalOverflow() public {
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        vm.startPrank(earnerManager);
 
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
+        vm.stopPrank();
 
         // At low index, principal equals amount
         pyusdx.setAccountLastIndex(alice, PRECISION);
@@ -1683,11 +1703,12 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     /* ============ min112 Capping Behavior Tests ============ */
 
     function test_transfer_insufficientPrincipal_min112Caps() public {
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        vm.startPrank(earnerManager);
 
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
+        vm.stopPrank();
 
         // Set high index so transfer needs more principal than available
         pyusdx.setAccountLastIndex(alice, PRECISION * 1000);
@@ -1722,7 +1743,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_burn_insufficientPrincipal_min112Caps() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         // Set high index
         pyusdx.setAccountLastIndex(alice, PRECISION * 1000);
@@ -1745,11 +1766,12 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     }
 
     function test_transfer_min112_recipientGetsPrincipal() public {
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        vm.startPrank(earnerManager);
 
-        vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
+
+        vm.stopPrank();
 
         // Set high index
         pyusdx.setAccountLastIndex(alice, PRECISION * 1000);
@@ -1792,6 +1814,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Set up alice as an earner
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(500));
 
         // Warp time to accrue yield
@@ -1820,6 +1843,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Set up alice as an earner
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(500));
 
         vm.warp(block.timestamp + 365 days);
@@ -1840,6 +1864,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Set up alice as an earner
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(500));
 
         vm.warp(block.timestamp + 365 days);
@@ -2407,7 +2432,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_forceTransfer_happyPath_nonEarningToEarning() public {
         // Make bob earning
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(bob, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(bob, true, 0, address(0));
 
         // Mint to alice (non-earning)
         minterGateway.mint(alice, MINT_AMOUNT);

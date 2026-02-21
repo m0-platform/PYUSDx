@@ -78,7 +78,8 @@ contract YieldToOneUnitTests is Test {
         );
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(address(extension), true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(address(extension), true, 0, address(0));
+
         pyusdx.setAccountRateBps(address(extension), uint24(500));
 
         vm.prank(rateManager);
@@ -241,7 +242,7 @@ contract YieldToOneUnitTests is Test {
 
     function test_claimYield_withFee() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(address(extension), true, earnerManager, 1000, address(0));
+        pyusdx.setEarningDetails(address(extension), true, 1000, address(0));
 
         _wrapFor(alice, alice, MINT_AMOUNT);
 
