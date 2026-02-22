@@ -14,28 +14,19 @@ interface IPYUSDX {
     /* ============ Events ============ */
 
     /**
-     * @notice Emitted when earning details are set for an account.
-     * @param account        The account whose earning details are being set.
-     * @param isEarning      Whether the account is earning.
-     * @param earnerManager  The Earner Manager setting the details.
+     * @notice Emitted when account info is set.
+     * @param account        The account whose info is being set.
+     * @param earnerRate     The earner rate in basis points (0 = not earning).
      * @param feeRate        The fee rate on yield (basis points).
      * @param claimRecipient The address that will receive claimed yield.
      */
-    event EarningDetailsSet(
-        address indexed account,
-        bool indexed isEarning,
-        address indexed earnerManager,
-        uint16 feeRate,
-        address claimRecipient
-    );
+    event AccountInfoSet(address indexed account, uint24 earnerRate, uint16 feeRate, address claimRecipient);
 
     /**
-     * @notice Emitted when yield is claimed for an account.
-     * @param account         The account for which yield is claimed.
-     * @param claimRecipient  The address receiving the yield.
-     * @param yield           The amount of yield claimed.
+     * @notice Emitted when earning is started for an account.
+     * @param account The account that started earning.
      */
-    event Claimed(address indexed account, address indexed claimRecipient, uint240 yield);
+    event StartedEarning(address indexed account);
 
     /**
      * @notice Emitted when earning is stopped for an account.
@@ -44,17 +35,20 @@ interface IPYUSDX {
     event StoppedEarning(address indexed account);
 
     /**
-     * @notice Emitted when an earner's individual yield rate is set.
-     * @param account The earner account.
-     * @param oldRate The previous rate in basis points.
-     * @param newRate The new rate in basis points.
+     * @notice Emitted when yield is claimed for an account.
+     * @param account         The account for which yield is claimed.
+     * @param claimRecipient  The address receiving the yield.
+     * @param yield           The amount of yield claimed.
      */
-    event EarnerRateSet(address indexed account, uint24 oldRate, uint24 newRate);
+    event Claimed(address indexed account, address indexed claimRecipient, uint256 yield);
+
+    /**
+     * @notice Emitted when the earner manager is set or updated.
+     * @param  account The address of the new earner manager.
+     */
+    event EarnerManagerSet(address indexed account);
 
     /* ============ Custom Errors ============ */
-
-    /// @notice Thrown when the minter gateway address is zero.
-    error ZeroMinterGateway();
 
     /// @notice Thrown when the admin address is zero.
     error ZeroAdmin();
@@ -65,17 +59,17 @@ interface IPYUSDX {
     /// @notice Thrown when an account address is zero.
     error ZeroAccount();
 
-    /// @notice Thrown when the caller does not have the EARNER_MANAGER_ROLE.
+    /// @notice Thrown when an amount is zero.
+    error ZeroAmount();
+
+    /// @notice Thrown when the caller does not have the ISSUER_ROLE.
+    error NotIssuer();
+
+    /// @notice Thrown when the caller is not the earner manager.
     error NotEarnerManager();
 
-    /// @notice Thrown when the caller is not the Minter Gateway.
-    error NotMinterGateway();
-
-    /// @notice Thrown when earning details were already set by a different earner manager.
-    error EarnerDetailsAlreadySet(address account);
-
-    /// @notice Thrown when earning details are invalid (e.g., not earning but has fee rate).
-    error InvalidDetails();
+    /// @notice Thrown when account info is invalid (e.g., not earning but has fee rate).
+    error InvalidAccountInfo();
 
     /// @notice Thrown when the fee rate exceeds the maximum.
     error FeeRateTooHigh(uint16 feeRate);
@@ -83,32 +77,14 @@ interface IPYUSDX {
     /// @notice Thrown when an input array is empty.
     error ArrayLengthZero();
 
-    /// @notice Thrown when an amount is zero.
-    error ZeroAmount();
-
-    /// @notice Thrown when mint would overflow principal calculations.
-    error OverflowsPrincipalOfTotalSupply();
-
     /// @notice Thrown when burn amount exceeds account balance.
     error InsufficientBalance(address account, uint256 balance, uint256 amount);
-
-    /// @notice Thrown when trying to set a rate for a non-earning account.
-    error NotEarning();
-
-    /// @notice Thrown when caller lacks RATE_MANAGER_ROLE.
-    error NotRateManager();
-
-    /// @notice Thrown when rate exceeds maximum (100%).
-    error RateTooHigh();
-
-    /// @notice Thrown when the rate manager address is zero.
-    error ZeroRateManager();
 
     /* ============ Interactive Functions ============ */
 
     /**
      * @notice Mints PYUSDX to an account.
-     * @dev    MUST only be callable by MinterGateway.
+     * @dev    MUST only be callable by ISSUER_ROLE.
      * @dev    MUST revert if the contract is paused.
      * @dev    MUST revert if the account is frozen.
      * @param account The account receiving the minted PYUSDX.
@@ -118,7 +94,7 @@ interface IPYUSDX {
 
     /**
      * @notice Burns PYUSDX from an account.
-     * @dev    MUST only be callable by MinterGateway.
+     * @dev    MUST only be callable by ISSUER_ROLE.
      * @dev    MUST revert if the contract is paused.
      * @dev    MUST revert if the account is frozen.
      * @param account The account from which PYUSDX is burnt.
@@ -130,132 +106,115 @@ interface IPYUSDX {
      * @notice Claims accrued yield for an account.
      * @dev    Anyone can call on behalf of any account.
      * @dev    MUST revert if the contract is paused.
-     * @dev    MUST revert if the account is frozen.
      * @param account The account to claim yield for.
      * @return yield  The amount of yield claimed.
      */
-    function claimFor(address account) external returns (uint240 yield);
+    function claimFor(address account) external returns (uint256 yield);
 
     /**
-     * @notice Sets earning details for a single account.
-     * @dev    MUST only be callable by an Earner Manager.
-     * @dev    MUST revert if the account is already managed by a different earner manager.
+     * @notice Sets account info for a single account.
+     * @dev    MUST only be callable by the earner manager.
      * @param account         The account to configure.
-     * @param isEarning       Whether the account is earning.
+     * @param earnerRate      The earner rate in basis points (0 to stop earning).
      * @param feeRate         The fee rate on yield (basis points, 0-10000).
      * @param claimRecipient  The address to receive claimed yield (address(0) to clear).
      */
-    function setEarningDetails(address account, bool isEarning, uint16 feeRate, address claimRecipient) external;
+    function setAccountInfo(address account, uint24 earnerRate, uint16 feeRate, address claimRecipient) external;
 
     /**
-     * @notice Sets earning details for multiple accounts.
-     * @dev    MUST only be callable by an Earner Manager.
+     * @notice Sets account info for multiple accounts.
+     * @dev    MUST only be callable by the earner manager.
      * @dev    MUST revert if array lengths do not match.
      * @param accounts         The accounts to configure.
-     * @param isEarning        The earning statuses for each account.
+     * @param earnerRates      The earner rates for each account (basis points).
      * @param feeRates         The fee rates for each account (basis points).
      * @param claimRecipients  The addresses to receive claimed yield.
      */
-    function setEarningDetails(
+    function setAccountInfo(
         address[] calldata accounts,
-        bool[] calldata isEarning,
+        uint24[] calldata earnerRates,
         uint16[] calldata feeRates,
         address[] calldata claimRecipients
     ) external;
 
     /**
-     * @notice Sets the yield rate for a single earner.
-     * @dev    MUST only be callable by RATE_MANAGER_ROLE.
-     * @dev    MUST revert if the account is not earning.
-     * @param account    The earner account.
-     * @param newRateBps The new yield rate in basis points.
+     * @notice Starts earning for an account with the given configuration.
+     * @dev    MUST only be callable by the earner manager.
+     * @param account         The account to start earning for.
+     * @param earnerRate      The earner rate in basis points.
+     * @param feeRate         The fee rate on yield (basis points).
+     * @param claimRecipient  The address to receive claimed yield.
      */
-    function setEarnerRate(address account, uint24 newRateBps) external;
+    function startEarningFor(address account, uint24 earnerRate, uint16 feeRate, address claimRecipient) external;
 
     /**
-     * @notice Sets yield rates for multiple earners.
-     * @dev    MUST only be callable by RATE_MANAGER_ROLE.
-     * @dev    MUST revert if array lengths do not match.
-     * @param accounts The earner accounts.
-     * @param rates    The new yield rates in basis points.
+     * @notice Sets the earner manager address.
+     * @dev    MUST only be callable by DEFAULT_ADMIN_ROLE.
+     * @param earnerManager The new earner manager address.
      */
-    function setEarnerRateBatch(address[] calldata accounts, uint24[] calldata rates) external;
+    function setEarnerManager(address earnerManager) external;
 
     /* ============ View/Pure Functions ============ */
 
-    /// @notice The Minter Gateway contract address.
-    function minterGateway() external view returns (address);
+    /// @notice The earner manager address.
+    function earnerManager() external view returns (address);
 
     /// @notice The maximum fee rate (10000 = 100%).
     function MAX_FEE_RATE() external view returns (uint16);
 
+    /// @notice The role that can issue (mint/burn) PYUSDX tokens.
+    function ISSUER_ROLE() external view returns (bytes32);
+
     /**
      * @notice Returns whether an account is earning.
      * @param account The account to query.
-     * @return True if the account is earning.
+     * @return True if the account is earning (earnerRate > 0).
      */
     function isEarning(address account) external view returns (bool);
 
     /**
-     * @notice Returns earning statuses for multiple accounts.
-     * @param accounts The accounts to query.
-     * @return Boolean array indicating earning status for each account.
-     */
-    function isEarning(address[] calldata accounts) external view returns (bool[] memory);
-
-    /**
      * @notice Returns the recipient of yield claims for an account.
-     * @dev    Returns the locally set claim recipient if set, otherwise the account itself.
+     * @dev    Returns the account itself if no claim recipient is set.
      * @param account The account to query.
      * @return The claim recipient address.
      */
     function claimRecipientFor(address account) external view returns (address);
 
     /**
-     * @notice Returns the recipients of yield claims for multiple accounts.
-     * @param accounts The accounts to query.
-     * @return recipients Array of claim recipient addresses.
-     */
-    function claimRecipientsFor(address[] calldata accounts) external view returns (address[] memory);
-
-    /**
-     * @notice Returns detailed earning configuration for an account.
+     * @notice Returns earning configuration for an account.
      * @param account The account to query.
-     * @return isEarning      Whether the account is earning.
-     * @return earnerManager  The Earner Manager for the account.
+     * @return earnerRate     The earner rate in basis points (0 = not earning).
      * @return feeRate        The fee rate on yield (basis points).
      * @return claimRecipient The address that receives claimed yield.
      */
-    function getEarningDetails(
+    function getAccountEarningInfo(
         address account
-    ) external view returns (bool isEarning, address earnerManager, uint16 feeRate, address claimRecipient);
+    ) external view returns (uint24 earnerRate, uint16 feeRate, address claimRecipient);
 
     /**
-     * @notice Returns detailed earning configuration for multiple accounts.
-     * @param accounts The accounts to query.
-     * @return isEarning       Earning status for each account.
-     * @return earnerManagers  Earner Manager address for each account.
-     * @return feeRates        Fee rate for each account (basis points).
-     * @return claimRecipients Addresses to receive claimed yield.
-     */
-    function getEarningDetails(
-        address[] calldata accounts
-    )
-        external
-        view
-        returns (
-            bool[] memory isEarning,
-            address[] memory earnerManagers,
-            uint16[] memory feeRates,
-            address[] memory claimRecipients
-        );
-
-    /**
-     * @notice Returns the accrued but unclaimed yield for an account.
+     * @notice Returns accrued yield, fee, and net yield for an account.
      * @param account The account to query.
-     * @return The accrued yield (0 if account not earning).
+     * @return yieldWithFee  The total accrued yield including fee.
+     * @return fee           The fee portion of the accrued yield.
+     * @return yieldNetOfFee The accrued yield net of fee.
      */
-    function accruedYieldOf(address account) external view returns (uint240);
+    function accruedYieldAndFeeOf(
+        address account
+    ) external view returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee);
+
+    /**
+     * @notice Returns the accrued but unclaimed yield (net of fee) for an account.
+     * @param account The account to query.
+     * @return The accrued yield net of fee (0 if account not earning).
+     */
+    function accruedYieldOf(address account) external view returns (uint256);
+
+    /**
+     * @notice Returns the accrued fee for an account.
+     * @param account The account to query.
+     * @return The accrued fee (0 if account not earning).
+     */
+    function accruedFeeOf(address account) external view returns (uint256);
 
     /**
      * @notice Returns the token balance including any accrued yield.
@@ -273,28 +232,24 @@ interface IPYUSDX {
     function earningPrincipalOf(address account) external view returns (uint112);
 
     /**
-     * @notice Returns the current per-account yield index.
-     * @dev    Returns PRECISION (1e12) for non-earners.
+     * @notice Returns the stored (last snapshotted) index for an account.
      * @param account The account to query.
-     * @return The current index for the account.
+     * @return The last stored index value.
      */
-    function currentAccountIndex(address account) external view returns (uint128);
+    function lastIndexOf(address account) external view returns (uint128);
 
     /**
-     * @notice The role that can manage earners.
-     * @return The EARNER_MANAGER_ROLE bytes32 value.
+     * @notice Returns the computed current index for an account.
+     * @dev    Returns EXP_SCALED_ONE (1e12) for non-earners.
+     * @param account The account to query.
+     * @return The current index value.
      */
-    function EARNER_MANAGER_ROLE() external view returns (bytes32);
+    function currentIndexOf(address account) external view returns (uint128);
 
     /**
-     * @notice The role that can mint PYUSDX tokens.
-     * @return The MINTER_ROLE bytes32 value.
+     * @notice Returns the last update timestamp for an account.
+     * @param account The account to query.
+     * @return The last update timestamp.
      */
-    function MINTER_ROLE() external view returns (bytes32);
-
-    /**
-     * @notice The role that can set yield rates.
-     * @return The RATE_MANAGER_ROLE bytes32 value.
-     */
-    function RATE_MANAGER_ROLE() external view returns (bytes32);
+    function lastUpdateTimestampOf(address account) external view returns (uint32);
 }
