@@ -41,7 +41,7 @@ abstract contract PYUSDXBaseUnitTest is Test {
         // TODO: figure out how to avoid this circular dependency
         minterGateway = new MinterGatewayMock(address(0));
 
-        address implementation = address(new PYUSDXHarness(address(minterGateway)));
+        address implementation = address(new PYUSDXHarness());
 
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
@@ -55,13 +55,17 @@ abstract contract PYUSDXBaseUnitTest is Test {
                     pauser,
                     freezeManager,
                     forcedTransferManager,
-                    earnerManager,
-                    rateManager
+                    earnerManager
                 )
             )
         );
 
         minterGateway.setPyusdx(address(pyusdx));
+
+        // Grant ISSUER_ROLE to minterGateway mock so it can mint/burn
+        bytes32 issuerRole = pyusdx.ISSUER_ROLE();
+        vm.prank(admin);
+        pyusdx.grantRole(issuerRole, address(minterGateway));
     }
 
     /* ============ Indexing Math Helpers ============ */

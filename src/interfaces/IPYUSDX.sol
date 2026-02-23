@@ -48,6 +48,18 @@ interface IPYUSDX {
      */
     event EarnerManagerSet(address indexed account);
 
+    /// @notice Emitted when an earner's account info is updated (rate, fee, or recipient change).
+    event AccountInfoUpdated(address indexed account, uint24 earnerRate, uint16 feeRate, address claimRecipient);
+
+    /// @notice Emitted when an account's index is updated.
+    event IndexUpdated(uint128 currentIndex, address indexed account);
+
+    /// @notice Emitted when yield is claimed for an account.
+    event YieldClaimed(address indexed account, uint256 yieldNetOfFee);
+
+    /// @notice Emitted when a fee is claimed from an account's yield.
+    event FeeClaimed(address indexed account, address indexed recipient, uint256 fee);
+
     /* ============ Custom Errors ============ */
 
     /// @notice Thrown when the admin address is zero.
@@ -107,9 +119,23 @@ interface IPYUSDX {
      * @dev    Anyone can call on behalf of any account.
      * @dev    MUST revert if the contract is paused.
      * @param account The account to claim yield for.
-     * @return yield  The amount of yield claimed.
+     * @return yieldWithFee  The gross yield claimed.
+     * @return fee           The fee deducted.
+     * @return yieldNetOfFee The net yield after fee.
      */
-    function claimFor(address account) external returns (uint256 yield);
+    function claimFor(address account) external returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee);
+
+    /**
+     * @notice Claims accrued yield for multiple accounts.
+     * @dev    MUST revert if the contract is paused or any account is frozen.
+     * @param  accounts       The accounts to claim yield for.
+     * @return yieldWithFees  The gross yield claimed per account.
+     * @return fees           The fee deducted per account.
+     * @return yieldNetOfFees The net yield per account.
+     */
+    function claimFor(
+        address[] calldata accounts
+    ) external returns (uint256[] memory yieldWithFees, uint256[] memory fees, uint256[] memory yieldNetOfFees);
 
     /**
      * @notice Sets account info for a single account.
@@ -138,16 +164,6 @@ interface IPYUSDX {
     ) external;
 
     /**
-     * @notice Starts earning for an account with the given configuration.
-     * @dev    MUST only be callable by the earner manager.
-     * @param account         The account to start earning for.
-     * @param earnerRate      The earner rate in basis points.
-     * @param feeRate         The fee rate on yield (basis points).
-     * @param claimRecipient  The address to receive claimed yield.
-     */
-    function startEarningFor(address account, uint24 earnerRate, uint16 feeRate, address claimRecipient) external;
-
-    /**
      * @notice Sets the earner manager address.
      * @dev    MUST only be callable by DEFAULT_ADMIN_ROLE.
      * @param earnerManager The new earner manager address.
@@ -160,7 +176,7 @@ interface IPYUSDX {
     function earnerManager() external view returns (address);
 
     /// @notice The maximum fee rate (10000 = 100%).
-    function MAX_FEE_RATE() external view returns (uint16);
+    function ONE_HUNDRED_PERCENT() external view returns (uint16);
 
     /// @notice The role that can issue (mint/burn) PYUSDX tokens.
     function ISSUER_ROLE() external view returns (bytes32);

@@ -30,8 +30,8 @@ contract PYUSDXInvariants is PYUSDXBaseUnitTest {
         testAccounts[3] = david;
 
         for (uint256 i = 0; i < testAccounts.length; i++) {
-            (bool isEarning, , , ) = pyusdx.getEarningDetails(testAccounts[i]);
-            if (!isEarning) {
+            (uint24 earnerRate_, , ) = pyusdx.getAccountEarningInfo(testAccounts[i]);
+            if (earnerRate_ == 0) {
                 assertEq(pyusdx.earningPrincipalOf(testAccounts[i]), 0, "Non-earning account has non-zero principal");
             }
         }
@@ -61,8 +61,8 @@ contract PYUSDXInvariants is PYUSDXBaseUnitTest {
         testAccounts[3] = david;
 
         for (uint256 i = 0; i < testAccounts.length; i++) {
-            (bool isEarning, , , ) = pyusdx.getEarningDetails(testAccounts[i]);
-            if (isEarning) {
+            (uint24 earnerRate_, , ) = pyusdx.getAccountEarningInfo(testAccounts[i]);
+            if (earnerRate_ > 0) {
                 uint256 balance = pyusdx.balanceOf(testAccounts[i]);
                 uint112 principal = pyusdx.earningPrincipalOf(testAccounts[i]);
 

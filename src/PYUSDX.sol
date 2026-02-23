@@ -18,7 +18,7 @@ abstract contract PYUSDXStorageLayout {
     struct PYUSDXStorageStruct {
         // Supply tracking
         uint256 totalSupply;
-        // earner manager address (can manage earners and receive fees from their acconts)
+        // earner manager address (can manage earners and receive fees from their accounts)
         address earnerManager;
         // Account data
         mapping(address account => Account) accounts;
@@ -64,7 +64,7 @@ contract PYUSDX is
     /* ============ Constants ============ */
 
     /// @notice Maximum fee rate in bps (100%).
-    uint16 public constant MAX_FEE_RATE = 10_000;
+    uint16 public constant ONE_HUNDRED_PERCENT = 10_000;
 
     /// @notice Precision scaling for index calculations (1e12).
     uint56 internal constant EXP_SCALED_ONE = 1e12;
@@ -136,7 +136,7 @@ contract PYUSDX is
 
         $.totalSupply += amount;
 
-        if ($.accounts[account].earnerRate > 0) {
+        if (isEarning(account)) {
             _addEarningAmount($, account, amount);
         } else {
             _addNonEarningAmount($, account, amount);
@@ -155,7 +155,7 @@ contract PYUSDX is
 
         $.totalSupply -= amount;
 
-        if ($.accounts[account].earnerRate > 0) {
+        if (isEarning(account)) {
             _subtractEarningAmount($, account, amount);
         } else {
             _subtractNonEarningAmount($, account, amount);
@@ -169,6 +169,25 @@ contract PYUSDX is
         address account
     ) external whenNotPaused returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) {
         return _claimFor(account);
+    }
+
+    /// @inheritdoc IPYUSDX
+    function claimFor(
+        address[] calldata accounts
+    )
+        external
+        whenNotPaused
+        returns (uint256[] memory yieldWithFees, uint256[] memory fees, uint256[] memory yieldNetOfFees)
+    {
+        if (accounts.length == 0) revert ArrayLengthZero();
+
+        yieldWithFees = new uint256[](accounts.length);
+        fees = new uint256[](accounts.length);
+        yieldNetOfFees = new uint256[](accounts.length);
+
+        for (uint256 i; i < accounts.length; ++i) {
+            (yieldWithFees[i], fees[i], yieldNetOfFees[i]) = _claimFor(accounts[i]);
+        }
     }
 
     /// @inheritdoc IPYUSDX
@@ -229,7 +248,7 @@ contract PYUSDX is
         if (feeRate == 0 || yieldWithFee == 0) return (yieldWithFee, 0, yieldWithFee);
 
         unchecked {
-            fee = (yieldWithFee * feeRate) / MAX_FEE_RATE;
+            fee = (yieldWithFee * feeRate) / ONE_HUNDRED_PERCENT;
             yieldNetOfFee = yieldWithFee - fee;
         }
     }
@@ -262,12 +281,12 @@ contract PYUSDX is
     }
 
     /// @inheritdoc IPYUSDX
-    function isEarning(address account) external view returns (bool) {
+    function isEarning(address account) public view returns (bool) {
         return _getPYUSDXStorageLocation().accounts[account].earnerRate > 0;
     }
 
     /// @inheritdoc IPYUSDX
-    function claimRecipientFor(address account) external view returns (address) {
+    function claimRecipientFor(address account) public view returns (address) {
         address claimRecipient = _getPYUSDXStorageLocation().accounts[account].claimRecipient;
         return claimRecipient == address(0) ? account : claimRecipient;
     }
@@ -324,7 +343,10 @@ contract PYUSDX is
      * @param account   The account to be frozen.
      */
     function _beforeFreeze(address account) internal override {
+        _claimFor(account); // claim accrued yield before freezing
+
         _stopEarningFor(account);
+
         super._beforeFreeze(account);
     }
 
@@ -339,6 +361,7 @@ contract PYUSDX is
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 
+        // If the new earner manager is the same as the current one, do nothing.
         if (earnerManager_ == $.earnerManager) return;
 
         $.earnerManager = earnerManager_;
@@ -349,32 +372,37 @@ contract PYUSDX is
     /// @dev Internal implementation for setting earning details.
     function _setAccountInfo(address account, uint24 earnerRate, uint16 feeRate, address claimRecipient) internal {
         _revertIfZeroAccount(account);
-        if (feeRate > MAX_FEE_RATE) revert FeeRateTooHigh(feeRate);
+        if (feeRate > ONE_HUNDRED_PERCENT) revert FeeRateTooHigh(feeRate);
 
         // Disable earning should have all earning-related fields set to 0, address(0).
-        if (earnerRate == 0 && feeRate != 0 && claimRecipient != address(0)) revert InvalidAccountInfo();
+        if (earnerRate == 0 && (feeRate != 0 || claimRecipient != address(0))) revert InvalidAccountInfo();
 
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-        Account storage accountInfo = $.accounts[account];
-
-        bool wasEarning = accountInfo.earnerRate > 0;
+        bool wasEarning = isEarning(account);
         bool willEarn = earnerRate > 0;
 
         // No change for a non-earner, no-op action.
         if (!wasEarning && !willEarn) return;
+
+        Account storage accountInfo = _getPYUSDXStorageLocation().accounts[account];
 
         // No change for an earner, no-op action. Happens rarely, consider removing.
         if (
             wasEarning &&
             willEarn &&
             earnerRate == accountInfo.earnerRate &&
-            accountInfo.feeRate == feeRate &&
-            accountInfo.claimRecipient == claimRecipient
+            feeRate == accountInfo.feeRate &&
+            claimRecipient == accountInfo.claimRecipient
         ) return;
 
-        emit AccountInfoSet(account, earnerRate, feeRate, claimRecipient);
+        // Option 1: Disable earning for an earner, resetting all earning-related fields to 0, address(0).
+        if (wasEarning && !willEarn) {
+            _claimFor(account);
+            _stopEarningFor(account);
 
-        // Enable earning for a non-earner.
+            return;
+        }
+
+        // Option 2: Enable earning for a non-earner.
         if (!wasEarning && willEarn) {
             accountInfo.lastIndex = EXP_SCALED_ONE;
             accountInfo.lastUpdateTimestamp = uint32(block.timestamp);
@@ -389,42 +417,36 @@ contract PYUSDX is
             return;
         }
 
+        // Option 3: Update earning details for an earner, claiming any accrued yield first.
+        emit AccountInfoUpdated(account, earnerRate, feeRate, claimRecipient);
+
         // Claim accrued yield for earners before changing their configuration or disable earning.
         _claimFor(account);
 
-        // Disable earning for an earner, resetting all earning-related fields to 0, address(0).
-        if (wasEarning && !willEarn) {
-            delete accountInfo.lastIndex;
-            delete accountInfo.lastUpdateTimestamp;
-            delete accountInfo.earnerRate;
-            delete accountInfo.feeRate;
-            delete accountInfo.claimRecipient;
-            delete accountInfo.earningPrincipal;
-
-            emit StoppedEarning(account);
-        } else {
-            // NOTE: required only when earner rate is changing
+        if (accountInfo.earnerRate != earnerRate) {
             _updateIndexOf(account);
-
             accountInfo.earnerRate = earnerRate;
-            accountInfo.feeRate = feeRate;
-            accountInfo.claimRecipient = claimRecipient;
         }
+
+        accountInfo.feeRate = feeRate;
+        accountInfo.claimRecipient = claimRecipient;
     }
 
     /// @dev Snapshots the account's current index into storage. Returns the new index value.
-    function _updateIndexOf(address account) internal returns (uint128 lastIndex) {
+    function _updateIndexOf(address account) internal returns (uint128 currentIndex) {
+        if (!isEarning(account)) return EXP_SCALED_ONE;
+
         Account storage accountInfo = _getPYUSDXStorageLocation().accounts[account];
 
-        if (accountInfo.earnerRate == 0) return EXP_SCALED_ONE;
-
-        accountInfo.lastIndex = lastIndex = currentIndexOf(account);
+        accountInfo.lastIndex = currentIndex = currentIndexOf(account);
         accountInfo.lastUpdateTimestamp = uint32(block.timestamp);
+
+        emit IndexUpdated(currentIndex, account);
     }
 
     /// @dev Internal claim implementation.
     function _claimFor(address account) internal returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) {
-        (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) = accruedYieldAndFeeOf(account);
+        (yieldWithFee, fee, yieldNetOfFee) = accruedYieldAndFeeOf(account);
 
         if (yieldWithFee == 0) return (0, 0, 0);
 
@@ -435,10 +457,8 @@ contract PYUSDX is
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 
         // No change in principal, only the balance is updated to include the newly claimed yield.
-        unchecked {
-            $.accounts[account].balance += yieldWithFee;
-            $.totalSupply += yieldWithFee;
-        }
+        $.accounts[account].balance += yieldWithFee;
+        $.totalSupply += yieldWithFee;
 
         address claimRecipient = claimRecipientFor(account);
 
@@ -469,56 +489,23 @@ contract PYUSDX is
         if (account == address(0)) revert ZeroAccount();
     }
 
-    // function startEarningFor(address account, uint24 earnerRate, uint16 feeRate, address claimRecipient) external onlyEarnerManager {
-    //     _setAccountInfo(account, earnerRate, feeRate, claimRecipient);
-    // }
-
     /// @dev   Stops earning for an account, claiming any accrued yield first.
     /// @param account The account to stop earning for.
     function _stopEarningFor(address account) internal {
         // If account is not an earner, return early.
         if (!isEarning(account)) return;
 
-        // Claim any accrued yield first
-        _claimFor(account);
-
-        Account storage accounInfo = _getPYUSDXStorageLocation().accounts[account];
+        Account storage accountInfo = _getPYUSDXStorageLocation().accounts[account];
 
         // Clean up all account info fields except balance.
-        delete accounInfo.earningPrincipal;
-        delete accounInfo.earnerRate;
-        delete accounInfo.feeRate;
-        delete accounInfo.claimRecipient;
-        delete accounInfo.lastIndex;
-        delete accounInfo.lastUpdateTimestamp;
+        delete accountInfo.earningPrincipal;
+        delete accountInfo.earnerRate;
+        delete accountInfo.feeRate;
+        delete accountInfo.claimRecipient;
+        delete accountInfo.lastIndex;
+        delete accountInfo.lastUpdateTimestamp;
 
         emit StoppedEarning(account);
-    }
-
-    /// @dev   Internal force transfer implementation to seize funds from frozen accounts.
-    /// @param frozenAccount The frozen account to transfer from.
-    /// @param recipient     The account to transfer to.
-    /// @param amount        The amount to transfer.
-    function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
-        _revertIfZeroAccount(recipient);
-        _revertIfNotFrozen(frozenAccount);
-
-        emit Transfer(frozenAccount, recipient, amount);
-        emit ForcedTransfer(frozenAccount, recipient, msg.sender, amount);
-
-        if (amount == 0) return;
-
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-
-        // Subtract from frozen (non-earning) account
-        _subtractNonEarningAmount($, frozenAccount, amount);
-
-        // Add to recipient (can be earning or non-earning)
-        if ($.accounts[recipient].earnerRate > 0) {
-            _addEarningAmount($, recipient, amount);
-        } else {
-            _addNonEarningAmount($, recipient, amount);
-        }
     }
 
     /// @dev Adds non-earning amount to an account's balance and total supply.
@@ -526,7 +513,7 @@ contract PYUSDX is
     /// @param account The account to add the amount to.
     /// @param amount The amount to add (must be safe240).
     function _addNonEarningAmount(PYUSDXStorageStruct storage $, address account, uint256 amount) internal {
-        // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `_mint`.
+        // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `mint`.
         unchecked {
             $.accounts[account].balance += amount;
         }
@@ -537,10 +524,9 @@ contract PYUSDX is
     /// @param account The account to add the amount to.
     /// @param amount The present amount to add.
     function _addEarningAmount(PYUSDXStorageStruct storage $, address account, uint256 amount) internal {
-        uint128 accountIndex = _updateIndexOf(account);
-        uint112 principal = _getPrincipalAmountRoundedDown(amount, accountIndex);
+        uint112 principal = _getPrincipalAmountRoundedDown(amount, _updateIndexOf(account));
 
-        // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `_mint`.
+        // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `mint`.
         unchecked {
             $.accounts[account].balance += amount;
             $.accounts[account].earningPrincipal += principal;
@@ -574,8 +560,7 @@ contract PYUSDX is
             revert InsufficientBalance(account, accountBalance, amount);
         }
 
-        uint128 accountIndex = _updateIndexOf(account);
-        uint112 principal = _getPrincipalAmountRoundedUp(amount, accountIndex);
+        uint112 principal = _getPrincipalAmountRoundedUp(amount, _updateIndexOf(account));
         uint112 earningPrincipal = $.accounts[account].earningPrincipal;
 
         unchecked {
@@ -610,6 +595,32 @@ contract PYUSDX is
         }
 
         // Add to recipient
+        if (isEarning(recipient)) {
+            _addEarningAmount($, recipient, amount);
+        } else {
+            _addNonEarningAmount($, recipient, amount);
+        }
+    }
+
+    /// @dev   Internal force transfer implementation to seize funds from frozen accounts.
+    /// @param frozenAccount The frozen account to transfer from.
+    /// @param recipient     The account to transfer to.
+    /// @param amount        The amount to transfer.
+    function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
+        _revertIfZeroAccount(recipient);
+        _revertIfNotFrozen(frozenAccount);
+
+        emit Transfer(frozenAccount, recipient, amount);
+        emit ForcedTransfer(frozenAccount, recipient, msg.sender, amount);
+
+        if (amount == 0) return;
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        // Subtract from frozen (non-earning) account
+        _subtractNonEarningAmount($, frozenAccount, amount);
+
+        // Add to recipient (can be earning or non-earning)
         if (isEarning(recipient)) {
             _addEarningAmount($, recipient, amount);
         } else {
