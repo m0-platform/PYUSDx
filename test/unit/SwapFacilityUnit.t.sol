@@ -654,22 +654,6 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         assertFalse(swapFacility.canSwapViaPath(address(randomToken), address(extensionA)));
     }
 
-    /* ============ msgSender (View) ============ */
-
-    // TODO: move to integration tests
-    function test_msgSender_duringSwap() public {
-        _setupSwapIn(alice, AMOUNT);
-
-        // msgSender() should return the original caller during a swap
-        // We can't directly test this from outside, but we can verify it returns 0 when not swapping
-        assertEq(swapFacility.msgSender(), address(0));
-    }
-
-    function test_msgSender_zero() public view {
-        // When no swap is in progress, msgSender should return zero
-        assertEq(swapFacility.msgSender(), address(0));
-    }
-
     /* ============ Pause Behavior ============ */
 
     function test_allFunctionsRevertWhenPaused() public {
@@ -705,21 +689,5 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
 
         vm.prank(alice);
         swapFacility.replaceAsset(address(mockUSDC), address(extensionA), address(multiMintExtension), AMOUNT, alice);
-    }
-
-    /* ============ Reentrancy Protection ============ */
-
-    // TODO: move to integration tests
-    function test_reentrancy_blocked() public {
-        // The isNotLocked modifier prevents reentrancy
-        // This test verifies that the lock mechanism is in place
-        _setupSwapIn(alice, AMOUNT);
-
-        // Normal swap should work
-        vm.prank(alice);
-        swapFacility.swapIn(address(extensionA), AMOUNT, alice);
-
-        // msgSender should be 0 after swap completes
-        assertEq(swapFacility.msgSender(), address(0));
     }
 }
