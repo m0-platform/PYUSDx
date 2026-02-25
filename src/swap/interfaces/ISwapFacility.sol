@@ -68,6 +68,7 @@ interface ISwapFacility {
     /* ============ Interactive Functions ============ */
 
     /// @notice Swaps between two tokens, which can be PYUSDX, PYUSDX Extensions, or an asset used by MultiMint Extensions.
+    /// @dev    Reverts with InvalidSwapPath if tokenIn == tokenOut (self-swaps are not allowed).
     /// @param  tokenIn      The address of the token to swap from.
     /// @param  tokenOut     The address of the token to swap to.
     /// @param  amount       The amount to swap.

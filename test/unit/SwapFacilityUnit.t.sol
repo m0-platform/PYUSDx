@@ -436,6 +436,48 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         swapFacility.swap(address(mockUSDC), address(multiMintExtension), AMOUNT, alice);
     }
 
+    /* ============ Self-Swap Guard ============ */
+
+    function test_swap_selfSwapPyusdx() public {
+        _setupSwapIn(alice, AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ISwapFacility.InvalidSwapPath.selector, address(pyusdx), address(pyusdx))
+        );
+
+        vm.prank(alice);
+        swapFacility.swap(address(pyusdx), address(pyusdx), AMOUNT, alice);
+    }
+
+    function test_swap_selfSwapExtension() public {
+        _setupSwapOut(alice, AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ISwapFacility.InvalidSwapPath.selector, address(extensionA), address(extensionA))
+        );
+
+        vm.prank(alice);
+        swapFacility.swap(address(extensionA), address(extensionA), AMOUNT, alice);
+    }
+
+    function test_swap_selfSwapMultiMint() public {
+        mockUSDC.mint(alice, AMOUNT);
+
+        vm.prank(alice);
+        IERC20(address(mockUSDC)).approve(address(swapFacility), AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISwapFacility.InvalidSwapPath.selector,
+                address(multiMintExtension),
+                address(multiMintExtension)
+            )
+        );
+
+        vm.prank(alice);
+        swapFacility.swap(address(multiMintExtension), address(multiMintExtension), AMOUNT, alice);
+    }
+
     /* ============ replaceAsset ============ */
 
     function test_replaceAsset() public {
@@ -557,6 +599,18 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
 
     function test_canSwapViaPath_assetToMultiMint() public view {
         assertTrue(swapFacility.canSwapViaPath(address(mockUSDC), address(multiMintExtension)));
+    }
+
+    function test_canSwapViaPath_selfSwapPyusdx() public view {
+        assertFalse(swapFacility.canSwapViaPath(address(pyusdx), address(pyusdx)));
+    }
+
+    function test_canSwapViaPath_selfSwapExtension() public view {
+        assertFalse(swapFacility.canSwapViaPath(address(extensionA), address(extensionA)));
+    }
+
+    function test_canSwapViaPath_selfSwapMultiMint() public view {
+        assertFalse(swapFacility.canSwapViaPath(address(multiMintExtension), address(multiMintExtension)));
     }
 
     function test_canSwapViaPath_paused() public {
