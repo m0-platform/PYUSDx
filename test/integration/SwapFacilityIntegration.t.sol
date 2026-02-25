@@ -484,4 +484,47 @@ contract SwapFacilityIntegrationTests is BaseForkTest {
 
         assertEq(USDC.balanceOf(alice), AMOUNT);
     }
+
+    function testIntegration_replaceAssetWithPermit_extension_bytesSignature() public {
+        // Setup: bob swaps USDC into multiMintExtension
+        _dealUSDC(bob, AMOUNT);
+
+        vm.prank(bob);
+        IERC20(address(USDC)).approve(address(swapFacility), AMOUNT);
+
+        vm.prank(bob);
+        swapFacility.swap(address(USDC), address(multiMintExtension), AMOUNT, bob);
+
+        // Alice gets extension tokens
+        _mintPYUSDX(alice, AMOUNT);
+
+        vm.prank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
+
+        vm.prank(alice);
+        swapFacility.swapIn(address(yieldToOne), AMOUNT, alice);
+
+        bytes memory signature = _getPermitSignatureBytes(
+            address(yieldToOne),
+            address(swapFacility),
+            alice,
+            aliceKey,
+            AMOUNT,
+            yieldToOne.nonces(alice),
+            block.timestamp
+        );
+
+        vm.prank(alice);
+        swapFacility.replaceAssetWithPermit(
+            address(USDC),
+            address(yieldToOne),
+            address(multiMintExtension),
+            AMOUNT,
+            alice,
+            block.timestamp,
+            signature
+        );
+
+        assertEq(USDC.balanceOf(alice), AMOUNT);
+    }
 }
