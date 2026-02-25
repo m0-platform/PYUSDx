@@ -86,8 +86,12 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
         MinterGatewayStorageStruct storage $ = _getMinterGatewayStorageLocation();
         mintId = ++$.mintNonce;
 
+        uint40 createdAt = uint40(block.timestamp);
+        uint40 activeAt = createdAt + $.mintDelay;
+        uint40 expiresAt = activeAt + $.mintTTL;
+
         $.mintProposals[mintId] = MintProposal({
-            createdAt: uint40(block.timestamp),
+            createdAt: createdAt,
             mintDelay: $.mintDelay,
             mintTTL: $.mintTTL,
             minter: msg.sender,
@@ -95,7 +99,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
             amount: amount
         });
 
-        emit MintProposed(mintId, msg.sender, amount, recipient);
+        emit MintProposed(mintId, msg.sender, amount, recipient, activeAt, expiresAt);
     }
 
     /// @inheritdoc IMinterGateway

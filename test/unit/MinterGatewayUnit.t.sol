@@ -115,8 +115,11 @@ contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
     }
 
     function test_proposeMint() public {
+        uint40 activeAt = uint40(block.timestamp) + DEFAULT_MINT_DELAY;
+        uint40 expiresAt = activeAt + DEFAULT_MINT_TTL;
+
         vm.expectEmit();
-        emit IMinterGateway.MintProposed(1, minter, 100, recipient);
+        emit IMinterGateway.MintProposed(1, minter, 100, recipient, activeAt, expiresAt);
 
         vm.prank(minter);
         uint48 mintId = minterGateway.proposeMint(100, recipient);
