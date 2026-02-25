@@ -8,29 +8,29 @@ interface ISwapFacility {
     //// ============ Events ============ */
 
     /// @notice Emitted when PYUSDX Extension is swapped for another PYUSDX Extension.
-    /// @param extensionIn  The address of the input PYUSDX Extension.
-    /// @param extensionOut The address of the output PYUSDX Extension.
-    /// @param amount       The amount swapped.
-    /// @param recipient    The address to receive the output PYUSDX Extension token.
+    /// @param  extensionIn  The address of the input PYUSDX Extension.
+    /// @param  extensionOut The address of the output PYUSDX Extension.
+    /// @param  amount       The amount swapped.
+    /// @param  recipient    The address to receive the output PYUSDX Extension token.
     event Swapped(address indexed extensionIn, address indexed extensionOut, uint256 amount, address indexed recipient);
 
     /// @notice Emitted when PYUSDX token is swapped for PYUSDX Extension.
-    /// @param token        The address of the PYUSDX token.
-    /// @param extensionOut The address of the output PYUSDX Extension.
-    /// @param amount       The amount swapped.
-    /// @param recipient    The address to receive the output PYUSDX Extension token.
+    /// @param  token        The address of the PYUSDX token.
+    /// @param  extensionOut The address of the output PYUSDX Extension.
+    /// @param  amount       The amount swapped.
+    /// @param  recipient    The address to receive the output PYUSDX Extension token.
     event SwappedIn(address indexed token, address indexed extensionOut, uint256 amount, address indexed recipient);
 
     /// @notice Emitted when PYUSDX Extension is swapped for PYUSDX token.
-    /// @param token        The address of the PYUSDX token.
-    /// @param extensionIn  The address of the input PYUSDX Extension.
-    /// @param amount       The amount swapped.
-    /// @param recipient    The address to receive the PYUSDX token.
+    /// @param  token        The address of the PYUSDX token.
+    /// @param  extensionIn  The address of the input PYUSDX Extension.
+    /// @param  amount       The amount swapped.
+    /// @param  recipient    The address to receive the PYUSDX token.
     event SwappedOut(address indexed extensionIn, address indexed token, uint256 amount, address indexed recipient);
 
-    /// @notice Emitted when an PYUSDX Extension is admin approved or not.
+    /// @notice Emitted when a PYUSDX Extension is admin approved or not.
     /// @param  extension The address of an PYUSDX Extension.
-    /// @param  approved   True if the extension is approved, false otherwise.
+    /// @param  approved  True if the extension is approved, false otherwise.
     event ApprovedExtensionSet(address indexed extension, bool approved);
 
     /// @notice Emitted when PYUSDX token is swapped for MultiMint Extension.
@@ -59,7 +59,7 @@ interface ISwapFacility {
     /// @notice Thrown in the constructor if PYUSDX Token is 0x0.
     error ZeroPYUSDXToken();
 
-    /// @notice Thrown in `swap` functions if an extension is not a TTG approved earner.
+    /// @notice Thrown in `swap` functions if an extension is not approved.
     error NotApprovedExtension(address extension);
 
     /// @notice Thrown in `swap` function if the provided tokens do not represent a valid swap path.
@@ -69,21 +69,21 @@ interface ISwapFacility {
 
     /// @notice Swaps between two tokens, which can be PYUSDX, PYUSDX Extensions, or an asset used by MultiMint Extensions.
     /// @dev    Reverts with InvalidSwapPath if tokenIn == tokenOut (self-swaps are not allowed).
-    /// @param  tokenIn      The address of the token to swap from.
-    /// @param  tokenOut     The address of the token to swap to.
-    /// @param  amount       The amount to swap.
-    /// @param  recipient    The address to receive the swapped tokens.
+    /// @param  tokenIn   The address of the token to swap from.
+    /// @param  tokenOut  The address of the token to swap to.
+    /// @param  amount    The amount to swap.
+    /// @param  recipient The address to receive the swapped tokens.
     function swap(address tokenIn, address tokenOut, uint256 amount, address recipient) external;
 
     /// @notice Swaps between two tokens using permit.
-    /// @param  tokenIn      The address of the token to swap from.
-    /// @param  tokenOut     The address of the token to swap to.
-    /// @param  amount       The amount to swap.
-    /// @param  recipient    The address to receive the swapped tokens.
-    /// @param  deadline     The last timestamp where the signature is still valid.
-    /// @param  v            An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
-    /// @param  r            An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
-    /// @param  s            An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
+    /// @param  tokenIn   The address of the token to swap from.
+    /// @param  tokenOut  The address of the token to swap to.
+    /// @param  amount    The amount to swap.
+    /// @param  recipient The address to receive the swapped tokens.
+    /// @param  deadline  The last timestamp where the signature is still valid.
+    /// @param  v         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
+    /// @param  r         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
+    /// @param  s         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
     function swapWithPermit(
         address tokenIn,
         address tokenOut,
@@ -96,12 +96,12 @@ interface ISwapFacility {
     ) external;
 
     /// @notice Swaps between two tokens using permit.
-    /// @param  tokenIn      The address of the token to swap from.
-    /// @param  tokenOut     The address of the token to swap to.
-    /// @param  amount       The amount to swap.
-    /// @param  recipient    The address to receive the swapped tokens.
-    /// @param  deadline     The last timestamp where the signature is still valid.
-    /// @param  signature    An arbitrary signature (EIP-712).
+    /// @param  tokenIn   The address of the token to swap from.
+    /// @param  tokenOut  The address of the token to swap to.
+    /// @param  amount    The amount to swap.
+    /// @param  recipient The address to receive the swapped tokens.
+    /// @param  deadline  The last timestamp where the signature is still valid.
+    /// @param  signature An arbitrary signature (EIP-712).
     function swapWithPermit(
         address tokenIn,
         address tokenOut,
@@ -179,8 +179,8 @@ interface ISwapFacility {
 
     /// @notice Sets whether the `extension` is admin approved.
     /// @dev    MUST only be callable by an address with the `DEFAULT_ADMIN_ROLE` role.
-    /// @param  extension    The address of an PYUSDX Extension.
-    /// @param  approved True if the extension is admin approved, false otherwise.
+    /// @param  extension The address of an PYUSDX Extension.
+    /// @param  approved  True if the extension is admin approved, false otherwise.
     function setApprovedExtension(address extension, bool approved) external;
 
     /* ============ View/Pure Functions ============ */
@@ -194,12 +194,12 @@ interface ISwapFacility {
 
     /// @notice Checks if the extension is approved.
     /// @param  extension The extension address to check.
-    /// @return true if approved, false otherwise.
+    /// @return True if approved, false otherwise.
     function isApprovedExtension(address extension) external view returns (bool);
 
     /// @notice Checks if `tokenIn` can be swapped for `tokenOut`.
-    /// @param  tokenIn   The address of the input token.
-    /// @param  tokenOut  The address of the output token.
-    /// @return true if can swap, false otherwise.
+    /// @param  tokenIn  The address of the input token.
+    /// @param  tokenOut The address of the output token.
+    /// @return True if can swap, false otherwise.
     function canSwapViaPath(address tokenIn, address tokenOut) external view returns (bool);
 }

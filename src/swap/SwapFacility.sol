@@ -253,7 +253,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock, SwapFacilityUp
         if (isApprovedExtension(tokenIn) && tokenOutExtension)
             return _swapExtensions(tokenIn, tokenOut, amount, recipient);
 
-        // If token out is an extension, we try to swap in via MultiMint
+        // If tokenOut is an extension but tokenIn is an external asset, route through MultiMint
         if (tokenOutExtension) return _swapInMultiMint(tokenIn, tokenOut, amount, recipient);
 
         // If none of the above, we revert
@@ -309,6 +309,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock, SwapFacilityUp
         _revertIfCannotMultiMint(asset, extensionOut);
 
         // NOTE: Use safeTransferFrom and forceApprove to handle assets that do not return a boolean value.
+        // NOTE: Fee-on-transfer tokens are not supported. The full `amount` must be received by the contract.
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(asset).forceApprove(extensionOut, amount);
         IMultiMint(extensionOut).wrap(asset, recipient, amount);
