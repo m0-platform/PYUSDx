@@ -37,6 +37,7 @@ abstract contract PYUSDXBaseUnitTest is BaseTest {
                     freezeManager,
                     forcedTransferManager,
                     earnerManager,
+                    rateLimitManager,
                     address(minterGateway)
                 )
             )

@@ -67,4 +67,20 @@ contract PYUSDXHarness is PYUSDX {
     function setAccountRateBps(address account, uint32 newRateBps) external {
         _getPYUSDXStorageLocation().accounts[account].earnerRate = newRateBps;
     }
+
+    /// @notice Sets rate-limit storage directly for edge-case testing.
+    function setRateLimitState(
+        address issuer,
+        uint256 capacity,
+        uint256 refillPerSecond,
+        uint256 remainingAmount,
+        uint40 lastRefillTime
+    ) external {
+        Bucket storage bucket = _getRateLimiterStorageLocation().issuerBuckets[issuer];
+
+        bucket.capacity = capacity;
+        bucket.refillPerSecond = refillPerSecond;
+        bucket.remainingAmount = remainingAmount;
+        bucket.lastRefillTime = lastRefillTime;
+    }
 }

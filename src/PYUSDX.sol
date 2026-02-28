@@ -12,6 +12,8 @@ import { AccessControlUpgradeable } from "../lib/evm-m-extensions/lib/common/lib
 
 import { IERC20 } from "../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
+import { RateLimiter } from "./abstract/RateLimiter.sol";
+
 import { IPYUSDX } from "./IPYUSDX.sol";
 
 /// @notice ERC-7201 namespaced storage layout for PYUSDX.
@@ -56,8 +58,8 @@ abstract contract PYUSDXStorageLayout {
 /// @notice PYUSDX upgradeable ERC20 non-rebasing token with claimable yield.
 contract PYUSDX is
     IPYUSDX,
+    RateLimiter,
     PYUSDXStorageLayout,
-    AccessControlUpgradeable,
     ERC20ExtendedUpgradeable,
     Freezable,
     ForcedTransferable,
@@ -99,6 +101,7 @@ contract PYUSDX is
     /// @param freezeManager The freeze manager address with FREEZE_MANAGER_ROLE.
     /// @param forcedTransferManager The forced transfer manager address with FORCED_TRANSFER_MANAGER_ROLE.
     /// @param earnerManager_ The earner manager address.
+    /// @param rateLimitManager The rate limit manager address with RATE_LIMITER_ROLE.
     /// @param issuer The issuer address with ISSUER_ROLE (e.g. MinterGateway proxy).
     function initialize(
         string calldata name,
@@ -108,6 +111,7 @@ contract PYUSDX is
         address freezeManager,
         address forcedTransferManager,
         address earnerManager_,
+        address rateLimitManager,
         address issuer
     ) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
@@ -117,6 +121,7 @@ contract PYUSDX is
         __ForcedTransferable_init(forcedTransferManager);
         __Freezable_init(freezeManager);
         __Pausable_init(pauser);
+        __RateLimiter_init(rateLimitManager);
 
         _setEarnerManager(earnerManager_);
 
