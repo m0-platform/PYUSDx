@@ -9,50 +9,40 @@ import { Pausable } from "../../lib/m-extensions/src/components/pausable/Pausabl
 
 import { IMultiMint } from "../interfaces/IMultiMint.sol";
 import { IPYUSDXExtension } from "../interfaces/IPYUSDXExtension.sol";
+import { IPYUSDXExtensionFactory } from "../deploy/interfaces/IPYUSDXExtensionFactory.sol";
 
 import { ISwapFacility } from "./interfaces/ISwapFacility.sol";
 
 import { ReentrancyLock } from "./ReentrancyLock.sol";
-
-abstract contract SwapFacilityUpgradeableStorageLayout {
-    /// @custom:storage-location erc7201:M0.storage.SwapFacility
-    struct SwapFacilityStorageStruct {
-        mapping(address extension => bool approved) approvedExtensions;
-    }
-
-    // keccak256(abi.encode(uint256(keccak256("M0.storage.SwapFacility")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant _SWAP_FACILITY_EXTENDED_STORAGE_LOCATION =
-        0x2f6671d90ec6fb8a38d5fa4043e503b2789e716b6e5219d1b20da9c6434dde00;
-
-    function _getSwapFacilityStorageLocation() internal pure returns (SwapFacilityStorageStruct storage $) {
-        assembly {
-            $.slot := _SWAP_FACILITY_EXTENDED_STORAGE_LOCATION
-        }
-    }
-}
 
 /**
  * @title  Swap Facility
  * @notice A contract responsible for swapping between PYUSDX Extensions.
  * @author M0 Labs
  */
-contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock, SwapFacilityUpgradeableStorageLayout {
+contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     using SafeERC20 for IERC20;
 
     /// @inheritdoc ISwapFacility
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable pyusdx;
 
+    /// @inheritdoc ISwapFacility
+    /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
+    address public immutable extensionFactory;
+
     /**
      * @custom:oz-upgrades-unsafe-allow constructor
      * @notice Constructs SwapFacility Implementation contract
      * @dev    Sets immutable storage.
-     * @param  pyusdx_ The address of PYUSDX token.
+     * @param  pyusdx_            The address of PYUSDX token.
+     * @param  extensionFactory_  The address of the PYUSDX Extension Factory.
      */
-    constructor(address pyusdx_) {
+    constructor(address pyusdx_, address extensionFactory_) {
         _disableInitializers();
 
         if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDXToken();
+        if ((extensionFactory = extensionFactory_) == address(0)) revert ZeroExtensionFactory();
     }
 
     /* ============ Initializer ============ */
@@ -154,31 +144,15 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock, SwapFacilityUp
         _replaceAsset(asset, tokenIn, extensionOut, amount, recipient);
     }
 
-    /* ============ Admin Controlled Interactive Functions ============ */
-
-    /// @inheritdoc ISwapFacility
-    function setApprovedExtension(address extension, bool approved) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (extension == address(0)) revert ZeroExtension();
-
-        if (isApprovedExtension(extension) == approved) return;
-
-        _getSwapFacilityStorageLocation().approvedExtensions[extension] = approved;
-
-        emit ApprovedExtensionSet(extension, approved);
-    }
-
     /* ============ View/Pure Functions ============ */
 
     /// @inheritdoc ISwapFacility
     function isApprovedExtension(address extension) public view returns (bool) {
-        return _getSwapFacilityStorageLocation().approvedExtensions[extension];
+        return IPYUSDXExtensionFactory(extensionFactory).isApprovedExtension(extension);
     }
 
     /// @inheritdoc ISwapFacility
     function canSwapViaPath(address tokenIn, address tokenOut) external view returns (bool) {
-        // Self-swaps are not valid
-        if (tokenIn == tokenOut) return false;
-
         bool isTokenInPaused;
         bool isTokenOutPaused;
 
@@ -237,9 +211,6 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock, SwapFacilityUp
     function _swap(address tokenIn, address tokenOut, uint256 amount, address recipient) private {
         _requireNotPaused();
 
-        // Prevent self-swaps (e.g., PYUSDX -> PYUSDX or extension -> same extension)
-        if (tokenIn == tokenOut) revert InvalidSwapPath(tokenIn, tokenOut);
-
         // If the input token is PYUSDX, we swap it for the output token, which must be an approved extension
         // This is checked in _swapIn
         if (tokenIn == pyusdx) return _swapIn(tokenOut, amount, recipient);
@@ -253,7 +224,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock, SwapFacilityUp
         if (isApprovedExtension(tokenIn) && tokenOutExtension)
             return _swapExtensions(tokenIn, tokenOut, amount, recipient);
 
-        // If tokenOut is an extension but tokenIn is an external asset, route through MultiMint
+        // If token out is an extension, we try to swap in via MultiMint
         if (tokenOutExtension) return _swapInMultiMint(tokenIn, tokenOut, amount, recipient);
 
         // If none of the above, we revert
@@ -309,7 +280,6 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock, SwapFacilityUp
         _revertIfCannotMultiMint(asset, extensionOut);
 
         // NOTE: Use safeTransferFrom and forceApprove to handle assets that do not return a boolean value.
-        // NOTE: Fee-on-transfer tokens are not supported. The full `amount` must be received by the contract.
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(asset).forceApprove(extensionOut, amount);
         IMultiMint(extensionOut).wrap(asset, recipient, amount);

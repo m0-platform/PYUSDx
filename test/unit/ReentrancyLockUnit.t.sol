@@ -5,25 +5,44 @@ import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-
 import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IAccessControl } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
-import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
+import { IPYUSDXExtensionFactory } from "../../src/deploy/interfaces/IPYUSDXExtensionFactory.sol";
+import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+
+import { SwapFacility } from "../../src/swap/SwapFacility.sol";
+import { IReentrancyLock } from "../../src/swap/interfaces/IReentrancyLock.sol";
+
+import { PYUSDXExtensionFactoryHarness } from "../harness/PYUSDXExtensionFactoryHarness.sol";
+
 import { MockPYUSDXExtension } from "../mock/MockPYUSDXExtension.sol";
 import { MockTrustedRouter } from "../mock/MockTrustedRouter.sol";
 import { MockRouterAwareExtension } from "../mock/MockRouterAwareExtension.sol";
 import { MockReentrantExtension } from "../mock/MockReentrantExtension.sol";
-import { SwapFacility } from "../../src/swap/SwapFacility.sol";
-import { IReentrancyLock } from "../../src/swap/interfaces/IReentrancyLock.sol";
+
+import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
 contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
     SwapFacility public swapFacility;
     MockPYUSDXExtension public extensionA;
     MockRouterAwareExtension public routerAwareExtension;
+    PYUSDXExtensionFactoryHarness public factory;
 
     uint256 public constant AMOUNT = 1000e6;
 
     function setUp() public override {
         super.setUp();
 
-        address swapFacilityImpl = address(new SwapFacility(address(pyusdx)));
+        // Predict factory proxy address
+        // After super.setUp(), nonce is 4
+        // new SwapFacility impl: 4 -> 5
+        // deployTransparentProxy: 5 -> 6
+        // new Factory impl: 6 -> 7
+        // deployTransparentProxy: 7 -> 8
+        // Factory proxy is at nonce 7 = 4 + 3
+
+        uint64 nonceBeforeDeployments = vm.getNonce(address(this));
+        address predictedFactory = vm.computeCreateAddress(address(this), nonceBeforeDeployments + 3);
+
+        address swapFacilityImpl = address(new SwapFacility(address(pyusdx), predictedFactory));
         swapFacility = SwapFacility(
             UnsafeUpgrades.deployTransparentProxy(
                 swapFacilityImpl,
@@ -32,15 +51,21 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
             )
         );
 
+        // Deploy factory with actual SwapFacility address
+        factory = PYUSDXExtensionFactoryHarness(
+            UnsafeUpgrades.deployTransparentProxy(
+                address(new PYUSDXExtensionFactoryHarness(address(pyusdx), address(swapFacility))),
+                admin,
+                abi.encodeWithSelector(PYUSDXExtensionFactory.initialize.selector, admin, factoryManager)
+            )
+        );
+
         extensionA = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
         routerAwareExtension = new MockRouterAwareExtension(address(pyusdx), address(swapFacility));
 
-        vm.startPrank(admin);
-
-        swapFacility.setApprovedExtension(address(extensionA), true);
-        swapFacility.setApprovedExtension(address(routerAwareExtension), true);
-
-        vm.stopPrank();
+        // Register mock extensions by default
+        factory.registerExtension(address(extensionA), IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(routerAwareExtension), IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE);
     }
 
     function _setupSwapIn(address user, uint256 amount) internal {
@@ -145,8 +170,7 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
     function test_reentrancy_blocked() public {
         MockReentrantExtension reentrantExtension = new MockReentrantExtension(address(pyusdx), address(swapFacility));
 
-        vm.prank(admin);
-        swapFacility.setApprovedExtension(address(reentrantExtension), true);
+        factory.registerExtension(address(reentrantExtension), IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         _setupSwapIn(alice, AMOUNT);
 
