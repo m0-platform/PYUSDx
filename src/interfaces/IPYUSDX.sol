@@ -14,15 +14,6 @@ interface IPYUSDX {
     /* ============ Events ============ */
 
     /**
-     * @notice Emitted when account info is set.
-     * @param account        The account whose info is being set.
-     * @param earnerRate     The earner rate in basis points (0 = not earning).
-     * @param feeRate        The fee rate on yield (basis points).
-     * @param claimRecipient The address that will receive claimed yield.
-     */
-    event AccountInfoSet(address indexed account, uint24 earnerRate, uint16 feeRate, address claimRecipient);
-
-    /**
      * @notice Emitted when earning is started for an account.
      * @param account The account that started earning.
      */
@@ -35,12 +26,18 @@ interface IPYUSDX {
     event StoppedEarning(address indexed account);
 
     /**
-     * @notice Emitted when yield is claimed for an account.
-     * @param account         The account for which yield is claimed.
-     * @param claimRecipient  The address receiving the yield.
-     * @param yield           The amount of yield claimed.
+     * @notice Emitted when account info is updated.
+     * @param account        The account that was updated.
+     * @param earnerRate     The new earner rate in basis points (0 = not earning).
+     * @param feeRate        The new fee rate in basis points.
+     * @param claimRecipient The new claim recipient address.
      */
-    event Claimed(address indexed account, address indexed claimRecipient, uint256 yield);
+    event AccountInfoUpdated(
+        address indexed account,
+        uint32 earnerRate,
+        uint16 feeRate,
+        address indexed claimRecipient
+    );
 
     /**
      * @notice Emitted when the earner manager is set or updated.
@@ -48,11 +45,8 @@ interface IPYUSDX {
      */
     event EarnerManagerSet(address indexed account);
 
-    /// @notice Emitted when an earner's account info is updated (rate, fee, or recipient change).
-    event AccountInfoUpdated(address indexed account, uint24 earnerRate, uint16 feeRate, address claimRecipient);
-
     /// @notice Emitted when an account's index is updated.
-    event IndexUpdated(uint128 currentIndex, address indexed account);
+    event IndexUpdated(address indexed account, uint128 currentIndex);
 
     /// @notice Emitted when yield is claimed for an account.
     event YieldClaimed(address indexed account, uint256 yieldNetOfFee);
@@ -145,7 +139,7 @@ interface IPYUSDX {
      * @param feeRate         The fee rate on yield (basis points, 0-10000).
      * @param claimRecipient  The address to receive claimed yield (address(0) to clear).
      */
-    function setAccountInfo(address account, uint24 earnerRate, uint16 feeRate, address claimRecipient) external;
+    function setAccountInfo(address account, uint32 earnerRate, uint16 feeRate, address claimRecipient) external;
 
     /**
      * @notice Sets account info for multiple accounts.
@@ -158,7 +152,7 @@ interface IPYUSDX {
      */
     function setAccountInfo(
         address[] calldata accounts,
-        uint24[] calldata earnerRates,
+        uint32[] calldata earnerRates,
         uint16[] calldata feeRates,
         address[] calldata claimRecipients
     ) external;
@@ -198,18 +192,18 @@ interface IPYUSDX {
 
     /**
      * @notice Returns earning configuration for an account.
-     * @param account The account to query.
+     * @param  account The account to query.
      * @return earnerRate     The earner rate in basis points (0 = not earning).
      * @return feeRate        The fee rate on yield (basis points).
      * @return claimRecipient The address that receives claimed yield.
      */
     function getAccountEarningInfo(
         address account
-    ) external view returns (uint24 earnerRate, uint16 feeRate, address claimRecipient);
+    ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient);
 
     /**
      * @notice Returns accrued yield, fee, and net yield for an account.
-     * @param account The account to query.
+     * @param  account The account to query.
      * @return yieldWithFee  The total accrued yield including fee.
      * @return fee           The fee portion of the accrued yield.
      * @return yieldNetOfFee The accrued yield net of fee.
@@ -220,14 +214,14 @@ interface IPYUSDX {
 
     /**
      * @notice Returns the accrued but unclaimed yield (net of fee) for an account.
-     * @param account The account to query.
+     * @param  account The account to query.
      * @return The accrued yield net of fee (0 if account not earning).
      */
     function accruedYieldOf(address account) external view returns (uint256);
 
     /**
      * @notice Returns the accrued fee for an account.
-     * @param account The account to query.
+     * @param  account The account to query.
      * @return The accrued fee (0 if account not earning).
      */
     function accruedFeeOf(address account) external view returns (uint256);
@@ -267,5 +261,5 @@ interface IPYUSDX {
      * @param account The account to query.
      * @return The last update timestamp.
      */
-    function lastUpdateTimestampOf(address account) external view returns (uint32);
+    function lastUpdateTimestampOf(address account) external view returns (uint40);
 }

@@ -14,16 +14,16 @@ contract PYUSDXHarness is PYUSDX {
     /// @param earnerRate The earner rate in basis points (0 = not earning)
     /// @param feeRate The fee rate (basis points)
     /// @param claimRecipient The claim recipient address
-    function setAccountInfoDirect(address account, uint24 earnerRate, uint16 feeRate, address claimRecipient) external {
+    function setAccountInfoDirect(address account, uint32 earnerRate, uint16 feeRate, address claimRecipient) external {
         Account storage existing = _getPYUSDXStorageLocation().accounts[account];
         bool willEarn = earnerRate > 0;
         // Initialize lastIndex to EXP_SCALED_ONE when enabling earning for a new account
         uint128 lastIndex_ = willEarn
             ? (existing.lastIndex == 0 ? uint128(EXP_SCALED_ONE) : existing.lastIndex)
             : uint128(0);
-        uint32 lastUpdateTimestamp_ = willEarn
-            ? (existing.lastUpdateTimestamp == 0 ? uint32(block.timestamp) : existing.lastUpdateTimestamp)
-            : uint32(0);
+        uint40 lastUpdateTimestamp_ = willEarn
+            ? (existing.lastUpdateTimestamp == 0 ? uint40(block.timestamp) : existing.lastUpdateTimestamp)
+            : uint40(0);
         _getPYUSDXStorageLocation().accounts[account] = Account({
             balance: existing.balance,
             lastIndex: lastIndex_,
@@ -34,7 +34,7 @@ contract PYUSDXHarness is PYUSDX {
             feeRate: feeRate
         });
 
-        emit AccountInfoSet(account, earnerRate, feeRate, claimRecipient);
+        emit AccountInfoUpdated(account, earnerRate, feeRate, claimRecipient);
     }
 
     /// @notice Sets the earning principal for an account
@@ -64,7 +64,7 @@ contract PYUSDXHarness is PYUSDX {
     /// @return claimRecipient The claim recipient
     function getAccountStorage(
         address account
-    ) external view returns (uint24 earnerRate, uint16 feeRate, address claimRecipient) {
+    ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient) {
         Account memory accountData = _getPYUSDXStorageLocation().accounts[account];
         return (accountData.earnerRate, accountData.feeRate, accountData.claimRecipient);
     }
@@ -86,13 +86,13 @@ contract PYUSDXHarness is PYUSDX {
     /// @param newIndex The index value to set
     function setAccountLastIndex(address account, uint128 newIndex) external {
         _getPYUSDXStorageLocation().accounts[account].lastIndex = newIndex;
-        _getPYUSDXStorageLocation().accounts[account].lastUpdateTimestamp = uint32(block.timestamp);
+        _getPYUSDXStorageLocation().accounts[account].lastUpdateTimestamp = uint40(block.timestamp);
     }
 
     /// @notice Set the per-account earner rate directly for testing
     /// @param account The account to configure
     /// @param newRateBps The rate in basis points
-    function setAccountRateBps(address account, uint24 newRateBps) external {
+    function setAccountRateBps(address account, uint32 newRateBps) external {
         _getPYUSDXStorageLocation().accounts[account].earnerRate = newRateBps;
     }
 }

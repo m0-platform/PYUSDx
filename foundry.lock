@@ -2,6 +2,9 @@
   "lib/common": {
     "rev": "613d2d95a476612270324ecbe92317eb5e9bc98f"
   },
+  "lib/evm-m-extensions": {
+    "rev": "71a92d5578679975cd8a5864a54a2af2a478230e"
+  },
   "lib/forge-std": {
     "branch": {
       "name": "v1",

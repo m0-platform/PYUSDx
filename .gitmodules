@@ -5,3 +5,4 @@
 [submodule "lib/m-extensions"]
 	path = lib/m-extensions
 	url = https://github.com/m0-foundation/m-extensions
+	branch = feat/add-hooks-to-components

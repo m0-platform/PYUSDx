@@ -6,6 +6,7 @@ import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFre
 import { IForcedTransferable } from "../../lib/m-extensions/src/components/forcedTransferable/IForcedTransferable.sol";
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
 import { AccessControlUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import { IAccessControl } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { PausableUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { UIntMath } from "../../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
 import { IndexingMath } from "../../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
@@ -103,7 +104,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     /* ============ mint ============ */
 
     function test_mint_revertIfCallerNotIssuer() public {
-        vm.expectRevert(IPYUSDX.NotIssuer.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                pyusdx.ISSUER_ROLE()
+            )
+        );
 
         vm.prank(alice);
         pyusdx.mint(bob, MINT_AMOUNT);
@@ -201,7 +208,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_mint_earningAccount_withIndexGrowth() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
 
         uint128 indexBefore = pyusdx.currentIndexOf(alice);
 
@@ -303,7 +310,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     /* ============ burn ============ */
 
     function test_burn_revertIfCallerNotIssuer() public {
-        vm.expectRevert(IPYUSDX.NotIssuer.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                pyusdx.ISSUER_ROLE()
+            )
+        );
 
         vm.prank(alice);
         pyusdx.burn(bob, BURN_AMOUNT);
@@ -418,7 +431,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_burn_earningAccount_withIndexGrowth() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -662,11 +675,11 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_transfer_earningToEarning_withIndexGrowth() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
 
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(bob, 500, 0, address(0));
-        pyusdx.setAccountRateBps(bob, uint24(500));
+        pyusdx.setAccountRateBps(bob, uint32(500));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -869,7 +882,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(1000));
+        pyusdx.setAccountRateBps(alice, uint32(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -1075,7 +1088,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_mint_earningAccount_after10YearsCompounding() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
 
         uint128 indexBefore = pyusdx.currentIndexOf(alice);
 
@@ -1101,10 +1114,10 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_transfer_earningToEarning_after50Years() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(1000));
+        pyusdx.setAccountRateBps(alice, uint32(1000));
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(bob, 500, 0, address(0));
-        pyusdx.setAccountRateBps(bob, uint24(1000));
+        pyusdx.setAccountRateBps(bob, uint32(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -1132,7 +1145,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_burn_earningAccount_after100YearsMaxRate() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(10000));
+        pyusdx.setAccountRateBps(alice, uint32(10000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -1154,7 +1167,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_index_growth_capsAtMax() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(10000));
+        pyusdx.setAccountRateBps(alice, uint32(10000));
 
         // Warp far into the future to try to overflow index
         vm.warp(365 days * 1000);
@@ -1174,7 +1187,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_mint_earningAccount_withRateChange() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
 
         // Warp to grow index
         vm.warp(365 days);
@@ -1182,7 +1195,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         // Change rate - snapshot account index before changing rate
         pyusdx.setAccountLastIndex(alice, indexAt5Percent);
-        pyusdx.setAccountRateBps(alice, uint24(1000));
+        pyusdx.setAccountRateBps(alice, uint32(1000));
 
         uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
 
@@ -1199,10 +1212,10 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_transfer_earningToEarning_withRateChange() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(bob, 500, 0, address(0));
-        pyusdx.setAccountRateBps(bob, uint24(500));
+        pyusdx.setAccountRateBps(bob, uint32(500));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -1212,9 +1225,9 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Change rate mid-stream - snapshot account indices before changing rate
         uint128 indexBeforeRateChange = pyusdx.lastIndexOf(alice);
         pyusdx.setAccountLastIndex(alice, indexBeforeRateChange);
-        pyusdx.setAccountRateBps(alice, uint24(2000));
+        pyusdx.setAccountRateBps(alice, uint32(2000));
         pyusdx.setAccountLastIndex(bob, indexBeforeRateChange);
-        pyusdx.setAccountRateBps(bob, uint24(2000));
+        pyusdx.setAccountRateBps(bob, uint32(2000));
 
         uint112 alicePrincipalBefore = pyusdx.earningPrincipalOf(alice);
         uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
@@ -1234,7 +1247,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_burn_earningAccount_withRateChange() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(1000));
+        pyusdx.setAccountRateBps(alice, uint32(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -1245,7 +1258,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         // Change rate to 0% - snapshot the account index before changing rate
         pyusdx.setAccountLastIndex(alice, indexBeforeRateChange);
-        pyusdx.setAccountRateBps(alice, uint24(0));
+        pyusdx.setAccountRateBps(alice, uint32(0));
 
         uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
 
@@ -1784,7 +1797,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Set up alice as an earner
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
 
         // Warp time to accrue yield
         vm.warp(block.timestamp + 365 days);
@@ -1812,7 +1825,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Set up alice as an earner
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
 
         vm.warp(block.timestamp + 365 days);
 
@@ -1832,7 +1845,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Set up alice as an earner
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
 
         vm.warp(block.timestamp + 365 days);
 
@@ -1891,7 +1904,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 500, bob);
 
-        (uint24 earnerRate_, uint16 feeRate, address recipient) = pyusdx.getAccountEarningInfo(alice);
+        (uint32 earnerRate_, uint16 feeRate, address recipient) = pyusdx.getAccountEarningInfo(alice);
         assertTrue(earnerRate_ > 0);
         assertEq(feeRate, 500);
         assertEq(recipient, bob);
@@ -1904,7 +1917,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 0, 0, address(0));
 
-        (uint24 earnerRate_, , ) = pyusdx.getAccountEarningInfo(alice);
+        (uint32 earnerRate_, , ) = pyusdx.getAccountEarningInfo(alice);
         assertEq(earnerRate_, 0);
     }
 
@@ -1931,7 +1944,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         batchAccounts[0] = alice;
         batchAccounts[1] = bob;
 
-        uint24[] memory earnerRates = new uint24[](2);
+        uint32[] memory earnerRates = new uint32[](2);
         earnerRates[0] = 500;
         earnerRates[1] = 500;
 
@@ -1953,18 +1966,18 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     function test_setAccountInfo_batch_revert_arrayLengthZero() public {
         vm.expectRevert(IPYUSDX.ArrayLengthZero.selector);
         vm.prank(earnerManager);
-        pyusdx.setAccountInfo(new address[](0), new uint24[](0), new uint16[](0), new address[](0));
+        pyusdx.setAccountInfo(new address[](0), new uint32[](0), new uint16[](0), new address[](0));
     }
 
     function test_setAccountInfo_batch_revert_arrayLengthMismatch() public {
         vm.expectRevert(IForcedTransferable.ArrayLengthMismatch.selector);
         vm.prank(earnerManager);
-        pyusdx.setAccountInfo(new address[](2), new uint24[](1), new uint16[](2), new address[](2));
+        pyusdx.setAccountInfo(new address[](2), new uint32[](1), new uint16[](2), new address[](2));
     }
 
     function test_setEarningDetails_noop_alreadyDisabled() public {
         // Alice is not earning (default state)
-        (uint24 earnerRate_, , ) = pyusdx.getAccountEarningInfo(alice);
+        (uint32 earnerRate_, , ) = pyusdx.getAccountEarningInfo(alice);
         assertEq(earnerRate_, 0);
 
         // Calling setEarningDetails with isEarning=false should be a no-op (no event)
@@ -1975,7 +1988,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Verify no AccountInfoSet event was emitted
         VmSafe.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
-            assertNotEq(logs[i].topics[0], IPYUSDX.AccountInfoSet.selector);
+            assertNotEq(logs[i].topics[0], IPYUSDX.AccountInfoUpdated.selector);
         }
 
         // State should remain unchanged
@@ -1988,7 +2001,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 500, bob);
 
-        (uint24 earnerRate_, uint16 feeRate, address recipient) = pyusdx.getAccountEarningInfo(alice);
+        (uint32 earnerRate_, uint16 feeRate, address recipient) = pyusdx.getAccountEarningInfo(alice);
         assertTrue(earnerRate_ > 0);
         assertEq(feeRate, 500);
         assertEq(recipient, bob);
@@ -2001,7 +2014,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Verify no AccountInfoSet event was emitted
         VmSafe.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
-            assertNotEq(logs[i].topics[0], IPYUSDX.AccountInfoSet.selector);
+            assertNotEq(logs[i].topics[0], IPYUSDX.AccountInfoUpdated.selector);
         }
 
         // State should remain unchanged
@@ -2110,7 +2123,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // Set up alice as an earner with NO fee and NO claim recipient (yield stays with alice)
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
 
         // Warp time to accrue yield
         vm.warp(block.timestamp + 365 days);
@@ -2134,7 +2147,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(pyusdx.isFrozen(alice));
 
         // Verify earning stopped
-        (uint24 earnerRate_, uint16 feeRate, address claimRecipient) = pyusdx.getAccountEarningInfo(alice);
+        (uint32 earnerRate_, uint16 feeRate, address claimRecipient) = pyusdx.getAccountEarningInfo(alice);
         assertEq(earnerRate_, 0);
         assertEq(feeRate, 0);
         assertEq(claimRecipient, alice); // getEarningDetails resolves address(0) to account
@@ -2156,7 +2169,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.setAccountInfo(alice, 500, 5000, bob); // 50% fee, bob is recipient
 
         // Verify earning data is set
-        (uint24 earnerRate_, uint16 feeRate, address claimRecipient) = pyusdx.getAccountEarningInfo(alice);
+        (uint32 earnerRate_, uint16 feeRate, address claimRecipient) = pyusdx.getAccountEarningInfo(alice);
         assertTrue(earnerRate_ > 0);
         assertEq(feeRate, 5000);
         assertEq(claimRecipient, bob);
@@ -2283,7 +2296,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertFalse(pyusdx.isEarning(carol));
 
         // Verify all earning data cleared for alice and bob
-        (uint24 earnerRate_, uint16 feeRate, address recipient) = pyusdx.getAccountEarningInfo(alice);
+        (uint32 earnerRate_, uint16 feeRate, address recipient) = pyusdx.getAccountEarningInfo(alice);
         assertEq(earnerRate_, 0);
         assertEq(feeRate, 0);
         assertEq(recipient, alice);
@@ -2744,7 +2757,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 0, 0, address(0));
 
-        (uint24 earnerRate_, uint16 feeRate, address claimRecipient) = pyusdx.getAccountEarningInfo(alice);
+        (uint32 earnerRate_, uint16 feeRate, address claimRecipient) = pyusdx.getAccountEarningInfo(alice);
         assertEq(earnerRate_, 0);
         assertEq(feeRate, 0);
         assertEq(claimRecipient, alice); // getEarningDetails resolves address(0) to account

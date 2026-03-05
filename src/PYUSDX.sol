@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity 0.8.26;
 
 import { ERC20ExtendedUpgradeable } from "../lib/m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
 import { Freezable } from "../lib/m-extensions/src/components/freezable/Freezable.sol";
@@ -27,10 +27,10 @@ abstract contract PYUSDXStorageLayout {
     struct Account {
         // Slot 0: 256/256
         uint256 balance;
-        // Slot 1: 192/256 — isEarning + index math (single SLOAD)
+        // Slot 1: 208/256 — isEarning + index math (single SLOAD)
         uint128 lastIndex;
-        uint32 lastUpdateTimestamp;
-        uint24 earnerRate;
+        uint40 lastUpdateTimestamp;
+        uint32 earnerRate;
         // Slot 2: 160/256 — claim config (cold path)
         address claimRecipient;
         // Slot 3: 128/256 — principal + fee (co-read in _claim)
@@ -81,12 +81,6 @@ contract PYUSDX is
 
     /* ============ Modifiers ============ */
 
-    /// @notice Restricts access to only the Minter Gateway contract.
-    modifier onlyIssuer() {
-        if (!hasRole(ISSUER_ROLE, msg.sender)) revert NotIssuer();
-        _;
-    }
-
     /// @notice Restricts access to only the Earner Manager address.
     modifier onlyEarnerManager() {
         if (msg.sender != earnerManager()) revert NotEarnerManager();
@@ -127,7 +121,7 @@ contract PYUSDX is
     /* ============ Interactive Functions ============ */
 
     /// @inheritdoc IPYUSDX
-    function mint(address account, uint256 amount) external onlyIssuer whenNotPaused {
+    function mint(address account, uint256 amount) external onlyRole(ISSUER_ROLE) whenNotPaused {
         _revertIfZeroAccount(account);
         _revertIfFrozen(account);
         _revertIfZeroAmount(amount);
@@ -146,7 +140,7 @@ contract PYUSDX is
     }
 
     /// @inheritdoc IPYUSDX
-    function burn(address account, uint256 amount) external onlyIssuer whenNotPaused {
+    function burn(address account, uint256 amount) external onlyRole(ISSUER_ROLE) whenNotPaused {
         _revertIfZeroAccount(account);
         _revertIfFrozen(account);
         _revertIfZeroAmount(amount);
@@ -193,7 +187,7 @@ contract PYUSDX is
     /// @inheritdoc IPYUSDX
     function setAccountInfo(
         address account,
-        uint24 earnerRate,
+        uint32 earnerRate,
         uint16 feeRate,
         address claimRecipient
     ) external onlyEarnerManager {
@@ -203,7 +197,7 @@ contract PYUSDX is
     /// @inheritdoc IPYUSDX
     function setAccountInfo(
         address[] calldata accounts,
-        uint24[] calldata earnerRates,
+        uint32[] calldata earnerRates,
         uint16[] calldata feeRates,
         address[] calldata claimRecipients
     ) external onlyEarnerManager {
@@ -241,8 +235,8 @@ contract PYUSDX is
 
         if (accountInfo.earnerRate == 0) return (0, 0, 0);
 
-        uint256 presentValue = _getPresentAmountRoundedDown(accountInfo.earningPrincipal, currentIndexOf(account));
-        yieldWithFee = presentValue > accountInfo.balance ? presentValue - accountInfo.balance : 0;
+        uint256 balanceWithYield = _getPresentAmountRoundedDown(accountInfo.earningPrincipal, currentIndexOf(account));
+        yieldWithFee = balanceWithYield > accountInfo.balance ? balanceWithYield - accountInfo.balance : 0;
         uint16 feeRate = accountInfo.feeRate;
 
         if (feeRate == 0 || yieldWithFee == 0) return (yieldWithFee, 0, yieldWithFee);
@@ -302,7 +296,7 @@ contract PYUSDX is
     }
 
     /// @inheritdoc IPYUSDX
-    function lastUpdateTimestampOf(address account) external view returns (uint32) {
+    function lastUpdateTimestampOf(address account) external view returns (uint40) {
         return _getPYUSDXStorageLocation().accounts[account].lastUpdateTimestamp;
     }
 
@@ -326,14 +320,12 @@ contract PYUSDX is
         }
     }
 
-    /// @notice Returns earning details for a single account.
+    /// @inheritdoc IPYUSDX
     function getAccountEarningInfo(
         address account
-    ) external view returns (uint24 earnerRate, uint16 feeRate, address claimRecipient) {
+    ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient) {
         Account memory accountInfo = _getPYUSDXStorageLocation().accounts[account];
-        claimRecipient = accountInfo.claimRecipient;
-        if (claimRecipient == address(0)) claimRecipient = account;
-        return (accountInfo.earnerRate, accountInfo.feeRate, claimRecipient);
+        return (accountInfo.earnerRate, accountInfo.feeRate, claimRecipientFor(account));
     }
 
     /* ============ Hooks For Internal Interactive Functions ============ */
@@ -370,7 +362,7 @@ contract PYUSDX is
     }
 
     /// @dev Internal implementation for setting earning details.
-    function _setAccountInfo(address account, uint24 earnerRate, uint16 feeRate, address claimRecipient) internal {
+    function _setAccountInfo(address account, uint32 earnerRate, uint16 feeRate, address claimRecipient) internal {
         _revertIfZeroAccount(account);
         if (feeRate > ONE_HUNDRED_PERCENT) revert FeeRateTooHigh(feeRate);
 
@@ -405,7 +397,7 @@ contract PYUSDX is
         // Option 2: Enable earning for a non-earner.
         if (!wasEarning && willEarn) {
             accountInfo.lastIndex = EXP_SCALED_ONE;
-            accountInfo.lastUpdateTimestamp = uint32(block.timestamp);
+            accountInfo.lastUpdateTimestamp = uint40(block.timestamp);
 
             accountInfo.earningPrincipal = _getPrincipalAmountRoundedDown(accountInfo.balance, EXP_SCALED_ONE);
             accountInfo.earnerRate = earnerRate;
@@ -439,9 +431,9 @@ contract PYUSDX is
         Account storage accountInfo = _getPYUSDXStorageLocation().accounts[account];
 
         accountInfo.lastIndex = currentIndex = currentIndexOf(account);
-        accountInfo.lastUpdateTimestamp = uint32(block.timestamp);
+        accountInfo.lastUpdateTimestamp = uint40(block.timestamp);
 
-        emit IndexUpdated(currentIndex, account);
+        emit IndexUpdated(account, currentIndex);
     }
 
     /// @dev Internal claim implementation.

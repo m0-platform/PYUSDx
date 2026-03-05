@@ -210,7 +210,7 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
     function testIntegration_burnWithIndexGrowth() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(1000));
+        pyusdx.setAccountRateBps(alice, uint32(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
 
@@ -275,7 +275,7 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
     function testIntegration_mintBurnEarningWithYield() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(1000));
+        pyusdx.setAccountRateBps(alice, uint32(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
         uint112 principalAfterMint = pyusdx.earningPrincipalOf(alice);
@@ -332,7 +332,7 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
     function testIntegration_burnWithMultipleIndexUpdates() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-        pyusdx.setAccountRateBps(alice, uint24(500));
+        pyusdx.setAccountRateBps(alice, uint32(500));
 
         // Initial mint
         minterGateway.mint(alice, MINT_AMOUNT);
