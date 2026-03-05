@@ -5,7 +5,7 @@ gas_reports_ignore = []
 ignored_error_codes = []
 optimizer = true
 optimizer_runs = 19933
-solc_version = "0.8.26"
+solc_version = "0.8.34"
 verbosity = 3
 
 [lint]
