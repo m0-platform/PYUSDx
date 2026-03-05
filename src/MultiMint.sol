@@ -12,7 +12,7 @@ import { IERC20 } from "../lib/m-extensions/lib/common/src/interfaces/IERC20.sol
 
 import { YieldToOne } from "./YieldToOne.sol";
 import { IMultiMint } from "./interfaces/IMultiMint.sol";
-import { ISwapFacility } from "./interfaces/ISwapFacility.sol";
+import { ISwapFacility } from "./swap/interfaces/ISwapFacility.sol";
 
 abstract contract MultiMintStorageLayout {
     struct Asset {
@@ -45,7 +45,7 @@ abstract contract MultiMintStorageLayout {
  *         into a token with yield claimable by a single recipient.
  * @dev    Extends YieldToOne with a multi-collateral backing model. Users
  *         can mint by depositing PYUSDX. Unwrapping always returns PYUSDX, other
- *         stablecoins can only be extracted via `replaceAssetWithPYUSDX`.
+ *         stablecoins can only be extracted via `replaceAsset`.
  * @author M0 Labs
  */
 contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
@@ -140,8 +140,8 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     }
 
     /// @inheritdoc IMultiMint
-    function replaceAssetWithPYUSDX(address asset, address recipient, uint256 amount) external onlySwapFacility {
-        _replaceAssetWithPYUSDX(asset, ISwapFacility(msg.sender).msgSender(), recipient, amount);
+    function replaceAsset(address asset, address recipient, uint256 amount) external onlySwapFacility {
+        _replaceAsset(asset, ISwapFacility(msg.sender).msgSender(), recipient, amount);
     }
 
     /// @inheritdoc IMultiMint
@@ -285,12 +285,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
      * @param recipient Address that will receive the `asset` tokens.
      * @param amount    Amount of PYUSDX to deposit (in PYUSDX decimals).
      */
-    function _replaceAssetWithPYUSDX(
-        address asset,
-        address account,
-        address recipient,
-        uint256 amount
-    ) internal virtual {
+    function _replaceAsset(address asset, address account, address recipient, uint256 amount) internal virtual {
         _requireNotPaused();
 
         FreezableStorageStruct storage $f = _getFreezableStorageLocation();

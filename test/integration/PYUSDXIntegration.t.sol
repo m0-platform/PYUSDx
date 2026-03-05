@@ -209,7 +209,8 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
 
     function testIntegration_burnWithIndexGrowth() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -274,7 +275,8 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
 
     function testIntegration_mintBurnEarningWithYield() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(1000));
 
         minterGateway.mint(alice, MINT_AMOUNT);
@@ -331,7 +333,8 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
 
     function testIntegration_burnWithMultipleIndexUpdates() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(alice, true, earnerManager, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
         pyusdx.setAccountRateBps(alice, uint24(500));
 
         // Initial mint
@@ -366,6 +369,7 @@ contract PYUSDXIntegrationTests is PYUSDXBaseUnitTest {
         // Enable earning with 10% fee, bob as claim recipient
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(alice, true, 1000, bob);
+
         assertTrue(pyusdx.isEarning(alice));
 
         // Set rate via public setEarnerRate

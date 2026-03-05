@@ -95,7 +95,7 @@ interface IMultiMint is IYieldToOne {
      * @param  recipient Address that will receive the `asset` token.
      * @param  amount    Amount of PYUSDX to deposit (in PYUSDX decimals).
      */
-    function replaceAssetWithPYUSDX(address asset, address recipient, uint256 amount) external;
+    function replaceAsset(address asset, address recipient, uint256 amount) external;
 
     /**
      * @notice Sets the asset cap for a given `asset`.

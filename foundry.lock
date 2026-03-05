@@ -10,5 +10,11 @@
   },
   "lib/m-extensions": {
     "rev": "8a8fe2b903e56a12a74b12f57a8c354dc6b9fcc3"
+  },
+  "lib/uniswap-v4-periphery": {
+    "rev": "5da22e609fd78c01fb7ddf2a6abb1f2ec7dc2b87"
+  },
+  "lib/v4-periphery": {
+    "rev": "5da22e609fd78c01fb7ddf2a6abb1f2ec7dc2b87"
   }
 }
