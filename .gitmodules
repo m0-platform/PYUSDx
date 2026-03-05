@@ -6,3 +6,6 @@
 	path = lib/m-extensions
 	url = https://github.com/m0-foundation/m-extensions
 	branch = feat/add-hooks-to-components
+[submodule "lib/evm-m-extensions"]
+	path = lib/evm-m-extensions
+	url = https://github.com/m0-foundation/evm-m-extensions
