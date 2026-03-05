@@ -57,7 +57,7 @@ interface ISwapFacility {
     /// @notice Thrown in the constructor if PYUSDX Token is 0x0.
     error ZeroPYUSDXToken();
 
-    /// @notice Thrown in `swap` functions if an extension is not a TTG approved earner.
+    /// @notice Thrown in `swap` functions if an extension is not approved.
     error NotApprovedExtension(address extension);
 
     /// @notice Thrown in `swap` function if the provided tokens do not represent a valid swap path.
@@ -66,21 +66,21 @@ interface ISwapFacility {
     /* ============ Interactive Functions ============ */
 
     /// @notice Swaps between two tokens, which can be PYUSDX, PYUSDX Extensions, or an asset used by MultiMint Extensions.
-    /// @param  tokenIn      The address of the token to swap from.
-    /// @param  tokenOut     The address of the token to swap to.
-    /// @param  amount       The amount to swap.
-    /// @param  recipient    The address to receive the swapped tokens.
+    /// @param  tokenIn   The address of the token to swap from.
+    /// @param  tokenOut  The address of the token to swap to.
+    /// @param  amount    The amount to swap.
+    /// @param  recipient The address to receive the swapped tokens.
     function swap(address tokenIn, address tokenOut, uint256 amount, address recipient) external;
 
     /// @notice Swaps between two tokens using permit.
-    /// @param  tokenIn      The address of the token to swap from.
-    /// @param  tokenOut     The address of the token to swap to.
-    /// @param  amount       The amount to swap.
-    /// @param  recipient    The address to receive the swapped tokens.
-    /// @param  deadline     The last timestamp where the signature is still valid.
-    /// @param  v            An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
-    /// @param  r            An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
-    /// @param  s            An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
+    /// @param  tokenIn   The address of the token to swap from.
+    /// @param  tokenOut  The address of the token to swap to.
+    /// @param  amount    The amount to swap.
+    /// @param  recipient The address to receive the swapped tokens.
+    /// @param  deadline  The last timestamp where the signature is still valid.
+    /// @param  v         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
+    /// @param  r         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
+    /// @param  s         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
     function swapWithPermit(
         address tokenIn,
         address tokenOut,
@@ -93,12 +93,12 @@ interface ISwapFacility {
     ) external;
 
     /// @notice Swaps between two tokens using permit.
-    /// @param  tokenIn      The address of the token to swap from.
-    /// @param  tokenOut     The address of the token to swap to.
-    /// @param  amount       The amount to swap.
-    /// @param  recipient    The address to receive the swapped tokens.
-    /// @param  deadline     The last timestamp where the signature is still valid.
-    /// @param  signature    An arbitrary signature (EIP-712).
+    /// @param  tokenIn   The address of the token to swap from.
+    /// @param  tokenOut  The address of the token to swap to.
+    /// @param  amount    The amount to swap.
+    /// @param  recipient The address to receive the swapped tokens.
+    /// @param  deadline  The last timestamp where the signature is still valid.
+    /// @param  signature An arbitrary signature (EIP-712).
     function swapWithPermit(
         address tokenIn,
         address tokenOut,
@@ -188,12 +188,12 @@ interface ISwapFacility {
 
     /// @notice Checks if the extension is approved.
     /// @param  extension The extension address to check.
-    /// @return true if approved, false otherwise.
+    /// @return True if approved, false otherwise.
     function isApprovedExtension(address extension) external view returns (bool);
 
     /// @notice Checks if `tokenIn` can be swapped for `tokenOut`.
-    /// @param  tokenIn   The address of the input token.
-    /// @param  tokenOut  The address of the output token.
-    /// @return true if can swap, false otherwise.
+    /// @param  tokenIn  The address of the input token.
+    /// @param  tokenOut The address of the output token.
+    /// @return True if can swap, false otherwise.
     function canSwapViaPath(address tokenIn, address tokenOut) external view returns (bool);
 }

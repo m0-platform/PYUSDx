@@ -6,101 +6,23 @@ import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.
 import { IERC20Extended } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 
 import { IPYUSDXExtensionFactory } from "../../src/deploy/interfaces/IPYUSDXExtensionFactory.sol";
-import { MinterGateway } from "../../src/MinterGateway.sol";
 import { MultiMint } from "../../src/MultiMint.sol";
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
-import { PYUSDX } from "../../src/PYUSDX.sol";
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
-import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 import { IAccessControl } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { YieldToOne } from "../../src/YieldToOne.sol";
-import { BaseForkTest } from "../utils/BaseForkTest.sol";
-import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 
-contract SwapFacilityIntegrationTests is BaseForkTest {
-    MinterGateway public minterGateway;
-    PYUSDXHarness public pyusdx;
+import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
-    PYUSDXExtensionFactory public factory;
-    SwapFacility public swapFacility;
+contract SwapFacilityIntegrationTests is IntegrationForkTest {
     YieldToOne public yieldToOne;
     MultiMint public multiMintExtension;
 
     uint256 public constant AMOUNT = 1000e6;
-    uint32 public constant MINT_DELAY = 1; // 1 second for testing
-    uint32 public constant MINT_TTL = 3600; // 1 hour
 
     function setUp() public override {
         super.setUp();
 
-        // Step 1: Predict MinterGateway proxy address
-        // PYUSDX implementation: nonce N
-        // PYUSDX proxy: nonce N+1
-        // MinterGateway implementation: nonce N+2
-        // MinterGateway proxy: nonce N+3 (this is what we predict)
-        uint64 nonceBeforePYUSDX = vm.getNonce(address(this));
-        address predictedMinterGateway = vm.computeCreateAddress(address(this), nonceBeforePYUSDX + 3);
-
-        // Step 2: Deploy PYUSDX with predicted MinterGateway proxy address (immutable baked in)
-        pyusdx = PYUSDXHarness(
-            UnsafeUpgrades.deployTransparentProxy(
-                address(new PYUSDXHarness(predictedMinterGateway)),
-                admin,
-                abi.encodeWithSelector(
-                    PYUSDX.initialize.selector,
-                    "PayPal USD Yield",
-                    "PYUSDX",
-                    admin,
-                    pauser,
-                    freezeManager,
-                    forcedTransferManager,
-                    earnerManager,
-                    rateManager
-                )
-            )
-        );
-
-        // Step 3: Deploy MinterGateway with actual PYUSDX address
-        minterGateway = MinterGateway(
-            UnsafeUpgrades.deployTransparentProxy(
-                address(new MinterGateway(address(pyusdx))),
-                admin,
-                abi.encodeWithSelector(MinterGateway.initialize.selector, admin, minter, MINT_DELAY, MINT_TTL)
-            )
-        );
-
-        // Verify prediction was correct
-        assertEq(address(minterGateway), predictedMinterGateway, "MinterGateway address prediction failed");
-
-        // Step 4: Predict factory address
-        // new SwapFacility impl: N+1
-        // deployTransparentProxy: N+2
-        // new Factory impl: N+3
-        // deployTransparentProxy: N+4 (factory proxy)
-        address predictedFactory = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 3);
-
-        // Step 5: Deploy SwapFacility with predicted factory address
-        swapFacility = SwapFacility(
-            UnsafeUpgrades.deployTransparentProxy(
-                address(new SwapFacility(address(pyusdx), predictedFactory)),
-                admin,
-                abi.encodeWithSelector(SwapFacility.initialize.selector, admin, pauser)
-            )
-        );
-
-        // Step 6: Deploy factory with actual SwapFacility address
-        factory = PYUSDXExtensionFactory(
-            UnsafeUpgrades.deployTransparentProxy(
-                address(new PYUSDXExtensionFactory(address(pyusdx), address(swapFacility))),
-                admin,
-                abi.encodeWithSelector(PYUSDXExtensionFactory.initialize.selector, admin, factoryManager)
-            )
-        );
-
-        // Verify factory prediction was correct
-        assertEq(address(factory), predictedFactory);
-
-        // Step 7: Deploy YieldToOne through factory
+        // Deploy YieldToOne through factory
         vm.prank(admin);
         (address yieldToOneProxy, , ) = factory.deployYieldToOne(
             "YieldToOne",
@@ -113,11 +35,11 @@ contract SwapFacilityIntegrationTests is BaseForkTest {
         );
         yieldToOne = YieldToOne(yieldToOneProxy);
 
-        // Step 8: Enable earning for YieldToOne
+        // Enable earning for YieldToOne
         vm.prank(earnerManager);
         pyusdx.setEarningDetails(address(yieldToOne), true, 0, yieldRecipient);
 
-        // Step 9: Deploy MultiMint through factory
+        // Deploy MultiMint through factory
         vm.prank(admin);
         (address multiMintProxy, , ) = factory.deployMultiMint(
             "MultiMint",
@@ -131,19 +53,9 @@ contract SwapFacilityIntegrationTests is BaseForkTest {
         );
         multiMintExtension = MultiMint(multiMintProxy);
 
-        // Step 10: Allow USDC in MultiMint by setting asset cap
+        // Allow USDC in MultiMint by setting asset cap
         vm.prank(assetCapManager);
         multiMintExtension.setAssetCap(address(USDC), type(uint256).max);
-    }
-
-    /// @dev Helper to mint PYUSDX through the time-delay mechanism
-    function _mintPYUSDX(address recipient, uint256 amount) internal {
-        vm.prank(minter);
-        uint48 mintId = minterGateway.proposeMint(amount, recipient);
-
-        vm.warp(block.timestamp + MINT_DELAY);
-
-        minterGateway.mint(mintId);
     }
 
     /* ============ Factory Tests ============ */

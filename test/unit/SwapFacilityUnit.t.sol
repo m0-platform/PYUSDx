@@ -424,6 +424,8 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
     /* ============ Self-Swap Guard ============ */
 
     function test_swap_selfSwapPyusdx() public {
+        _setupSwapIn(alice, AMOUNT);
+
         vm.expectRevert(
             abi.encodeWithSelector(ISwapFacility.InvalidSwapPath.selector, address(pyusdx), address(pyusdx))
         );
@@ -433,6 +435,8 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
     }
 
     function test_swap_selfSwapExtension() public {
+        _setupSwapOut(alice, AMOUNT);
+
         vm.expectRevert(
             abi.encodeWithSelector(ISwapFacility.InvalidSwapPath.selector, address(extensionA), address(extensionA))
         );
@@ -442,6 +446,11 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
     }
 
     function test_swap_selfSwapMultiMint() public {
+        mockUSDC.mint(alice, AMOUNT);
+
+        vm.prank(alice);
+        IERC20(address(mockUSDC)).approve(address(swapFacility), AMOUNT);
+
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISwapFacility.InvalidSwapPath.selector,
@@ -771,6 +780,18 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
 
     function test_canSwapViaPath_pyusdxToExtension() public view {
         assertTrue(swapFacility.canSwapViaPath(address(pyusdx), address(extensionA)));
+    }
+
+    function test_canSwapViaPath_selfSwapPyusdx() public view {
+        assertFalse(swapFacility.canSwapViaPath(address(pyusdx), address(pyusdx)));
+    }
+
+    function test_canSwapViaPath_selfSwapExtension() public view {
+        assertFalse(swapFacility.canSwapViaPath(address(extensionA), address(extensionA)));
+    }
+
+    function test_canSwapViaPath_selfSwapMultiMint() public view {
+        assertFalse(swapFacility.canSwapViaPath(address(multiMintExtension), address(multiMintExtension)));
     }
 
     function test_canSwapViaPath_extensionToPyusdx() public view {

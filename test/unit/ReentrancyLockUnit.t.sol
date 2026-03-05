@@ -42,10 +42,10 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
         uint64 nonceBeforeDeployments = vm.getNonce(address(this));
         address predictedFactory = vm.computeCreateAddress(address(this), nonceBeforeDeployments + 3);
 
-        address swapFacilityImpl = address(new SwapFacility(address(pyusdx), predictedFactory));
+        address swapFacilityImplementation = address(new SwapFacility(address(pyusdx), predictedFactory));
         swapFacility = SwapFacility(
             UnsafeUpgrades.deployTransparentProxy(
-                swapFacilityImpl,
+                swapFacilityImplementation,
                 admin,
                 abi.encodeWithSelector(SwapFacility.initialize.selector, admin, pauser)
             )

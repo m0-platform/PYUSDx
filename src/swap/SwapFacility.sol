@@ -153,6 +153,9 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
 
     /// @inheritdoc ISwapFacility
     function canSwapViaPath(address tokenIn, address tokenOut) external view returns (bool) {
+        // Self-swaps are not valid
+        if (tokenIn == tokenOut) return false;
+
         bool isTokenInPaused;
         bool isTokenOutPaused;
 
@@ -211,6 +214,9 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     function _swap(address tokenIn, address tokenOut, uint256 amount, address recipient) private {
         _requireNotPaused();
 
+        // Prevent self-swaps (e.g., PYUSDX -> PYUSDX or extension -> same extension)
+        if (tokenIn == tokenOut) revert InvalidSwapPath(tokenIn, tokenOut);
+
         // If the input token is PYUSDX, we swap it for the output token, which must be an approved extension
         // This is checked in _swapIn
         if (tokenIn == pyusdx) return _swapIn(tokenOut, amount, recipient);
@@ -224,7 +230,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         if (isApprovedExtension(tokenIn) && tokenOutExtension)
             return _swapExtensions(tokenIn, tokenOut, amount, recipient);
 
-        // If token out is an extension, we try to swap in via MultiMint
+        // If tokenOut is an extension but tokenIn is an external asset, route through MultiMint
         if (tokenOutExtension) return _swapInMultiMint(tokenIn, tokenOut, amount, recipient);
 
         // If none of the above, we revert
@@ -280,6 +286,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         _revertIfCannotMultiMint(asset, extensionOut);
 
         // NOTE: Use safeTransferFrom and forceApprove to handle assets that do not return a boolean value.
+        // NOTE: Fee-on-transfer tokens are not supported. The full `amount` must be received by the contract.
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(asset).forceApprove(extensionOut, amount);
         IMultiMint(extensionOut).wrap(asset, recipient, amount);

@@ -42,10 +42,10 @@ contract MultiMintTest is Test {
 
     function setUp() public {
         minterGateway = new MinterGatewayMock(address(0));
-        address pyusdxImpl = address(new PYUSDXHarness(address(minterGateway)));
+        address pyusdxImplementation = address(new PYUSDXHarness(address(minterGateway)));
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
-                pyusdxImpl,
+                pyusdxImplementation,
                 admin,
                 abi.encodeWithSelector(
                     PYUSDX.initialize.selector,

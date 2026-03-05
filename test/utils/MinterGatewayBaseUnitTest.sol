@@ -30,10 +30,10 @@ abstract contract MinterGatewayBaseUnitTest is Test {
         address predictedPyusdx = vm.computeCreateAddress(address(this), nonceBefore + 2);
 
         // Deploy MinterGateway with predicted address
-        address minterGatewayImpl = address(new MinterGateway(predictedPyusdx));
+        address minterGatewayImplementation = address(new MinterGateway(predictedPyusdx));
         minterGateway = MinterGateway(
             UnsafeUpgrades.deployTransparentProxy(
-                minterGatewayImpl,
+                minterGatewayImplementation,
                 admin,
                 abi.encodeWithSelector(
                     MinterGateway.initialize.selector,
