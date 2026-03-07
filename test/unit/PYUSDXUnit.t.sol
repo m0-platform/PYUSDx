@@ -2764,4 +2764,152 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
         assertEq(pyusdx.lastIndexOf(alice), 0);
     }
+
+    /* ============ distributeReward ============ */
+
+    function test_distributeReward_revertIfNotEarnerManager() public {
+        vm.expectRevert(IPYUSDX.NotEarnerManager.selector);
+
+        vm.prank(alice);
+        pyusdx.distributeReward(bob, MINT_AMOUNT);
+    }
+
+    function test_distributeReward_revertIfPaused() public {
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, MINT_AMOUNT);
+    }
+
+    function test_distributeReward_revertIfZeroAccount() public {
+        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
+
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(address(0), MINT_AMOUNT);
+    }
+
+    function test_distributeReward_revertIfZeroAmount() public {
+        vm.expectRevert(IPYUSDX.ZeroAmount.selector);
+
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, 0);
+    }
+
+    function test_distributeReward_revertIfAccountFrozen() public {
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, MINT_AMOUNT);
+    }
+
+    function test_distributeReward_nonEarningAccount() public {
+        assertFalse(pyusdx.isEarning(alice));
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+
+        vm.expectEmit();
+        emit IERC20.Transfer(address(0), alice, MINT_AMOUNT);
+
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, MINT_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), balanceBefore + MINT_AMOUNT);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore + MINT_AMOUNT);
+        assertEq(pyusdx.earningPrincipalOf(alice), 0);
+    }
+
+    function test_distributeReward_earningAccount() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
+
+        assertTrue(pyusdx.isEarning(alice));
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+        uint128 indexBefore = pyusdx.lastIndexOf(alice);
+
+        vm.expectEmit();
+        emit IERC20.Transfer(address(0), alice, MINT_AMOUNT);
+
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, MINT_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), balanceBefore + MINT_AMOUNT);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore + MINT_AMOUNT);
+
+        uint112 expectedPrincipal = _getExpectedPrincipal(MINT_AMOUNT, indexBefore);
+        assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipal);
+    }
+
+    function test_distributeReward_earningAccount_withIndexGrowth() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
+        pyusdx.setAccountRateBps(alice, uint32(500));
+
+        minterGateway.mint(alice, MINT_AMOUNT);
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint128 indexAfterWarp = pyusdx.currentIndexOf(alice);
+
+        uint256 rewardAmount = 50e6;
+
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, rewardAmount);
+
+        assertEq(pyusdx.balanceOf(alice), balanceBefore + rewardAmount);
+
+        uint112 expectedNewPrincipal = _getExpectedPrincipal(rewardAmount, indexAfterWarp);
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore + expectedNewPrincipal);
+    }
+
+    function test_distributeReward_multipleRecipients() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+
+        uint256 rewardAlice = 50e6;
+        uint256 rewardBob = 30e6;
+
+        vm.startPrank(earnerManager);
+        pyusdx.distributeReward(alice, rewardAlice);
+        pyusdx.distributeReward(bob, rewardBob);
+        vm.stopPrank();
+
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore + rewardAlice);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + rewardBob);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore + rewardAlice + rewardBob);
+    }
+
+    function testFuzz_distributeReward(uint256 amount) public {
+        uint256 boundedAmount = bound(amount, 1, uint256(type(uint112).max) - 1);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
+
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
+        uint128 indexBefore = pyusdx.lastIndexOf(alice);
+
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, boundedAmount);
+
+        assertEq(pyusdx.balanceOf(alice), balanceBefore + boundedAmount);
+
+        uint112 expectedPrincipal = _getExpectedPrincipal(boundedAmount, indexBefore);
+        assertEq(pyusdx.earningPrincipalOf(alice), principalBefore + expectedPrincipal);
+    }
 }

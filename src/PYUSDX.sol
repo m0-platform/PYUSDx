@@ -216,6 +216,26 @@ contract PYUSDX is
     }
 
     /// @inheritdoc IPYUSDX
+    function distributeReward(address account, uint256 amount) external onlyEarnerManager whenNotPaused {
+        _revertIfZeroAccount(account);
+        _revertIfFrozen(account);
+        _revertIfZeroAmount(amount);
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        $.totalSupply += amount;
+
+        // Add to recipient
+        if (isEarning(account)) {
+            _addEarningAmount($, account, amount);
+        } else {
+            _addNonEarningAmount($, account, amount);
+        }
+
+        emit Transfer(address(0), account, amount);
+    }
+
+    /// @inheritdoc IPYUSDX
     function setEarnerManager(address earnerManager_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setEarnerManager(earnerManager_);
     }

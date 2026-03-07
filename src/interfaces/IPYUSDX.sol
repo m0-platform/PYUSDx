@@ -158,6 +158,16 @@ interface IPYUSDX {
     ) external;
 
     /**
+     * @notice Distributes a reward to an account by minting new PYUSDX.
+     * @dev    MUST only be callable by the earner manager.
+     * @dev    MUST revert if the contract is paused.
+     * @dev    MUST revert if the account is frozen.
+     * @param account The account to receive the reward.
+     * @param amount  The amount of PYUSDX to distribute.
+     */
+    function distributeReward(address account, uint256 amount) external;
+
+    /**
      * @notice Sets the earner manager address.
      * @dev    MUST only be callable by DEFAULT_ADMIN_ROLE.
      * @param earnerManager The new earner manager address.
