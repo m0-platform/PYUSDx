@@ -89,6 +89,7 @@ contract MockPYUSDXExtension is ERC20 {
         bytes32 s
     ) external {
         // Mock implementation - no-op
+        // TODO: remove
     }
 
     /**
@@ -97,6 +98,7 @@ contract MockPYUSDXExtension is ERC20 {
      */
     function permit(address owner, address spender, uint256 value, uint256 deadline, bytes memory signature) external {
         // Mock implementation - no-op
+        // TODO: remove
     }
 
     /**
@@ -104,6 +106,7 @@ contract MockPYUSDXExtension is ERC20 {
      * @return The PERMIT_TYPEHASH.
      */
     function PERMIT_TYPEHASH() external pure returns (bytes32) {
+        // TODO: remove
         return keccak256("Permit(address owner,address spender,uint256 value,uint256 deadline)");
     }
 

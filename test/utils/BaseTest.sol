@@ -14,8 +14,10 @@ abstract contract BaseTest is Test {
     address public earnerManager = makeAddr("earnerManager");
     address public rateManager = makeAddr("rateManager");
     address public yieldRecipient = makeAddr("yieldRecipient");
+    address public yieldRecipientManager = makeAddr("yieldRecipientManager");
     address public minter = makeAddr("minter");
     address public assetCapManager = makeAddr("assetCapManager");
+    address public factoryManager = makeAddr("factoryManager");
 
     // Test user addresses (with private keys for permit testing)
     address public alice;

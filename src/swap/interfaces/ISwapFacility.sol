@@ -8,30 +8,25 @@ interface ISwapFacility {
     //// ============ Events ============ */
 
     /// @notice Emitted when PYUSDX Extension is swapped for another PYUSDX Extension.
-    /// @param  extensionIn  The address of the input PYUSDX Extension.
-    /// @param  extensionOut The address of the output PYUSDX Extension.
-    /// @param  amount       The amount swapped.
-    /// @param  recipient    The address to receive the output PYUSDX Extension token.
+    /// @param extensionIn  The address of the input PYUSDX Extension.
+    /// @param extensionOut The address of the output PYUSDX Extension.
+    /// @param amount       The amount swapped.
+    /// @param recipient    The address to receive the output PYUSDX Extension token.
     event Swapped(address indexed extensionIn, address indexed extensionOut, uint256 amount, address indexed recipient);
 
     /// @notice Emitted when PYUSDX token is swapped for PYUSDX Extension.
-    /// @param  token        The address of the PYUSDX token.
-    /// @param  extensionOut The address of the output PYUSDX Extension.
-    /// @param  amount       The amount swapped.
-    /// @param  recipient    The address to receive the output PYUSDX Extension token.
+    /// @param token        The address of the PYUSDX token.
+    /// @param extensionOut The address of the output PYUSDX Extension.
+    /// @param amount       The amount swapped.
+    /// @param recipient    The address to receive the output PYUSDX Extension token.
     event SwappedIn(address indexed token, address indexed extensionOut, uint256 amount, address indexed recipient);
 
     /// @notice Emitted when PYUSDX Extension is swapped for PYUSDX token.
-    /// @param  token        The address of the PYUSDX token.
-    /// @param  extensionIn  The address of the input PYUSDX Extension.
-    /// @param  amount       The amount swapped.
-    /// @param  recipient    The address to receive the PYUSDX token.
+    /// @param token        The address of the PYUSDX token.
+    /// @param extensionIn  The address of the input PYUSDX Extension.
+    /// @param amount       The amount swapped.
+    /// @param recipient    The address to receive the PYUSDX token.
     event SwappedOut(address indexed extensionIn, address indexed token, uint256 amount, address indexed recipient);
-
-    /// @notice Emitted when a PYUSDX Extension is admin approved or not.
-    /// @param  extension The address of an PYUSDX Extension.
-    /// @param  approved  True if the extension is approved, false otherwise.
-    event ApprovedExtensionSet(address indexed extension, bool approved);
 
     /// @notice Emitted when PYUSDX token is swapped for MultiMint Extension.
     /// @param  asset        The address of the asset.
@@ -56,6 +51,9 @@ interface ISwapFacility {
     /// @notice Thrown if the extension is 0x0.
     error ZeroExtension();
 
+    /// @notice Thrown in the constructor if the extension factory is 0x0.
+    error ZeroExtensionFactory();
+
     /// @notice Thrown in the constructor if PYUSDX Token is 0x0.
     error ZeroPYUSDXToken();
 
@@ -68,7 +66,6 @@ interface ISwapFacility {
     /* ============ Interactive Functions ============ */
 
     /// @notice Swaps between two tokens, which can be PYUSDX, PYUSDX Extensions, or an asset used by MultiMint Extensions.
-    /// @dev    Reverts with InvalidSwapPath if tokenIn == tokenOut (self-swaps are not allowed).
     /// @param  tokenIn   The address of the token to swap from.
     /// @param  tokenOut  The address of the token to swap to.
     /// @param  amount    The amount to swap.
@@ -177,16 +174,13 @@ interface ISwapFacility {
         bytes calldata signature
     ) external;
 
-    /// @notice Sets whether the `extension` is admin approved.
-    /// @dev    MUST only be callable by an address with the `DEFAULT_ADMIN_ROLE` role.
-    /// @param  extension The address of an PYUSDX Extension.
-    /// @param  approved  True if the extension is admin approved, false otherwise.
-    function setApprovedExtension(address extension, bool approved) external;
-
     /* ============ View/Pure Functions ============ */
 
     /// @notice The address of the PYUSDX Token contract.
     function pyusdx() external view returns (address);
+
+    /// @notice The address of the PYUSDX Extension Factory contract.
+    function extensionFactory() external view returns (address);
 
     /// @notice Returns the address that called `swap`.
     /// @dev    Must be used instead of `msg.sender` in PYUSDX Extensions contracts to get the original sender.
