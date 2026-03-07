@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity 0.8.34;
+pragma solidity 0.8.26;
 
 /**
  * @title  PYUSDX Extension where all yield is claimable by a single recipient.
