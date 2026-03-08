@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
-import { IForcedTransferable } from "../../lib/m-extensions/src/components/forcedTransferable/IForcedTransferable.sol";
+import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
+import { IForcedTransferable } from "../../lib/evm-m-extensions/src/components/forcedTransferable/IForcedTransferable.sol";
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
-import { AccessControlUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
-import { IAccessControl } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
-import { PausableUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
-import { UIntMath } from "../../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
-import { IndexingMath } from "../../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
-import { VmSafe } from "../../lib/m-extensions/lib/forge-std/src/Vm.sol";
+import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
+import { UIntMath } from "../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
+import { IndexingMath } from "../../lib/evm-m-extensions/lib/common/src/libs/IndexingMath.sol";
+import { VmSafe } from "../../lib/evm-m-extensions/lib/forge-std/src/Vm.sol";
 
-import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import { Test } from "../../lib/m-extensions/lib/forge-std/src/Test.sol";
-import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
@@ -10,9 +10,9 @@ import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { YieldToOne } from "../../src/YieldToOne.sol";
 import { IYieldToOne } from "../../src/interfaces/IYieldToOne.sol";
-import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
-import { IERC20Extended } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
+import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
+import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
 
 contract YieldToOneUnitTests is Test {

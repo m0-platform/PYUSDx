@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import { Test } from "../../lib/m-extensions/lib/forge-std/src/Test.sol";
+import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
 
-import { IndexingMath } from "../../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
-import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { IndexingMath } from "../../lib/evm-m-extensions/lib/common/src/libs/IndexingMath.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";

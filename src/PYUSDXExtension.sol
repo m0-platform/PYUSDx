@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.26;
 
-import { ERC20ExtendedUpgradeable } from "../lib/m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
+import { ERC20ExtendedUpgradeable } from "../lib/evm-m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
 
-import { IERC20 } from "../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IERC20 } from "../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { IPYUSDXExtension } from "./interfaces/IPYUSDXExtension.sol";
 import { ISwapFacility } from "./interfaces/ISwapFacility.sol";

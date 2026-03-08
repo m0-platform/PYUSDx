@@ -10,8 +10,5 @@
       "name": "v1",
       "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
     }
-  },
-  "lib/m-extensions": {
-    "rev": "8a8fe2b903e56a12a74b12f57a8c354dc6b9fcc3"
   }
 }

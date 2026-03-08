@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
+import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
-import { PausableUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
+import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 

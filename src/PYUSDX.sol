@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import { ERC20ExtendedUpgradeable } from "../lib/m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
-import { Freezable } from "../lib/m-extensions/src/components/freezable/Freezable.sol";
-import { ForcedTransferable } from "../lib/m-extensions/src/components/forcedTransferable/ForcedTransferable.sol";
-import { Pausable } from "../lib/m-extensions/src/components/pausable/Pausable.sol";
-import { UIntMath } from "../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
-import { ContinuousIndexingMath } from "../lib/m-extensions/lib/common/src/libs/ContinuousIndexingMath.sol";
-import { IndexingMath } from "../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
-import { AccessControlUpgradeable } from "../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import { ERC20ExtendedUpgradeable } from "../lib/evm-m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
+import { Freezable } from "../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
+import { ForcedTransferable } from "../lib/evm-m-extensions/src/components/forcedTransferable/ForcedTransferable.sol";
+import { Pausable } from "../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
+import { UIntMath } from "../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
+import { ContinuousIndexingMath } from "../lib/evm-m-extensions/lib/common/src/libs/ContinuousIndexingMath.sol";
+import { IndexingMath } from "../lib/evm-m-extensions/lib/common/src/libs/IndexingMath.sol";
+import { AccessControlUpgradeable } from "../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
 

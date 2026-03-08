@@ -2,13 +2,12 @@
 
 pragma solidity 0.8.26;
 
-import { IERC20Metadata } from "../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20Metadata } from "../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { SafeERC20 } from "../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import { SafeERC20 } from "../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { UIntMath } from "../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
-
-import { IERC20 } from "../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { UIntMath } from "../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
+import { IERC20 } from "../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { YieldToOne } from "./YieldToOne.sol";
 import { IMultiMint } from "./interfaces/IMultiMint.sol";
