@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.26;
+pragma solidity ^0.8.26;
 
 import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
@@ -42,10 +42,10 @@ contract MultiMintTest is Test {
 
     function setUp() public {
         minterGateway = new MinterGatewayMock(address(0));
-        address pyusdxImpl = address(new PYUSDXHarness());
+        address pyusdxImplementation = address(new PYUSDXHarness(address(minterGateway)));
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
-                pyusdxImpl,
+                pyusdxImplementation,
                 admin,
                 abi.encodeWithSelector(
                     PYUSDX.initialize.selector,
@@ -55,15 +55,12 @@ contract MultiMintTest is Test {
                     pauser,
                     freezeManager,
                     address(1),
-                    earnerManager
+                    earnerManager,
+                    rateManager
                 )
             )
         );
         minterGateway.setPyusdx(address(pyusdx));
-
-        bytes32 issuerRole = pyusdx.ISSUER_ROLE();
-        vm.prank(admin);
-        pyusdx.grantRole(issuerRole, address(minterGateway));
 
         swapFacility = new MockSwapFacility(address(pyusdx));
 
@@ -86,7 +83,13 @@ contract MultiMintTest is Test {
             )
         );
 
-        pyusdx.setAccountInfoDirect(address(extension), 500, 0, address(0));
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(address(extension), true, 0, address(0));
+
+        pyusdx.setAccountRateBps(address(extension), uint24(500));
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(address(extension), 500);
 
         usdc = new MockERC20("USD Coin", "USDC", 6);
         dai = new MockERC20("Dai", "DAI", 18);
@@ -163,10 +166,10 @@ contract MultiMintTest is Test {
         extension.wrap(address(usdc), alice, MINT_AMOUNT);
     }
 
-    function test_replaceAssetWithPYUSDX_revert_notSwapFacility() public {
+    function test_replaceAsset_revert_notSwapFacility() public {
         vm.prank(alice);
         vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
-        extension.replaceAssetWithPYUSDX(address(usdc), alice, MINT_AMOUNT);
+        extension.replaceAsset(address(usdc), alice, MINT_AMOUNT);
     }
 
     /* ============ Multi-Asset Wrapping ============ */
@@ -321,7 +324,7 @@ contract MultiMintTest is Test {
 
     /* ============ Replace Asset with PYUSDX ============ */
 
-    function test_replaceAssetWithPYUSDX() public {
+    function test_replaceAsset() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         minterGateway.mint(bob, 50e6);
@@ -337,7 +340,7 @@ contract MultiMintTest is Test {
         assertEq(extension.totalSupply(), 100e6);
     }
 
-    function test_replaceAssetWithPYUSDX_revert_insufficientAssetBacking() public {
+    function test_replaceAsset_revert_insufficientAssetBacking() public {
         _wrapAssetFor(alice, address(usdc), 50e6);
 
         minterGateway.mint(bob, 100e6);
@@ -350,13 +353,13 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function test_replaceAssetWithPYUSDX_revert_invalidAsset() public {
+    function test_replaceAsset_revert_invalidAsset() public {
         vm.prank(address(swapFacility));
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
-        extension.replaceAssetWithPYUSDX(address(0), bob, 50e6);
+        extension.replaceAsset(address(0), bob, 50e6);
     }
 
-    function test_replaceAssetWithPYUSDX_crossDecimal() public {
+    function test_replaceAsset_crossDecimal() public {
         _wrapAssetFor(alice, address(dai), 500e18);
 
         minterGateway.mint(bob, 200e6);
@@ -370,7 +373,7 @@ contract MultiMintTest is Test {
         assertEq(extension.totalAssets(), 300e6);
     }
 
-    function test_replaceAssetWithPYUSDX_revert_paused() public {
+    function test_replaceAsset_revert_paused() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         minterGateway.mint(bob, 50e6);
@@ -386,7 +389,7 @@ contract MultiMintTest is Test {
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
     }
 
-    function test_replaceAssetWithPYUSDX_emitsEvent() public {
+    function test_replaceAsset_emitsEvent() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         minterGateway.mint(bob, 50e6);
@@ -514,7 +517,7 @@ contract MultiMintTest is Test {
         swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
     }
 
-    function test_replaceAssetWithPYUSDX_revert_frozen() public {
+    function test_replaceAsset_revert_frozen() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         minterGateway.mint(bob, 50e6);

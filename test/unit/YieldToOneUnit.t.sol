@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.26;
+pragma solidity ^0.8.26;
 
 import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
@@ -37,10 +37,10 @@ contract YieldToOneUnitTests is Test {
     function setUp() public {
         minterGateway = new MinterGatewayMock(address(0));
 
-        address pyusdxImpl = address(new PYUSDXHarness());
+        address pyusdxImplementation = address(new PYUSDXHarness(address(minterGateway)));
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
-                pyusdxImpl,
+                pyusdxImplementation,
                 admin,
                 abi.encodeWithSelector(
                     PYUSDX.initialize.selector,
@@ -50,15 +50,12 @@ contract YieldToOneUnitTests is Test {
                     pauser,
                     freezeManager,
                     address(1),
-                    earnerManager
+                    earnerManager,
+                    rateManager
                 )
             )
         );
         minterGateway.setPyusdx(address(pyusdx));
-
-        bytes32 issuerRole = pyusdx.ISSUER_ROLE();
-        vm.prank(admin);
-        pyusdx.grantRole(issuerRole, address(minterGateway));
 
         swapFacility = new MockSwapFacility(address(pyusdx));
 
@@ -80,7 +77,13 @@ contract YieldToOneUnitTests is Test {
             )
         );
 
-        pyusdx.setAccountInfoDirect(address(extension), 500, 0, address(0));
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(address(extension), true, 0, address(0));
+
+        pyusdx.setAccountRateBps(address(extension), uint24(500));
+
+        vm.prank(rateManager);
+        pyusdx.setEarnerRate(address(extension), 500);
     }
 
     /* ============ Helpers ============ */
@@ -238,13 +241,14 @@ contract YieldToOneUnitTests is Test {
     }
 
     function test_claimYield_withFee() public {
-        pyusdx.setAccountInfoDirect(address(extension), 500, 1000, address(0));
+        vm.prank(earnerManager);
+        pyusdx.setEarningDetails(address(extension), true, 1000, address(0));
 
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         vm.warp(block.timestamp + 365 days);
 
-        (uint256 grossYield, , ) = pyusdx.accruedYieldAndFeeOf(address(extension));
+        uint256 grossYield = pyusdx.accruedYieldOf(address(extension));
 
         extension.claimYield();
 

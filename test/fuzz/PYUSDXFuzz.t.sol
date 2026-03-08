@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.26;
+pragma solidity ^0.8.26;
 import { console } from "../../lib/forge-std/src/console.sol";
 import { UIntMath } from "../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
 import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
@@ -13,23 +13,23 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     /* ============ Fuzz: mint ============ */
 
     function testFuzz_mint_nonEarningAccount(uint256 amount) public {
-        uint256 boundedAmount = bound(amount, 1, type(uint256).max);
+        uint256 boundedAmount = bound(amount, 1, uint256(type(uint240).max) + 1);
 
         uint256 totalSupplyBefore = pyusdx.totalSupply();
 
-        // With uint256 totalSupply, overflow only occurs at uint256 boundary
-        bool wouldOverflowSupply;
-        unchecked {
-            wouldOverflowSupply = totalSupplyBefore + boundedAmount < totalSupplyBefore;
-        }
+        bool amountExceedsUInt240 = boundedAmount > type(uint240).max;
 
-        if (wouldOverflowSupply) {
-            vm.expectRevert();
+        bool wouldOverflowSupply = totalSupplyBefore + boundedAmount > type(uint240).max;
+
+        if (amountExceedsUInt240) {
+            vm.expectRevert(UIntMath.InvalidUInt240.selector);
+        } else if (wouldOverflowSupply) {
+            vm.expectRevert(IPYUSDX.OverflowsPrincipalOfTotalSupply.selector);
         }
 
         minterGateway.mint(alice, boundedAmount);
 
-        if (!wouldOverflowSupply) {
+        if (!amountExceedsUInt240 && !wouldOverflowSupply) {
             assertEq(pyusdx.balanceOf(alice), boundedAmount);
             assertEq(pyusdx.totalSupply(), totalSupplyBefore + boundedAmount);
         }
@@ -37,7 +37,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
     function testFuzz_mint_earningAccount(uint256 amount, uint128 index) public {
         vm.prank(earnerManager);
-        pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
 
         uint256 boundedAmount = bound(amount, 1, uint256(type(uint240).max) + 1);
         uint128 boundedIndex = uint128(bound(index, 1e12, 1e18)); // From 1x to 1,000,000x index
@@ -47,7 +47,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         pyusdx.setAccountLastIndex(alice, boundedIndex);
 
         // Get the actual current index used by the contract (includes continuous compounding)
-        uint128 actualIndex = pyusdx.lastIndexOf(alice);
+        uint128 actualIndex = pyusdx.currentAccountIndex(alice);
 
         // Skip cases where our test calculations would overflow (not contract behavior)
         vm.assume(boundedAmount <= type(uint256).max / PRECISION);
@@ -58,17 +58,20 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         uint256 amountPrincipal = (boundedAmount * PRECISION) / actualIndex;
 
         bool wouldOverflowPrincipal = amountPrincipal > type(uint112).max;
+        bool wouldOverflowSupply = totalSupplyBefore + boundedAmount > type(uint240).max;
 
         // Check reverts in the same order as the contract would encounter them
         if (amountExceedsUInt240) {
             vm.expectRevert(UIntMath.InvalidUInt240.selector);
+        } else if (wouldOverflowSupply) {
+            vm.expectRevert(IPYUSDX.OverflowsPrincipalOfTotalSupply.selector);
         } else if (wouldOverflowPrincipal) {
             vm.expectRevert(UIntMath.InvalidUInt112.selector);
         }
 
         minterGateway.mint(alice, boundedAmount);
 
-        if (!amountExceedsUInt240 && !wouldOverflowPrincipal) {
+        if (!amountExceedsUInt240 && !wouldOverflowPrincipal && !wouldOverflowSupply) {
             uint112 expectedPrincipal = _expectedPrincipalRoundDown(uint240(boundedAmount), actualIndex);
             assertEq(pyusdx.balanceOf(alice), boundedAmount);
             assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipal);
@@ -79,21 +82,27 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     /* ============ Fuzz: burn ============ */
 
     function testFuzz_burn_nonEarningAccount(uint256 mintAmount, uint256 burnAmount) public {
-        burnAmount = bound(burnAmount, 1, type(uint256).max);
-        mintAmount = bound(mintAmount, 1, type(uint256).max);
+        burnAmount = bound(burnAmount, 1, uint256(type(uint240).max) + 1);
+        mintAmount = bound(mintAmount, 1, uint256(type(uint240).max) + 1);
+        vm.assume(_canSafelyMint(mintAmount));
 
         minterGateway.mint(alice, mintAmount);
 
+        bool amountExceedsUInt240 = burnAmount > type(uint240).max;
         bool wouldExceedBalance = burnAmount > mintAmount;
 
-        if (wouldExceedBalance) {
-            // totalSupply -= amount underflows before balance check
-            vm.expectRevert();
+        // Check reverts in the same order as the contract would encounter them
+        if (amountExceedsUInt240) {
+            vm.expectRevert(UIntMath.InvalidUInt240.selector);
+        } else if (wouldExceedBalance) {
+            vm.expectRevert(
+                abi.encodeWithSelector(IPYUSDX.InsufficientBalance.selector, alice, mintAmount, burnAmount)
+            );
         }
 
         minterGateway.burn(alice, burnAmount);
 
-        if (!wouldExceedBalance) {
+        if (!amountExceedsUInt240 && !wouldExceedBalance) {
             assertEq(pyusdx.balanceOf(alice), mintAmount - burnAmount);
             assertEq(pyusdx.totalSupply(), mintAmount - burnAmount);
         }
@@ -102,19 +111,20 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     /* ============ Fuzz: burn ============ */
 
     function testFuzz_burn_earningAccount(uint256 mintAmount, uint256 burnAmount, uint128 index) public {
-        // Keep within uint240 range for earning accounts (uint240 cast in burn path)
-        mintAmount = bound(mintAmount, 1, uint256(type(uint240).max));
-        burnAmount = bound(burnAmount, 1, uint256(type(uint240).max));
+        mintAmount = bound(mintAmount, 1, uint256(type(uint240).max) + 1);
+        burnAmount = bound(burnAmount, 1, uint256(type(uint240).max) + 1);
 
         uint128 boundedIndex = uint128(bound(index, 1e12, 1e15)); // From 1x to 1,000x index
 
         vm.prank(earnerManager);
-        pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
+        pyusdx.setEarningDetails(alice, true, 0, address(0));
+
+        vm.assume(_canSafelyMint(mintAmount));
 
         pyusdx.setAccountLastIndex(alice, boundedIndex);
 
         // Skip if mint would overflow principal (uint112)
-        uint128 actualIndex = pyusdx.lastIndexOf(alice);
+        uint128 actualIndex = pyusdx.currentAccountIndex(alice);
         vm.assume(mintAmount <= type(uint256).max / 1e12);
         vm.assume((uint256(mintAmount) * 1e12) / actualIndex <= type(uint112).max);
 
@@ -124,17 +134,22 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         uint256 balanceBefore = pyusdx.balanceOf(alice);
         uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
 
+        bool burnExceedsUInt240 = burnAmount > type(uint240).max;
         bool wouldExceedBalance = burnAmount > balanceBefore;
 
-        if (wouldExceedBalance) {
-            // totalSupply -= amount underflows before balance check
-            vm.expectRevert();
+        // Check reverts in the same order as the contract would encounter them
+        if (burnExceedsUInt240) {
+            vm.expectRevert(UIntMath.InvalidUInt240.selector);
+        } else if (wouldExceedBalance) {
+            vm.expectRevert(
+                abi.encodeWithSelector(IPYUSDX.InsufficientBalance.selector, alice, balanceBefore, burnAmount)
+            );
         }
 
         minterGateway.burn(alice, burnAmount);
 
         // Verify state when no revert
-        if (!wouldExceedBalance) {
+        if (!burnExceedsUInt240 && !wouldExceedBalance) {
             uint112 expectedPrincipalSubtracted = _getExpectedPrincipalRoundedUp(burnAmount, actualIndex);
 
             // Principal being rounded up, it may be greater than the stored principal
@@ -190,9 +205,13 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             }
         } else if (boundedPath == 1) {
             // E -> E (0% fee)
-            vm.prank(earnerManager);
-            pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
-            pyusdx.setAccountInfoDirect(bob, 500, 0, address(0));
+            vm.startPrank(earnerManager);
+
+            pyusdx.setEarningDetails(alice, true, 0, address(0));
+            pyusdx.setEarningDetails(bob, true, 0, address(0));
+
+            vm.stopPrank();
+
             pyusdx.setAccountLastIndex(alice, boundedIndex);
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
@@ -202,7 +221,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
             // Check for principal overflow when adding to recipient
             uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
-            uint128 actualIndex = pyusdx.lastIndexOf(alice);
+            uint128 actualIndex = pyusdx.currentAccountIndex(alice);
             uint256 principalToAdd = _expectedPrincipalRoundUpSafe(boundedAmount, actualIndex);
             bool wouldOverflowPrincipal = bobPrincipalBefore + principalToAdd > type(uint112).max;
 
@@ -225,7 +244,8 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         } else if (boundedPath == 2) {
             // N -> E
             vm.prank(earnerManager);
-            pyusdx.setAccountInfoDirect(bob, 500, 0, address(0));
+            pyusdx.setEarningDetails(bob, true, 0, address(0));
+
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
             minterGateway.mint(alice, boundedAmount);
@@ -234,7 +254,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
             // Check for principal overflow when adding to earning recipient
             uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
-            uint128 actualIndex = pyusdx.lastIndexOf(bob);
+            uint128 actualIndex = pyusdx.currentAccountIndex(bob);
             uint256 principalToAdd = _expectedPrincipalRoundUpSafe(boundedAmount, actualIndex);
             bool wouldOverflowPrincipal = bobPrincipalBefore + principalToAdd > type(uint112).max;
 
@@ -243,7 +263,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
                     abi.encodeWithSelector(IPYUSDX.InsufficientBalance.selector, alice, aliceBalance, boundedAmount)
                 );
             } else if (!amountExceedsUInt240 && !wouldExceedBalance && wouldOverflowPrincipal) {
-                vm.expectRevert(UIntMath.InvalidUInt112.selector);
+                vm.expectRevert(IPYUSDX.OverflowsPrincipalOfTotalSupply.selector);
             }
 
             vm.prank(alice);
@@ -257,7 +277,8 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         } else if (boundedPath == 3) {
             // E -> N
             vm.prank(earnerManager);
-            pyusdx.setAccountInfoDirect(alice, 500, 0, address(0));
+            pyusdx.setEarningDetails(alice, true, 0, address(0));
+
             pyusdx.setAccountLastIndex(alice, boundedIndex);
 
             minterGateway.mint(alice, boundedAmount);
@@ -271,7 +292,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             }
 
             uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
-            uint128 actualIndex = pyusdx.lastIndexOf(alice);
+            uint128 actualIndex = pyusdx.currentAccountIndex(alice);
 
             vm.prank(alice);
             pyusdx.transfer(bob, boundedAmount);
@@ -286,9 +307,13 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             }
         } else if (boundedPath == 4) {
             // E -> E with same 1% fee
-            vm.prank(earnerManager);
-            pyusdx.setAccountInfoDirect(alice, 500, 100, address(0));
-            pyusdx.setAccountInfoDirect(bob, 500, 100, address(0));
+            vm.startPrank(earnerManager);
+
+            pyusdx.setEarningDetails(alice, true, 100, address(0));
+            pyusdx.setEarningDetails(bob, true, 100, address(0));
+
+            vm.stopPrank();
+
             pyusdx.setAccountLastIndex(alice, boundedIndex);
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
@@ -298,7 +323,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
             // Check for principal overflow when adding to recipient
             uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
-            uint128 actualIndex = pyusdx.lastIndexOf(alice);
+            uint128 actualIndex = pyusdx.currentAccountIndex(alice);
             uint256 principalToAdd = _expectedPrincipalRoundUpSafe(boundedAmount, actualIndex);
             bool wouldOverflowPrincipal = bobPrincipalBefore + principalToAdd > type(uint112).max;
 
@@ -319,9 +344,13 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             }
         } else if (boundedPath == 5) {
             // E -> E with different fees (1% alice, 5% bob)
-            vm.prank(earnerManager);
-            pyusdx.setAccountInfoDirect(alice, 500, 100, address(0));
-            pyusdx.setAccountInfoDirect(bob, 500, 500, address(0));
+            vm.startPrank(earnerManager);
+
+            pyusdx.setEarningDetails(alice, true, 100, address(0));
+            pyusdx.setEarningDetails(bob, true, 500, address(0));
+
+            vm.stopPrank();
+
             pyusdx.setAccountLastIndex(alice, boundedIndex);
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
@@ -331,7 +360,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
             // Check for principal overflow when adding to recipient
             uint112 bobPrincipalBefore = pyusdx.earningPrincipalOf(bob);
-            uint128 actualIndex = pyusdx.lastIndexOf(alice);
+            uint128 actualIndex = pyusdx.currentAccountIndex(alice);
             uint256 principalToAdd = _expectedPrincipalRoundUpSafe(boundedAmount, actualIndex);
             bool wouldOverflowPrincipal = bobPrincipalBefore + principalToAdd > type(uint112).max;
 
@@ -373,10 +402,8 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
     /* ============ Helper Functions ============ */
 
-    /// @dev Check if minting amount would overflow totalSupply (uint256)
+    /// @dev Check if minting amount would overflow totalSupply (uint240)
     function _canSafelyMint(uint256 amount) internal view returns (bool) {
-        unchecked {
-            return pyusdx.totalSupply() + amount >= pyusdx.totalSupply();
-        }
+        return pyusdx.totalSupply() + amount <= type(uint240).max;
     }
 }
