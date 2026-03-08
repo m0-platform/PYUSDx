@@ -37,7 +37,7 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
 
         // Enable earning for YieldToOne
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(address(yieldToOne), true, 0, yieldRecipient);
+        pyusdx.setAccountInfo(address(yieldToOne), 500, 0, yieldRecipient);
 
         // Deploy MultiMint through factory
         vm.prank(admin);

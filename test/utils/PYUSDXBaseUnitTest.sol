@@ -22,7 +22,7 @@ abstract contract PYUSDXBaseUnitTest is BaseTest {
         // TODO: figure out how to avoid this circular dependency
         minterGateway = new MinterGatewayMock(address(0));
 
-        address implementation = address(new PYUSDXHarness(address(minterGateway)));
+        address implementation = address(new PYUSDXHarness());
 
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
@@ -36,8 +36,7 @@ abstract contract PYUSDXBaseUnitTest is BaseTest {
                     pauser,
                     freezeManager,
                     forcedTransferManager,
-                    earnerManager,
-                    rateManager
+                    earnerManager
                 )
             )
         );

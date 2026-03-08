@@ -38,7 +38,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address minterGatewayProxy,
         PYUSDXConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
-        implementation = address(new PYUSDX(minterGatewayProxy));
+        implementation = address(new PYUSDX());
 
         proxy = _deployCreate3TransparentProxy(
             implementation,

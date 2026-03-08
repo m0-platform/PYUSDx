@@ -42,7 +42,7 @@ contract MultiMintTest is Test {
 
     function setUp() public {
         minterGateway = new MinterGatewayMock(address(0));
-        address pyusdxImplementation = address(new PYUSDXHarness(address(minterGateway)));
+        address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
                 pyusdxImplementation,
@@ -55,8 +55,7 @@ contract MultiMintTest is Test {
                     pauser,
                     freezeManager,
                     address(1),
-                    earnerManager,
-                    rateManager
+                    earnerManager
                 )
             )
         );
@@ -84,12 +83,9 @@ contract MultiMintTest is Test {
         );
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(address(extension), true, 0, address(0));
+        pyusdx.setAccountInfo(address(extension), 500, 0, address(0));
 
         pyusdx.setAccountRateBps(address(extension), uint24(500));
-
-        vm.prank(rateManager);
-        pyusdx.setEarnerRate(address(extension), 500);
 
         usdc = new MockERC20("USD Coin", "USDC", 6);
         dai = new MockERC20("Dai", "DAI", 18);
