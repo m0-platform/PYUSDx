@@ -8,11 +8,11 @@ import { PYUSDX } from "../../src/PYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
-import { MultiMint } from "../../src/MultiMint.sol";
-import { IMultiMint } from "../../src/interfaces/IMultiMint.sol";
+import { MultiMint } from "../../src/platform/MultiMint.sol";
+import { IMultiMint } from "../../src/platform/interfaces/IMultiMint.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
-import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
+import { IPYUSDXExtension } from "../../src/platform/interfaces/IPYUSDXExtension.sol";
 import { MockERC20 } from "../mock/MockERC20.sol";
 import { FeeOnTransferMock } from "../mock/FeeOnTransferMock.sol";
 

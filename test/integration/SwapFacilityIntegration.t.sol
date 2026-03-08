@@ -5,11 +5,11 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 
-import { IPYUSDXExtensionFactory } from "../../src/deploy/interfaces/IPYUSDXExtensionFactory.sol";
-import { MultiMint } from "../../src/MultiMint.sol";
+import { IPYUSDXExtensionFactory } from "../../src/platform/interfaces/IPYUSDXExtensionFactory.sol";
+import { MultiMint } from "../../src/platform/MultiMint.sol";
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
-import { YieldToOne } from "../../src/YieldToOne.sol";
+import { YieldToOne } from "../../src/platform/YieldToOne.sol";
 
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 

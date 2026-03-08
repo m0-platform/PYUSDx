@@ -5,12 +5,12 @@ import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openze
 import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import { UnsafeUpgrades, Upgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
-import { IPYUSDXExtensionFactory } from "../../src/deploy/interfaces/IPYUSDXExtensionFactory.sol";
-import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
-import { MultiMint } from "../../src/MultiMint.sol";
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+import { IPYUSDXExtensionFactory } from "../../src/platform/interfaces/IPYUSDXExtensionFactory.sol";
+import { IPYUSDXExtension } from "../../src/platform/interfaces/IPYUSDXExtension.sol";
+import { MultiMint } from "../../src/platform/MultiMint.sol";
+import { PYUSDXExtensionFactory } from "../../src/platform/PYUSDXExtensionFactory.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
-import { YieldToOne } from "../../src/YieldToOne.sol";
+import { YieldToOne } from "../../src/platform/YieldToOne.sol";
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
 contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {

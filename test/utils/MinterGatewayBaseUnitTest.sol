@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import { Test } from "../../lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
-import { MinterGateway } from "../../src/MinterGateway.sol";
+import { MinterGateway } from "../../src/core/MinterGateway.sol";
 import { PYUSDXMock } from "../mock/PYUSDXMock.sol";
 
 /// @title MinterGateway Base Unit Test

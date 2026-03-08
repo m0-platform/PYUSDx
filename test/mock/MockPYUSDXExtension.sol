@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 
 import { ERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
+import { IPYUSDXExtension } from "../../src/platform/interfaces/IPYUSDXExtension.sol";
 
 /**
  * @title  Mock PYUSDX Extension

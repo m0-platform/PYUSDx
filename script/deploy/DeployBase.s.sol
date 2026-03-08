@@ -8,9 +8,9 @@ import { DeployHelpers } from "../../lib/evm-m-extensions/lib/common/script/depl
 
 import { Upgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
-import { MinterGateway } from "../../src/MinterGateway.sol";
+import { MinterGateway } from "../../src/core/MinterGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+import { PYUSDXExtensionFactory } from "../../src/platform/PYUSDXExtensionFactory.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 
 import { ScriptBase } from "../ScriptBase.s.sol";

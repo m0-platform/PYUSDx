@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 
 import { console } from "../../lib/forge-std/src/console.sol";
 
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+import { PYUSDXExtensionFactory } from "../../src/platform/PYUSDXExtensionFactory.sol";
 
 import { DeployBase } from "./DeployBase.s.sol";
 

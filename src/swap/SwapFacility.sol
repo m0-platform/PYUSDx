@@ -7,9 +7,9 @@ import { SafeERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppeli
 import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 import { Pausable } from "../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
 
-import { IMultiMint } from "../interfaces/IMultiMint.sol";
-import { IPYUSDXExtension } from "../interfaces/IPYUSDXExtension.sol";
-import { IPYUSDXExtensionFactory } from "../deploy/interfaces/IPYUSDXExtensionFactory.sol";
+import { IMultiMint } from "../platform/interfaces/IMultiMint.sol";
+import { IPYUSDXExtension } from "../platform/interfaces/IPYUSDXExtension.sol";
+import { IPYUSDXExtensionFactory } from "../platform/interfaces/IPYUSDXExtensionFactory.sol";
 
 import { ISwapFacility } from "./interfaces/ISwapFacility.sol";
 

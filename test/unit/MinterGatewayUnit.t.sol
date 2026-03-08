@@ -2,11 +2,11 @@
 pragma solidity 0.8.26;
 
 import { MinterGatewayBaseUnitTest } from "../utils/MinterGatewayBaseUnitTest.sol";
-import { IMinterGateway } from "../../src/interfaces/IMinterGateway.sol";
+import { IMinterGateway } from "../../src/core/interfaces/IMinterGateway.sol";
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
-import { MinterGateway } from "../../src/MinterGateway.sol";
+import { MinterGateway } from "../../src/core/MinterGateway.sol";
 
 contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
     /* ============ Constructor ============ */

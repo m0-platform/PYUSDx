@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.26;
 
-import { IERC20 } from "../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { IYieldToOne } from "./interfaces/IYieldToOne.sol";
-import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
+import { IPYUSDX } from "../interfaces/IPYUSDX.sol";
 
-import { Freezable } from "../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
-import { Pausable } from "../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
+import { Freezable } from "../../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
+import { Pausable } from "../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
 import { PYUSDXExtension } from "./PYUSDXExtension.sol";
 
 abstract contract YieldToOneStorageLayout {

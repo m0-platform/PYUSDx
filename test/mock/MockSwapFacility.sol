@@ -3,8 +3,8 @@ pragma solidity 0.8.26;
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
-import { IMultiMint } from "../../src/interfaces/IMultiMint.sol";
+import { IPYUSDXExtension } from "../../src/platform/interfaces/IPYUSDXExtension.sol";
+import { IMultiMint } from "../../src/platform/interfaces/IMultiMint.sol";
 
 contract MockSwapFacility {
     address public pyusdx;

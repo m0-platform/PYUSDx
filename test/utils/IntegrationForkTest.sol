@@ -4,9 +4,9 @@ pragma solidity ^0.8.26;
 import { Config } from "../../script/Config.sol";
 import { DeployBase } from "../../script/deploy/DeployBase.s.sol";
 
-import { MinterGateway } from "../../src/MinterGateway.sol";
+import { MinterGateway } from "../../src/core/MinterGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+import { PYUSDXExtensionFactory } from "../../src/platform/PYUSDXExtensionFactory.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 
 import { BaseForkTest } from "./BaseForkTest.sol";

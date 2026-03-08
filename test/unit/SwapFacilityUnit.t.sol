@@ -7,8 +7,8 @@ import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interf
 import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 
-import { IPYUSDXExtensionFactory } from "../../src/deploy/interfaces/IPYUSDXExtensionFactory.sol";
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+import { IPYUSDXExtensionFactory } from "../../src/platform/interfaces/IPYUSDXExtensionFactory.sol";
+import { PYUSDXExtensionFactory } from "../../src/platform/PYUSDXExtensionFactory.sol";
 
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";

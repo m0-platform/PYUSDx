@@ -6,14 +6,14 @@ import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/
 import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import { TransparentUpgradeableProxy } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
+import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
 
-import { IPYUSDXExtension } from "../interfaces/IPYUSDXExtension.sol";
+import { IPYUSDXExtension } from "./interfaces/IPYUSDXExtension.sol";
 
 import { IPYUSDXExtensionFactory } from "./interfaces/IPYUSDXExtensionFactory.sol";
 
-import { MultiMint } from "../MultiMint.sol";
-import { YieldToOne } from "../YieldToOne.sol";
+import { MultiMint } from "./MultiMint.sol";
+import { YieldToOne } from "./YieldToOne.sol";
 
 /// @notice ERC-7201 namespaced storage layout for PYUSDXExtensionFactory.
 abstract contract PYUSDXExtensionFactoryStorageLayout {

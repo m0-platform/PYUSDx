@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.26;
 
-import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
+import { IERC20Extended } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 
 /**
  * @title  PYUSDX Extension interface extending Extended ERC20.

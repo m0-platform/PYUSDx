@@ -2,9 +2,9 @@
 pragma solidity 0.8.26;
 
 import { IMinterGateway } from "./interfaces/IMinterGateway.sol";
-import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
+import { IPYUSDX } from "../interfaces/IPYUSDX.sol";
 
-import { AccessControlUpgradeable } from "../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 /// @notice ERC-7201 namespaced storage layout for MinterGateway.
 abstract contract MinterGatewayStorageLayout {
