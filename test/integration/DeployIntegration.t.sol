@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { YieldToOne } from "../../src/platform/YieldToOne.sol";
+import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 

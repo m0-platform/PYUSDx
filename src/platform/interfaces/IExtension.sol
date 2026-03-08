@@ -8,7 +8,7 @@ import { IERC20Extended } from "../../../lib/evm-m-extensions/lib/common/src/int
  * @title  PYUSDX Extension interface extending Extended ERC20.
  * @author M0 Labs
  */
-interface IPYUSDXExtension is IERC20Extended {
+interface IExtension is IERC20Extended {
     /* ============ Custom Errors ============ */
 
     /**

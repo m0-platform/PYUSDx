@@ -3,8 +3,8 @@ pragma solidity 0.8.26;
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { IPYUSDXExtension } from "../../src/platform/interfaces/IPYUSDXExtension.sol";
-import { IMultiMint } from "../../src/platform/interfaces/IMultiMint.sol";
+import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
+import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
 
 contract MockSwapFacility {
     address public pyusdx;
@@ -22,14 +22,14 @@ contract MockSwapFacility {
         _locker = msg.sender;
         IERC20(pyusdx).transferFrom(msg.sender, address(this), amount);
         IERC20(pyusdx).approve(extension, amount);
-        IPYUSDXExtension(extension).wrap(recipient, amount);
+        IExtension(extension).wrap(recipient, amount);
         _locker = address(0);
     }
 
     function swapOut(address extension, uint256 amount, address recipient) external {
         _locker = msg.sender;
         IERC20(extension).transferFrom(msg.sender, address(this), amount);
-        IPYUSDXExtension(extension).unwrap(amount);
+        IExtension(extension).unwrap(amount);
         IERC20(pyusdx).transfer(recipient, amount);
         _locker = address(0);
     }
@@ -37,10 +37,10 @@ contract MockSwapFacility {
     function swapExtensions(address extIn, address extOut, uint256 amount, address recipient) external {
         _locker = msg.sender;
         IERC20(extIn).transferFrom(msg.sender, address(this), amount);
-        IPYUSDXExtension(extIn).unwrap(amount);
+        IExtension(extIn).unwrap(amount);
         uint256 bal = IERC20(pyusdx).balanceOf(address(this));
         IERC20(pyusdx).approve(extOut, bal);
-        IPYUSDXExtension(extOut).wrap(recipient, bal);
+        IExtension(extOut).wrap(recipient, bal);
         _locker = address(0);
     }
 

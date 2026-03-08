@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 

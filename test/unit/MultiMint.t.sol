@@ -8,11 +8,11 @@ import { PYUSDX } from "../../src/PYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
-import { MultiMint } from "../../src/platform/MultiMint.sol";
-import { IMultiMint } from "../../src/platform/interfaces/IMultiMint.sol";
+import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
+import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
-import { IPYUSDXExtension } from "../../src/platform/interfaces/IPYUSDXExtension.sol";
+import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 import { MockERC20 } from "../mock/MockERC20.sol";
 import { FeeOnTransferMock } from "../mock/FeeOnTransferMock.sol";
 
@@ -146,25 +146,25 @@ contract MultiMintTest is Test {
 
     function test_wrap_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.wrap(alice, MINT_AMOUNT);
     }
 
     function test_unwrap_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.unwrap(MINT_AMOUNT);
     }
 
     function test_wrapAsset_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.wrap(address(usdc), alice, MINT_AMOUNT);
     }
 
     function test_replaceAsset_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.replaceAsset(address(usdc), alice, MINT_AMOUNT);
     }
 
@@ -240,7 +240,7 @@ contract MultiMintTest is Test {
 
     function test_wrap_asset_revert_zeroAmount() public {
         vm.prank(address(swapFacility));
-        vm.expectRevert(IPYUSDXExtension.ZeroAmount.selector);
+        vm.expectRevert(IExtension.ZeroAmount.selector);
         extension.wrap(address(usdc), alice, 0);
     }
 
@@ -272,7 +272,7 @@ contract MultiMintTest is Test {
         dai.mint(alice, 1);
         vm.startPrank(alice);
         dai.approve(address(swapFacility), 1);
-        vm.expectRevert(IPYUSDXExtension.ZeroAmount.selector);
+        vm.expectRevert(IExtension.ZeroAmount.selector);
         swapFacility.swapInAsset(address(extension), address(dai), 1, alice);
         vm.stopPrank();
     }

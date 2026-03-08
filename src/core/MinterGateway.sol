@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import { IMinterGateway } from "./interfaces/IMinterGateway.sol";
-import { IPYUSDX } from "../interfaces/IPYUSDX.sol";
+import { IMinterGateway } from "./IMinterGateway.sol";
+import { IPYUSDX } from "../IPYUSDX.sol";
 
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 

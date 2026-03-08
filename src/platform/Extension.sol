@@ -6,23 +6,23 @@ import { ERC20ExtendedUpgradeable } from "../../lib/evm-m-extensions/lib/common/
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { IPYUSDXExtension } from "./interfaces/IPYUSDXExtension.sol";
+import { IExtension } from "./interfaces/IExtension.sol";
 import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
 
 /**
- * @title  PYUSDXExtension
+ * @title  Extension
  * @notice Upgradeable ERC20 base contract for wrapping PYUSDX into a branded extension token.
  * @author M0 Labs
  */
-abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable {
+abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
     /* ============ Variables ============ */
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
-    /// @inheritdoc IPYUSDXExtension
+    /// @inheritdoc IExtension
     address public immutable pyusdx;
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
-    /// @inheritdoc IPYUSDXExtension
+    /// @inheritdoc IExtension
     address public immutable swapFacility;
 
     /* ============ Modifiers ============ */
@@ -36,7 +36,7 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable 
 
     /**
      * @custom:oz-upgrades-unsafe-allow constructor
-     * @notice Constructs PYUSDXExtension Implementation contract.
+     * @notice Constructs Extension Implementation contract.
      * @dev    Sets immutable storage.
      * @param  pyusdx_       The address of the PYUSDX token.
      * @param  swapFacility_ The address of the swap facility.
@@ -55,18 +55,18 @@ abstract contract PYUSDXExtension is IPYUSDXExtension, ERC20ExtendedUpgradeable 
      * @param  name   The name of the token.
      * @param  symbol The symbol of the token.
      */
-    function __PYUSDXExtension_init(string memory name, string memory symbol) internal onlyInitializing {
+    function __Extension_init(string memory name, string memory symbol) internal onlyInitializing {
         __ERC20ExtendedUpgradeable_init(name, symbol, 6);
     }
 
     /* ============ Interactive Functions ============ */
 
-    /// @inheritdoc IPYUSDXExtension
+    /// @inheritdoc IExtension
     function wrap(address recipient, uint256 amount) external onlySwapFacility {
         _wrap(ISwapFacility(msg.sender).msgSender(), recipient, amount);
     }
 
-    /// @inheritdoc IPYUSDXExtension
+    /// @inheritdoc IExtension
     function unwrap(uint256 amount) external onlySwapFacility {
         _unwrap(ISwapFacility(msg.sender).msgSender(), amount);
     }

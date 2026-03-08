@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.26;
 
-import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { IYieldToOne } from "./interfaces/IYieldToOne.sol";
-import { IPYUSDX } from "../interfaces/IPYUSDX.sol";
+import { IPYUSDX } from "../../IPYUSDX.sol";
 
-import { Freezable } from "../../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
-import { Pausable } from "../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
-import { PYUSDXExtension } from "./PYUSDXExtension.sol";
+import { Freezable } from "../../../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
+import { Pausable } from "../../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
+import { Extension } from "../Extension.sol";
 
 abstract contract YieldToOneStorageLayout {
     /// @custom:storage-location erc7201:PYUSDX.storage.YieldToOne
@@ -39,7 +39,7 @@ abstract contract YieldToOneStorageLayout {
  *         PYUSDX (net of PYUSDX's fee), then minted as extension tokens to the yield recipient.
  * @author M0 Labs
  */
-contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Freezable, Pausable {
+contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezable, Pausable {
     /* ============ Variables ============ */
 
     /// @inheritdoc IYieldToOne
@@ -52,7 +52,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
      * @param pyusdx_       The address of the PYUSDX token.
      * @param swapFacility_ The address of the swap facility.
      */
-    constructor(address pyusdx_, address swapFacility_) PYUSDXExtension(pyusdx_, swapFacility_) {}
+    constructor(address pyusdx_, address swapFacility_) Extension(pyusdx_, swapFacility_) {}
 
     /* ============ Initializer ============ */
 
@@ -102,7 +102,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
         if (admin == address(0)) revert ZeroAdmin();
         if (IPYUSDX(pyusdx).claimRecipientFor(address(this)) != address(this)) revert InvalidClaimRecipient();
 
-        __PYUSDXExtension_init(name, symbol);
+        __Extension_init(name, symbol);
         __Freezable_init(freezeManager);
         __Pausable_init(pauser);
 

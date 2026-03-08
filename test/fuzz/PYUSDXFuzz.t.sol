@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 import { console } from "../../lib/forge-std/src/console.sol";
 import { UIntMath } from "../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
-import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 

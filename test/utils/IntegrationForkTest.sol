@@ -6,7 +6,7 @@ import { DeployBase } from "../../script/deploy/DeployBase.s.sol";
 
 import { MinterGateway } from "../../src/core/MinterGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
-import { PYUSDXExtensionFactory } from "../../src/platform/PYUSDXExtensionFactory.sol";
+import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 
 import { BaseForkTest } from "./BaseForkTest.sol";
@@ -32,7 +32,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
     PYUSDX public pyusdx;
     MinterGateway public minterGateway;
     SwapFacility public swapFacility;
-    PYUSDXExtensionFactory public factory;
+    ExtensionFactory public factory;
 
     DeployBase.CoreDeployments internal _coreDeployments;
 
@@ -66,7 +66,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
         pyusdx = PYUSDX(deployments_.pyusdxProxy);
         minterGateway = MinterGateway(deployments_.minterGatewayProxy);
         swapFacility = SwapFacility(deployments_.swapFacilityProxy);
-        factory = PYUSDXExtensionFactory(deployments_.factoryProxy);
+        factory = ExtensionFactory(deployments_.factoryProxy);
         _coreDeployments = deployments_;
     }
 

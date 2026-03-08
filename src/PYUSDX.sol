@@ -12,7 +12,7 @@ import { AccessControlUpgradeable } from "../lib/evm-m-extensions/lib/common/lib
 
 import { IERC20 } from "../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
+import { IPYUSDX } from "./IPYUSDX.sol";
 
 /// @notice ERC-7201 namespaced storage layout for PYUSDX.
 abstract contract PYUSDXStorageLayout {

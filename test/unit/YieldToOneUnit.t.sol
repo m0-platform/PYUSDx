@@ -8,12 +8,12 @@ import { PYUSDX } from "../../src/PYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
-import { YieldToOne } from "../../src/platform/YieldToOne.sol";
-import { IYieldToOne } from "../../src/platform/interfaces/IYieldToOne.sol";
+import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
+import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
-import { IPYUSDXExtension } from "../../src/platform/interfaces/IPYUSDXExtension.sol";
+import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 
 contract YieldToOneUnitTests is Test {
     MinterGatewayMock public minterGateway;
@@ -126,7 +126,7 @@ contract YieldToOneUnitTests is Test {
 
     function test_wrap_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.wrap(alice, MINT_AMOUNT);
     }
 
@@ -147,7 +147,7 @@ contract YieldToOneUnitTests is Test {
 
     function test_unwrap_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.unwrap(MINT_AMOUNT);
     }
 

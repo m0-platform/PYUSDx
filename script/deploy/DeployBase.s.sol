@@ -10,7 +10,7 @@ import { Upgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-up
 
 import { MinterGateway } from "../../src/core/MinterGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
-import { PYUSDXExtensionFactory } from "../../src/platform/PYUSDXExtensionFactory.sol";
+import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 
 import { ScriptBase } from "../ScriptBase.s.sol";
@@ -108,12 +108,12 @@ contract DeployBase is DeployHelpers, ScriptBase {
         FactoryConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
         // NOTE: SwapFacility must already be deployed since constructor calls ISwapFacility(swapFacility).pyusdx()
-        implementation = address(new PYUSDXExtensionFactory(pyusdxProxy, swapFacilityProxy));
+        implementation = address(new ExtensionFactory(pyusdxProxy, swapFacilityProxy));
 
         proxy = _deployCreate3TransparentProxy(
             implementation,
             config.admin,
-            abi.encodeWithSelector(PYUSDXExtensionFactory.initialize.selector, config.admin, config.factoryManager),
+            abi.encodeWithSelector(ExtensionFactory.initialize.selector, config.admin, config.factoryManager),
             _computeSalt(deployer, "PYUSDXExtensionFactory")
         );
 

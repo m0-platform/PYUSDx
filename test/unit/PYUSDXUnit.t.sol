@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IForcedTransferable } from "../../lib/evm-m-extensions/src/components/forcedTransferable/IForcedTransferable.sol";
-import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { UIntMath } from "../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";

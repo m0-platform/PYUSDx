@@ -4,11 +4,11 @@ pragma solidity ^0.8.26;
 
 import { ERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IPYUSDXExtension } from "../../src/platform/interfaces/IPYUSDXExtension.sol";
+import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 
 /**
  * @title  Mock PYUSDX Extension
- * @notice Mock implementation of IPYUSDXExtension for testing
+ * @notice Mock implementation of IExtension for testing
  */
 contract MockPYUSDXExtension is ERC20 {
     /* ============ Immutable Storage ============ */
@@ -32,8 +32,8 @@ contract MockPYUSDXExtension is ERC20 {
      * @param swapFacility_ The address of the swap facility contract.
      */
     constructor(address pyusdx_, address swapFacility_) ERC20("Mock PYUSDX Extension", "mockEXT") {
-        if (pyusdx_ == address(0)) revert IPYUSDXExtension.ZeroPYUSDX();
-        if (swapFacility_ == address(0)) revert IPYUSDXExtension.ZeroSwapFacility();
+        if (pyusdx_ == address(0)) revert IExtension.ZeroPYUSDX();
+        if (swapFacility_ == address(0)) revert IExtension.ZeroSwapFacility();
         pyusdx = pyusdx_;
         swapFacility = swapFacility_;
     }
@@ -55,7 +55,7 @@ contract MockPYUSDXExtension is ERC20 {
      * @param  amount    The amount of extension tokens to mint.
      */
     function wrap(address recipient, uint256 amount) external {
-        if (msg.sender != swapFacility) revert IPYUSDXExtension.NotSwapFacility();
+        if (msg.sender != swapFacility) revert IExtension.NotSwapFacility();
         // Transfer PYUSDX from swapFacility to this contract
         IERC20(pyusdx).transferFrom(swapFacility, address(this), amount);
         // Mint extension tokens to recipient
@@ -68,7 +68,7 @@ contract MockPYUSDXExtension is ERC20 {
      * @param  amount The amount of extension tokens to burn.
      */
     function unwrap(uint256 amount) external {
-        if (msg.sender != swapFacility) revert IPYUSDXExtension.NotSwapFacility();
+        if (msg.sender != swapFacility) revert IExtension.NotSwapFacility();
         // Burn extension tokens from caller
         _burn(msg.sender, amount);
         // Transfer PYUSDX to swapFacility
