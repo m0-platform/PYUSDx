@@ -18,8 +18,6 @@ abstract contract MinterGatewayStorageLayout {
 
     struct MintProposal {
         uint40 createdAt; // ──╮ Timestamp when the proposal was created, good for 100+ years.
-        // uint32 mintDelay; //   │ Delay in seconds before the mint can be executed.
-        // uint32 mintTTL; // ────╯ Time to live in seconds for the proposal.
         address minter; //       Address that proposed the mint.
         address recipient; //    Address that will receive the minted tokens.
         uint256 amount; //       Amount of PYUSDX to mint.

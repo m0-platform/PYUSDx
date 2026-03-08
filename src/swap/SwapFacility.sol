@@ -7,13 +7,13 @@ import { SafeERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppeli
 import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 import { Pausable } from "../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
 
+import { ReentrancyLock } from "./ReentrancyLock.sol";
+
 import { IMultiMint } from "../platform/projects/interfaces/IMultiMint.sol";
 import { IExtension } from "../platform/interfaces/IExtension.sol";
 import { IExtensionFactory } from "../platform/interfaces/IExtensionFactory.sol";
 
 import { ISwapFacility } from "./interfaces/ISwapFacility.sol";
-
-import { ReentrancyLock } from "./ReentrancyLock.sol";
 
 /**
  * @title  Swap Facility
