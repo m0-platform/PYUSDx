@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import { IMinterGateway } from "./interfaces/IMinterGateway.sol";
 import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
+
 import { AccessControlUpgradeable } from "../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 /// @notice ERC-7201 namespaced storage layout for MinterGateway.
@@ -17,8 +18,8 @@ abstract contract MinterGatewayStorageLayout {
 
     struct MintProposal {
         uint40 createdAt; // ──╮ Timestamp when the proposal was created, good for 100+ years.
-        uint32 mintDelay; //   │ Delay in seconds before the mint can be executed.
-        uint32 mintTTL; // ────╯ Time to live in seconds for the proposal.
+        // uint32 mintDelay; //   │ Delay in seconds before the mint can be executed.
+        // uint32 mintTTL; // ────╯ Time to live in seconds for the proposal.
         address minter; //       Address that proposed the mint.
         address recipient; //    Address that will receive the minted tokens.
         uint256 amount; //       Amount of PYUSDX to mint.
@@ -42,7 +43,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
     /* ============ Constants ============ */
 
     /// @inheritdoc IMinterGateway
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
 
     /* ============ Immutable Variables ============ */
 
@@ -54,8 +55,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
     /// @notice Constructs the MinterGateway implementation contract.
     /// @param pyusdx_ The PYUSDX token contract address.
     constructor(address pyusdx_) {
-        if (pyusdx_ == address(0)) revert ZeroPYUSDXToken();
-        pyusdx = pyusdx_;
+        if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDXToken();
 
         _disableInitializers();
     }
@@ -70,7 +70,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
         __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(MINTER_ROLE, minter);
+        _grantRole(ISSUER_ROLE, minter);
 
         _setMintDelay(mintDelay_);
         _setMintTTL(mintTTL_);
@@ -79,7 +79,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
     /* ============ Interactive Functions ============ */
 
     /// @inheritdoc IMinterGateway
-    function proposeMint(uint256 amount, address recipient) external onlyRole(MINTER_ROLE) returns (uint48 mintId) {
+    function proposeMint(uint256 amount, address recipient) external onlyRole(ISSUER_ROLE) returns (uint48 mintId) {
         if (amount == 0) revert ZeroMintAmount();
         if (recipient == address(0)) revert ZeroMintRecipient();
 
@@ -92,8 +92,6 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
         $.mintProposals[mintId] = MintProposal({
             createdAt: createdAt,
-            mintDelay: $.mintDelay,
-            mintTTL: $.mintTTL,
             minter: msg.sender,
             recipient: recipient,
             amount: amount
@@ -109,10 +107,10 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
         if (proposal.createdAt == 0) revert InvalidMintProposal();
 
-        uint40 activeAt = proposal.createdAt + proposal.mintDelay;
+        uint40 activeAt = proposal.createdAt + $.mintDelay;
         if (block.timestamp < activeAt) revert PendingMintProposal(activeAt);
 
-        uint40 expiresAt = activeAt + proposal.mintTTL;
+        uint40 expiresAt = activeAt + $.mintTTL;
         if (block.timestamp > expiresAt) revert ExpiredMintProposal(expiresAt);
 
         address recipient = proposal.recipient;
@@ -126,7 +124,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
     }
 
     /// @inheritdoc IMinterGateway
-    function burn(uint256 amount) external onlyRole(MINTER_ROLE) {
+    function burn(uint256 amount) external onlyRole(ISSUER_ROLE) {
         if (amount == 0) revert ZeroBurnAmount();
 
         IPYUSDX(pyusdx).burn(msg.sender, amount);
@@ -142,7 +140,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
         if (proposal.createdAt == 0) revert InvalidMintProposal();
         if (proposal.minter != msg.sender) revert NotMintProposalCreator();
 
-        uint40 activeAt = proposal.createdAt + proposal.mintDelay;
+        uint40 activeAt = proposal.createdAt + $.mintDelay;
         if (block.timestamp >= activeAt) revert ActiveMintProposal(activeAt);
 
         delete $.mintProposals[mintId];
@@ -193,6 +191,9 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
     /// @param mintDelay_ The mint delay in seconds
     function _setMintDelay(uint32 mintDelay_) internal {
         MinterGatewayStorageStruct storage $ = _getMinterGatewayStorageLocation();
+
+        if ($.mintDelay == mintDelay_) return;
+
         $.mintDelay = mintDelay_;
         emit MintDelaySet(mintDelay_);
     }
@@ -203,6 +204,9 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
         if (mintTTL_ == 0) revert ZeroMintTTL();
 
         MinterGatewayStorageStruct storage $ = _getMinterGatewayStorageLocation();
+
+        if ($.mintTTL == mintTTL_) return;
+
         $.mintTTL = mintTTL_;
         emit MintTTLSet(mintTTL_);
     }

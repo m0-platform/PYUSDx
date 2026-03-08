@@ -10,6 +10,8 @@ import { ContinuousIndexingMath } from "../lib/evm-m-extensions/lib/common/src/l
 import { IndexingMath } from "../lib/evm-m-extensions/lib/common/src/libs/IndexingMath.sol";
 import { AccessControlUpgradeable } from "../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
+import { IERC20 } from "../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+
 import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
 
 /// @notice ERC-7201 namespaced storage layout for PYUSDX.
@@ -27,7 +29,7 @@ abstract contract PYUSDXStorageLayout {
     struct Account {
         // Slot 0: 256/256
         uint256 balance;
-        // Slot 1: 208/256 — isEarning + index math (single SLOAD)
+        // Slot 1: 200/256 — isEarning + index math (single SLOAD)
         uint128 lastIndex;
         uint40 lastUpdateTimestamp;
         uint32 earnerRate;
@@ -67,7 +69,7 @@ contract PYUSDX is
     uint16 public constant ONE_HUNDRED_PERCENT = 10_000;
 
     /// @notice Precision scaling for index calculations (1e12).
-    uint56 internal constant EXP_SCALED_ONE = 1e12;
+    uint128 public constant EXP_SCALED_ONE = 1e12;
 
     /// @notice The role that can issue PYUSDX tokens.
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
@@ -247,6 +249,16 @@ contract PYUSDX is
         return _getPYUSDXStorageLocation().earnerManager;
     }
 
+    /// @inheritdoc IERC20
+    function totalSupply() public view returns (uint256) {
+        return _getPYUSDXStorageLocation().totalSupply;
+    }
+
+    /// @inheritdoc IERC20
+    function balanceOf(address account) public view override returns (uint256) {
+        return _getPYUSDXStorageLocation().accounts[account].balance;
+    }
+
     /// @inheritdoc IPYUSDX
     function accruedYieldAndFeeOf(
         address account
@@ -284,19 +296,17 @@ contract PYUSDX is
         }
     }
 
-    /// @notice Returns the balance of an account.
-    function balanceOf(address account) public view override returns (uint256) {
-        return _getPYUSDXStorageLocation().accounts[account].balance;
-    }
-
-    /// @notice Returns the total supply.
-    function totalSupply() public view returns (uint256) {
-        return _getPYUSDXStorageLocation().totalSupply;
-    }
-
     /// @inheritdoc IPYUSDX
     function isEarning(address account) public view returns (bool) {
         return _getPYUSDXStorageLocation().accounts[account].earnerRate > 0;
+    }
+
+    /// @inheritdoc IPYUSDX
+    function getAccountEarningInfo(
+        address account
+    ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient) {
+        Account memory accountInfo = _getPYUSDXStorageLocation().accounts[account];
+        return (accountInfo.earnerRate, accountInfo.feeRate, claimRecipientFor(account));
     }
 
     /// @inheritdoc IPYUSDX
@@ -340,14 +350,6 @@ contract PYUSDX is
         }
     }
 
-    /// @inheritdoc IPYUSDX
-    function getAccountEarningInfo(
-        address account
-    ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient) {
-        Account memory accountInfo = _getPYUSDXStorageLocation().accounts[account];
-        return (accountInfo.earnerRate, accountInfo.feeRate, claimRecipientFor(account));
-    }
-
     /* ============ Hooks For Internal Interactive Functions ============ */
 
     /**
@@ -355,7 +357,7 @@ contract PYUSDX is
      * @param account   The account to be frozen.
      */
     function _beforeFreeze(address account) internal override {
-        _claimFor(account); // claim accrued yield before freezing
+        _claimFor(account); 
 
         _stopEarningFor(account);
 
@@ -382,6 +384,7 @@ contract PYUSDX is
     }
 
     /// @dev Internal implementation for setting earning details.
+    // TODO: limits on earner rate?
     function _setAccountInfo(address account, uint32 earnerRate, uint16 feeRate, address claimRecipient) internal {
         _revertIfZeroAccount(account);
         if (feeRate > ONE_HUNDRED_PERCENT) revert FeeRateTooHigh(feeRate);
@@ -390,58 +393,50 @@ contract PYUSDX is
         if (earnerRate == 0 && (feeRate != 0 || claimRecipient != address(0))) revert InvalidAccountInfo();
 
         bool wasEarning = isEarning(account);
-        bool willEarn = earnerRate > 0;
+        bool willBeEarning = earnerRate > 0;
 
         // No change for a non-earner, no-op action.
-        if (!wasEarning && !willEarn) return;
+        if (!wasEarning && !willBeEarning) return;
 
         Account storage accountInfo = _getPYUSDXStorageLocation().accounts[account];
 
         // No change for an earner, no-op action. Happens rarely, consider removing.
         if (
             wasEarning &&
-            willEarn &&
+            willBeEarning &&
             earnerRate == accountInfo.earnerRate &&
             feeRate == accountInfo.feeRate &&
             claimRecipient == accountInfo.claimRecipient
         ) return;
 
+
+        // Update account info.
+        emit AccountInfoUpdated(account, earnerRate, feeRate, claimRecipient);
+
+        // Claim accrued yield for earners before changing their earning status & configuration.
+        _claimFor(account);
+
         // Option 1: Disable earning for an earner, resetting all earning-related fields to 0, address(0).
-        if (wasEarning && !willEarn) {
-            _claimFor(account);
+        if (wasEarning && !willBeEarning) {
             _stopEarningFor(account);
 
             return;
         }
 
-        // Option 2: Enable earning for a non-earner.
-        if (!wasEarning && willEarn) {
-            accountInfo.lastIndex = EXP_SCALED_ONE;
-            accountInfo.lastUpdateTimestamp = uint40(block.timestamp);
-
-            accountInfo.earningPrincipal = _getPrincipalAmountRoundedDown(accountInfo.balance, EXP_SCALED_ONE);
-            accountInfo.earnerRate = earnerRate;
-            accountInfo.feeRate = feeRate;
-            accountInfo.claimRecipient = claimRecipient;
-
-            emit StartedEarning(account);
-
-            return;
-        }
-
-        // Option 3: Update earning details for an earner, claiming any accrued yield first.
-        emit AccountInfoUpdated(account, earnerRate, feeRate, claimRecipient);
-
-        // Claim accrued yield for earners before changing their configuration or disable earning.
-        _claimFor(account);
-
-        if (accountInfo.earnerRate != earnerRate) {
-            _updateIndexOf(account);
-            accountInfo.earnerRate = earnerRate;
-        }
-
+        // Update index for the account before potentially changing its earner rate.
+        _updateIndexOf(account);
+        accountInfo.earnerRate = earnerRate;
         accountInfo.feeRate = feeRate;
         accountInfo.claimRecipient = claimRecipient;
+
+        // Enable earning for a non-earner.
+        if (!wasEarning && willBeEarning) {
+            accountInfo.lastIndex = EXP_SCALED_ONE;
+            accountInfo.lastUpdateTimestamp = uint40(block.timestamp);
+            accountInfo.earningPrincipal = _getPrincipalAmountRoundedDown(accountInfo.balance, EXP_SCALED_ONE);
+
+            emit StartedEarning(account);
+        }
     }
 
     /// @dev Snapshots the account's current index into storage. Returns the new index value.
@@ -469,8 +464,8 @@ contract PYUSDX is
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 
         // No change in principal, only the balance is updated to include the newly claimed yield.
-        $.accounts[account].balance += yieldWithFee;
         $.totalSupply += yieldWithFee;
+        $.accounts[account].balance += yieldWithFee;
 
         address claimRecipient = claimRecipientFor(account);
 

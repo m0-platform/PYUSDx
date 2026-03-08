@@ -91,9 +91,9 @@ interface IMinterGateway {
 
     /* ============ Constants ============ */
 
-    /// @notice Returns the role identifier for minter role
+    /// @notice Returns the role identifier for issuer role
     /// @return The bytes32 role identifier
-    function MINTER_ROLE() external view returns (bytes32);
+    function ISSUER_ROLE() external view returns (bytes32);
 
     /* ============ Initializer ============ */
 

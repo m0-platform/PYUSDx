@@ -37,7 +37,7 @@ contract DeployIntegrationTests is IntegrationForkTest {
 
     function test_coreDeployment_minterGatewayRoles() public view {
         assertTrue(minterGateway.hasRole(minterGateway.DEFAULT_ADMIN_ROLE(), admin));
-        assertTrue(minterGateway.hasRole(minterGateway.MINTER_ROLE(), minter));
+        assertTrue(minterGateway.hasRole(minterGateway.ISSUER_ROLE(), minter));
     }
 
     function test_coreDeployment_swapFacilityRoles() public view {
