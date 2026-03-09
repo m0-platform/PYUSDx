@@ -20,12 +20,8 @@ contract PYUSDXIntegrationTests is IntegrationForkTest {
 
         // Warp and verify yield accrued
         vm.warp(block.timestamp + 365 days);
-        uint256 accruedYield = pyusdx.accruedYieldOf(alice);
-        assertGt(accruedYield, 0);
-
-        // Claim — verify fee to earnerManager, net yield to bob, alice balance unchanged
-        uint256 expectedFee = (accruedYield * 1000) / 10_000;
-        uint256 expectedNetYield = accruedYield - expectedFee;
+        (uint256 yieldWithFee, uint256 expectedFee, uint256 expectedNetYield) = pyusdx.accruedYieldAndFeeOf(alice);
+        assertGt(yieldWithFee, 0);
 
         uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
         uint256 bobBalanceBefore = pyusdx.balanceOf(bob);

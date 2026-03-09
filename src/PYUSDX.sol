@@ -99,6 +99,7 @@ contract PYUSDX is
     /// @param freezeManager The freeze manager address with FREEZE_MANAGER_ROLE.
     /// @param forcedTransferManager The forced transfer manager address with FORCED_TRANSFER_MANAGER_ROLE.
     /// @param earnerManager_ The earner manager address.
+    /// @param issuer The issuer address with ISSUER_ROLE (e.g. MinterGateway proxy).
     function initialize(
         string calldata name,
         string calldata symbol,
@@ -106,9 +107,11 @@ contract PYUSDX is
         address pauser,
         address freezeManager,
         address forcedTransferManager,
-        address earnerManager_
+        address earnerManager_,
+        address issuer
     ) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
+        if (issuer == address(0)) revert ZeroIssuer();
 
         __ERC20ExtendedUpgradeable_init(name, symbol, 6);
         __ForcedTransferable_init(forcedTransferManager);
@@ -118,6 +121,7 @@ contract PYUSDX is
         _setEarnerManager(earnerManager_);
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(ISSUER_ROLE, issuer);
     }
 
     /* ============ Interactive Functions ============ */

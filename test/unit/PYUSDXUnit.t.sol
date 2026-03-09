@@ -40,7 +40,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
             pauser,
             freezeManager,
             forcedTransferManager,
-            earnerManager
+            earnerManager,
+            address(minterGateway)
         );
     }
 
@@ -57,7 +58,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
             pauser,
             freezeManager,
             forcedTransferManager,
-            address(0)
+            address(0),
+            address(minterGateway)
         );
     }
 
@@ -71,7 +73,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
             pauser,
             freezeManager,
             forcedTransferManager,
-            earnerManager
+            earnerManager,
+            address(minterGateway)
         );
     }
 

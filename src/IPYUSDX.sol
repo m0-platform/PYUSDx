@@ -59,6 +59,9 @@ interface IPYUSDX {
     /// @notice Thrown when the admin address is zero.
     error ZeroAdmin();
 
+    /// @notice Thrown when the issuer address is zero.
+    error ZeroIssuer();
+
     /// @notice Thrown when the earner manager address is zero.
     error ZeroEarnerManager();
 

@@ -36,16 +36,13 @@ abstract contract PYUSDXBaseUnitTest is BaseTest {
                     pauser,
                     freezeManager,
                     forcedTransferManager,
-                    earnerManager
+                    earnerManager,
+                    address(minterGateway)
                 )
             )
         );
 
         minterGateway.setPyusdx(address(pyusdx));
-
-        bytes32 issuerRole = pyusdx.ISSUER_ROLE();
-        vm.prank(admin);
-        pyusdx.grantRole(issuerRole, address(minterGateway));
     }
 
     /* ============ Indexing Math Helpers ============ */

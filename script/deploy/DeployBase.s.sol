@@ -52,7 +52,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
                 config.freezeManager,
                 config.forcedTransferManager,
                 config.earnerManager,
-                config.rateManager
+                minterGatewayProxy
             ),
             _computeSalt(deployer, "PYUSDX")
         );
