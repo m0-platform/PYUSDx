@@ -41,12 +41,7 @@ abstract contract ExtensionFactoryStorageLayout {
 /// @notice A factory contract for deploying and registering PYUSDX extensions (YieldToOne, MultiMint).
 ///         Serves as the single source of truth for extension approval in the SwapFacility.
 /// @author M0 Labs
-contract ExtensionFactory is
-    IExtensionFactory,
-    Initializable,
-    AccessControlUpgradeable,
-    ExtensionFactoryStorageLayout
-{
+contract ExtensionFactory is IExtensionFactory, Initializable, AccessControlUpgradeable, ExtensionFactoryStorageLayout {
     /* ============ Variables ============ */
 
     /// @inheritdoc IExtensionFactory
@@ -216,10 +211,8 @@ contract ExtensionFactory is
             revert InvalidExtensionType();
         }
 
-        if (
-            IExtension(implementation).pyusdx() != pyusdx ||
-            IExtension(implementation).swapFacility() != swapFacility
-        ) revert InvalidImplementation();
+        if (IExtension(implementation).pyusdx() != pyusdx || IExtension(implementation).swapFacility() != swapFacility)
+            revert InvalidImplementation();
 
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
 

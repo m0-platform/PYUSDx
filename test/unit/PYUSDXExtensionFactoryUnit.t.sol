@@ -3,7 +3,10 @@ pragma solidity ^0.8.26;
 
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import { UnsafeUpgrades, Upgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import {
+    UnsafeUpgrades,
+    Upgrades
+} from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";

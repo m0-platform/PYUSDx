@@ -149,13 +149,13 @@ contract PYUSDX is
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 
-        $.totalSupply -= amount;
-
         if (isEarning(account)) {
             _subtractEarningAmount($, account, amount);
         } else {
             _subtractNonEarningAmount($, account, amount);
         }
+
+        $.totalSupply -= amount;
 
         emit Transfer(account, address(0), amount);
     }
@@ -357,7 +357,7 @@ contract PYUSDX is
      * @param account   The account to be frozen.
      */
     function _beforeFreeze(address account) internal override {
-        _claimFor(account); 
+        _claimFor(account);
 
         _stopEarningFor(account);
 
@@ -408,7 +408,6 @@ contract PYUSDX is
             feeRate == accountInfo.feeRate &&
             claimRecipient == accountInfo.claimRecipient
         ) return;
-
 
         // Update account info.
         emit AccountInfoUpdated(account, earnerRate, feeRate, claimRecipient);

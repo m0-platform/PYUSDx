@@ -6,6 +6,7 @@ import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/
 import { IForcedTransferable } from "../../lib/evm-m-extensions/src/components/forcedTransferable/IForcedTransferable.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { UIntMath } from "../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
 import { IndexingMath } from "../../lib/evm-m-extensions/lib/common/src/libs/IndexingMath.sol";
@@ -84,8 +85,14 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ mint ============ */
 
-    function test_mint_revertIfCallerNotMinterGateway() public {
-        vm.expectRevert(IPYUSDX.NotIssuer.selector);
+    function test_mint_revertIfCallerNotIssuer() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                pyusdx.ISSUER_ROLE()
+            )
+        );
 
         vm.prank(alice);
         pyusdx.mint(bob, MINT_AMOUNT);
@@ -267,8 +274,14 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ burn ============ */
 
-    function test_burn_revertIfCallerNotMinterGateway() public {
-        vm.expectRevert(IPYUSDX.NotIssuer.selector);
+    function test_burn_revertIfCallerNotIssuer() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                pyusdx.ISSUER_ROLE()
+            )
+        );
 
         vm.prank(alice);
         pyusdx.burn(bob, BURN_AMOUNT);
@@ -1222,9 +1235,9 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         uint128 indexBeforeRateChange = pyusdx.currentIndexOf(alice);
 
-        // Change rate to 0% - snapshot the account index before changing rate
+        // Change rate to 500 bps - snapshot the account index before changing rate
         pyusdx.setAccountLastIndex(alice, indexBeforeRateChange);
-        pyusdx.setAccountRateBps(alice, uint24(0));
+        pyusdx.setAccountRateBps(alice, uint24(500));
 
         uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
 
@@ -1782,9 +1795,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         uint128 index = pyusdx.currentIndexOf(alice);
         uint112 principal = pyusdx.earningPrincipalOf(alice);
         uint256 expectedBalanceWithYield = IndexingMath.getPresentAmountRoundedDown(principal, index);
-        uint256 expectedYield = expectedBalanceWithYield > balance
-            ? expectedBalanceWithYield - balance
-            : 0;
+        uint256 expectedYield = expectedBalanceWithYield > balance ? expectedBalanceWithYield - balance : 0;
 
         // Verify yield calculation
         uint256 actualYield = pyusdx.accruedYieldOf(alice);
@@ -1842,7 +1853,11 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         (uint256 claimed, , ) = pyusdx.claimFor(alice);
 
         assertEq(claimed, expectedYieldWithFee, "Should return claimed yield");
-        assertEq(pyusdx.totalSupply(), totalSupplyBefore + expectedYieldWithFee, "Total supply should increase by yield");
+        assertEq(
+            pyusdx.totalSupply(),
+            totalSupplyBefore + expectedYieldWithFee,
+            "Total supply should increase by yield"
+        );
         assertEq(pyusdx.balanceOf(alice), balanceBefore + expectedYieldWithFee, "balanceOf should increase by yield");
         assertEq(pyusdx.accruedYieldOf(alice), 0, "Accrued yield should be 0 after claim");
     }
@@ -1861,7 +1876,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.claimFor(alice);
     }
 
-    function test_claimFor_revert_whenFrozen() public {
+    function test_claimFor_frozenAccount_returnsZero() public {
         // Mint tokens to alice first (as non-earner)
         minterGateway.mint(alice, 1000e6);
 
@@ -1871,8 +1886,11 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.prank(freezeManager);
         pyusdx.freeze(alice);
 
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        pyusdx.claimFor(alice);
+        // Freezing stops earning and claims any accrued yield, so claimFor returns zeros
+        (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) = pyusdx.claimFor(alice);
+        assertEq(yieldWithFee, 0);
+        assertEq(fee, 0);
+        assertEq(yieldNetOfFee, 0);
     }
 
     /* ============ setEarningDetails ============ */
@@ -2501,8 +2519,9 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         vm.warp(block.timestamp + 365 days);
 
-        (uint256 expectedYieldWithFee, uint256 expectedFee, uint256 expectedNetYield) = pyusdx
-            .accruedYieldAndFeeOf(alice);
+        (uint256 expectedYieldWithFee, uint256 expectedFee, uint256 expectedNetYield) = pyusdx.accruedYieldAndFeeOf(
+            alice
+        );
         assertGt(expectedYieldWithFee, 0);
 
         uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);

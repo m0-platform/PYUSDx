@@ -14,6 +14,7 @@ import { Extension } from "../Extension.sol";
 abstract contract YieldToOneStorageLayout {
     /// @custom:storage-location erc7201:PYUSDX.storage.YieldToOne
     struct YieldToOneStorageStruct {
+        uint256 totalSupply;
         address yieldRecipient;
         mapping(address account => uint256 balance) balanceOf;
     }
@@ -118,11 +119,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     function claimYield() public virtual returns (uint256) {
         _beforeClaimYield();
 
-        uint256 totalSupplyBefore_ = totalSupply();
-
-        IPYUSDX(pyusdx).claimFor(address(this));
-
-        uint256 yield_ = totalSupply() - totalSupplyBefore_;
+        (, , uint256 yield_) = IPYUSDX(pyusdx).claimFor(address(this));
 
         if (yield_ == 0) return 0;
 
@@ -150,7 +147,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
 
     /// @inheritdoc IERC20
     function totalSupply() public view virtual returns (uint256) {
-        return _pyusdxBalanceOf(address(this));
+        return _getYieldToOneStorage().totalSupply;
     }
 
     /// @inheritdoc IYieldToOne
@@ -224,8 +221,11 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
      * @param amount    The amount of tokens to mint.
      */
     function _mint(address recipient, uint256 amount) internal override {
+        YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
+
         unchecked {
-            _getYieldToOneStorage().balanceOf[recipient] += amount;
+            $.totalSupply += amount;
+            $.balanceOf[recipient] += amount;
         }
 
         emit Transfer(address(0), recipient, amount);
@@ -237,8 +237,11 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
      * @param amount  The amount of tokens to burn.
      */
     function _burn(address account, uint256 amount) internal override {
+        YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
+
         unchecked {
-            _getYieldToOneStorage().balanceOf[account] -= amount;
+            $.totalSupply -= amount;
+            $.balanceOf[account] -= amount;
         }
 
         emit Transfer(account, address(0), amount);

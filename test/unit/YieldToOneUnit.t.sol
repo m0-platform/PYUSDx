@@ -56,6 +56,10 @@ contract YieldToOneUnitTests is Test {
         );
         minterGateway.setPyusdx(address(pyusdx));
 
+        bytes32 issuerRole = pyusdx.ISSUER_ROLE();
+        vm.prank(admin);
+        pyusdx.grantRole(issuerRole, address(minterGateway));
+
         swapFacility = new MockSwapFacility(address(pyusdx));
 
         address extensionImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
@@ -244,7 +248,7 @@ contract YieldToOneUnitTests is Test {
 
         vm.warp(block.timestamp + 365 days);
 
-        uint256 grossYield = pyusdx.accruedYieldOf(address(extension));
+        (uint256 grossYield, , ) = pyusdx.accruedYieldAndFeeOf(address(extension));
 
         extension.claimYield();
 

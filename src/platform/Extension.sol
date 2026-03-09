@@ -75,7 +75,7 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
 
     /// @inheritdoc IERC20
     function balanceOf(address account) public view virtual returns (uint256);
-    
+
     /* ============ Hooks For Internal Interactive Functions ============ */
 
     /**
@@ -131,6 +131,7 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
     function _wrap(address account, address recipient, uint256 amount) internal {
         _revertIfZeroAccount(recipient);
         _revertIfZeroAmount(amount);
+
         _beforeWrap(account, recipient, amount);
 
         IERC20(pyusdx).transferFrom(msg.sender, address(this), amount);
@@ -145,8 +146,9 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
      */
     function _unwrap(address account, uint256 amount) internal {
         _revertIfZeroAmount(amount);
-        _beforeUnwrap(account, amount);
         _revertIfInsufficientBalance(msg.sender, amount);
+
+        _beforeUnwrap(account, amount);
 
         _burn(msg.sender, amount);
 

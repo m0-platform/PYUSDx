@@ -61,6 +61,10 @@ contract MultiMintTest is Test {
         );
         minterGateway.setPyusdx(address(pyusdx));
 
+        bytes32 issuerRole = pyusdx.ISSUER_ROLE();
+        vm.prank(admin);
+        pyusdx.grantRole(issuerRole, address(minterGateway));
+
         swapFacility = new MockSwapFacility(address(pyusdx));
 
         address extensionImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));

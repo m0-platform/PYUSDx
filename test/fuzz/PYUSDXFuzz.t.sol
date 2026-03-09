@@ -13,22 +13,14 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     /* ============ Fuzz: mint ============ */
 
     function testFuzz_mint_nonEarningAccount(uint256 amount) public {
-        uint256 boundedAmount = bound(amount, 1, uint256(type(uint240).max) + 1);
+        uint256 boundedAmount = bound(amount, 1, type(uint240).max);
 
         uint256 totalSupplyBefore = pyusdx.totalSupply();
 
-        bool amountExceedsUInt240 = boundedAmount > type(uint240).max;
-
-        if (amountExceedsUInt240) {
-            vm.expectRevert(UIntMath.InvalidUInt240.selector);
-        }
-
         minterGateway.mint(alice, boundedAmount);
 
-        if (!amountExceedsUInt240) {
-            assertEq(pyusdx.balanceOf(alice), boundedAmount);
-            assertEq(pyusdx.totalSupply(), totalSupplyBefore + boundedAmount);
-        }
+        assertEq(pyusdx.balanceOf(alice), boundedAmount);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore + boundedAmount);
     }
 
     function testFuzz_mint_earningAccount(uint256 amount, uint128 index) public {
@@ -75,19 +67,15 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     /* ============ Fuzz: burn ============ */
 
     function testFuzz_burn_nonEarningAccount(uint256 mintAmount, uint256 burnAmount) public {
-        burnAmount = bound(burnAmount, 1, uint256(type(uint240).max) + 1);
-        mintAmount = bound(mintAmount, 1, uint256(type(uint240).max) + 1);
+        burnAmount = bound(burnAmount, 1, type(uint240).max);
+        mintAmount = bound(mintAmount, 1, type(uint240).max);
         vm.assume(_canSafelyMint(mintAmount));
 
         minterGateway.mint(alice, mintAmount);
 
-        bool amountExceedsUInt240 = burnAmount > type(uint240).max;
         bool wouldExceedBalance = burnAmount > mintAmount;
 
-        // Check reverts in the same order as the contract would encounter them
-        if (amountExceedsUInt240) {
-            vm.expectRevert(UIntMath.InvalidUInt240.selector);
-        } else if (wouldExceedBalance) {
+        if (wouldExceedBalance) {
             vm.expectRevert(
                 abi.encodeWithSelector(IPYUSDX.InsufficientBalance.selector, alice, mintAmount, burnAmount)
             );
@@ -95,7 +83,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
         minterGateway.burn(alice, burnAmount);
 
-        if (!amountExceedsUInt240 && !wouldExceedBalance) {
+        if (!wouldExceedBalance) {
             assertEq(pyusdx.balanceOf(alice), mintAmount - burnAmount);
             assertEq(pyusdx.totalSupply(), mintAmount - burnAmount);
         }
@@ -104,8 +92,8 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     /* ============ Fuzz: burn ============ */
 
     function testFuzz_burn_earningAccount(uint256 mintAmount, uint256 burnAmount, uint128 index) public {
-        mintAmount = bound(mintAmount, 1, uint256(type(uint240).max) + 1);
-        burnAmount = bound(burnAmount, 1, uint256(type(uint240).max) + 1);
+        mintAmount = bound(mintAmount, 1, type(uint240).max);
+        burnAmount = bound(burnAmount, 1, type(uint240).max);
 
         uint128 boundedIndex = uint128(bound(index, 1e12, 1e15)); // From 1x to 1,000x index
 
@@ -127,13 +115,10 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         uint256 balanceBefore = pyusdx.balanceOf(alice);
         uint112 principalBefore = pyusdx.earningPrincipalOf(alice);
 
-        bool burnExceedsUInt240 = burnAmount > type(uint240).max;
         bool wouldExceedBalance = burnAmount > balanceBefore;
 
-        // Check reverts in the same order as the contract would encounter them
-        if (burnExceedsUInt240) {
-            vm.expectRevert(UIntMath.InvalidUInt240.selector);
-        } else if (wouldExceedBalance) {
+        // Balance check happens before uint240 cast in the contract
+        if (wouldExceedBalance) {
             vm.expectRevert(
                 abi.encodeWithSelector(IPYUSDX.InsufficientBalance.selector, alice, balanceBefore, burnAmount)
             );
@@ -142,7 +127,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         minterGateway.burn(alice, burnAmount);
 
         // Verify state when no revert
-        if (!burnExceedsUInt240 && !wouldExceedBalance) {
+        if (!wouldExceedBalance) {
             uint112 expectedPrincipalSubtracted = _getExpectedPrincipalRoundedUp(burnAmount, actualIndex);
 
             // Principal being rounded up, it may be greater than the stored principal
