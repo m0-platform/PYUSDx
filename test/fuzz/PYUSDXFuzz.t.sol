@@ -69,8 +69,6 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     function testFuzz_burn_nonEarningAccount(uint256 mintAmount, uint256 burnAmount) public {
         burnAmount = bound(burnAmount, 1, type(uint240).max);
         mintAmount = bound(mintAmount, 1, type(uint240).max);
-        vm.assume(_canSafelyMint(mintAmount));
-
         minterGateway.mint(alice, mintAmount);
 
         bool wouldExceedBalance = burnAmount > mintAmount;
@@ -99,8 +97,6 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
-
-        vm.assume(_canSafelyMint(mintAmount));
 
         pyusdx.setAccountLastIndex(alice, boundedIndex);
 
@@ -146,8 +142,6 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         uint256 boundedAmount = bound(amount, 1, uint256(type(uint240).max) + 1);
         uint128 boundedIndex = uint128(bound(index, 1e12, 1e15)); // From 1x to 1,000x index
         uint8 boundedPath = uint8(bound(path, 0, 7)); // 8 path variations
-
-        vm.assume(_canSafelyMint(boundedAmount * 2)); // Need for both alice and bob
 
         // Skip if principal would overflow uint112 for earning accounts
         vm.assume(boundedAmount <= type(uint256).max / 1e12);
@@ -376,12 +370,5 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
                 assertEq(pyusdx.balanceOf(bob), boundedAmount);
             }
         }
-    }
-
-    /* ============ Helper Functions ============ */
-
-    /// @dev Check if minting amount would overflow totalSupply (uint240)
-    function _canSafelyMint(uint256 amount) internal view returns (bool) {
-        return pyusdx.totalSupply() + amount <= type(uint240).max;
     }
 }
