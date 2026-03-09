@@ -128,21 +128,12 @@ contract PYUSDX is
 
     /// @inheritdoc IPYUSDX
     function mint(address account, uint256 amount) external onlyRole(ISSUER_ROLE) whenNotPaused {
-        _revertIfZeroAccount(account);
-        _revertIfFrozen(account);
-        _revertIfZeroAmount(amount);
+        _mint(account, amount);
+    }
 
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-
-        $.totalSupply += amount;
-
-        if (isEarning(account)) {
-            _addEarningAmount($, account, amount);
-        } else {
-            _addNonEarningAmount($, account, amount);
-        }
-
-        emit Transfer(address(0), account, amount);
+    /// @inheritdoc IPYUSDX
+    function distributeReward(address account, uint256 amount) external onlyEarnerManager whenNotPaused {
+        _mint(account, amount);
     }
 
     /// @inheritdoc IPYUSDX
@@ -219,26 +210,6 @@ contract PYUSDX is
         for (uint256 i; i < accounts.length; ++i) {
             _setAccountInfo(accounts[i], earnerRates[i], feeRates[i], claimRecipients[i]);
         }
-    }
-
-    /// @inheritdoc IPYUSDX
-    function distributeReward(address account, uint256 amount) external onlyEarnerManager whenNotPaused {
-        _revertIfZeroAccount(account);
-        _revertIfFrozen(account);
-        _revertIfZeroAmount(amount);
-
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
-
-        $.totalSupply += amount;
-
-        // Add to recipient
-        if (isEarning(account)) {
-            _addEarningAmount($, account, amount);
-        } else {
-            _addNonEarningAmount($, account, amount);
-        }
-
-        emit Transfer(address(0), account, amount);
     }
 
     /// @inheritdoc IPYUSDX
@@ -368,7 +339,7 @@ contract PYUSDX is
         super._beforeFreeze(account);
     }
 
-    /* ============ Internal Functions ============ */
+    /* ============ Internal Interactive Functions ============ */
 
     /**
      * @dev Sets the earner manager.
@@ -486,8 +457,6 @@ contract PYUSDX is
 
         _transfer(account, feeRecipient, fee);
     }
-
-    /* ============ Internal Interactive Functions ============ */
 
     /// @dev   Stops earning for an account, claiming any accrued yield first.
     /// @param account The account to stop earning for.
@@ -626,6 +595,27 @@ contract PYUSDX is
         } else {
             _addNonEarningAmount($, recipient, amount);
         }
+    }
+
+    /// @dev   Internal mint implementation to create new tokens.
+    /// @param account The account to mint to.
+    /// @param amount  The amount to mint.
+    function _mint(address account, uint256 amount) internal virtual {
+        _revertIfZeroAccount(account);
+        _revertIfFrozen(account);
+        _revertIfZeroAmount(amount);
+
+        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+
+        $.totalSupply += amount;
+
+        if (isEarning(account)) {
+            _addEarningAmount($, account, amount);
+        } else {
+            _addNonEarningAmount($, account, amount);
+        }
+
+        emit Transfer(address(0), account, amount);
     }
 
     /* ============ Internal View/Pure Functions ============ */
