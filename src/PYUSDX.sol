@@ -483,17 +483,7 @@ contract PYUSDX is
         _transfer(account, feeRecipient, fee);
     }
 
-    /* ============ Internal View/Pure Functions ============ */
-
-    /// @dev Reverts if amount is zero.
-    function _revertIfZeroAmount(uint256 amount) internal pure {
-        if (amount == 0) revert ZeroAmount();
-    }
-
-    /// @dev Reverts if account is zero address.
-    function _revertIfZeroAccount(address account) internal pure {
-        if (account == address(0)) revert ZeroAccount();
-    }
+    /* ============ Internal Interactive Functions ============ */
 
     /// @dev   Stops earning for an account, claiming any accrued yield first.
     /// @param account The account to stop earning for.
@@ -649,5 +639,15 @@ contract PYUSDX is
     /// @dev Returns the principal amount (rounded up) given the present amount and an index.
     function _getPrincipalAmountRoundedUp(uint256 presentAmount, uint128 index) internal pure returns (uint112) {
         return IndexingMath.getPrincipalAmountRoundedUp(uint240(presentAmount), index);
+    }
+
+    /// @dev Reverts if amount is zero.
+    function _revertIfZeroAmount(uint256 amount) internal pure {
+        if (amount == 0) revert ZeroAmount();
+    }
+
+    /// @dev Reverts if account is zero address.
+    function _revertIfZeroAccount(address account) internal pure {
+        if (account == address(0)) revert ZeroAccount();
     }
 }
