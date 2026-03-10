@@ -319,7 +319,7 @@ contract PYUSDX is
         }
     }
 
-    /* ============ Hooks For Internal Interactive Functions ============ */
+    /* ============ Internal Hooks ============ */
 
     /**
      * @dev   Hook called before freezing an account.
