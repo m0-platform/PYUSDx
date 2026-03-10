@@ -118,17 +118,19 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     function claimYield() public virtual returns (uint256) {
         _beforeClaimYield();
 
-        uint256 yield_ = yield();
-
-        if (yield_ == 0) return 0;
-
+        // Realize any pending PYUSDX yield.
         IPYUSDX(pyusdx).claimFor(address(this));
 
-        emit YieldClaimed(yield_);
+        // Mint extension tokens for ALL excess PYUSDX — covers both
+        // normal claims and direct claimFor bypass.
+        uint256 excess_ = _pyusdxBalanceOf(address(this)) - totalSupply();
 
-        _mint(yieldRecipient(), yield_);
+        if (excess_ == 0) return 0;
 
-        return yield_;
+        emit YieldClaimed(excess_);
+        _mint(yieldRecipient(), excess_);
+
+        return excess_;
     }
 
     /// @inheritdoc IYieldToOne
@@ -153,7 +155,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
 
     /// @inheritdoc IYieldToOne
     function yield() public view virtual returns (uint256) {
-        return IPYUSDX(pyusdx).accruedYieldToSelfOf(address(this));
+        uint256 excess_ = _pyusdxBalanceOf(address(this)) - totalSupply();
+        return excess_ + IPYUSDX(pyusdx).accruedYieldToSelfOf(address(this));
     }
 
     /// @inheritdoc IYieldToOne

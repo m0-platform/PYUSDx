@@ -293,15 +293,44 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Yield View ============ */
 
-    function test_yield_resetToZeroAfterClaim() public {
+    function test_yield_includesExcessAfterDirectClaimFor() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
-        assertGt(extension.yield(), 0);
+        uint256 yieldBefore = extension.yield();
+        assertGt(yieldBefore, 0);
 
+        // Direct claimFor bypass — yield lands in extension but no tokens minted.
         pyusdx.claimFor(address(extension));
 
+        // yield() should still show the excess (realized but unminted).
+        uint256 yieldAfter = extension.yield();
+        assertGt(yieldAfter, 0);
+        assertEq(yieldAfter, pyusdx.balanceOf(address(extension)) - extension.totalSupply());
+
+        // claimYield should recover the excess.
+        uint256 claimed = extension.claimYield();
+        assertEq(claimed, yieldAfter);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
         assertEq(extension.yield(), 0);
+    }
+
+    function test_yield_includesRandomPyusdxTransfer() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        // Someone sends PYUSDX directly to the extension.
+        uint256 gift = 100e6;
+        minterGateway.mint(bob, gift);
+        vm.prank(bob);
+        IERC20(address(pyusdx)).transfer(address(extension), gift);
+
+        // yield() should reflect the excess.
+        assertGe(extension.yield(), gift);
+
+        // claimYield recovers it.
+        uint256 claimed = extension.claimYield();
+        assertGe(claimed, gift);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 
     /* ============ Freeze via SwapFacility ============ */
