@@ -201,11 +201,6 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         return amount != 0 && assetBalanceOf(asset) >= amount;
     }
 
-    /// @inheritdoc IERC20
-    function totalSupply() public view override returns (uint256) {
-        return _pyusdxBalanceOf(address(this)) + totalAssets();
-    }
-
     /* ============ Hooks ============ */
 
     /**
@@ -316,6 +311,16 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     }
 
     /* ============ Internal View Functions ============ */
+
+    /// @dev Returns the excess PYUSDX balance that is not backing extension tokens.
+    function _excess() internal view virtual override returns (uint256) {
+        uint256 pyusdxBalance = _pyusdxBalanceOf(address(this));
+        uint256 totalAssets_ = totalAssets();
+        uint256 totalSupply_ = totalSupply();
+        uint256 pyusdxBackedSupply = totalSupply_ > totalAssets_ ? totalSupply_ - totalAssets_ : 0;
+
+        return pyusdxBalance > pyusdxBackedSupply ? pyusdxBalance - pyusdxBackedSupply : 0;
+    }
 
     /// @dev Returns the current supply of PYUSDX backing the extension token.
     function _pyusdxBacking() internal view returns (uint256) {

@@ -118,17 +118,20 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     function claimYield() public virtual returns (uint256) {
         _beforeClaimYield();
 
-        uint256 yield_ = yield();
-
-        if (yield_ == 0) return 0;
-
+        // NOTE: Realize any pending PYUSDX yield
         IPYUSDX(pyusdx).claimFor(address(this));
 
-        emit YieldClaimed(yield_);
+        // NOTE: Excess accounts for the newly claimed yield and any prior unclaimed yield.
+        uint256 excess = _excess();
 
-        _mint(yieldRecipient(), yield_);
+        if (excess == 0) return 0;
 
-        return yield_;
+        emit YieldClaimed(excess);
+
+        // NOTE: mint the excess PYUSDX as extension tokens
+        _mint(yieldRecipient(), excess);
+
+        return excess;
     }
 
     /// @inheritdoc IYieldToOne
@@ -153,7 +156,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
 
     /// @inheritdoc IYieldToOne
     function yield() public view virtual returns (uint256) {
-        return IPYUSDX(pyusdx).accruedYieldToSelfOf(address(this));
+        return _excess() + IPYUSDX(pyusdx).accruedYieldToSelfOf(address(this));
     }
 
     /// @inheritdoc IYieldToOne
@@ -211,7 +214,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     /// @dev   Hook called before claiming yield.
     function _beforeClaimYield() internal view virtual {}
 
-    /* ============ Internal Functions ============ */
+    /* ============ Internal Interactive Functions ============ */
 
     /**
      * @dev   Mints `amount` extension tokens to `recipient`.
@@ -274,5 +277,15 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         $.yieldRecipient = yieldRecipient_;
 
         emit YieldRecipientSet(yieldRecipient_);
+    }
+
+    /* ============ Internal View Functions ============ */
+
+    /// @dev Returns the excess PYUSDX balance of the extension
+    function _excess() internal view virtual returns (uint256) {
+        uint256 pyusdxBalance = _pyusdxBalanceOf(address(this));
+        uint256 totalSupply_ = totalSupply();
+
+        return pyusdxBalance > totalSupply_ ? pyusdxBalance - totalSupply_ : 0;
     }
 }
