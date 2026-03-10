@@ -12,6 +12,7 @@ abstract contract BaseTest is Test {
     address public freezeManager = makeAddr("freezeManager");
     address public forcedTransferManager = makeAddr("forcedTransferManager");
     address public earnerManager = makeAddr("earnerManager");
+    address public rateLimitManager = makeAddr("rateLimitManager");
     address public rateManager = makeAddr("rateManager");
     address public yieldRecipient = makeAddr("yieldRecipient");
     address public yieldRecipientManager = makeAddr("yieldRecipientManager");

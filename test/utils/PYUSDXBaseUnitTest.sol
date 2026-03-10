@@ -5,6 +5,7 @@ import { IndexingMath } from "../../lib/evm-m-extensions/lib/common/src/libs/Ind
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { PYUSDX } from "../../src/PYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 import { BaseTest } from "./BaseTest.sol";
@@ -28,16 +29,21 @@ abstract contract PYUSDXBaseUnitTest is BaseTest {
             UnsafeUpgrades.deployTransparentProxy(
                 implementation,
                 admin,
-                abi.encodeWithSelector(
-                    PYUSDX.initialize.selector,
-                    "PayPal USD Yield",
-                    "PYUSDX",
-                    admin,
-                    pauser,
-                    freezeManager,
-                    forcedTransferManager,
-                    earnerManager,
-                    address(minterGateway)
+                abi.encodeCall(
+                    PYUSDX.initialize,
+                    (
+                        IPYUSDX.InitializeParams({
+                            name: "PayPal USD Yield",
+                            symbol: "PYUSDX",
+                            admin: admin,
+                            pauser: pauser,
+                            freezeManager: freezeManager,
+                            forcedTransferManager: forcedTransferManager,
+                            earnerManager: earnerManager,
+                            rateLimitManager: rateLimitManager,
+                            issuer: address(minterGateway)
+                        })
+                    )
                 )
             )
         );

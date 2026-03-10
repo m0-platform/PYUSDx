@@ -10,6 +10,7 @@ import { Upgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-up
 
 import { MinterGateway } from "../../src/core/MinterGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 
@@ -43,16 +44,21 @@ contract DeployBase is DeployHelpers, ScriptBase {
         proxy = _deployCreate3TransparentProxy(
             implementation,
             config.admin,
-            abi.encodeWithSelector(
-                PYUSDX.initialize.selector,
-                config.name,
-                config.symbol,
-                config.admin,
-                config.pauser,
-                config.freezeManager,
-                config.forcedTransferManager,
-                config.earnerManager,
-                minterGatewayProxy
+            abi.encodeCall(
+                PYUSDX.initialize,
+                (
+                    IPYUSDX.InitializeParams({
+                        name: config.name,
+                        symbol: config.symbol,
+                        admin: config.admin,
+                        pauser: config.pauser,
+                        freezeManager: config.freezeManager,
+                        forcedTransferManager: config.forcedTransferManager,
+                        earnerManager: config.earnerManager,
+                        rateLimitManager: config.rateManager,
+                        issuer: minterGatewayProxy
+                    })
+                )
             ),
             _computeSalt(deployer, "PYUSDX")
         );

@@ -12,6 +12,8 @@ import { AccessControlUpgradeable } from "../lib/evm-m-extensions/lib/common/lib
 
 import { IERC20 } from "../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
+import { RateLimiter } from "./abstract/RateLimiter.sol";
+
 import { IPYUSDX } from "./IPYUSDX.sol";
 
 /// @notice ERC-7201 namespaced storage layout for PYUSDX.
@@ -56,8 +58,8 @@ abstract contract PYUSDXStorageLayout {
 /// @notice PYUSDX upgradeable ERC20 non-rebasing token with claimable yield.
 contract PYUSDX is
     IPYUSDX,
+    RateLimiter,
     PYUSDXStorageLayout,
-    AccessControlUpgradeable,
     ERC20ExtendedUpgradeable,
     Freezable,
     ForcedTransferable,
@@ -92,36 +94,21 @@ contract PYUSDX is
     /* ============ Initializer ============ */
 
     /// @notice Initializes the PYUSDX contract.
-    /// @param name The token name.
-    /// @param symbol The token symbol.
-    /// @param admin The admin address with DEFAULT_ADMIN_ROLE.
-    /// @param pauser The pauser address with PAUSER_ROLE.
-    /// @param freezeManager The freeze manager address with FREEZE_MANAGER_ROLE.
-    /// @param forcedTransferManager The forced transfer manager address with FORCED_TRANSFER_MANAGER_ROLE.
-    /// @param earnerManager_ The earner manager address.
-    /// @param issuer The issuer address with ISSUER_ROLE (e.g. MinterGateway proxy).
-    function initialize(
-        string calldata name,
-        string calldata symbol,
-        address admin,
-        address pauser,
-        address freezeManager,
-        address forcedTransferManager,
-        address earnerManager_,
-        address issuer
-    ) external initializer {
-        if (admin == address(0)) revert ZeroAdmin();
-        if (issuer == address(0)) revert ZeroIssuer();
+    /// @param params The initialization parameters.
+    function initialize(InitializeParams calldata params) external initializer {
+        if (params.admin == address(0)) revert ZeroAdmin();
+        if (params.issuer == address(0)) revert ZeroIssuer();
 
-        __ERC20ExtendedUpgradeable_init(name, symbol, 6);
-        __ForcedTransferable_init(forcedTransferManager);
-        __Freezable_init(freezeManager);
-        __Pausable_init(pauser);
+        __ERC20ExtendedUpgradeable_init(params.name, params.symbol, 6);
+        __ForcedTransferable_init(params.forcedTransferManager);
+        __Freezable_init(params.freezeManager);
+        __Pausable_init(params.pauser);
+        __RateLimiter_init(params.rateLimitManager);
 
-        _setEarnerManager(earnerManager_);
+        _setEarnerManager(params.earnerManager);
 
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(ISSUER_ROLE, issuer);
+        _grantRole(DEFAULT_ADMIN_ROLE, params.admin);
+        _grantRole(ISSUER_ROLE, params.issuer);
     }
 
     /* ============ Interactive Functions ============ */
@@ -611,6 +598,7 @@ contract PYUSDX is
         _revertIfZeroAccount(account);
         _revertIfFrozen(account);
         _revertIfZeroAmount(amount);
+        _enforceRateLimit(msg.sender, amount);
 
         PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
 

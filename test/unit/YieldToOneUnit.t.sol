@@ -5,6 +5,7 @@ import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { PYUSDX } from "../../src/PYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
@@ -42,16 +43,21 @@ contract YieldToOneUnitTests is Test {
             UnsafeUpgrades.deployTransparentProxy(
                 pyusdxImplementation,
                 admin,
-                abi.encodeWithSelector(
-                    PYUSDX.initialize.selector,
-                    "PayPal USD Yield",
-                    "PYUSDX",
-                    admin,
-                    pauser,
-                    freezeManager,
-                    address(1),
-                    earnerManager,
-                    address(minterGateway)
+                abi.encodeCall(
+                    PYUSDX.initialize,
+                    (
+                        IPYUSDX.InitializeParams({
+                            name: "PayPal USD Yield",
+                            symbol: "PYUSDX",
+                            admin: admin,
+                            pauser: pauser,
+                            freezeManager: freezeManager,
+                            forcedTransferManager: address(1),
+                            earnerManager: earnerManager,
+                            rateLimitManager: rateManager,
+                            issuer: address(minterGateway)
+                        })
+                    )
                 )
             )
         );

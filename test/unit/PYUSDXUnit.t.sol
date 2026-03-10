@@ -14,6 +14,8 @@ import { VmSafe } from "../../lib/evm-m-extensions/lib/forge-std/src/Vm.sol";
 
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
+import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
+
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
@@ -25,6 +27,27 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     uint256 public constant BURN_AMOUNT = 50e6; // 50 PYUSDX (6 decimals)
     uint256 public constant TRANSFER_AMOUNT = 30e6; // 30 PYUSDX (6 decimals)
 
+    /* ============ constructor ============ */
+
+    function test_constructor() public {
+        PYUSDXHarness newPyusdx = new PYUSDXHarness();
+        // Constructor disables initializers, so cannot initialize the implementation directly
+        vm.expectRevert();
+        newPyusdx.initialize(
+            IPYUSDX.InitializeParams({
+                name: "PayPal USD Yield",
+                symbol: "PYUSDX",
+                admin: admin,
+                pauser: pauser,
+                freezeManager: freezeManager,
+                forcedTransferManager: forcedTransferManager,
+                earnerManager: earnerManager,
+                rateLimitManager: rateLimitManager,
+                issuer: address(minterGateway)
+            })
+        );
+    }
+
     /* ============ initialize ============ */
 
     function test_initialize_revertIfZeroAdmin() public {
@@ -34,14 +57,17 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.expectRevert(IPYUSDX.ZeroAdmin.selector);
 
         newPyusdx.initialize(
-            "PayPal USD Yield",
-            "PYUSDX",
-            address(0),
-            pauser,
-            freezeManager,
-            forcedTransferManager,
-            earnerManager,
-            address(minterGateway)
+            IPYUSDX.InitializeParams({
+                name: "PayPal USD Yield",
+                symbol: "PYUSDX",
+                admin: address(0),
+                pauser: pauser,
+                freezeManager: freezeManager,
+                forcedTransferManager: forcedTransferManager,
+                earnerManager: earnerManager,
+                rateLimitManager: rateLimitManager,
+                issuer: address(minterGateway)
+            })
         );
     }
 
@@ -52,14 +78,17 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.expectRevert(IPYUSDX.ZeroEarnerManager.selector);
 
         newPyusdx.initialize(
-            "PayPal USD Yield",
-            "PYUSDX",
-            admin,
-            pauser,
-            freezeManager,
-            forcedTransferManager,
-            address(0),
-            address(minterGateway)
+            IPYUSDX.InitializeParams({
+                name: "PayPal USD Yield",
+                symbol: "PYUSDX",
+                admin: admin,
+                pauser: pauser,
+                freezeManager: freezeManager,
+                forcedTransferManager: forcedTransferManager,
+                earnerManager: address(0),
+                rateLimitManager: rateLimitManager,
+                issuer: address(minterGateway)
+            })
         );
     }
 
@@ -67,14 +96,17 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.expectRevert();
 
         pyusdx.initialize(
-            "PayPal USD Yield",
-            "PYUSDX",
-            admin,
-            pauser,
-            freezeManager,
-            forcedTransferManager,
-            earnerManager,
-            address(minterGateway)
+            IPYUSDX.InitializeParams({
+                name: "PayPal USD Yield",
+                symbol: "PYUSDX",
+                admin: admin,
+                pauser: pauser,
+                freezeManager: freezeManager,
+                forcedTransferManager: forcedTransferManager,
+                earnerManager: earnerManager,
+                rateLimitManager: rateLimitManager,
+                issuer: address(minterGateway)
+            })
         );
     }
 
@@ -273,6 +305,46 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         assertEq(pyusdx.balanceOf(alice), balanceBefore + MINT_AMOUNT);
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
+    }
+
+    /* ============ Rate Limit ============ */
+
+    function test_setRateLimit_revertIfNotManager() public {
+        vm.expectRevert();
+        pyusdx.setRateLimit(address(minterGateway), 100e6, 10e6, true);
+    }
+
+    function test_setRateLimit() public {
+        vm.prank(rateLimitManager);
+        pyusdx.setRateLimit(address(minterGateway), 100e6, 10e6, true);
+
+        (uint256 capacity, uint256 refillPerSecond) = pyusdx.getRateLimitConfig(address(minterGateway));
+
+        assertEq(capacity, 100e6);
+        assertEq(refillPerSecond, 10e6);
+        assertEq(pyusdx.getRemainingAmount(address(minterGateway)), 100e6);
+    }
+
+    function test_mint_consumesRateLimit() public {
+        vm.prank(rateLimitManager);
+        pyusdx.setRateLimit(address(minterGateway), 100e6, 0, true);
+
+        minterGateway.mint(alice, 30e6);
+        assertEq(pyusdx.getRemainingAmount(address(minterGateway)), 70e6);
+
+        // minterGateway.mint(bob, 20e6);
+        // assertEq(pyusdx.getRemainingAmount(address(minterGateway)), 50e6);
+    }
+
+    function test_mint_revertIfRateLimitExceeded() public {
+        vm.prank(rateLimitManager);
+        pyusdx.setRateLimit(address(minterGateway), 100e6, 0, true);
+
+        minterGateway.mint(alice, 60e6);
+        assertEq(pyusdx.getRemainingAmount(address(minterGateway)), 40e6);
+
+        vm.expectRevert(abi.encodeWithSelector(IRateLimiter.RateLimitExceeded.selector, 50e6, 40e6));
+        minterGateway.mint(bob, 50e6);
     }
 
     /* ============ burn ============ */

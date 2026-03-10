@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
-import { console } from "../../lib/forge-std/src/console.sol";
+
 import { UIntMath } from "../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
+
+import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
 
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
@@ -62,6 +64,79 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipal);
             assertEq(pyusdx.totalSupply(), totalSupplyBefore + boundedAmount);
         }
+    }
+
+    function testFuzz_rateLimit_refillStaysWithinCapacity(
+        uint256 capacity,
+        uint256 bucketRemaining,
+        uint256 mintAmount,
+        uint256 refillPerSecond,
+        uint40 currentTime,
+        uint40 timeSinceLastRefill,
+        uint40 elapsedAfterMint
+    ) public {
+        uint256 boundedCapacity = bound(capacity, 1, type(uint256).max);
+        uint256 boundedBucketRemaining = bound(bucketRemaining, 0, boundedCapacity);
+        uint256 boundedMintAmount = bound(mintAmount, 0, type(uint256).max);
+        uint256 boundedRefillPerSecond = bound(refillPerSecond, 1, type(uint256).max);
+
+        // Bound currentTime to reasonable range, then constrain other time values
+        uint40 boundedCurrentTime = uint40(bound(currentTime, 1, type(uint40).max));
+        uint40 boundedTimeSinceLastRefill = uint40(bound(timeSinceLastRefill, 0, boundedCurrentTime - 1));
+        uint40 boundedElapsedAfterMint = uint40(bound(elapsedAfterMint, 0, type(uint40).max - boundedCurrentTime));
+
+        vm.warp(boundedCurrentTime);
+
+        pyusdx.setRateLimitState(
+            address(minterGateway),
+            boundedCapacity,
+            boundedRefillPerSecond,
+            boundedBucketRemaining,
+            boundedCurrentTime - boundedTimeSinceLastRefill
+        );
+
+        // Calculate available amount after refill (caps at capacity)
+        uint256 available = pyusdx.getRemainingAmount(address(minterGateway));
+
+        bool isZeroAmount = boundedMintAmount == 0;
+        bool exceedsRateLimit = boundedMintAmount > available;
+
+        if (isZeroAmount) {
+            vm.expectRevert(IPYUSDX.ZeroAmount.selector);
+        } else if (exceedsRateLimit) {
+            vm.expectRevert(
+                abi.encodeWithSelector(IRateLimiter.RateLimitExceeded.selector, boundedMintAmount, available)
+            );
+        }
+
+        minterGateway.mint(alice, boundedMintAmount);
+
+        // Only test refill behavior if mint succeeded
+        if (!exceedsRateLimit && !isZeroAmount) {
+            vm.warp(block.timestamp + boundedElapsedAfterMint);
+
+            uint256 availableAfterMint = pyusdx.getRemainingAmount(address(minterGateway));
+
+            assertLe(availableAfterMint, boundedCapacity);
+        }
+    }
+
+    function testFuzz_rateLimit_zeroRefillConsumesCapacity(uint256 capacity, uint256 amount, uint40 elapsed) public {
+        uint256 boundedCapacity = bound(capacity, 1, type(uint256).max);
+        uint256 boundedAmount = bound(amount, 1, boundedCapacity);
+        uint40 boundedElapsed = uint40(bound(elapsed, 1, type(uint40).max));
+
+        vm.prank(rateLimitManager);
+        pyusdx.setRateLimit(address(minterGateway), boundedCapacity, 0, true);
+
+        assertEq(pyusdx.getRemainingAmount(address(minterGateway)), boundedCapacity);
+
+        minterGateway.mint(alice, boundedAmount);
+        assertEq(pyusdx.getRemainingAmount(address(minterGateway)), boundedCapacity - boundedAmount);
+
+        // Time passes but no refill (zero refillPerSecond)
+        vm.warp(block.timestamp + boundedElapsed);
+        assertEq(pyusdx.getRemainingAmount(address(minterGateway)), boundedCapacity - boundedAmount);
     }
 
     /* ============ Fuzz: burn ============ */
