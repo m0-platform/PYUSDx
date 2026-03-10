@@ -118,18 +118,20 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     function claimYield() public virtual returns (uint256) {
         _beforeClaimYield();
 
-        // Realize any pending PYUSDX yield.
+        // NOTE: Realize any pending PYUSDX yield
         IPYUSDX(pyusdx).claimFor(address(this));
 
-        // Mint extension tokens for all excess PYUSDX.
-        uint256 excess_ = _pyusdxBalanceOf(address(this)) - _pyusdxBackedSupply();
+        // NOTE: Excess accounts for the newly claimed yield and any prior unclaimed yield.
+        uint256 excess = _excess();
 
-        if (excess_ == 0) return 0;
+        if (excess == 0) return 0;
 
-        emit YieldClaimed(excess_);
-        _mint(yieldRecipient(), excess_);
+        emit YieldClaimed(excess);
 
-        return excess_;
+        // NOTE: mint the excess PYUSDX as extension tokens
+        _mint(yieldRecipient(), excess);
+
+        return excess;
     }
 
     /// @inheritdoc IYieldToOne
@@ -138,13 +140,6 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         claimYield();
 
         _setYieldRecipient(account);
-    }
-
-    /* ============ Internal View Functions ============ */
-
-    /// @dev Returns the portion of totalSupply backed by PYUSDX. Override in multi-collateral extensions.
-    function _pyusdxBackedSupply() internal view virtual returns (uint256) {
-        return totalSupply();
     }
 
     /* ============ View/Pure Functions ============ */
@@ -161,8 +156,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
 
     /// @inheritdoc IYieldToOne
     function yield() public view virtual returns (uint256) {
-        uint256 excess_ = _pyusdxBalanceOf(address(this)) - _pyusdxBackedSupply();
-        return excess_ + IPYUSDX(pyusdx).accruedYieldToSelfOf(address(this));
+        return _excess() + IPYUSDX(pyusdx).accruedYieldToSelfOf(address(this));
     }
 
     /// @inheritdoc IYieldToOne
@@ -220,7 +214,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     /// @dev   Hook called before claiming yield.
     function _beforeClaimYield() internal view virtual {}
 
-    /* ============ Internal Functions ============ */
+    /* ============ Internal Interactive Functions ============ */
 
     /**
      * @dev   Mints `amount` extension tokens to `recipient`.
@@ -283,5 +277,15 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         $.yieldRecipient = yieldRecipient_;
 
         emit YieldRecipientSet(yieldRecipient_);
+    }
+
+    /* ============ Internal View Functions ============ */
+
+    /// @dev Returns the excess PYUSDX balance of the extension
+    function _excess() internal view virtual returns (uint256) {
+        uint256 pyusdxBalance = _pyusdxBalanceOf(address(this));
+        uint256 totalSupply_ = totalSupply();
+
+        return pyusdxBalance > totalSupply_ ? pyusdxBalance - totalSupply_ : 0;
     }
 }

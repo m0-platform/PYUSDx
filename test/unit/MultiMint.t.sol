@@ -485,7 +485,7 @@ contract MultiMintTest is Test {
 
         // Direct claimFor bypass.
         pyusdx.claimFor(address(extension));
-        uint256 excess = pyusdx.balanceOf(address(extension)) + extension.totalAssets() - extension.totalSupply();
+        uint256 excess = pyusdx.balanceOf(address(extension)) - (extension.totalSupply() - extension.totalAssets());
         assertGt(excess, 0);
 
         // claimYield recovers the excess.
