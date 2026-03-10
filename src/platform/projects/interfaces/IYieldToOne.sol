@@ -32,9 +32,6 @@ interface IYieldToOne {
     /// @notice Emitted in initializer if Admin is 0x0.
     error ZeroAdmin();
 
-    /// @notice Emitted when the PYUSDX claimRecipient for this contract is not set to itself.
-    error InvalidClaimRecipient();
-
     /* ============ Interactive Functions ============ */
 
     /**

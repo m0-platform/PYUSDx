@@ -1806,6 +1806,45 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertGt(actualYield, 0, "Should have positive yield after time passes");
     }
 
+    /* ============ accruedYieldToSelfOf ============ */
+
+    function test_accruedYieldToSelfOf_nonEarner() public view {
+        assertEq(pyusdx.accruedYieldToSelfOf(alice), 0);
+    }
+
+    function test_accruedYieldToSelfOf_earnerNoRedirect() public {
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 0, address(0));
+
+        pyusdx.setAccountRateBps(alice, uint24(500));
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 yieldToSelf = pyusdx.accruedYieldToSelfOf(alice);
+        uint256 accruedYield = pyusdx.accruedYieldOf(alice);
+
+        assertEq(yieldToSelf, accruedYield, "Should equal accruedYieldOf when no redirect");
+        assertGt(yieldToSelf, 0, "Should have positive yield");
+    }
+
+    function test_accruedYieldToSelfOf_yieldRedirected() public {
+        uint256 balance = 1000e6;
+        minterGateway.mint(alice, balance);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 0, bob);
+
+        pyusdx.setAccountRateBps(alice, uint24(500));
+
+        vm.warp(block.timestamp + 365 days);
+
+        assertGt(pyusdx.accruedYieldOf(alice), 0, "Should have accrued yield");
+        assertEq(pyusdx.accruedYieldToSelfOf(alice), 0, "Should return 0 when yield is redirected");
+    }
+
     /* ============ balanceWithYieldOf ============ */
 
     function test_balanceWithYieldOf() public {

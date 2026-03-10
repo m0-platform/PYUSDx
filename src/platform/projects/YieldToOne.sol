@@ -101,7 +101,6 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     ) internal onlyInitializing {
         if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
         if (admin == address(0)) revert ZeroAdmin();
-        if (IPYUSDX(pyusdx).claimRecipientFor(address(this)) != address(this)) revert InvalidClaimRecipient();
 
         __Extension_init(name, symbol);
         __Freezable_init(freezeManager);
@@ -119,9 +118,11 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     function claimYield() public virtual returns (uint256) {
         _beforeClaimYield();
 
-        (, , uint256 yield_) = IPYUSDX(pyusdx).claimFor(address(this));
+        uint256 yield_ = yield();
 
         if (yield_ == 0) return 0;
+
+        IPYUSDX(pyusdx).claimFor(address(this));
 
         emit YieldClaimed(yield_);
 
@@ -152,7 +153,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
 
     /// @inheritdoc IYieldToOne
     function yield() public view virtual returns (uint256) {
-        return IPYUSDX(pyusdx).accruedYieldOf(address(this));
+        return IPYUSDX(pyusdx).accruedYieldToSelfOf(address(this));
     }
 
     /// @inheritdoc IYieldToOne
@@ -207,11 +208,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         _revertIfFrozen($, recipient);
     }
 
-    /// @dev   Hook called before claiming yield. Reverts if the PYUSDX claimRecipient is misconfigured.
-    ///        Inheriting contracts that override this function MUST call `super._beforeClaimYield()`.
-    function _beforeClaimYield() internal view virtual {
-        if (IPYUSDX(pyusdx).claimRecipientFor(address(this)) != address(this)) revert InvalidClaimRecipient();
-    }
+    /// @dev   Hook called before claiming yield.
+    function _beforeClaimYield() internal view virtual {}
 
     /* ============ Internal Functions ============ */
 

@@ -260,6 +260,13 @@ contract PYUSDX is
     }
 
     /// @inheritdoc IPYUSDX
+    function accruedYieldToSelfOf(address account) public view returns (uint256 yieldToSelf) {
+        if (account != claimRecipientFor(account)) return 0;
+
+        (, , yieldToSelf) = accruedYieldAndFeeOf(account);
+    }
+
+    /// @inheritdoc IPYUSDX
     function accruedFeeOf(address account) public view returns (uint256 fee) {
         (, fee, ) = accruedYieldAndFeeOf(account);
     }

@@ -233,6 +233,13 @@ interface IPYUSDX {
     function accruedYieldOf(address account) external view returns (uint256);
 
     /**
+     * @notice Returns the accrued yield that would be claimed by the account itself.
+     * @param  account The account to query.
+     * @return The accrued yield to self (0 if account not earning or yield is redirected).
+     */
+    function accruedYieldToSelfOf(address account) external view returns (uint256);
+
+    /**
      * @notice Returns the accrued fee for an account.
      * @param  account The account to query.
      * @return The accrued fee (0 if account not earning).

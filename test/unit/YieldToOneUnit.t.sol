@@ -255,6 +255,22 @@ contract YieldToOneUnitTests is Test {
         assertGt(pyusdx.balanceOf(earnerManager), 0);
     }
 
+    function test_claimYield_zeroWhenYieldRedirected() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        // Redirect yield away from the extension
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(address(extension), 500, 0, alice);
+
+        vm.warp(block.timestamp + 365 days);
+
+        assertGt(pyusdx.accruedYieldOf(address(extension)), 0);
+        assertEq(extension.yield(), 0);
+
+        uint256 claimed = extension.claimYield();
+        assertEq(claimed, 0);
+    }
+
     /* ============ SetYieldRecipient ============ */
 
     function test_setYieldRecipient() public {
