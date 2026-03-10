@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
-import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
-import { Test } from "../../lib/m-extensions/lib/forge-std/src/Test.sol";
+import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
+
 import { RateLimiterHarness } from "../harness/RateLimiterHarness.sol";
 
 contract RateLimiterTests is Test {
@@ -205,7 +206,9 @@ contract RateLimiterTests is Test {
 
     function test_getRemainingAmount_overflowCapsAtCapacity() public {
         // Set up bucket with values that would cause overflow
-        limiter.setBucketState(issuer, 100e6, type(uint256).max, 1, uint40(block.timestamp - 1));
+        limiter.setBucketState(issuer, 100e6, type(uint256).max, 1, uint40(block.timestamp));
+
+        vm.warp(block.timestamp + 1);
 
         // remaining + refillPerSecond * elapsed would overflow, should cap at capacity
         assertEq(limiter.getRemainingAmount(issuer), 100e6);

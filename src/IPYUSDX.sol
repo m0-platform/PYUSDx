@@ -54,6 +54,21 @@ interface IPYUSDX {
     /// @notice Emitted when a fee is claimed from an account's yield.
     event FeeClaimed(address indexed account, address indexed recipient, uint256 fee);
 
+    /* ============ Structs ============ */
+
+    /// @notice Parameters for initializing the PYUSDX contract.
+    struct InitializeParams {
+        string name;
+        string symbol;
+        address admin;
+        address pauser;
+        address freezeManager;
+        address forcedTransferManager;
+        address earnerManager;
+        address rateLimitManager;
+        address issuer;
+    }
+
     /* ============ Custom Errors ============ */
 
     /// @notice Thrown when the admin address is zero.
