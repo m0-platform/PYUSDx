@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { YieldToOne } from "../../src/YieldToOne.sol";
+import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
@@ -13,8 +13,7 @@ contract DeployIntegrationTests is IntegrationForkTest {
     /* ============ Cross-Reference Tests ============ */
 
     function test_coreDeployment_crossReferences() public view {
-        // PYUSDX ↔ MinterGateway
-        assertEq(pyusdx.minterGateway(), address(minterGateway));
+        // MinterGateway → PYUSDX
         assertEq(minterGateway.pyusdx(), address(pyusdx));
 
         // SwapFacility → PYUSDX, Factory
@@ -33,13 +32,12 @@ contract DeployIntegrationTests is IntegrationForkTest {
         assertTrue(pyusdx.hasRole(pyusdx.PAUSER_ROLE(), pauser));
         assertTrue(pyusdx.hasRole(pyusdx.FREEZE_MANAGER_ROLE(), freezeManager));
         assertTrue(pyusdx.hasRole(pyusdx.FORCED_TRANSFER_MANAGER_ROLE(), forcedTransferManager));
-        assertTrue(pyusdx.hasRole(pyusdx.EARNER_MANAGER_ROLE(), earnerManager));
-        assertTrue(pyusdx.hasRole(pyusdx.RATE_MANAGER_ROLE(), rateManager));
+        assertEq(pyusdx.earnerManager(), earnerManager);
     }
 
     function test_coreDeployment_minterGatewayRoles() public view {
         assertTrue(minterGateway.hasRole(minterGateway.DEFAULT_ADMIN_ROLE(), admin));
-        assertTrue(minterGateway.hasRole(minterGateway.MINTER_ROLE(), minter));
+        assertTrue(minterGateway.hasRole(minterGateway.ISSUER_ROLE(), minter));
     }
 
     function test_coreDeployment_swapFacilityRoles() public view {
@@ -105,7 +103,7 @@ contract DeployIntegrationTests is IntegrationForkTest {
 
         // Enable earning for the extension
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(address(yto), true, 0, yieldRecipient);
+        pyusdx.setAccountInfo(address(yto), 500, 0, yieldRecipient);
 
         // Mint PYUSDX
         _mintPYUSDX(alice, amount);

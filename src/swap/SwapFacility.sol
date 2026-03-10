@@ -2,18 +2,18 @@
 
 pragma solidity 0.8.26;
 
-import { IERC20 } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IERC20Extended } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
-import { Pausable } from "../../lib/m-extensions/src/components/pausable/Pausable.sol";
-
-import { IMultiMint } from "../interfaces/IMultiMint.sol";
-import { IPYUSDXExtension } from "../interfaces/IPYUSDXExtension.sol";
-import { IPYUSDXExtensionFactory } from "../deploy/interfaces/IPYUSDXExtensionFactory.sol";
-
-import { ISwapFacility } from "./interfaces/ISwapFacility.sol";
+import { IERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
+import { Pausable } from "../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
 
 import { ReentrancyLock } from "./ReentrancyLock.sol";
+
+import { IMultiMint } from "../platform/projects/interfaces/IMultiMint.sol";
+import { IExtension } from "../platform/interfaces/IExtension.sol";
+import { IExtensionFactory } from "../platform/interfaces/IExtensionFactory.sol";
+
+import { ISwapFacility } from "./interfaces/ISwapFacility.sol";
 
 /**
  * @title  Swap Facility
@@ -76,7 +76,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         bytes32 r,
         bytes32 s
     ) external isNotLocked {
-        try IPYUSDXExtension(tokenIn).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
+        try IExtension(tokenIn).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
         _swap(tokenIn, tokenOut, amount, recipient);
     }
 
@@ -89,7 +89,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         uint256 deadline,
         bytes calldata signature
     ) external isNotLocked {
-        try IPYUSDXExtension(tokenIn).permit(msg.sender, address(this), amount, deadline, signature) {} catch {}
+        try IExtension(tokenIn).permit(msg.sender, address(this), amount, deadline, signature) {} catch {}
         _swap(tokenIn, tokenOut, amount, recipient);
     }
 
@@ -148,7 +148,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
 
     /// @inheritdoc ISwapFacility
     function isApprovedExtension(address extension) public view returns (bool) {
-        return IPYUSDXExtensionFactory(extensionFactory).isApprovedExtension(extension);
+        return IExtensionFactory(extensionFactory).isApprovedExtension(extension);
     }
 
     /// @inheritdoc ISwapFacility
@@ -248,13 +248,13 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         uint256 pyusdxBalanceBefore = _pyusdxBalanceOf(address(this));
 
         IERC20(extensionIn).transferFrom(msg.sender, address(this), amount);
-        IPYUSDXExtension(extensionIn).unwrap(amount);
+        IExtension(extensionIn).unwrap(amount);
 
         // NOTE: Ensures that we wrap the equivalent amount of PYUSDX received from unwrapping.
         amount = _pyusdxBalanceOf(address(this)) - pyusdxBalanceBefore;
 
         IERC20(pyusdx).approve(extensionOut, amount);
-        IPYUSDXExtension(extensionOut).wrap(recipient, amount);
+        IExtension(extensionOut).wrap(recipient, amount);
 
         emit Swapped(extensionIn, extensionOut, amount, recipient);
     }
@@ -270,7 +270,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
 
         IERC20(pyusdx).transferFrom(msg.sender, address(this), amount);
         IERC20(pyusdx).approve(extensionOut, amount);
-        IPYUSDXExtension(extensionOut).wrap(recipient, amount);
+        IExtension(extensionOut).wrap(recipient, amount);
 
         emit SwappedIn(pyusdx, extensionOut, amount, recipient);
     }
@@ -326,7 +326,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         } else {
             // NOTE: Extension tokens - unwrap to get PYUSDX
             IERC20(tokenIn).transferFrom(msg.sender, address(this), amount);
-            IPYUSDXExtension(tokenIn).unwrap(amount);
+            IExtension(tokenIn).unwrap(amount);
         }
 
         // NOTE: Ensures that we replace asset by the equivalent amount of PYUSDX received.
@@ -352,7 +352,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         uint256 pyusdxBalanceBefore = _pyusdxBalanceOf(address(this));
 
         // NOTE: Amount and recipient validation is performed in Extensions.
-        IPYUSDXExtension(extensionIn).unwrap(amount);
+        IExtension(extensionIn).unwrap(amount);
 
         // NOTE: Ensures that we transfer to recipient the equivalent amount of PYUSDX received from unwrapping.
         amount = _pyusdxBalanceOf(address(this)) - pyusdxBalanceBefore;

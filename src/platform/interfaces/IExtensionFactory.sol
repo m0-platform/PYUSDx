@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 
 /// @title  PYUSDX Extension Factory interface.
 /// @author M0 Labs
-interface IPYUSDXExtensionFactory {
+interface IExtensionFactory {
     /* ============ Enums ============ */
 
     /// @notice The type of PYUSDX extension.

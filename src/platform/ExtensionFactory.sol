@@ -2,24 +2,24 @@
 
 pragma solidity 0.8.26;
 
-import { AccessControlUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
-import { Initializable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import { TransparentUpgradeableProxy } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import { TransparentUpgradeableProxy } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
+import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
 
-import { IPYUSDXExtension } from "../interfaces/IPYUSDXExtension.sol";
+import { IExtension } from "./interfaces/IExtension.sol";
 
-import { IPYUSDXExtensionFactory } from "./interfaces/IPYUSDXExtensionFactory.sol";
+import { IExtensionFactory } from "./interfaces/IExtensionFactory.sol";
 
-import { MultiMint } from "../MultiMint.sol";
-import { YieldToOne } from "../YieldToOne.sol";
+import { MultiMint } from "./projects/MultiMint.sol";
+import { YieldToOne } from "./projects/YieldToOne.sol";
 
-/// @notice ERC-7201 namespaced storage layout for PYUSDXExtensionFactory.
-abstract contract PYUSDXExtensionFactoryStorageLayout {
+/// @notice ERC-7201 namespaced storage layout for ExtensionFactory.
+abstract contract ExtensionFactoryStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.PYUSDXExtensionFactory
     struct ExtensionFactoryStorage {
-        mapping(address extension => IPYUSDXExtensionFactory.ExtensionType extensionType) extensionTypes;
+        mapping(address extension => IExtensionFactory.ExtensionType extensionType) extensionTypes;
         mapping(address extension => bool active) activeExtensions;
         address yieldToOneImplementation;
         address multiMintImplementation;
@@ -37,34 +37,29 @@ abstract contract PYUSDXExtensionFactoryStorageLayout {
     }
 }
 
-/// @title  PYUSDX Extension Factory
+/// @title  Extension Factory
 /// @notice A factory contract for deploying and registering PYUSDX extensions (YieldToOne, MultiMint).
 ///         Serves as the single source of truth for extension approval in the SwapFacility.
 /// @author M0 Labs
-contract PYUSDXExtensionFactory is
-    IPYUSDXExtensionFactory,
-    Initializable,
-    AccessControlUpgradeable,
-    PYUSDXExtensionFactoryStorageLayout
-{
+contract ExtensionFactory is IExtensionFactory, Initializable, AccessControlUpgradeable, ExtensionFactoryStorageLayout {
     /* ============ Variables ============ */
 
-    /// @inheritdoc IPYUSDXExtensionFactory
+    /// @inheritdoc IExtensionFactory
     bytes32 public constant FACTORY_MANAGER_ROLE = keccak256("FACTORY_MANAGER_ROLE");
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
-    /// @inheritdoc IPYUSDXExtensionFactory
+    /// @inheritdoc IExtensionFactory
     address public immutable override pyusdx;
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
-    /// @inheritdoc IPYUSDXExtensionFactory
+    /// @inheritdoc IExtensionFactory
     address public immutable override swapFacility;
 
     /* ============ Constructor ============ */
 
     /**
      * @custom:oz-upgrades-unsafe-allow constructor
-     * @notice Constructs PYUSDXExtensionFactory implementation contract.
+     * @notice Constructs ExtensionFactory implementation contract.
      * @dev    Sets immutable storage.
      * @param  pyusdx_        The address of the PYUSDX token.
      * @param  swapFacility_  The address of the SwapFacility contract.
@@ -80,7 +75,7 @@ contract PYUSDXExtensionFactory is
     /* ============ Initializer ============ */
 
     /**
-     * @notice Initializes the PYUSDXExtensionFactory proxy.
+     * @notice Initializes the ExtensionFactory proxy.
      * @param  admin          The address of the admin.
      * @param  factoryManager The address of the factory manager.
      */
@@ -100,7 +95,7 @@ contract PYUSDXExtensionFactory is
 
     /* ============ External Functions ============ */
 
-    /// @inheritdoc IPYUSDXExtensionFactory
+    /// @inheritdoc IExtensionFactory
     function deployYieldToOne(
         string calldata name,
         string calldata symbol,
@@ -140,7 +135,7 @@ contract PYUSDXExtensionFactory is
         emit ExtensionDeployed(ExtensionType.YIELD_TO_ONE, proxy, proxyAdmin, implementation, msg.sender);
     }
 
-    /// @inheritdoc IPYUSDXExtensionFactory
+    /// @inheritdoc IExtensionFactory
     function deployMultiMint(
         string calldata name,
         string calldata symbol,
@@ -192,7 +187,7 @@ contract PYUSDXExtensionFactory is
         emit ExtensionDeployed(ExtensionType.MULTI_MINT, proxy, proxyAdmin, implementation, msg.sender);
     }
 
-    /// @inheritdoc IPYUSDXExtensionFactory
+    /// @inheritdoc IExtensionFactory
     function setExtensionStatus(address extension, bool status) external override onlyRole(FACTORY_MANAGER_ROLE) {
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
 
@@ -207,7 +202,7 @@ contract PYUSDXExtensionFactory is
         emit ExtensionStatusSet(extension, status);
     }
 
-    /// @inheritdoc IPYUSDXExtensionFactory
+    /// @inheritdoc IExtensionFactory
     function setImplementation(
         ExtensionType extensionType,
         address implementation
@@ -216,10 +211,8 @@ contract PYUSDXExtensionFactory is
             revert InvalidExtensionType();
         }
 
-        if (
-            IPYUSDXExtension(implementation).pyusdx() != pyusdx ||
-            IPYUSDXExtension(implementation).swapFacility() != swapFacility
-        ) revert InvalidImplementation();
+        if (IExtension(implementation).pyusdx() != pyusdx || IExtension(implementation).swapFacility() != swapFacility)
+            revert InvalidImplementation();
 
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
 
@@ -234,12 +227,12 @@ contract PYUSDXExtensionFactory is
 
     /* ============ Public Functions ============ */
 
-    /// @inheritdoc IPYUSDXExtensionFactory
+    /// @inheritdoc IExtensionFactory
     function getExtensionType(address extension) external view override returns (ExtensionType) {
         return _getExtensionFactoryStorage().extensionTypes[extension];
     }
 
-    /// @inheritdoc IPYUSDXExtensionFactory
+    /// @inheritdoc IExtensionFactory
     function getImplementation(ExtensionType extensionType) external view override returns (address) {
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
 
@@ -249,7 +242,7 @@ contract PYUSDXExtensionFactory is
         return address(0);
     }
 
-    /// @inheritdoc IPYUSDXExtensionFactory
+    /// @inheritdoc IExtensionFactory
     function isApprovedExtension(address extension) public view override returns (bool) {
         return _getExtensionFactoryStorage().activeExtensions[extension];
     }

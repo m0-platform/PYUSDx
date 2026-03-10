@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity 0.8.26;
 
 /// @title IMinterGateway
 /// @notice Interface for the MinterGateway contract that manages minting and burning of PYUSDX tokens
@@ -91,9 +91,9 @@ interface IMinterGateway {
 
     /* ============ Constants ============ */
 
-    /// @notice Returns the role identifier for minter role
+    /// @notice Returns the role identifier for issuer role
     /// @return The bytes32 role identifier
-    function MINTER_ROLE() external view returns (bytes32);
+    function ISSUER_ROLE() external view returns (bytes32);
 
     /* ============ Initializer ============ */
 

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { ERC20 } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
-import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IMultiMint } from "../../src/interfaces/IMultiMint.sol";
+import { ERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
 
 /**
  * @title MockMultiMint

@@ -2,18 +2,19 @@
 
 pragma solidity 0.8.26;
 
-import { IERC20 } from "../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { IYieldToOne } from "./interfaces/IYieldToOne.sol";
-import { IPYUSDX } from "./interfaces/IPYUSDX.sol";
+import { IPYUSDX } from "../../IPYUSDX.sol";
 
-import { Freezable } from "../lib/m-extensions/src/components/freezable/Freezable.sol";
-import { Pausable } from "../lib/m-extensions/src/components/pausable/Pausable.sol";
-import { PYUSDXExtension } from "./PYUSDXExtension.sol";
+import { Freezable } from "../../../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
+import { Pausable } from "../../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
+import { Extension } from "../Extension.sol";
 
 abstract contract YieldToOneStorageLayout {
     /// @custom:storage-location erc7201:PYUSDX.storage.YieldToOne
     struct YieldToOneStorageStruct {
+        uint256 totalSupply;
         address yieldRecipient;
         mapping(address account => uint256 balance) balanceOf;
     }
@@ -39,7 +40,7 @@ abstract contract YieldToOneStorageLayout {
  *         PYUSDX (net of PYUSDX's fee), then minted as extension tokens to the yield recipient.
  * @author M0 Labs
  */
-contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Freezable, Pausable {
+contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezable, Pausable {
     /* ============ Variables ============ */
 
     /// @inheritdoc IYieldToOne
@@ -52,7 +53,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
      * @param pyusdx_       The address of the PYUSDX token.
      * @param swapFacility_ The address of the swap facility.
      */
-    constructor(address pyusdx_, address swapFacility_) PYUSDXExtension(pyusdx_, swapFacility_) {}
+    constructor(address pyusdx_, address swapFacility_) Extension(pyusdx_, swapFacility_) {}
 
     /* ============ Initializer ============ */
 
@@ -100,9 +101,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
     ) internal onlyInitializing {
         if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
         if (admin == address(0)) revert ZeroAdmin();
-        if (IPYUSDX(pyusdx).claimRecipientFor(address(this)) != address(this)) revert InvalidClaimRecipient();
 
-        __PYUSDXExtension_init(name, symbol);
+        __Extension_init(name, symbol);
         __Freezable_init(freezeManager);
         __Pausable_init(pauser);
 
@@ -118,19 +118,20 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
     function claimYield() public virtual returns (uint256) {
         _beforeClaimYield();
 
-        uint256 totalSupplyBefore_ = totalSupply();
-
+        // NOTE: Realize any pending PYUSDX yield
         IPYUSDX(pyusdx).claimFor(address(this));
 
-        uint256 yield_ = totalSupply() - totalSupplyBefore_;
+        // NOTE: Excess accounts for the newly claimed yield and any prior unclaimed yield.
+        uint256 excess = _excess();
 
-        if (yield_ == 0) return 0;
+        if (excess == 0) return 0;
 
-        emit YieldClaimed(yield_);
+        emit YieldClaimed(excess);
 
-        _mint(yieldRecipient(), yield_);
+        // NOTE: mint the excess PYUSDX as extension tokens
+        _mint(yieldRecipient(), excess);
 
-        return yield_;
+        return excess;
     }
 
     /// @inheritdoc IYieldToOne
@@ -150,12 +151,12 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
 
     /// @inheritdoc IERC20
     function totalSupply() public view virtual returns (uint256) {
-        return _pyusdxBalanceOf(address(this));
+        return _getYieldToOneStorage().totalSupply;
     }
 
     /// @inheritdoc IYieldToOne
     function yield() public view virtual returns (uint256) {
-        return IPYUSDX(pyusdx).accruedYieldOf(address(this));
+        return _excess() + IPYUSDX(pyusdx).accruedYieldToSelfOf(address(this));
     }
 
     /// @inheritdoc IYieldToOne
@@ -210,13 +211,10 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
         _revertIfFrozen($, recipient);
     }
 
-    /// @dev   Hook called before claiming yield. Reverts if the PYUSDX claimRecipient is misconfigured.
-    ///        Inheriting contracts that override this function MUST call `super._beforeClaimYield()`.
-    function _beforeClaimYield() internal view virtual {
-        if (IPYUSDX(pyusdx).claimRecipientFor(address(this)) != address(this)) revert InvalidClaimRecipient();
-    }
+    /// @dev   Hook called before claiming yield.
+    function _beforeClaimYield() internal view virtual {}
 
-    /* ============ Internal Functions ============ */
+    /* ============ Internal Interactive Functions ============ */
 
     /**
      * @dev   Mints `amount` extension tokens to `recipient`.
@@ -224,8 +222,11 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
      * @param amount    The amount of tokens to mint.
      */
     function _mint(address recipient, uint256 amount) internal override {
+        YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
+
         unchecked {
-            _getYieldToOneStorage().balanceOf[recipient] += amount;
+            $.totalSupply += amount;
+            $.balanceOf[recipient] += amount;
         }
 
         emit Transfer(address(0), recipient, amount);
@@ -237,8 +238,11 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
      * @param amount  The amount of tokens to burn.
      */
     function _burn(address account, uint256 amount) internal override {
+        YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
+
         unchecked {
-            _getYieldToOneStorage().balanceOf[account] -= amount;
+            $.totalSupply -= amount;
+            $.balanceOf[account] -= amount;
         }
 
         emit Transfer(account, address(0), amount);
@@ -273,5 +277,15 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, PYUSDXExtension, Fr
         $.yieldRecipient = yieldRecipient_;
 
         emit YieldRecipientSet(yieldRecipient_);
+    }
+
+    /* ============ Internal View Functions ============ */
+
+    /// @dev Returns the excess PYUSDX balance of the extension
+    function _excess() internal view virtual returns (uint256) {
+        uint256 pyusdxBalance = _pyusdxBalanceOf(address(this));
+        uint256 totalSupply_ = totalSupply();
+
+        return pyusdxBalance > totalSupply_ ? pyusdxBalance - totalSupply_ : 0;
     }
 }

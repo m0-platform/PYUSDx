@@ -4,13 +4,14 @@ pragma solidity 0.8.26;
 
 import { console } from "../../lib/forge-std/src/console.sol";
 
-import { DeployHelpers } from "../../lib/m-extensions/lib/common/script/deploy/DeployHelpers.sol";
+import { DeployHelpers } from "../../lib/evm-m-extensions/lib/common/script/deploy/DeployHelpers.sol";
 
-import { Upgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { Upgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
-import { MinterGateway } from "../../src/MinterGateway.sol";
+import { MinterGateway } from "../../src/core/MinterGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
+import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 
 import { ScriptBase } from "../ScriptBase.s.sol";
@@ -38,21 +39,26 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address minterGatewayProxy,
         PYUSDXConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
-        implementation = address(new PYUSDX(minterGatewayProxy));
+        implementation = address(new PYUSDX());
 
         proxy = _deployCreate3TransparentProxy(
             implementation,
             config.admin,
-            abi.encodeWithSelector(
-                PYUSDX.initialize.selector,
-                config.name,
-                config.symbol,
-                config.admin,
-                config.pauser,
-                config.freezeManager,
-                config.forcedTransferManager,
-                config.earnerManager,
-                config.rateManager
+            abi.encodeCall(
+                PYUSDX.initialize,
+                (
+                    IPYUSDX.InitializeParams({
+                        name: config.name,
+                        symbol: config.symbol,
+                        admin: config.admin,
+                        pauser: config.pauser,
+                        freezeManager: config.freezeManager,
+                        forcedTransferManager: config.forcedTransferManager,
+                        earnerManager: config.earnerManager,
+                        rateLimitManager: config.rateManager,
+                        issuer: minterGatewayProxy
+                    })
+                )
             ),
             _computeSalt(deployer, "PYUSDX")
         );
@@ -108,12 +114,12 @@ contract DeployBase is DeployHelpers, ScriptBase {
         FactoryConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
         // NOTE: SwapFacility must already be deployed since constructor calls ISwapFacility(swapFacility).pyusdx()
-        implementation = address(new PYUSDXExtensionFactory(pyusdxProxy, swapFacilityProxy));
+        implementation = address(new ExtensionFactory(pyusdxProxy, swapFacilityProxy));
 
         proxy = _deployCreate3TransparentProxy(
             implementation,
             config.admin,
-            abi.encodeWithSelector(PYUSDXExtensionFactory.initialize.selector, config.admin, config.factoryManager),
+            abi.encodeWithSelector(ExtensionFactory.initialize.selector, config.admin, config.factoryManager),
             _computeSalt(deployer, "PYUSDXExtensionFactory")
         );
 

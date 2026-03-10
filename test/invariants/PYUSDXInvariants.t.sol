@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity 0.8.26;
 
-import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
@@ -30,8 +30,8 @@ contract PYUSDXInvariants is PYUSDXBaseUnitTest {
         testAccounts[3] = david;
 
         for (uint256 i = 0; i < testAccounts.length; i++) {
-            (bool isEarning, , , ) = pyusdx.getEarningDetails(testAccounts[i]);
-            if (!isEarning) {
+            (uint32 earnerRate_, , ) = pyusdx.getAccountEarningInfo(testAccounts[i]);
+            if (earnerRate_ == 0) {
                 assertEq(pyusdx.earningPrincipalOf(testAccounts[i]), 0, "Non-earning account has non-zero principal");
             }
         }
@@ -61,8 +61,8 @@ contract PYUSDXInvariants is PYUSDXBaseUnitTest {
         testAccounts[3] = david;
 
         for (uint256 i = 0; i < testAccounts.length; i++) {
-            (bool isEarning, , , ) = pyusdx.getEarningDetails(testAccounts[i]);
-            if (isEarning) {
+            (uint32 earnerRate_, , ) = pyusdx.getAccountEarningInfo(testAccounts[i]);
+            if (earnerRate_ > 0) {
                 uint256 balance = pyusdx.balanceOf(testAccounts[i]);
                 uint112 principal = pyusdx.earningPrincipalOf(testAccounts[i]);
 

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { IndexingMath } from "../../lib/m-extensions/lib/common/src/libs/IndexingMath.sol";
-import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { IndexingMath } from "../../lib/evm-m-extensions/lib/common/src/libs/IndexingMath.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { PYUSDX } from "../../src/PYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 import { BaseTest } from "./BaseTest.sol";
@@ -22,22 +23,27 @@ abstract contract PYUSDXBaseUnitTest is BaseTest {
         // TODO: figure out how to avoid this circular dependency
         minterGateway = new MinterGatewayMock(address(0));
 
-        address implementation = address(new PYUSDXHarness(address(minterGateway)));
+        address implementation = address(new PYUSDXHarness());
 
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
                 implementation,
                 admin,
-                abi.encodeWithSelector(
-                    PYUSDX.initialize.selector,
-                    "PayPal USD Yield",
-                    "PYUSDX",
-                    admin,
-                    pauser,
-                    freezeManager,
-                    forcedTransferManager,
-                    earnerManager,
-                    rateManager
+                abi.encodeCall(
+                    PYUSDX.initialize,
+                    (
+                        IPYUSDX.InitializeParams({
+                            name: "PayPal USD Yield",
+                            symbol: "PYUSDX",
+                            admin: admin,
+                            pauser: pauser,
+                            freezeManager: freezeManager,
+                            forcedTransferManager: forcedTransferManager,
+                            earnerManager: earnerManager,
+                            rateLimitManager: rateLimitManager,
+                            issuer: address(minterGateway)
+                        })
+                    )
                 )
             )
         );

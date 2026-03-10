@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { Test } from "../../lib/m-extensions/lib/forge-std/src/Test.sol";
+import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
 
 /// @title BaseTest
 /// @notice Base test contract with common test infrastructure
@@ -12,6 +12,7 @@ abstract contract BaseTest is Test {
     address public freezeManager = makeAddr("freezeManager");
     address public forcedTransferManager = makeAddr("forcedTransferManager");
     address public earnerManager = makeAddr("earnerManager");
+    address public rateLimitManager = makeAddr("rateLimitManager");
     address public rateManager = makeAddr("rateManager");
     address public yieldRecipient = makeAddr("yieldRecipient");
     address public yieldRecipientManager = makeAddr("yieldRecipientManager");

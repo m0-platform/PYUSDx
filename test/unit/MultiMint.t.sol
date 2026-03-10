@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { Test } from "../../lib/m-extensions/lib/forge-std/src/Test.sol";
-import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { PYUSDX } from "../../src/PYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
-import { MultiMint } from "../../src/MultiMint.sol";
-import { IMultiMint } from "../../src/interfaces/IMultiMint.sol";
-import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
-import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
+import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
+import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
+import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
+import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 import { MockERC20 } from "../mock/MockERC20.sol";
 import { FeeOnTransferMock } from "../mock/FeeOnTransferMock.sol";
 
@@ -42,21 +43,26 @@ contract MultiMintTest is Test {
 
     function setUp() public {
         minterGateway = new MinterGatewayMock(address(0));
-        address pyusdxImplementation = address(new PYUSDXHarness(address(minterGateway)));
+        address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
                 pyusdxImplementation,
                 admin,
-                abi.encodeWithSelector(
-                    PYUSDX.initialize.selector,
-                    "PayPal USD Yield",
-                    "PYUSDX",
-                    admin,
-                    pauser,
-                    freezeManager,
-                    address(1),
-                    earnerManager,
-                    rateManager
+                abi.encodeCall(
+                    PYUSDX.initialize,
+                    (
+                        IPYUSDX.InitializeParams({
+                            name: "PayPal USD Yield",
+                            symbol: "PYUSDX",
+                            admin: admin,
+                            pauser: pauser,
+                            freezeManager: freezeManager,
+                            forcedTransferManager: address(1),
+                            earnerManager: earnerManager,
+                            rateLimitManager: rateManager,
+                            issuer: address(minterGateway)
+                        })
+                    )
                 )
             )
         );
@@ -84,12 +90,9 @@ contract MultiMintTest is Test {
         );
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(address(extension), true, 0, address(0));
+        pyusdx.setAccountInfo(address(extension), 500, 0, address(0));
 
         pyusdx.setAccountRateBps(address(extension), uint24(500));
-
-        vm.prank(rateManager);
-        pyusdx.setEarnerRate(address(extension), 500);
 
         usdc = new MockERC20("USD Coin", "USDC", 6);
         dai = new MockERC20("Dai", "DAI", 18);
@@ -150,25 +153,25 @@ contract MultiMintTest is Test {
 
     function test_wrap_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.wrap(alice, MINT_AMOUNT);
     }
 
     function test_unwrap_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.unwrap(MINT_AMOUNT);
     }
 
     function test_wrapAsset_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.wrap(address(usdc), alice, MINT_AMOUNT);
     }
 
     function test_replaceAsset_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.replaceAsset(address(usdc), alice, MINT_AMOUNT);
     }
 
@@ -244,7 +247,7 @@ contract MultiMintTest is Test {
 
     function test_wrap_asset_revert_zeroAmount() public {
         vm.prank(address(swapFacility));
-        vm.expectRevert(IPYUSDXExtension.ZeroAmount.selector);
+        vm.expectRevert(IExtension.ZeroAmount.selector);
         extension.wrap(address(usdc), alice, 0);
     }
 
@@ -276,7 +279,7 @@ contract MultiMintTest is Test {
         dai.mint(alice, 1);
         vm.startPrank(alice);
         dai.approve(address(swapFacility), 1);
-        vm.expectRevert(IPYUSDXExtension.ZeroAmount.selector);
+        vm.expectRevert(IExtension.ZeroAmount.selector);
         swapFacility.swapInAsset(address(extension), address(dai), 1, alice);
         vm.stopPrank();
     }
@@ -447,15 +450,24 @@ contract MultiMintTest is Test {
         _wrapAssetFor(alice, address(usdc), 40e6);
 
         assertEq(extension.yield(), 0);
+        assertEq(extension.totalSupply(), 100e6);
 
         vm.warp(block.timestamp + 365 days);
 
-        // Yield is visible before claim via accruedYieldOf.
+        // Yield is visible before claim.
         assertGt(extension.yield(), 0);
 
-        // After external claim, accruedYieldOf resets to 0.
+        // After external claimFor, yield() still shows excess (realized but unminted).
         pyusdx.claimFor(address(extension));
+        uint256 yieldAfterClaim = extension.yield();
+        assertGt(yieldAfterClaim, 0);
+
+        // claimYield recovers it.
+        uint256 claimed = extension.claimYield();
+        assertEq(claimed, yieldAfterClaim);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
         assertEq(extension.yield(), 0);
+        assertEq(extension.totalSupply(), 100e6 + claimed);
     }
 
     function test_claimYield() public {
@@ -467,7 +479,25 @@ contract MultiMintTest is Test {
 
         assertGt(claimed, 0);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
+        assertEq(extension.totalSupply(), MINT_AMOUNT + claimed);
         assertEq(extension.yield(), 0);
+    }
+
+    function test_claimYield_directBypass() public {
+        _wrapPyusdxFor(alice, alice, 60e6);
+        _wrapAssetFor(alice, address(usdc), 40e6);
+
+        vm.warp(block.timestamp + 365 days);
+
+        // Direct claimFor bypass.
+        pyusdx.claimFor(address(extension));
+        uint256 excess = pyusdx.balanceOf(address(extension)) - (extension.totalSupply() - extension.totalAssets());
+        assertGt(excess, 0);
+
+        // claimYield recovers the excess.
+        uint256 claimed = extension.claimYield();
+        assertEq(claimed, excess);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 
     function test_setYieldRecipient() public {

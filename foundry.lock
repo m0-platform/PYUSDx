@@ -1,6 +1,6 @@
 {
-  "lib/common": {
-    "rev": "613d2d95a476612270324ecbe92317eb5e9bc98f"
+  "lib/evm-m-extensions": {
+    "rev": "a578136c47cb881c1cace33385a948f6513ef64d"
   },
   "lib/forge-std": {
     "branch": {
@@ -8,13 +8,7 @@
       "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
     }
   },
-  "lib/m-extensions": {
-    "rev": "8a8fe2b903e56a12a74b12f57a8c354dc6b9fcc3"
-  },
   "lib/uniswap-v4-periphery": {
-    "rev": "5da22e609fd78c01fb7ddf2a6abb1f2ec7dc2b87"
-  },
-  "lib/v4-periphery": {
     "rev": "5da22e609fd78c01fb7ddf2a6abb1f2ec7dc2b87"
   }
 }

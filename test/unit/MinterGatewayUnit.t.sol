@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity 0.8.26;
 
 import { MinterGatewayBaseUnitTest } from "../utils/MinterGatewayBaseUnitTest.sol";
-import { IMinterGateway } from "../../src/interfaces/IMinterGateway.sol";
-import { IAccessControl } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
-import { Initializable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
-import { MinterGateway } from "../../src/MinterGateway.sol";
+import { IMinterGateway } from "../../src/core/IMinterGateway.sol";
+import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { MinterGateway } from "../../src/core/MinterGateway.sol";
 
 contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
     /* ============ Constructor ============ */
@@ -80,7 +80,7 @@ contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
 
     function test_initialize() public view {
         assertTrue(minterGateway.hasRole(minterGateway.DEFAULT_ADMIN_ROLE(), admin));
-        assertTrue(minterGateway.hasRole(minterGateway.MINTER_ROLE(), minter));
+        assertTrue(minterGateway.hasRole(minterGateway.ISSUER_ROLE(), minter));
         assertEq(minterGateway.mintDelay(), DEFAULT_MINT_DELAY);
         assertEq(minterGateway.mintTTL(), DEFAULT_MINT_TTL);
     }
@@ -92,7 +92,7 @@ contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
                 other,
-                minterGateway.MINTER_ROLE()
+                minterGateway.ISSUER_ROLE()
             )
         );
 
@@ -218,7 +218,7 @@ contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
                 other,
-                minterGateway.MINTER_ROLE()
+                minterGateway.ISSUER_ROLE()
             )
         );
 
@@ -316,12 +316,11 @@ contract MinterGatewayUnitTest is MinterGatewayBaseUnitTest {
         // Revoke minter role using admin's DEFAULT_ADMIN_ROLE
         // Note: Using vm.prank with admin who has DEFAULT_ADMIN_ROLE
         vm.startPrank(admin);
-        minterGateway.revokeRole(minterGateway.MINTER_ROLE(), minter);
+        minterGateway.revokeRole(minterGateway.ISSUER_ROLE(), minter);
         vm.stopPrank();
 
         // Verify minter no longer has the role
-        assertFalse(minterGateway.hasRole(minterGateway.MINTER_ROLE(), minter));
-
+        assertFalse(minterGateway.hasRole(minterGateway.ISSUER_ROLE(), minter));
         // Minter can still cancel their own proposal (cancel doesn't require MINTER_ROLE)
         // This must happen while proposal is still pending (before activeAt)
         vm.prank(minter);

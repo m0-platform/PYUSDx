@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { IAccessControl } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
-import { Initializable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import { UnsafeUpgrades, Upgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import {
+    UnsafeUpgrades,
+    Upgrades
+} from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
-import { IPYUSDXExtensionFactory } from "../../src/deploy/interfaces/IPYUSDXExtensionFactory.sol";
-import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
-import { MultiMint } from "../../src/MultiMint.sol";
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
+import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
+import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
+import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
-import { YieldToOne } from "../../src/YieldToOne.sol";
+import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
 contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
-    PYUSDXExtensionFactory public factory;
+    ExtensionFactory public factory;
     SwapFacility public swapFacility;
 
     // Role addresses
@@ -50,11 +53,11 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         );
 
         // Deploy factory with actual SwapFacility address
-        factory = PYUSDXExtensionFactory(
+        factory = ExtensionFactory(
             UnsafeUpgrades.deployTransparentProxy(
-                address(new PYUSDXExtensionFactory(address(pyusdx), address(swapFacility))),
+                address(new ExtensionFactory(address(pyusdx), address(swapFacility))),
                 admin,
-                abi.encodeWithSelector(PYUSDXExtensionFactory.initialize.selector, admin, extensionManager)
+                abi.encodeWithSelector(ExtensionFactory.initialize.selector, admin, extensionManager)
             )
         );
 
@@ -65,32 +68,32 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
     /* ============ Constructor Tests ============ */
 
     function test_constructor_zeroPyusdx() public {
-        vm.expectRevert(IPYUSDXExtensionFactory.ZeroPYUSDX.selector);
-        new PYUSDXExtensionFactory(address(0), address(swapFacility));
+        vm.expectRevert(IExtensionFactory.ZeroPYUSDX.selector);
+        new ExtensionFactory(address(0), address(swapFacility));
     }
 
     function test_constructor_zeroSwapFacility() public {
-        vm.expectRevert(IPYUSDXExtensionFactory.ZeroSwapFacility.selector);
-        new PYUSDXExtensionFactory(address(pyusdx), address(0));
+        vm.expectRevert(IExtensionFactory.ZeroSwapFacility.selector);
+        new ExtensionFactory(address(pyusdx), address(0));
     }
 
     function test_initialize_zeroAdmin() public {
-        address impl = address(new PYUSDXExtensionFactory(address(pyusdx), address(swapFacility)));
-        vm.expectRevert(IPYUSDXExtensionFactory.ZeroAdmin.selector);
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        vm.expectRevert(IExtensionFactory.ZeroAdmin.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
             admin,
-            abi.encodeWithSelector(PYUSDXExtensionFactory.initialize.selector, address(0), extensionManager)
+            abi.encodeWithSelector(ExtensionFactory.initialize.selector, address(0), extensionManager)
         );
     }
 
     function test_initialize_zeroFactoryManager() public {
-        address impl = address(new PYUSDXExtensionFactory(address(pyusdx), address(swapFacility)));
-        vm.expectRevert(IPYUSDXExtensionFactory.ZeroFactoryManager.selector);
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        vm.expectRevert(IExtensionFactory.ZeroFactoryManager.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
             admin,
-            abi.encodeWithSelector(PYUSDXExtensionFactory.initialize.selector, admin, address(0))
+            abi.encodeWithSelector(ExtensionFactory.initialize.selector, admin, address(0))
         );
     }
 
@@ -101,8 +104,8 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         assertTrue(factory.hasRole(factory.DEFAULT_ADMIN_ROLE(), admin));
         assertTrue(factory.hasRole(factory.FACTORY_MANAGER_ROLE(), extensionManager));
 
-        assertTrue(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE) != address(0));
-        assertTrue(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT) != address(0));
+        assertTrue(factory.getImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE) != address(0));
+        assertTrue(factory.getImplementation(IExtensionFactory.ExtensionType.MULTI_MINT) != address(0));
     }
 
     function test_initialize_alreadyInitialized() public {
@@ -128,7 +131,7 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         assertTrue(implementation != address(0));
 
         // Verify extension is registered
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
         assertTrue(factory.isApprovedExtension(proxy));
 
         // Verify storage
@@ -143,8 +146,8 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         assertEq(YieldToOne(proxy).yieldRecipient(), yieldRecipient);
 
         // Verify wiring
-        assertEq(IPYUSDXExtension(proxy).pyusdx(), address(pyusdx));
-        assertEq(IPYUSDXExtension(proxy).swapFacility(), address(swapFacility));
+        assertEq(IExtension(proxy).pyusdx(), address(pyusdx));
+        assertEq(IExtension(proxy).swapFacility(), address(swapFacility));
     }
 
     function test_deployYieldToOne_permissionless() public {
@@ -160,7 +163,7 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         );
 
         assertTrue(factory.isApprovedExtension(proxy));
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
     }
 
     function test_deployYieldToOne_duplicateReverts() public {
@@ -235,7 +238,7 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         );
 
         assertEq(impl1, impl2);
-        assertEq(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE), impl1);
+        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE), impl1);
     }
 
     /* ============ deployMultiMint Tests ============ */
@@ -257,7 +260,7 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         assertTrue(implementation != address(0));
 
         // Verify extension is registered
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.MULTI_MINT));
         assertTrue(factory.isApprovedExtension(proxy));
 
         // Verify storage
@@ -272,8 +275,8 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         assertEq(MultiMint(proxy).yieldRecipient(), yieldRecipient);
 
         // Verify wiring
-        assertEq(IPYUSDXExtension(proxy).pyusdx(), address(pyusdx));
-        assertEq(IPYUSDXExtension(proxy).swapFacility(), address(swapFacility));
+        assertEq(IExtension(proxy).pyusdx(), address(pyusdx));
+        assertEq(IExtension(proxy).swapFacility(), address(swapFacility));
     }
 
     function test_deployMultiMint_permissionless() public {
@@ -290,7 +293,7 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         );
 
         assertTrue(factory.isApprovedExtension(proxy));
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.MULTI_MINT));
     }
 
     function test_deployMultiMint_duplicateReverts() public {
@@ -343,14 +346,14 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         );
 
         assertEq(impl1, impl2);
-        assertEq(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT), impl1);
+        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.MULTI_MINT), impl1);
     }
 
     /* ============ extensionType Tests ============ */
 
     function test_extensionType_noneForNonExtension() public view {
-        assertEq(uint8(factory.getExtensionType(alice)), uint8(IPYUSDXExtensionFactory.ExtensionType.NONE));
-        assertEq(uint8(factory.getExtensionType(address(0))), uint8(IPYUSDXExtensionFactory.ExtensionType.NONE));
+        assertEq(uint8(factory.getExtensionType(alice)), uint8(IExtensionFactory.ExtensionType.NONE));
+        assertEq(uint8(factory.getExtensionType(address(0))), uint8(IExtensionFactory.ExtensionType.NONE));
     }
 
     function test_extensionType_correctPerDeployment() public {
@@ -375,8 +378,8 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
             admin
         );
 
-        assertEq(uint8(factory.getExtensionType(ytoProxy)), uint8(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE));
-        assertEq(uint8(factory.getExtensionType(mmProxy)), uint8(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT));
+        assertEq(uint8(factory.getExtensionType(ytoProxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(mmProxy)), uint8(IExtensionFactory.ExtensionType.MULTI_MINT));
     }
 
     /* ============ setExtensionStatus Tests ============ */
@@ -395,7 +398,7 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         assertTrue(factory.isApprovedExtension(proxy));
 
         vm.expectEmit();
-        emit IPYUSDXExtensionFactory.ExtensionStatusSet(proxy, false);
+        emit IExtensionFactory.ExtensionStatusSet(proxy, false);
 
         vm.prank(extensionManager);
         factory.setExtensionStatus(proxy, false);
@@ -403,7 +406,7 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         assertFalse(factory.isApprovedExtension(proxy));
 
         // Type is preserved even when inactive
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
     }
 
     function test_setExtensionStatus_reactivate() public {
@@ -423,13 +426,13 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         assertFalse(factory.isApprovedExtension(proxy));
 
         vm.expectEmit();
-        emit IPYUSDXExtensionFactory.ExtensionStatusSet(proxy, true);
+        emit IExtensionFactory.ExtensionStatusSet(proxy, true);
 
         vm.prank(extensionManager);
         factory.setExtensionStatus(proxy, true);
 
         assertTrue(factory.isApprovedExtension(proxy));
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
     }
 
     function test_setExtensionStatus_idempotent() public {
@@ -451,7 +454,7 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
     }
 
     function test_setExtensionStatus_notRegistered() public {
-        vm.expectRevert(abi.encodeWithSelector(IPYUSDXExtensionFactory.ExtensionNotRegistered.selector, alice));
+        vm.expectRevert(abi.encodeWithSelector(IExtensionFactory.ExtensionNotRegistered.selector, alice));
 
         vm.prank(extensionManager);
         factory.setExtensionStatus(alice, true);
@@ -487,12 +490,12 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         address newImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
 
         vm.expectEmit();
-        emit IPYUSDXExtensionFactory.ImplementationSet(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
+        emit IExtensionFactory.ImplementationSet(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
 
         vm.prank(extensionManager);
-        factory.setImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
+        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
 
-        assertEq(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE), newImpl);
+        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE), newImpl);
     }
 
     function test_setImplementation_multiMint() public {
@@ -500,12 +503,12 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         address newImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
 
         vm.expectEmit();
-        emit IPYUSDXExtensionFactory.ImplementationSet(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT, newImpl);
+        emit IExtensionFactory.ImplementationSet(IExtensionFactory.ExtensionType.MULTI_MINT, newImpl);
 
         vm.prank(extensionManager);
-        factory.setImplementation(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT, newImpl);
+        factory.setImplementation(IExtensionFactory.ExtensionType.MULTI_MINT, newImpl);
 
-        assertEq(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT), newImpl);
+        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.MULTI_MINT), newImpl);
     }
 
     function test_setImplementation_proxyUsesNewImpl() public {
@@ -523,7 +526,7 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         // Set a new implementation
         address newImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
         vm.prank(extensionManager);
-        factory.setImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
+        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
 
         // Deploy second proxy - should use new implementation
         (address proxy2, , ) = factory.deployYieldToOne(
@@ -553,16 +556,16 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         );
 
         vm.prank(alice);
-        factory.setImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
+        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
     }
 
     function test_setImplementation_invalidType() public {
         address newImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
 
-        vm.expectRevert(IPYUSDXExtensionFactory.InvalidExtensionType.selector);
+        vm.expectRevert(IExtensionFactory.InvalidExtensionType.selector);
 
         vm.prank(extensionManager);
-        factory.setImplementation(IPYUSDXExtensionFactory.ExtensionType.NONE, newImpl);
+        factory.setImplementation(IExtensionFactory.ExtensionType.NONE, newImpl);
     }
 
     function test_setImplementation_invalidPyusdx() public {
@@ -570,10 +573,10 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         address wrongPyusdx = makeAddr("wrongPyusdx");
         address newImpl = address(new YieldToOne(wrongPyusdx, address(swapFacility)));
 
-        vm.expectRevert(IPYUSDXExtensionFactory.InvalidImplementation.selector);
+        vm.expectRevert(IExtensionFactory.InvalidImplementation.selector);
 
         vm.prank(extensionManager);
-        factory.setImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
+        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
     }
 
     function test_setImplementation_invalidSwapFacility() public {
@@ -581,10 +584,10 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         address wrongSwap = makeAddr("wrongSwap");
         address newImpl = address(new YieldToOne(address(pyusdx), wrongSwap));
 
-        vm.expectRevert(IPYUSDXExtensionFactory.InvalidImplementation.selector);
+        vm.expectRevert(IExtensionFactory.InvalidImplementation.selector);
 
         vm.prank(extensionManager);
-        factory.setImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
+        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
     }
 
     function test_setImplementation_zeroAddress() public {
@@ -592,7 +595,7 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         vm.expectRevert();
 
         vm.prank(extensionManager);
-        factory.setImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE, address(0));
+        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, address(0));
     }
 
     function test_setImplementation_eoa() public {
@@ -600,22 +603,22 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         vm.expectRevert();
 
         vm.prank(extensionManager);
-        factory.setImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE, alice);
+        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, alice);
     }
 
     /* ============ View Function Tests ============ */
 
     function test_getImplementation() public view {
         // Implementations are set at initialization
-        assertTrue(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE) != address(0));
-        assertTrue(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT) != address(0));
+        assertTrue(factory.getImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE) != address(0));
+        assertTrue(factory.getImplementation(IExtensionFactory.ExtensionType.MULTI_MINT) != address(0));
         // NONE always returns address(0)
-        assertEq(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.NONE), address(0));
+        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.NONE), address(0));
     }
 
     function test_getImplementation_returnsSameAfterDeploys() public {
-        address ytoImplBefore = factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE);
-        address mmImplBefore = factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT);
+        address ytoImplBefore = factory.getImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        address mmImplBefore = factory.getImplementation(IExtensionFactory.ExtensionType.MULTI_MINT);
 
         factory.deployYieldToOne(
             YTO_NAME,
@@ -639,8 +642,8 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         );
 
         // Implementations remain the same after deployments
-        assertEq(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE), ytoImplBefore);
-        assertEq(factory.getImplementation(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT), mmImplBefore);
+        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE), ytoImplBefore);
+        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.MULTI_MINT), mmImplBefore);
     }
 
     /* ============ Integration-like Tests ============ */
@@ -677,9 +680,9 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
             admin
         );
 
-        assertEq(uint8(factory.getExtensionType(proxy1)), uint8(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE));
-        assertEq(uint8(factory.getExtensionType(proxy2)), uint8(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE));
-        assertEq(uint8(factory.getExtensionType(proxy3)), uint8(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT));
+        assertEq(uint8(factory.getExtensionType(proxy1)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy2)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy3)), uint8(IExtensionFactory.ExtensionType.MULTI_MINT));
 
         assertTrue(factory.isApprovedExtension(proxy1));
         assertTrue(factory.isApprovedExtension(proxy2));
@@ -694,6 +697,6 @@ contract PYUSDXExtensionFactoryUnitTests is PYUSDXBaseUnitTest {
         assertTrue(factory.isApprovedExtension(proxy3));
 
         // Type preserved after deactivation
-        assertEq(uint8(factory.getExtensionType(proxy2)), uint8(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy2)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
     }
 }

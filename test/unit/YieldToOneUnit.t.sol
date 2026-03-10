@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { Test } from "../../lib/m-extensions/lib/forge-std/src/Test.sol";
-import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { PYUSDX } from "../../src/PYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
-import { YieldToOne } from "../../src/YieldToOne.sol";
-import { IYieldToOne } from "../../src/interfaces/IYieldToOne.sol";
-import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IFreezable } from "../../lib/m-extensions/src/components/freezable/IFreezable.sol";
-import { IERC20Extended } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
-import { IPYUSDXExtension } from "../../src/interfaces/IPYUSDXExtension.sol";
+import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
+import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.sol";
+import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
+import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
+import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 
 contract YieldToOneUnitTests is Test {
     MinterGatewayMock public minterGateway;
@@ -37,21 +38,26 @@ contract YieldToOneUnitTests is Test {
     function setUp() public {
         minterGateway = new MinterGatewayMock(address(0));
 
-        address pyusdxImplementation = address(new PYUSDXHarness(address(minterGateway)));
+        address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
                 pyusdxImplementation,
                 admin,
-                abi.encodeWithSelector(
-                    PYUSDX.initialize.selector,
-                    "PayPal USD Yield",
-                    "PYUSDX",
-                    admin,
-                    pauser,
-                    freezeManager,
-                    address(1),
-                    earnerManager,
-                    rateManager
+                abi.encodeCall(
+                    PYUSDX.initialize,
+                    (
+                        IPYUSDX.InitializeParams({
+                            name: "PayPal USD Yield",
+                            symbol: "PYUSDX",
+                            admin: admin,
+                            pauser: pauser,
+                            freezeManager: freezeManager,
+                            forcedTransferManager: address(1),
+                            earnerManager: earnerManager,
+                            rateLimitManager: rateManager,
+                            issuer: address(minterGateway)
+                        })
+                    )
                 )
             )
         );
@@ -78,12 +84,9 @@ contract YieldToOneUnitTests is Test {
         );
 
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(address(extension), true, 0, address(0));
+        pyusdx.setAccountInfo(address(extension), 500, 0, address(0));
 
         pyusdx.setAccountRateBps(address(extension), uint24(500));
-
-        vm.prank(rateManager);
-        pyusdx.setEarnerRate(address(extension), 500);
     }
 
     /* ============ Helpers ============ */
@@ -130,7 +133,7 @@ contract YieldToOneUnitTests is Test {
 
     function test_wrap_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.wrap(alice, MINT_AMOUNT);
     }
 
@@ -151,7 +154,7 @@ contract YieldToOneUnitTests is Test {
 
     function test_unwrap_revert_notSwapFacility() public {
         vm.prank(alice);
-        vm.expectRevert(IPYUSDXExtension.NotSwapFacility.selector);
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.unwrap(MINT_AMOUNT);
     }
 
@@ -242,13 +245,13 @@ contract YieldToOneUnitTests is Test {
 
     function test_claimYield_withFee() public {
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(address(extension), true, 1000, address(0));
+        pyusdx.setAccountInfo(address(extension), 500, 1000, address(0));
 
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         vm.warp(block.timestamp + 365 days);
 
-        uint256 grossYield = pyusdx.accruedYieldOf(address(extension));
+        (uint256 grossYield, , ) = pyusdx.accruedYieldAndFeeOf(address(extension));
 
         extension.claimYield();
 
@@ -256,6 +259,22 @@ contract YieldToOneUnitTests is Test {
         assertGt(yieldRecipientBalance, 0);
         assertLt(yieldRecipientBalance, grossYield);
         assertGt(pyusdx.balanceOf(earnerManager), 0);
+    }
+
+    function test_claimYield_zeroWhenYieldRedirected() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        // Redirect yield away from the extension
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(address(extension), 500, 0, alice);
+
+        vm.warp(block.timestamp + 365 days);
+
+        assertGt(pyusdx.accruedYieldOf(address(extension)), 0);
+        assertEq(extension.yield(), 0);
+
+        uint256 claimed = extension.claimYield();
+        assertEq(claimed, 0);
     }
 
     /* ============ SetYieldRecipient ============ */
@@ -280,15 +299,44 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Yield View ============ */
 
-    function test_yield_resetToZeroAfterClaim() public {
+    function test_yield_includesExcessAfterDirectClaimFor() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
-        assertGt(extension.yield(), 0);
+        uint256 yieldBefore = extension.yield();
+        assertGt(yieldBefore, 0);
 
+        // Direct claimFor bypass — yield lands in extension but no tokens minted.
         pyusdx.claimFor(address(extension));
 
+        // yield() should still show the excess (realized but unminted).
+        uint256 yieldAfter = extension.yield();
+        assertGt(yieldAfter, 0);
+        assertEq(yieldAfter, pyusdx.balanceOf(address(extension)) - extension.totalSupply());
+
+        // claimYield should recover the excess.
+        uint256 claimed = extension.claimYield();
+        assertEq(claimed, yieldAfter);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
         assertEq(extension.yield(), 0);
+    }
+
+    function test_yield_includesRandomPyusdxTransfer() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        // Someone sends PYUSDX directly to the extension.
+        uint256 gift = 100e6;
+        minterGateway.mint(bob, gift);
+        vm.prank(bob);
+        IERC20(address(pyusdx)).transfer(address(extension), gift);
+
+        // yield() should reflect the excess.
+        assertGe(extension.yield(), gift);
+
+        // claimYield recovers it.
+        uint256 claimed = extension.claimYield();
+        assertGe(claimed, gift);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 
     /* ============ Freeze via SwapFacility ============ */

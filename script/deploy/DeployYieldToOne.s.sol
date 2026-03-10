@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 
 import { console } from "../../lib/forge-std/src/console.sol";
 
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 
 import { DeployBase } from "./DeployBase.s.sol";
 
@@ -16,7 +16,7 @@ contract DeployYieldToOne is DeployBase {
 
         vm.startBroadcast(deployer);
 
-        (address proxy, address proxyAdmin, address implementation) = PYUSDXExtensionFactory(factory).deployYieldToOne(
+        (address proxy, address proxyAdmin, address implementation) = ExtensionFactory(factory).deployYieldToOne(
             config.name,
             config.symbol,
             config.yieldRecipient,

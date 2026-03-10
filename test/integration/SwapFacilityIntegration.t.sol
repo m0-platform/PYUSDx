@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
-import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IERC20Extended } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 
-import { IPYUSDXExtensionFactory } from "../../src/deploy/interfaces/IPYUSDXExtensionFactory.sol";
-import { MultiMint } from "../../src/MultiMint.sol";
+import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
+import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
-import { IAccessControl } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
-import { YieldToOne } from "../../src/YieldToOne.sol";
+import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
@@ -37,7 +37,7 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
 
         // Enable earning for YieldToOne
         vm.prank(earnerManager);
-        pyusdx.setEarningDetails(address(yieldToOne), true, 0, yieldRecipient);
+        pyusdx.setAccountInfo(address(yieldToOne), 500, 0, yieldRecipient);
 
         // Deploy MultiMint through factory
         vm.prank(admin);
@@ -67,22 +67,22 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
         assertTrue(factory.isApprovedExtension(address(multiMintExtension)));
         assertEq(
             uint8(factory.getExtensionType(address(yieldToOne))),
-            uint8(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE)
+            uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE)
         );
         assertEq(
             uint8(factory.getExtensionType(address(multiMintExtension))),
-            uint8(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT)
+            uint8(IExtensionFactory.ExtensionType.MULTI_MINT)
         );
     }
 
     function testIntegration_factory_extensionType() public view {
         assertEq(
             uint8(factory.getExtensionType(address(yieldToOne))),
-            uint8(IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE)
+            uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE)
         );
         assertEq(
             uint8(factory.getExtensionType(address(multiMintExtension))),
-            uint8(IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT)
+            uint8(IExtensionFactory.ExtensionType.MULTI_MINT)
         );
     }
 
@@ -92,7 +92,7 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
 
         // Deactivate
         vm.expectEmit();
-        emit IPYUSDXExtensionFactory.ExtensionStatusSet(address(yieldToOne), false);
+        emit IExtensionFactory.ExtensionStatusSet(address(yieldToOne), false);
 
         vm.prank(factoryManager);
         factory.setExtensionStatus(address(yieldToOne), false);
@@ -102,7 +102,7 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
 
         // Reactivate
         vm.expectEmit();
-        emit IPYUSDXExtensionFactory.ExtensionStatusSet(address(yieldToOne), true);
+        emit IExtensionFactory.ExtensionStatusSet(address(yieldToOne), true);
 
         vm.prank(factoryManager);
         factory.setExtensionStatus(address(yieldToOne), true);
@@ -132,7 +132,7 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
     }
 
     function testIntegration_factory_setExtensionStatus_notRegistered() public {
-        vm.expectRevert(abi.encodeWithSelector(IPYUSDXExtensionFactory.ExtensionNotRegistered.selector, alice));
+        vm.expectRevert(abi.encodeWithSelector(IExtensionFactory.ExtensionNotRegistered.selector, alice));
 
         vm.prank(factoryManager);
         factory.setExtensionStatus(alice, false);

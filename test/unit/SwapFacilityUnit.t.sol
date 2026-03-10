@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import { UnsafeUpgrades } from "../../lib/m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
-import { IERC20 } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IERC20Extended } from "../../lib/m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
-import { Initializable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import { PausableUpgradeable } from "../../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
+import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 
-import { IPYUSDXExtensionFactory } from "../../src/deploy/interfaces/IPYUSDXExtensionFactory.sol";
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
+import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 
-import { IPYUSDX } from "../../src/interfaces/IPYUSDX.sol";
+import { IPYUSDX } from "../../src/IPYUSDX.sol";
 
-import { PYUSDXExtensionFactoryHarness } from "../harness/PYUSDXExtensionFactoryHarness.sol";
+import { ExtensionFactoryHarness } from "../harness/ExtensionFactoryHarness.sol";
 
 import { MockERC20 } from "../mock/MockERC20.sol";
 import { MockPYUSDXExtension } from "../mock/MockPYUSDXExtension.sol";
@@ -24,7 +24,7 @@ import { MockMultiMint } from "../mock/MockMultiMint.sol";
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 
 contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
-    PYUSDXExtensionFactoryHarness public factory;
+    ExtensionFactoryHarness public factory;
     SwapFacility public swapFacility;
     MockPYUSDXExtension public extensionA;
     MockPYUSDXExtension public extensionB;
@@ -57,11 +57,11 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         );
 
         // Deploy factory with actual SwapFacility address
-        factory = PYUSDXExtensionFactoryHarness(
+        factory = ExtensionFactoryHarness(
             UnsafeUpgrades.deployTransparentProxy(
-                address(new PYUSDXExtensionFactoryHarness(address(pyusdx), address(swapFacility))),
+                address(new ExtensionFactoryHarness(address(pyusdx), address(swapFacility))),
                 admin,
-                abi.encodeWithSelector(PYUSDXExtensionFactory.initialize.selector, admin, factoryManager)
+                abi.encodeWithSelector(ExtensionFactory.initialize.selector, admin, factoryManager)
             )
         );
 
@@ -75,9 +75,9 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         multiMintExtension = new MockMultiMint(address(pyusdx), address(swapFacility), makeAddr("yieldRecipient"));
 
         // Register mock extensions by default
-        factory.registerExtension(address(extensionA), IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE);
-        factory.registerExtension(address(extensionB), IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE);
-        factory.registerExtension(address(multiMintExtension), IPYUSDXExtensionFactory.ExtensionType.MULTI_MINT);
+        factory.registerExtension(address(extensionA), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(extensionB), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(multiMintExtension), IExtensionFactory.ExtensionType.MULTI_MINT);
 
         // Allow mockUSDC in multiMintExtension
         multiMintExtension.setAllowedAsset(address(mockUSDC), true);
@@ -138,7 +138,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         assertFalse(swapFacility.isApprovedExtension(address(fresh)));
 
         // After registration, it should be approved
-        factory.registerExtension(address(fresh), IPYUSDXExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(fresh), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
         assertTrue(swapFacility.isApprovedExtension(address(fresh)));
     }
 

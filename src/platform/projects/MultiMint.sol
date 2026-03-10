@@ -2,17 +2,16 @@
 
 pragma solidity 0.8.26;
 
-import { IERC20Metadata } from "../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20Metadata } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { SafeERC20 } from "../lib/m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import { SafeERC20 } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { UIntMath } from "../lib/m-extensions/lib/common/src/libs/UIntMath.sol";
-
-import { IERC20 } from "../lib/m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { UIntMath } from "../../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
+import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { YieldToOne } from "./YieldToOne.sol";
 import { IMultiMint } from "./interfaces/IMultiMint.sol";
-import { ISwapFacility } from "./swap/interfaces/ISwapFacility.sol";
+import { ISwapFacility } from "../../swap/interfaces/ISwapFacility.sol";
 
 abstract contract MultiMintStorageLayout {
     struct Asset {
@@ -202,11 +201,6 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         return amount != 0 && assetBalanceOf(asset) >= amount;
     }
 
-    /// @inheritdoc IERC20
-    function totalSupply() public view override returns (uint256) {
-        return _pyusdxBalanceOf(address(this)) + totalAssets();
-    }
-
     /* ============ Hooks ============ */
 
     /**
@@ -317,6 +311,16 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     }
 
     /* ============ Internal View Functions ============ */
+
+    /// @dev Returns the excess PYUSDX balance that is not backing extension tokens.
+    function _excess() internal view virtual override returns (uint256) {
+        uint256 pyusdxBalance = _pyusdxBalanceOf(address(this));
+        uint256 totalAssets_ = totalAssets();
+        uint256 totalSupply_ = totalSupply();
+        uint256 pyusdxBackedSupply = totalSupply_ > totalAssets_ ? totalSupply_ - totalAssets_ : 0;
+
+        return pyusdxBalance > pyusdxBackedSupply ? pyusdxBalance - pyusdxBackedSupply : 0;
+    }
 
     /// @dev Returns the current supply of PYUSDX backing the extension token.
     function _pyusdxBacking() internal view returns (uint256) {

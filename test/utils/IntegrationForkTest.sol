@@ -4,9 +4,9 @@ pragma solidity ^0.8.26;
 import { Config } from "../../script/Config.sol";
 import { DeployBase } from "../../script/deploy/DeployBase.s.sol";
 
-import { MinterGateway } from "../../src/MinterGateway.sol";
+import { MinterGateway } from "../../src/core/MinterGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
-import { PYUSDXExtensionFactory } from "../../src/deploy/PYUSDXExtensionFactory.sol";
+import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 
 import { BaseForkTest } from "./BaseForkTest.sol";
@@ -27,12 +27,12 @@ contract CoreDeployer is DeployBase {
 /// @notice Base test that deploys the full PYUSDX stack via DeployBase deploy scripts
 /// @dev Uses CREATE3 via CreateX factory (available on mainnet forks).
 ///      Uses composition with CoreDeployer to avoid forge-std diamond inheritance
-///      between lib/forge-std (scripts) and lib/m-extensions/lib/forge-std (tests).
+///      between lib/forge-std (scripts) and lib/evm-m-extensions/lib/forge-std (tests).
 abstract contract IntegrationForkTest is BaseForkTest {
     PYUSDX public pyusdx;
     MinterGateway public minterGateway;
     SwapFacility public swapFacility;
-    PYUSDXExtensionFactory public factory;
+    ExtensionFactory public factory;
 
     DeployBase.CoreDeployments internal _coreDeployments;
 
@@ -66,7 +66,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
         pyusdx = PYUSDX(deployments_.pyusdxProxy);
         minterGateway = MinterGateway(deployments_.minterGatewayProxy);
         swapFacility = SwapFacility(deployments_.swapFacilityProxy);
-        factory = PYUSDXExtensionFactory(deployments_.factoryProxy);
+        factory = ExtensionFactory(deployments_.factoryProxy);
         _coreDeployments = deployments_;
     }
 
