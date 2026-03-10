@@ -54,6 +54,9 @@ interface IPYUSDX {
     /// @notice Emitted when a fee is claimed from an account's yield.
     event FeeClaimed(address indexed account, address indexed recipient, uint256 fee);
 
+    /// @notice Emitted when earner manager distributed additional reward for an account.
+    event RewardDistributed(address indexed account, uint256 amount);
+
     /* ============ Structs ============ */
 
     /// @notice Parameters for initializing the PYUSDX contract.
@@ -130,6 +133,7 @@ interface IPYUSDX {
      * @notice Claims accrued yield for an account.
      * @dev    Anyone can call on behalf of any account.
      * @dev    MUST revert if the contract is paused.
+     * @dev    MUST revert if the account is frozen.
      * @param account The account to claim yield for.
      * @return yieldWithFee  The gross yield claimed.
      * @return fee           The fee deducted.

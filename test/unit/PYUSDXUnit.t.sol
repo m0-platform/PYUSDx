@@ -307,6 +307,61 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
     }
 
+    /* ============ distributeReward ============ */
+
+    function test_distributeReward_happyPath() public {
+        uint256 balanceBefore = pyusdx.balanceOf(alice);
+        uint256 totalSupplyBefore = pyusdx.totalSupply();
+
+        vm.expectEmit();
+        emit IERC20.Transfer(address(0), alice, MINT_AMOUNT);
+
+        vm.expectEmit();
+        emit IPYUSDX.RewardDistributed(alice, MINT_AMOUNT);
+
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, MINT_AMOUNT);
+
+        assertEq(pyusdx.balanceOf(alice), balanceBefore + MINT_AMOUNT);
+        assertEq(pyusdx.totalSupply(), totalSupplyBefore + MINT_AMOUNT);
+    }
+
+    function test_distributeReward_revert_notEarnerManager() public {
+        vm.expectRevert(IPYUSDX.NotEarnerManager.selector);
+        vm.prank(alice);
+        pyusdx.distributeReward(bob, MINT_AMOUNT);
+    }
+
+    function test_distributeReward_revert_whenPaused() public {
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, MINT_AMOUNT);
+    }
+
+    function test_distributeReward_revert_frozenAccount() public {
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, MINT_AMOUNT);
+    }
+
+    function test_distributeReward_revert_zeroAccount() public {
+        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(address(0), MINT_AMOUNT);
+    }
+
+    function test_distributeReward_revert_zeroAmount() public {
+        vm.expectRevert(IPYUSDX.ZeroAmount.selector);
+        vm.prank(earnerManager);
+        pyusdx.distributeReward(alice, 0);
+    }
+
     /* ============ Rate Limit ============ */
 
     function test_setRateLimit_revertIfNotManager() public {
@@ -1990,8 +2045,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.claimFor(alice);
     }
 
-    function test_claimFor_frozenAccount_returnsZero() public {
-        // Mint tokens to alice first (as non-earner)
+    function test_claimFor_revert_frozenAccount() public {
         minterGateway.mint(alice, 1000e6);
 
         vm.prank(earnerManager);
@@ -2000,11 +2054,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.prank(freezeManager);
         pyusdx.freeze(alice);
 
-        // Freezing stops earning and claims any accrued yield, so claimFor returns zeros
-        (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) = pyusdx.claimFor(alice);
-        assertEq(yieldWithFee, 0);
-        assertEq(fee, 0);
-        assertEq(yieldNetOfFee, 0);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        pyusdx.claimFor(alice);
     }
 
     /* ============ setEarningDetails ============ */

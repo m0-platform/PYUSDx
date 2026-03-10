@@ -31,7 +31,7 @@ abstract contract PYUSDXStorageLayout {
     struct Account {
         // Slot 0: 256/256
         uint256 balance;
-        // Slot 1: 200/256 — isEarning + index math (single SLOAD)
+        // Slot 1: 200/256 — earnerRate + index math (single SLOAD)
         uint128 lastIndex;
         uint40 lastUpdateTimestamp;
         uint32 earnerRate;
@@ -121,6 +121,8 @@ contract PYUSDX is
     /// @inheritdoc IPYUSDX
     function distributeReward(address account, uint256 amount) external onlyEarnerManager whenNotPaused {
         _mint(account, amount);
+
+        emit RewardDistributed(account, amount);
     }
 
     /// @inheritdoc IPYUSDX
@@ -146,6 +148,8 @@ contract PYUSDX is
     function claimFor(
         address account
     ) external whenNotPaused returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) {
+        _revertIfFrozen(account);
+
         return _claimFor(account);
     }
 
