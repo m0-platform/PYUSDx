@@ -10,7 +10,9 @@ import { UIntMath } from "../../../lib/evm-m-extensions/lib/common/src/libs/UInt
 import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { YieldToOne } from "./YieldToOne.sol";
+import { IYieldToOne } from "./interfaces/IYieldToOne.sol";
 import { IMultiMint } from "./interfaces/IMultiMint.sol";
+import { IPYUSDX } from "../../IPYUSDX.sol";
 import { ISwapFacility } from "../../swap/interfaces/ISwapFacility.sol";
 
 abstract contract MultiMintStorageLayout {
@@ -143,6 +145,25 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         _replaceAsset(asset, ISwapFacility(msg.sender).msgSender(), recipient, amount);
     }
 
+    /// @inheritdoc IYieldToOne
+    function claimYield() public virtual override(IYieldToOne, YieldToOne) returns (uint256) {
+        _beforeClaimYield();
+
+        IPYUSDX(pyusdx).claimFor(address(this));
+
+        // In MultiMint, totalSupply includes tokens backed by non-PYUSDX assets.
+        // PYUSDX-backed portion = totalSupply - totalAssets.
+        // Excess = actual PYUSDX balance - PYUSDX-backed portion.
+        uint256 excess_ = _pyusdxBalanceOf(address(this)) + totalAssets() - totalSupply();
+
+        if (excess_ == 0) return 0;
+
+        emit YieldClaimed(excess_);
+        _mint(yieldRecipient(), excess_);
+
+        return excess_;
+    }
+
     /// @inheritdoc IMultiMint
     function setAssetCap(address asset, uint256 cap) external onlyRole(ASSET_CAP_MANAGER_ROLE) {
         _revertIfInvalidAsset(asset);
@@ -201,9 +222,10 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         return amount != 0 && assetBalanceOf(asset) >= amount;
     }
 
-    /// @inheritdoc IERC20
-    function totalSupply() public view override returns (uint256) {
-        return _pyusdxBalanceOf(address(this)) + totalAssets();
+    /// @inheritdoc IYieldToOne
+    function yield() public view virtual override(IYieldToOne, YieldToOne) returns (uint256) {
+        uint256 excess_ = _pyusdxBalanceOf(address(this)) + totalAssets() - totalSupply();
+        return excess_ + IPYUSDX(pyusdx).accruedYieldToSelfOf(address(this));
     }
 
     /* ============ Hooks ============ */

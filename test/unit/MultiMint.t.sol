@@ -444,15 +444,24 @@ contract MultiMintTest is Test {
         _wrapAssetFor(alice, address(usdc), 40e6);
 
         assertEq(extension.yield(), 0);
+        assertEq(extension.totalSupply(), 100e6);
 
         vm.warp(block.timestamp + 365 days);
 
-        // Yield is visible before claim via accruedYieldOf.
+        // Yield is visible before claim.
         assertGt(extension.yield(), 0);
 
-        // After external claim, accruedYieldOf resets to 0.
+        // After external claimFor, yield() still shows excess (realized but unminted).
         pyusdx.claimFor(address(extension));
+        uint256 yieldAfterClaim = extension.yield();
+        assertGt(yieldAfterClaim, 0);
+
+        // claimYield recovers it.
+        uint256 claimed = extension.claimYield();
+        assertEq(claimed, yieldAfterClaim);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
         assertEq(extension.yield(), 0);
+        assertEq(extension.totalSupply(), 100e6 + claimed);
     }
 
     function test_claimYield() public {
@@ -464,7 +473,25 @@ contract MultiMintTest is Test {
 
         assertGt(claimed, 0);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
+        assertEq(extension.totalSupply(), MINT_AMOUNT + claimed);
         assertEq(extension.yield(), 0);
+    }
+
+    function test_claimYield_directBypass() public {
+        _wrapPyusdxFor(alice, alice, 60e6);
+        _wrapAssetFor(alice, address(usdc), 40e6);
+
+        vm.warp(block.timestamp + 365 days);
+
+        // Direct claimFor bypass.
+        pyusdx.claimFor(address(extension));
+        uint256 excess = pyusdx.balanceOf(address(extension)) + extension.totalAssets() - extension.totalSupply();
+        assertGt(excess, 0);
+
+        // claimYield recovers the excess.
+        uint256 claimed = extension.claimYield();
+        assertEq(claimed, excess);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 
     function test_setYieldRecipient() public {
