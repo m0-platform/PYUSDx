@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.26;
+pragma solidity ^0.8.34;
 
 import { Test } from "../../lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { MinterGateway } from "../../src/core/MinterGateway.sol";
-import { PYUSDXMock } from "../mock/PYUSDXMock.sol";
+import { MockPYUSDX } from "../mock/MockPYUSDX.sol";
 
 /// @title MinterGateway Base Unit Test
 /// @notice Base test contract with common setup for MinterGateway tests
 abstract contract MinterGatewayBaseUnitTest is Test {
     MinterGateway public minterGateway;
-    PYUSDXMock public pyusdx;
+    MockPYUSDX public pyusdx;
 
     // Test addresses
     address public admin = makeAddr("admin");
@@ -24,8 +24,8 @@ abstract contract MinterGatewayBaseUnitTest is Test {
     uint32 public constant DEFAULT_MINT_TTL = 7 days;
 
     function setUp() public virtual {
-        // Predict PYUSDXMock address:
-        // After this point: nonce N -> MinterGateway impl, N+1 -> proxy, N+2 -> PYUSDXMock
+        // Predict MockPYUSDX address:
+        // After this point: nonce N -> MinterGateway impl, N+1 -> proxy, N+2 -> MockPYUSDX
         uint256 nonceBefore = vm.getNonce(address(this));
         address predictedPyusdx = vm.computeCreateAddress(address(this), nonceBefore + 2);
 
@@ -45,8 +45,8 @@ abstract contract MinterGatewayBaseUnitTest is Test {
             )
         );
 
-        // Deploy PYUSDXMock - lands at predicted address
-        pyusdx = new PYUSDXMock(address(minterGateway));
+        // Deploy MockPYUSDX - lands at predicted address
+        pyusdx = new MockPYUSDX(address(minterGateway));
         assertEq(address(pyusdx), predictedPyusdx, "address prediction failed");
     }
 

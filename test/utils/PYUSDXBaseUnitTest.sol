@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.34;
 
 import { IndexingMath } from "../../lib/evm-m-extensions/lib/common/src/libs/IndexingMath.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
@@ -7,13 +7,13 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
+import { MockMinterGateway } from "../mock/MockMinterGateway.sol";
 import { BaseTest } from "./BaseTest.sol";
 
 /// @title PYUSDX Base Unit Test
 /// @notice Base test contract with common setup for PYUSDX tests
 abstract contract PYUSDXBaseUnitTest is BaseTest {
-    MinterGatewayMock public minterGateway;
+    MockMinterGateway public minterGateway;
     PYUSDXHarness public pyusdx;
 
     function setUp() public virtual override {
@@ -21,7 +21,7 @@ abstract contract PYUSDXBaseUnitTest is BaseTest {
 
         // Deploy minter gateway mock first with dummy address (will be updated later)
         // TODO: figure out how to avoid this circular dependency
-        minterGateway = new MinterGatewayMock(address(0));
+        minterGateway = new MockMinterGateway(address(0));
 
         address implementation = address(new PYUSDXHarness());
 

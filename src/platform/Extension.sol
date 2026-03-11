@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-
-pragma solidity 0.8.26;
+pragma solidity ^0.8.34;
 
 import { ERC20ExtendedUpgradeable } from "../../lib/evm-m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
 

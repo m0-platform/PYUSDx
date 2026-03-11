@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity 0.8.34;
 
 import { UIntMath } from "../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity 0.8.34;
 
 import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
@@ -7,7 +7,7 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
+import { MockMinterGateway } from "../mock/MockMinterGateway.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.sol";
@@ -17,7 +17,7 @@ import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interf
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 
 contract YieldToOneUnitTests is Test {
-    MinterGatewayMock public minterGateway;
+    MockMinterGateway public minterGateway;
     PYUSDXHarness public pyusdx;
     MockSwapFacility public swapFacility;
     YieldToOne public extension;
@@ -36,7 +36,7 @@ contract YieldToOneUnitTests is Test {
     uint256 public constant MINT_AMOUNT = 1000e6;
 
     function setUp() public {
-        minterGateway = new MinterGatewayMock(address(0));
+        minterGateway = new MockMinterGateway(address(0));
 
         address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(

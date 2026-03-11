@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity 0.8.34;
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
@@ -18,7 +18,7 @@ import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
 
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
+import { MockMinterGateway } from "../mock/MockMinterGateway.sol";
 
 contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     event Transfer(address indexed from, address indexed to, uint256 value);
