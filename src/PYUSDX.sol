@@ -8,7 +8,6 @@ import { Pausable } from "../lib/evm-m-extensions/src/components/pausable/Pausab
 import { UIntMath } from "../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
 import { ContinuousIndexingMath } from "../lib/evm-m-extensions/lib/common/src/libs/ContinuousIndexingMath.sol";
 import { IndexingMath } from "../lib/evm-m-extensions/lib/common/src/libs/IndexingMath.sol";
-import { AccessControlUpgradeable } from "../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 import { IERC20 } from "../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 

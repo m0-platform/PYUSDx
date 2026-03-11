@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
+import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
@@ -70,16 +71,18 @@ contract DeployIntegrationTests is IntegrationForkTest {
     }
 
     function test_coreDeployment_factoryDeployExtension() public {
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: "TestYTO",
+            symbol: "TYTO",
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            freezeManager: freezeManager,
+            yieldRecipientManager: admin,
+            pauser: pauser
+        });
+
         vm.prank(admin);
-        (address ytoProxy, , ) = factory.deployYieldToOne(
-            "TestYTO",
-            "TYTO",
-            yieldRecipient,
-            admin,
-            freezeManager,
-            admin,
-            pauser
-        );
+        (address ytoProxy, , ) = factory.deployYieldToOne(string("test-yto-deploy"), params);
 
         assertTrue(factory.isApprovedExtension(ytoProxy));
         assertTrue(swapFacility.isApprovedExtension(ytoProxy));
@@ -89,16 +92,18 @@ contract DeployIntegrationTests is IntegrationForkTest {
         uint256 amount = 1000e6;
 
         // Deploy extension via factory
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: "TestYTO",
+            symbol: "TYTO",
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            freezeManager: freezeManager,
+            yieldRecipientManager: admin,
+            pauser: pauser
+        });
+
         vm.prank(admin);
-        (address ytoProxy, , ) = factory.deployYieldToOne(
-            "TestYTO",
-            "TYTO",
-            yieldRecipient,
-            admin,
-            freezeManager,
-            admin,
-            pauser
-        );
+        (address ytoProxy, , ) = factory.deployYieldToOne(string("test-yto-swap"), params);
         YieldToOne yto = YieldToOne(ytoProxy);
 
         // Enable earning for the extension

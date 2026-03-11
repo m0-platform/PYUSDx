@@ -77,8 +77,8 @@ contract YieldToOneUnitTests is Test {
                     yieldRecipient,
                     admin,
                     freezeManager,
-                    yieldRecipientManager,
-                    pauser
+                    pauser,
+                    yieldRecipientManager
                 )
             )
         );
@@ -174,8 +174,8 @@ contract YieldToOneUnitTests is Test {
                     yieldRecipient,
                     admin,
                     freezeManager,
-                    yieldRecipientManager,
-                    pauser
+                    pauser,
+                    yieldRecipientManager
                 )
             )
         );

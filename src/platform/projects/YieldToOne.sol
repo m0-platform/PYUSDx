@@ -64,8 +64,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
      * @param  yieldRecipient_       The address of the yield recipient.
      * @param  admin                 The address of the admin.
      * @param  freezeManager         The address of the freeze manager.
-     * @param  yieldRecipientManager The address of the yield recipient manager.
      * @param  pauser                The address of the pauser.
+     * @param  yieldRecipientManager The address of the yield recipient manager.
      */
     function initialize(
         string memory name,
@@ -73,10 +73,10 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         address yieldRecipient_,
         address admin,
         address freezeManager,
-        address yieldRecipientManager,
-        address pauser
+        address pauser,
+        address yieldRecipientManager
     ) public virtual initializer {
-        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, yieldRecipientManager, pauser);
+        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, pauser, yieldRecipientManager);
     }
 
     /**
@@ -87,8 +87,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
      * @param yieldRecipient_       The address of the yield recipient.
      * @param admin                 The address of the admin.
      * @param freezeManager         The address of the freeze manager.
-     * @param yieldRecipientManager The address of the yield recipient manager.
      * @param pauser                The address of the pauser.
+     * @param yieldRecipientManager The address of the yield recipient manager.
      */
     function __YieldToOne_init(
         string memory name,
@@ -96,8 +96,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         address yieldRecipient_,
         address admin,
         address freezeManager,
-        address yieldRecipientManager,
-        address pauser
+        address pauser,
+        address yieldRecipientManager
     ) internal onlyInitializing {
         if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
         if (admin == address(0)) revert ZeroAdmin();
