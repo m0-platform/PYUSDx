@@ -4,12 +4,10 @@ pragma solidity 0.8.26;
 
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import { TransparentUpgradeableProxy } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { DeployHelpers } from "../../lib/evm-m-extensions/lib/common/script/deploy/DeployHelpers.sol";
 
 import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
-
 import { IExtension } from "./interfaces/IExtension.sol";
-
 import { IExtensionFactory } from "./interfaces/IExtensionFactory.sol";
 
 import { MultiMint } from "./projects/MultiMint.sol";
@@ -41,8 +39,14 @@ abstract contract ExtensionFactoryStorageLayout {
 /// @notice A factory contract for deploying and registering PYUSDX extensions (YieldToOne, MultiMint).
 ///         Serves as the single source of truth for extension approval in the SwapFacility.
 /// @author M0 Labs
-contract ExtensionFactory is IExtensionFactory, Initializable, AccessControlUpgradeable, ExtensionFactoryStorageLayout {
-    /* ============ Variables ============ */
+contract ExtensionFactory is
+    IExtensionFactory,
+    Initializable,
+    AccessControlUpgradeable,
+    ExtensionFactoryStorageLayout,
+    DeployHelpers
+{
+    /* ============ State Variables ============ */
 
     /// @inheritdoc IExtensionFactory
     bytes32 public constant FACTORY_MANAGER_ROLE = keccak256("FACTORY_MANAGER_ROLE");
@@ -57,13 +61,11 @@ contract ExtensionFactory is IExtensionFactory, Initializable, AccessControlUpgr
 
     /* ============ Constructor ============ */
 
-    /**
-     * @custom:oz-upgrades-unsafe-allow constructor
-     * @notice Constructs ExtensionFactory implementation contract.
-     * @dev    Sets immutable storage.
-     * @param  pyusdx_        The address of the PYUSDX token.
-     * @param  swapFacility_  The address of the SwapFacility contract.
-     */
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    /// @notice Constructs ExtensionFactory implementation contract.
+    /// @dev    Sets immutable storage.
+    /// @param  pyusdx_       The address of the PYUSDX token.
+    /// @param  swapFacility_ The address of the SwapFacility contract.
     constructor(address pyusdx_, address swapFacility_) {
         _disableInitializers();
 
@@ -74,11 +76,9 @@ contract ExtensionFactory is IExtensionFactory, Initializable, AccessControlUpgr
 
     /* ============ Initializer ============ */
 
-    /**
-     * @notice Initializes the ExtensionFactory proxy.
-     * @param  admin          The address of the admin.
-     * @param  factoryManager The address of the factory manager.
-     */
+    /// @notice Initializes the ExtensionFactory proxy.
+    /// @param  admin          The address of the admin.
+    /// @param  factoryManager The address of the factory manager.
     function initialize(address admin, address factoryManager) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
         if (factoryManager == address(0)) revert ZeroFactoryManager();
@@ -97,36 +97,32 @@ contract ExtensionFactory is IExtensionFactory, Initializable, AccessControlUpgr
 
     /// @inheritdoc IExtensionFactory
     function deployYieldToOne(
-        string calldata name,
-        string calldata symbol,
-        address yieldRecipient,
-        address admin,
-        address freezeManager,
-        address yieldRecipientManager,
-        address pauser
-    ) external override returns (address proxy, address proxyAdmin, address implementation) {
-        if (admin == address(0)) revert ZeroAdmin();
+        string calldata extensionName,
+        YieldToOneParams calldata params
+    ) external returns (address proxy, address proxyAdmin, address implementation) {
+        _revertIfZeroAdmin(params.admin);
 
         implementation = _getExtensionFactoryStorage().yieldToOneImplementation;
 
-        bytes32 salt = keccak256(
-            abi.encode(msg.sender, name, symbol, yieldRecipient, admin, freezeManager, yieldRecipientManager, pauser)
-        );
-
         bytes memory initData = abi.encodeWithSelector(
             YieldToOne.initialize.selector,
-            name,
-            symbol,
-            yieldRecipient,
-            admin,
-            freezeManager,
-            yieldRecipientManager,
-            pauser
+            params.name,
+            params.symbol,
+            params.yieldRecipient,
+            params.admin,
+            params.freezeManager,
+            params.pauser,
+            params.yieldRecipientManager
         );
 
-        // NOTE: Deploy using CREATE2 to avoid duplicates, reverts when same deployer + same params.
-        //       admin is the ProxyAdmin owner and extension admin.
-        proxy = address(new TransparentUpgradeableProxy{ salt: salt }(implementation, admin, initData));
+        // NOTE: Deploy at a predicted address using CREATE3, reverts when same deployer + extensionName.
+        //       params.admin is the ProxyAdmin owner and extension admin.
+        proxy = _deployCreate3TransparentProxy(
+            implementation,
+            params.admin,
+            initData,
+            _computeExtensionSalt(msg.sender, extensionName)
+        );
 
         proxyAdmin = _getProxyAdmin(proxy);
 
@@ -137,48 +133,33 @@ contract ExtensionFactory is IExtensionFactory, Initializable, AccessControlUpgr
 
     /// @inheritdoc IExtensionFactory
     function deployMultiMint(
-        string calldata name,
-        string calldata symbol,
-        address yieldRecipient,
-        address admin,
-        address assetCapManager,
-        address freezeManager,
-        address pauser,
-        address yieldRecipientManager
-    ) external override returns (address proxy, address proxyAdmin, address implementation) {
-        if (admin == address(0)) revert ZeroAdmin();
+        string calldata extensionName,
+        MultiMintParams calldata params
+    ) external returns (address proxy, address proxyAdmin, address implementation) {
+        _revertIfZeroAdmin(params.admin);
 
         implementation = _getExtensionFactoryStorage().multiMintImplementation;
 
-        bytes32 salt = keccak256(
-            abi.encode(
-                msg.sender,
-                name,
-                symbol,
-                yieldRecipient,
-                admin,
-                assetCapManager,
-                freezeManager,
-                pauser,
-                yieldRecipientManager
-            )
-        );
-
         bytes memory initData = abi.encodeWithSelector(
             MultiMint.initialize.selector,
-            name,
-            symbol,
-            yieldRecipient,
-            admin,
-            assetCapManager,
-            freezeManager,
-            pauser,
-            yieldRecipientManager
+            params.name,
+            params.symbol,
+            params.yieldRecipient,
+            params.admin,
+            params.assetCapManager,
+            params.freezeManager,
+            params.pauser,
+            params.yieldRecipientManager
         );
 
-        // NOTE: Deploy using CREATE2 to avoid duplicates, reverts when same deployer + same params.
-        //       admin is the ProxyAdmin owner and extension admin.
-        proxy = address(new TransparentUpgradeableProxy{ salt: salt }(implementation, admin, initData));
+        // NOTE: Deploy at a predicted address using CREATE3, reverts when same deployer + extensionName.
+        //       params.admin is the ProxyAdmin owner and extension admin.
+        proxy = _deployCreate3TransparentProxy(
+            implementation,
+            params.admin,
+            initData,
+            _computeExtensionSalt(msg.sender, extensionName)
+        );
 
         proxyAdmin = _getProxyAdmin(proxy);
 
@@ -228,6 +209,11 @@ contract ExtensionFactory is IExtensionFactory, Initializable, AccessControlUpgr
     /* ============ Public Functions ============ */
 
     /// @inheritdoc IExtensionFactory
+    function getExtensionAddress(address deployer, string calldata extensionName) external view returns (address) {
+        return _getCreate3Address(address(this), _computeExtensionSalt(deployer, extensionName));
+    }
+
+    /// @inheritdoc IExtensionFactory
     function getExtensionType(address extension) external view override returns (ExtensionType) {
         return _getExtensionFactoryStorage().extensionTypes[extension];
     }
@@ -247,29 +233,51 @@ contract ExtensionFactory is IExtensionFactory, Initializable, AccessControlUpgr
         return _getExtensionFactoryStorage().activeExtensions[extension];
     }
 
-    /* ============ Internal Functions ============ */
+    /* ============ Internal Interactive Functions ============ */
 
-    /**
-     * @dev   Registers an extension in the factory.
-     * @param proxy          The address of the proxy.
-     * @param extensionType  The type of the extension.
-     */
+    /// @dev   Registers an extension in the factory.
+    /// @param proxy         The address of the proxy.
+    /// @param extensionType The type of the extension.
     function _registerExtension(address proxy, ExtensionType extensionType) internal {
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
         $.extensionTypes[proxy] = extensionType;
         $.activeExtensions[proxy] = true;
     }
 
-    /**
-     * @dev    Computes the ProxyAdmin address deployed by the TransparentUpgradeableProxy.
-     *         The ProxyAdmin is created via CREATE in the proxy constructor with nonce 1.
-     * @param  proxy The address of the proxy.
-     * @return The address of the ProxyAdmin.
-     */
+    /* ============ Internal View Functions ============ */
+
+    /// @dev    Computes a deployer-namespaced salt whose first 20 bytes match `address(this)`.
+    ///         This ensures CreateX's `_guard` takes the `SenderBytes.MsgSender` path (since
+    ///         the Factory is CreateX's `msg.sender`), while the deployer-specific hash in
+    ///         bytes 21-31 provides per-deployer uniqueness.
+    /// @param  deployer      The address of the deployer (e.g. `msg.sender` in deploy functions).
+    /// @param  extensionName The human-readable extension name.
+    /// @return The computed salt.
+    function _computeExtensionSalt(address deployer, string calldata extensionName) internal view returns (bytes32) {
+        return
+            bytes32(
+                abi.encodePacked(
+                    bytes20(address(this)),
+                    bytes1(0), // disable cross-chain redeploy protection
+                    bytes11(keccak256(abi.encodePacked(deployer, extensionName)))
+                )
+            );
+    }
+
+    /// @dev    Computes the ProxyAdmin address deployed by the TransparentUpgradeableProxy.
+    ///         The ProxyAdmin is created via CREATE in the proxy constructor with nonce 1.
+    /// @param  proxy The address of the proxy.
+    /// @return The address of the ProxyAdmin.
     function _getProxyAdmin(address proxy) internal pure returns (address) {
         // NOTE: ProxyAdmin is deployed by the proxy via CREATE with nonce 1
         //       Address = keccak256(0xd6 || 0x94 || proxy || 0x01)
         bytes32 hash = keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), proxy, bytes1(0x01)));
         return address(uint160(uint256(hash)));
+    }
+
+    /// @dev   Reverts if the given admin address is the zero address.
+    /// @param admin The admin address to check.
+    function _revertIfZeroAdmin(address admin) internal pure {
+        if (admin == address(0)) revert ZeroAdmin();
     }
 }

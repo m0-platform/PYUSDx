@@ -126,7 +126,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     ) internal onlyInitializing {
         if (assetCapManager == address(0)) revert ZeroAssetCapManager();
 
-        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, yieldRecipientManager, pauser);
+        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, pauser, yieldRecipientManager);
 
         _grantRole(ASSET_CAP_MANAGER_ROLE, assetCapManager);
     }
