@@ -157,6 +157,8 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
 
         uint256 elapsed;
 
+        // NOTE: `lastRefillTime` is always set from `block.timestamp`, so
+        //       `block.timestamp >= lastRefillTime` and subtraction cannot underflow.
         unchecked {
             elapsed = uint40(block.timestamp) - lastRefillTime;
         }

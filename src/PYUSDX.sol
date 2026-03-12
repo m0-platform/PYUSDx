@@ -239,6 +239,8 @@ contract PYUSDX is
 
         if (feeRate == 0 || yieldWithFee == 0) return (yieldWithFee, 0, yieldWithFee);
 
+        // NOTE: `feeRate` is capped at `ONE_HUNDRED_PERCENT` (10,000 bps), so `fee <= yieldWithFee`
+        //       and subtraction cannot underflow.
         unchecked {
             fee = (yieldWithFee * feeRate) / ONE_HUNDRED_PERCENT;
             yieldNetOfFee = yieldWithFee - fee;
@@ -264,9 +266,7 @@ contract PYUSDX is
 
     /// @inheritdoc IPYUSDX
     function balanceWithYieldOf(address account) external view returns (uint256) {
-        unchecked {
-            return balanceOf(account) + accruedYieldOf(account);
-        }
+        return balanceOf(account) + accruedYieldOf(account);
     }
 
     /// @inheritdoc IPYUSDX
@@ -309,6 +309,8 @@ contract PYUSDX is
 
         if (accountInfo.earnerRate == 0) return EXP_SCALED_ONE;
 
+        // NOTE: Result is bounded by `UIntMath.bound128()` which caps at `type(uint128).max`,
+        //       preventing overflow.
         unchecked {
             return
                 UIntMath.bound128(

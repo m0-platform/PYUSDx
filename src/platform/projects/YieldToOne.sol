@@ -224,10 +224,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     function _mint(address recipient, uint256 amount) internal override {
         YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
 
-        unchecked {
-            $.totalSupply += amount;
-            $.balanceOf[recipient] += amount;
-        }
+        $.totalSupply += amount;
+        $.balanceOf[recipient] += amount;
 
         emit Transfer(address(0), recipient, amount);
     }
@@ -240,6 +238,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     function _burn(address account, uint256 amount) internal override {
         YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
 
+        // NOTE: `amount` is verified to not exceed `$.balanceOf[account]` by the caller, so
+        //       subtraction cannot underflow. `totalSupply >= balanceOf[account]` by invariant.
         unchecked {
             $.totalSupply -= amount;
             $.balanceOf[account] -= amount;
@@ -257,6 +257,9 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     function _update(address sender, address recipient, uint256 amount) internal override {
         YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
 
+        // NOTE: `amount` is verified to not exceed `$.balanceOf[sender]` by the caller, so
+        //       subtraction cannot underflow. Addition cannot overflow because `totalSupply`
+        //       (which bounds the sum of all balances) fits in uint256.
         unchecked {
             $.balanceOf[sender] -= amount;
             $.balanceOf[recipient] += amount;
