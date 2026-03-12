@@ -545,6 +545,13 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         assertTrue(factory.isApprovedExtension(proxy));
     }
 
+    function test_setExtensionStatus_zeroExtension() public {
+        vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
+
+        vm.prank(factoryManager);
+        factory.setExtensionStatus(address(0), true);
+    }
+
     function test_setExtensionStatus_notRegistered() public {
         vm.expectRevert(abi.encodeWithSelector(IExtensionFactory.ExtensionNotRegistered.selector, alice));
 
@@ -687,7 +694,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     }
 
     function test_setImplementation_zeroAddress() public {
-        vm.expectRevert();
+        vm.expectRevert(IExtensionFactory.ZeroImplementation.selector);
 
         vm.prank(factoryManager);
         factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, address(0));

@@ -176,18 +176,20 @@ contract ExtensionFactory is
     }
 
     /// @inheritdoc IExtensionFactory
-    function setExtensionStatus(address extension, bool status) external override onlyRole(FACTORY_MANAGER_ROLE) {
+    function setExtensionStatus(address extension, bool enabled) external override onlyRole(FACTORY_MANAGER_ROLE) {
+        if (extension == address(0)) revert ZeroExtension();
+
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
 
         if ($.extensionTypes[extension] == ExtensionType.NONE) {
             revert ExtensionNotRegistered(extension);
         }
 
-        if ($.activeExtensions[extension] == status) return;
+        if ($.activeExtensions[extension] == enabled) return;
 
-        $.activeExtensions[extension] = status;
+        $.activeExtensions[extension] = enabled;
 
-        emit ExtensionStatusSet(extension, status);
+        emit ExtensionStatusSet(extension, enabled);
     }
 
     /// @inheritdoc IExtensionFactory

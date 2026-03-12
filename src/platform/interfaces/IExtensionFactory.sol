@@ -157,8 +157,8 @@ interface IExtensionFactory {
     /// @notice Sets whether an extension is active.
     /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.
     /// @param  extension The address of the extension.
-    /// @param  status    True if the extension should be active, false otherwise.
-    function setExtensionStatus(address extension, bool status) external;
+    /// @param  enabled   True if the extension should be active, false otherwise.
+    function setExtensionStatus(address extension, bool enabled) external;
 
     /// @notice Sets the cached implementation address for a given extension type.
     /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.
