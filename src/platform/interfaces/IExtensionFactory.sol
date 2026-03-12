@@ -84,6 +84,9 @@ interface IExtensionFactory {
     /// @notice Thrown if the extension is 0x0.
     error ZeroExtension();
 
+    /// @notice Thrown if an implementation address is 0x0.
+    error ZeroImplementation();
+
     /// @notice Thrown if the extension is not registered in the factory.
     error ExtensionNotRegistered(address extension);
 

@@ -6,11 +6,10 @@ import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzep
 import { DeployHelpers } from "../../lib/evm-m-extensions/lib/common/script/deploy/DeployHelpers.sol";
 
 import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
-import { IExtension } from "./interfaces/IExtension.sol";
-import { IExtensionFactory } from "./interfaces/IExtensionFactory.sol";
-
 import { MultiMint } from "./projects/MultiMint.sol";
 import { YieldToOne } from "./projects/YieldToOne.sol";
+import { IExtension } from "./interfaces/IExtension.sol";
+import { IExtensionFactory } from "./interfaces/IExtensionFactory.sol";
 
 /// @notice ERC-7201 namespaced storage layout for ExtensionFactory.
 abstract contract ExtensionFactoryStorageLayout {
@@ -76,11 +75,20 @@ contract ExtensionFactory is
     /* ============ Initializer ============ */
 
     /// @notice Initializes the ExtensionFactory proxy.
-    /// @param  admin          The address of the admin.
-    /// @param  factoryManager The address of the factory manager.
-    function initialize(address admin, address factoryManager) external initializer {
+    /// @param  admin                    The address of the admin.
+    /// @param  factoryManager           The address of the factory manager.
+    /// @param  yieldToOneImplementation The YieldToOne implementation address.
+    /// @param  multiMintImplementation  The MultiMint implementation address.
+    function initialize(
+        address admin,
+        address factoryManager,
+        address yieldToOneImplementation,
+        address multiMintImplementation
+    ) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
         if (factoryManager == address(0)) revert ZeroFactoryManager();
+        if (yieldToOneImplementation == address(0)) revert ZeroImplementation();
+        if (multiMintImplementation == address(0)) revert ZeroImplementation();
 
         __AccessControl_init();
 
@@ -88,8 +96,8 @@ contract ExtensionFactory is
         _grantRole(FACTORY_MANAGER_ROLE, factoryManager);
 
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
-        $.yieldToOneImplementation = address(new YieldToOne(pyusdx, swapFacility));
-        $.multiMintImplementation = address(new MultiMint(pyusdx, swapFacility));
+        $.yieldToOneImplementation = yieldToOneImplementation;
+        $.multiMintImplementation = multiMintImplementation;
     }
 
     /* ============ External Functions ============ */
@@ -187,6 +195,8 @@ contract ExtensionFactory is
         ExtensionType extensionType,
         address implementation
     ) external override onlyRole(FACTORY_MANAGER_ROLE) {
+        if (implementation == address(0)) revert ZeroImplementation();
+
         if (extensionType != ExtensionType.YIELD_TO_ONE && extensionType != ExtensionType.MULTI_MINT) {
             revert InvalidExtensionType();
         }
