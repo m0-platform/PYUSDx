@@ -3,9 +3,9 @@ pragma solidity 0.8.26;
 
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 
-/// @title Minter Gateway Mock
+/// @title Issuer Gateway Mock
 /// @notice Mock contract to test PYUSDX mint functionality
-contract MinterGatewayMock {
+contract IssuerGatewayMock {
     IPYUSDX public pyusdx;
 
     constructor(address pyusdx_) {

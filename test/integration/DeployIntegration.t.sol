@@ -13,8 +13,8 @@ contract DeployIntegrationTests is IntegrationForkTest {
     /* ============ Cross-Reference Tests ============ */
 
     function test_coreDeployment_crossReferences() public view {
-        // MinterGateway → PYUSDX
-        assertEq(minterGateway.pyusdx(), address(pyusdx));
+        // IssuerGateway → PYUSDX
+        assertEq(issuerGateway.pyusdx(), address(pyusdx));
 
         // SwapFacility → PYUSDX, Factory
         assertEq(swapFacility.pyusdx(), address(pyusdx));
@@ -35,9 +35,9 @@ contract DeployIntegrationTests is IntegrationForkTest {
         assertEq(pyusdx.earnerManager(), earnerManager);
     }
 
-    function test_coreDeployment_minterGatewayRoles() public view {
-        assertTrue(minterGateway.hasRole(minterGateway.DEFAULT_ADMIN_ROLE(), admin));
-        assertTrue(minterGateway.hasRole(minterGateway.ISSUER_ROLE(), minter));
+    function test_coreDeployment_issuerGatewayRoles() public view {
+        assertTrue(issuerGateway.hasRole(issuerGateway.DEFAULT_ADMIN_ROLE(), admin));
+        assertTrue(issuerGateway.hasRole(issuerGateway.ISSUER_ROLE(), minter));
     }
 
     function test_coreDeployment_swapFacilityRoles() public view {
@@ -64,7 +64,7 @@ contract DeployIntegrationTests is IntegrationForkTest {
         pyusdx.transfer(minter, amount);
 
         vm.prank(minter);
-        minterGateway.burn(amount);
+        issuerGateway.burn(amount);
 
         assertEq(pyusdx.balanceOf(minter), 0);
     }

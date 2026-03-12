@@ -4,13 +4,13 @@ pragma solidity 0.8.26;
 import { Test } from "../../lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
-import { MinterGateway } from "../../src/core/MinterGateway.sol";
+import { IssuerGateway } from "../../src/core/IssuerGateway.sol";
 import { PYUSDXMock } from "../mock/PYUSDXMock.sol";
 
-/// @title MinterGateway Base Unit Test
-/// @notice Base test contract with common setup for MinterGateway tests
-abstract contract MinterGatewayBaseUnitTest is Test {
-    MinterGateway public minterGateway;
+/// @title IssuerGateway Base Unit Test
+/// @notice Base test contract with common setup for IssuerGateway tests
+abstract contract IssuerGatewayBaseUnitTest is Test {
+    IssuerGateway public issuerGateway;
     PYUSDXMock public pyusdx;
 
     // Test addresses
@@ -25,18 +25,18 @@ abstract contract MinterGatewayBaseUnitTest is Test {
 
     function setUp() public virtual {
         // Predict PYUSDXMock address:
-        // After this point: nonce N -> MinterGateway impl, N+1 -> proxy, N+2 -> PYUSDXMock
+        // After this point: nonce N -> IssuerGateway impl, N+1 -> proxy, N+2 -> PYUSDXMock
         uint256 nonceBefore = vm.getNonce(address(this));
         address predictedPyusdx = vm.computeCreateAddress(address(this), nonceBefore + 2);
 
-        // Deploy MinterGateway with predicted address
-        address minterGatewayImplementation = address(new MinterGateway(predictedPyusdx));
-        minterGateway = MinterGateway(
+        // Deploy IssuerGateway with predicted address
+        address issuerGatewayImplementation = address(new IssuerGateway(predictedPyusdx));
+        issuerGateway = IssuerGateway(
             UnsafeUpgrades.deployTransparentProxy(
-                minterGatewayImplementation,
+                issuerGatewayImplementation,
                 admin,
                 abi.encodeWithSelector(
-                    MinterGateway.initialize.selector,
+                    IssuerGateway.initialize.selector,
                     admin,
                     minter,
                     DEFAULT_MINT_DELAY,
@@ -46,7 +46,7 @@ abstract contract MinterGatewayBaseUnitTest is Test {
         );
 
         // Deploy PYUSDXMock - lands at predicted address
-        pyusdx = new PYUSDXMock(address(minterGateway));
+        pyusdx = new PYUSDXMock(address(issuerGateway));
         assertEq(address(pyusdx), predictedPyusdx, "address prediction failed");
     }
 
@@ -58,22 +58,22 @@ abstract contract MinterGatewayBaseUnitTest is Test {
     /// @return mintId The ID of the created mint proposal
     function _proposeMint(uint256 amount, address recipient_) internal returns (uint48 mintId) {
         vm.prank(minter);
-        mintId = minterGateway.proposeMint(amount, recipient_);
+        mintId = issuerGateway.proposeMint(amount, recipient_);
     }
 
     /// @notice Warps time to when a mint proposal becomes executable
     /// @param mintId The mint proposal ID
     function _warpToMintable(uint48 mintId) internal {
-        (uint40 createdAt, , , ) = minterGateway.getMintProposal(mintId);
-        vm.warp(createdAt + minterGateway.mintDelay());
+        (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
+        vm.warp(createdAt + issuerGateway.mintDelay());
     }
 
     /// @notice Warps time to when a mint proposal is expired
     /// @param mintId The mint proposal ID
     /// @return expiresAt The timestamp at which the proposal expired
     function _warpToExpired(uint48 mintId) internal returns (uint40 expiresAt) {
-        (uint40 createdAt, , , ) = minterGateway.getMintProposal(mintId);
-        expiresAt = createdAt + minterGateway.mintDelay() + minterGateway.mintTTL();
+        (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
+        expiresAt = createdAt + issuerGateway.mintDelay() + issuerGateway.mintTTL();
         vm.warp(expiresAt + 1);
     }
 }

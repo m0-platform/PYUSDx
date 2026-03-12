@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import { IMinterGateway } from "./IMinterGateway.sol";
+import { IIssuerGateway } from "./IIssuerGateway.sol";
 import { IPYUSDX } from "../IPYUSDX.sol";
 
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
-/// @notice ERC-7201 namespaced storage layout for MinterGateway.
-abstract contract MinterGatewayStorageLayout {
-    /// @custom:storage-location erc7201:M0.storage.MinterGateway
-    struct MinterGatewayStorage {
+/// @notice ERC-7201 namespaced storage layout for IssuerGateway.
+abstract contract IssuerGatewayStorageLayout {
+    /// @custom:storage-location erc7201:M0.storage.IssuerGateway
+    struct IssuerGatewayStorage {
         uint32 mintDelay; // ──╮ Delay in seconds before a mint can be executed.
         uint32 mintTTL; //     │ Time to live in seconds for a mint proposal.
         uint48 mintNonce; // ──╯ Incremental counter for generating unique mint IDs.
@@ -23,34 +23,34 @@ abstract contract MinterGatewayStorageLayout {
         uint256 amount; //       Amount of PYUSDX to mint.
     }
 
-    // keccak256(abi.encode(uint256(keccak256("M0.storage.MinterGateway")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant _MINTER_GATEWAY_STORAGE_LOCATION =
+    // keccak256(abi.encode(uint256(keccak256("M0.storage.IssuerGateway")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant _ISSUER_GATEWAY_STORAGE_LOCATION =
         0xda46dec3db1918d8d4832c5443057c953d7a27444565c41e9c2acac962bf4c00;
 
-    function _getMinterGatewayStorage() internal pure returns (MinterGatewayStorage storage $) {
+    function _getIssuerGatewayStorage() internal pure returns (IssuerGatewayStorage storage $) {
         assembly {
-            $.slot := _MINTER_GATEWAY_STORAGE_LOCATION
+            $.slot := _ISSUER_GATEWAY_STORAGE_LOCATION
         }
     }
 }
 
-/// @title MinterGateway
+/// @title IssuerGateway
 /// @author M0 Labs
 /// @notice Gateway contract for proposing and executing mints on PYUSDX with a time delay.
-contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessControlUpgradeable {
+contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessControlUpgradeable {
     /* ============ Constants ============ */
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
 
     /* ============ Immutable Variables ============ */
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     address public immutable pyusdx;
 
     /* ============ Constructor ============ */
 
-    /// @notice Constructs the MinterGateway implementation contract.
+    /// @notice Constructs the IssuerGateway implementation contract.
     /// @param pyusdx_ The PYUSDX token contract address.
     constructor(address pyusdx_) {
         if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDXToken();
@@ -60,7 +60,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
     /* ============ Initializer ============ */
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function initialize(address admin, address minter, uint32 mintDelay_, uint32 mintTTL_) external initializer {
         if (admin == address(0)) revert ZeroAdminAddress();
         if (minter == address(0)) revert ZeroMinterAddress();
@@ -76,12 +76,12 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
     /* ============ Interactive Functions ============ */
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function proposeMint(uint256 amount, address recipient) external onlyRole(ISSUER_ROLE) returns (uint48 mintId) {
         if (amount == 0) revert ZeroMintAmount();
         if (recipient == address(0)) revert ZeroMintRecipient();
 
-        MinterGatewayStorage storage $ = _getMinterGatewayStorage();
+        IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
         mintId = ++$.mintNonce;
 
         uint40 createdAt = uint40(block.timestamp);
@@ -98,9 +98,9 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
         emit MintProposed(mintId, msg.sender, amount, recipient, activeAt, expiresAt);
     }
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function mint(uint48 mintId) external {
-        MinterGatewayStorage storage $ = _getMinterGatewayStorage();
+        IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
         MintProposal storage proposal = $.mintProposals[mintId];
 
         if (proposal.createdAt == 0) revert InvalidMintProposal();
@@ -121,7 +121,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
         emit MintExecuted(mintId, msg.sender, amount, recipient);
     }
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function burn(uint256 amount) external onlyRole(ISSUER_ROLE) {
         if (amount == 0) revert ZeroBurnAmount();
 
@@ -130,9 +130,9 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
         emit BurnExecuted(msg.sender, amount);
     }
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function cancelMint(uint48 mintId) external {
-        MinterGatewayStorage storage $ = _getMinterGatewayStorage();
+        IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
         MintProposal storage proposal = $.mintProposals[mintId];
 
         if (proposal.createdAt == 0) revert InvalidMintProposal();
@@ -148,37 +148,37 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
     /* ============ View Functions ============ */
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function mintDelay() external view returns (uint32) {
-        return _getMinterGatewayStorage().mintDelay;
+        return _getIssuerGatewayStorage().mintDelay;
     }
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function mintTTL() external view returns (uint32) {
-        return _getMinterGatewayStorage().mintTTL;
+        return _getIssuerGatewayStorage().mintTTL;
     }
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function mintNonce() external view returns (uint48) {
-        return _getMinterGatewayStorage().mintNonce;
+        return _getIssuerGatewayStorage().mintNonce;
     }
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function getMintProposal(
         uint48 mintId
     ) external view returns (uint40 createdAt, address minter, address recipient, uint256 amount) {
-        MintProposal memory proposal = _getMinterGatewayStorage().mintProposals[mintId];
+        MintProposal memory proposal = _getIssuerGatewayStorage().mintProposals[mintId];
         return (proposal.createdAt, proposal.minter, proposal.recipient, proposal.amount);
     }
 
     /* ============ Admin Functions ============ */
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function setMintDelay(uint32 mintDelay_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setMintDelay(mintDelay_);
     }
 
-    /// @inheritdoc IMinterGateway
+    /// @inheritdoc IIssuerGateway
     function setMintTTL(uint32 mintTTL_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setMintTTL(mintTTL_);
     }
@@ -188,7 +188,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
     /// @notice Updates the mint delay
     /// @param mintDelay_ The mint delay in seconds
     function _setMintDelay(uint32 mintDelay_) internal {
-        MinterGatewayStorage storage $ = _getMinterGatewayStorage();
+        IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
 
         if ($.mintDelay == mintDelay_) return;
 
@@ -201,7 +201,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
     function _setMintTTL(uint32 mintTTL_) internal {
         if (mintTTL_ == 0) revert ZeroMintTTL();
 
-        MinterGatewayStorage storage $ = _getMinterGatewayStorage();
+        IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
 
         if ($.mintTTL == mintTTL_) return;
 

@@ -7,7 +7,7 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
+import { IssuerGatewayMock } from "../mock/IssuerGatewayMock.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
@@ -18,7 +18,7 @@ import { MockERC20 } from "../mock/MockERC20.sol";
 import { FeeOnTransferMock } from "../mock/FeeOnTransferMock.sol";
 
 contract MultiMintTest is Test {
-    MinterGatewayMock public minterGateway;
+    IssuerGatewayMock public issuerGateway;
     PYUSDXHarness public pyusdx;
     MockSwapFacility public swapFacility;
     MultiMint public extension;
@@ -42,7 +42,7 @@ contract MultiMintTest is Test {
     uint256 public constant MINT_AMOUNT = 1000e6;
 
     function setUp() public {
-        minterGateway = new MinterGatewayMock(address(0));
+        issuerGateway = new IssuerGatewayMock(address(0));
         address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
@@ -60,13 +60,13 @@ contract MultiMintTest is Test {
                             forcedTransferManager: address(1),
                             earnerManager: earnerManager,
                             rateLimitManager: rateManager,
-                            issuer: address(minterGateway)
+                            issuer: address(issuerGateway)
                         })
                     )
                 )
             )
         );
-        minterGateway.setPyusdx(address(pyusdx));
+        issuerGateway.setPyusdx(address(pyusdx));
 
         swapFacility = new MockSwapFacility(address(pyusdx));
 
@@ -108,7 +108,7 @@ contract MultiMintTest is Test {
     /* ============ Helpers ============ */
 
     function _wrapPyusdxFor(address to, address recipient, uint256 amount) internal {
-        minterGateway.mint(to, amount);
+        issuerGateway.mint(to, amount);
 
         vm.startPrank(to);
         IERC20(address(pyusdx)).approve(address(swapFacility), amount);
@@ -330,7 +330,7 @@ contract MultiMintTest is Test {
     function test_replaceAsset() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
-        minterGateway.mint(bob, 50e6);
+        issuerGateway.mint(bob, 50e6);
         vm.startPrank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
@@ -346,7 +346,7 @@ contract MultiMintTest is Test {
     function test_replaceAsset_revert_insufficientAssetBacking() public {
         _wrapAssetFor(alice, address(usdc), 50e6);
 
-        minterGateway.mint(bob, 100e6);
+        issuerGateway.mint(bob, 100e6);
         vm.startPrank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), 100e6);
         vm.expectRevert(
@@ -365,7 +365,7 @@ contract MultiMintTest is Test {
     function test_replaceAsset_crossDecimal() public {
         _wrapAssetFor(alice, address(dai), 500e18);
 
-        minterGateway.mint(bob, 200e6);
+        issuerGateway.mint(bob, 200e6);
         vm.startPrank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), 200e6);
         swapFacility.replaceAsset(address(extension), address(dai), 200e6, bob);
@@ -379,7 +379,7 @@ contract MultiMintTest is Test {
     function test_replaceAsset_revert_paused() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
-        minterGateway.mint(bob, 50e6);
+        issuerGateway.mint(bob, 50e6);
         vm.startPrank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
         vm.stopPrank();
@@ -395,7 +395,7 @@ contract MultiMintTest is Test {
     function test_replaceAsset_emitsEvent() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
-        minterGateway.mint(bob, 50e6);
+        issuerGateway.mint(bob, 50e6);
         vm.startPrank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
         vm.expectEmit(true, true, false, true, address(extension));
@@ -550,7 +550,7 @@ contract MultiMintTest is Test {
     function test_replaceAsset_revert_frozen() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
-        minterGateway.mint(bob, 50e6);
+        issuerGateway.mint(bob, 50e6);
 
         vm.prank(freezeManager);
         extension.freeze(bob);

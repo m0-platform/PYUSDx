@@ -80,7 +80,7 @@ contract PYUSDXInvariants is PYUSDXBaseUnitTest {
         uint256 totalSupplyBefore = pyusdx.totalSupply();
 
         // Mint to non-earning account
-        minterGateway.mint(alice, amount);
+        issuerGateway.mint(alice, amount);
 
         // Check invariants still hold
         assertEq(pyusdx.totalSupply(), totalSupplyBefore + amount, "Total supply increased by amount");

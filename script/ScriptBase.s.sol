@@ -11,7 +11,7 @@ contract ScriptBase is Script, Config {
         address[] extensionAddresses;
         string[] extensionNames;
         address extensionFactory;
-        address minterGateway;
+        address issuerGateway;
         address pyusdx;
         address swapFacility;
     }
@@ -67,7 +67,7 @@ contract ScriptBase is Script, Config {
 
         if (
             keccak256(bytes(key_)) != keccak256(bytes("pyusdx")) &&
-            keccak256(bytes(key_)) != keccak256(bytes("minterGateway")) &&
+            keccak256(bytes(key_)) != keccak256(bytes("issuerGateway")) &&
             keccak256(bytes(key_)) != keccak256(bytes("swapFacility")) &&
             keccak256(bytes(key_)) != keccak256(bytes("extensionFactory"))
         ) {
@@ -82,8 +82,8 @@ contract ScriptBase is Script, Config {
 
         vm.serializeAddress(
             root,
-            "minterGateway",
-            keccak256(bytes(key_)) == keccak256("minterGateway") ? value_ : deployments_.minterGateway
+            "issuerGateway",
+            keccak256(bytes(key_)) == keccak256("issuerGateway") ? value_ : deployments_.issuerGateway
         );
 
         vm.serializeAddress(
@@ -125,12 +125,12 @@ contract ScriptBase is Script, Config {
         }
     }
 
-    function _getMinterGateway() internal view returns (address) {
+    function _getIssuerGateway() internal view returns (address) {
         Deployments memory deployments_ = _readDeployment(block.chainid);
-        if (deployments_.minterGateway == address(0)) {
-            return vm.envAddress("MINTER_GATEWAY");
+        if (deployments_.issuerGateway == address(0)) {
+            return vm.envAddress("ISSUER_GATEWAY");
         } else {
-            return deployments_.minterGateway;
+            return deployments_.issuerGateway;
         }
     }
 

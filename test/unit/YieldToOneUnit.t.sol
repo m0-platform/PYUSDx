@@ -7,7 +7,7 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { MinterGatewayMock } from "../mock/MinterGatewayMock.sol";
+import { IssuerGatewayMock } from "../mock/IssuerGatewayMock.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.sol";
@@ -17,7 +17,7 @@ import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interf
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 
 contract YieldToOneUnitTests is Test {
-    MinterGatewayMock public minterGateway;
+    IssuerGatewayMock public issuerGateway;
     PYUSDXHarness public pyusdx;
     MockSwapFacility public swapFacility;
     YieldToOne public extension;
@@ -36,7 +36,7 @@ contract YieldToOneUnitTests is Test {
     uint256 public constant MINT_AMOUNT = 1000e6;
 
     function setUp() public {
-        minterGateway = new MinterGatewayMock(address(0));
+        issuerGateway = new IssuerGatewayMock(address(0));
 
         address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(
@@ -55,13 +55,13 @@ contract YieldToOneUnitTests is Test {
                             forcedTransferManager: address(1),
                             earnerManager: earnerManager,
                             rateLimitManager: rateManager,
-                            issuer: address(minterGateway)
+                            issuer: address(issuerGateway)
                         })
                     )
                 )
             )
         );
-        minterGateway.setPyusdx(address(pyusdx));
+        issuerGateway.setPyusdx(address(pyusdx));
 
         swapFacility = new MockSwapFacility(address(pyusdx));
 
@@ -92,7 +92,7 @@ contract YieldToOneUnitTests is Test {
     /* ============ Helpers ============ */
 
     function _wrapFor(address to, address recipient, uint256 amount) internal {
-        minterGateway.mint(to, amount);
+        issuerGateway.mint(to, amount);
 
         vm.startPrank(to);
         IERC20(address(pyusdx)).approve(address(swapFacility), amount);
@@ -326,7 +326,7 @@ contract YieldToOneUnitTests is Test {
 
         // Someone sends PYUSDX directly to the extension.
         uint256 gift = 100e6;
-        minterGateway.mint(bob, gift);
+        issuerGateway.mint(bob, gift);
         vm.prank(bob);
         IERC20(address(pyusdx)).transfer(address(extension), gift);
 
@@ -356,7 +356,7 @@ contract YieldToOneUnitTests is Test {
     }
 
     function test_wrap_revert_frozen() public {
-        minterGateway.mint(alice, MINT_AMOUNT);
+        issuerGateway.mint(alice, MINT_AMOUNT);
 
         vm.prank(freezeManager);
         extension.freeze(alice);

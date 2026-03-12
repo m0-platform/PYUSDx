@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-/// @title IMinterGateway
-/// @notice Interface for the MinterGateway contract that manages minting and burning of PYUSDX tokens
-/// @dev Defines all events, errors, and functions for the MinterGateway
-interface IMinterGateway {
+/// @title IIssuerGateway
+/// @notice Interface for the IssuerGateway contract that manages minting and burning of PYUSDX tokens
+/// @dev Defines all events, errors, and functions for the IssuerGateway
+interface IIssuerGateway {
     /* ============ Events ============ */
 
     /// @notice Emitted when a new mint is proposed
@@ -97,7 +97,7 @@ interface IMinterGateway {
 
     /* ============ Initializer ============ */
 
-    /// @notice Initializes the MinterGateway contract
+    /// @notice Initializes the IssuerGateway contract
     /// @dev    Can only be called once due to initializer modifier
     /// @param  admin     The address that will have the default admin role
     /// @param  minter    The address that will have the minter role

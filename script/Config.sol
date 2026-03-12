@@ -16,7 +16,7 @@ contract Config {
         address rateManager;
     }
 
-    struct MinterGatewayConfig {
+    struct IssuerGatewayConfig {
         address admin;
         address minter;
         uint32 mintDelay;
