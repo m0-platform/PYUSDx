@@ -108,7 +108,7 @@ interface IMinterGateway {
     /* ============ Interactive Functions ============ */
 
     /// @notice Proposes a new mint operation
-    /// @dev    Only callable by addresses with MINTER_ROLE
+    /// @dev    Only callable by addresses with ISSUER_ROLE
     /// @param  amount    The amount of PYUSDX to mint
     /// @param  recipient The address that will receive the minted tokens
     /// @return mintId    The unique identifier for the mint proposal
@@ -120,7 +120,7 @@ interface IMinterGateway {
     function mint(uint48 mintId) external;
 
     /// @notice Burns PYUSDX tokens from the caller's balance
-    /// @dev    Only callable by addresses with MINTER_ROLE
+    /// @dev    Only callable by addresses with ISSUER_ROLE
     /// @param  amount The amount of PYUSDX to burn
     function burn(uint256 amount) external;
 

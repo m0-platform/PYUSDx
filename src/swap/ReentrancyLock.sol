@@ -12,7 +12,7 @@ import { IReentrancyLock } from "./interfaces/IReentrancyLock.sol";
 
 abstract contract ReentrancyLockStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.ReentrancyLock
-    struct ReentrancyLockStorageStruct {
+    struct ReentrancyLockStorage {
         mapping(address router => bool isTrusted) trustedRouters;
     }
 
@@ -20,7 +20,7 @@ abstract contract ReentrancyLockStorageLayout {
     bytes32 private constant _REENTRANCY_LOCK_STORAGE_LOCATION =
         0x157708201859ed3ceee295d1baf4381ae5b622de496b1cee3705ed07c6a50200;
 
-    function _getReentrancyLockStorageLocation() internal pure returns (ReentrancyLockStorageStruct storage $) {
+    function _getReentrancyLockStorage() internal pure returns (ReentrancyLockStorage storage $) {
         assembly {
             $.slot := _REENTRANCY_LOCK_STORAGE_LOCATION
         }
@@ -60,7 +60,7 @@ contract ReentrancyLock is IReentrancyLock, ReentrancyLockStorageLayout, AccessC
     function setTrustedRouter(address router, bool trusted) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (router == address(0)) revert ZeroRouter();
 
-        ReentrancyLockStorageStruct storage $ = _getReentrancyLockStorageLocation();
+        ReentrancyLockStorage storage $ = _getReentrancyLockStorage();
         if ($.trustedRouters[router] == trusted) return;
 
         $.trustedRouters[router] = trusted;
@@ -72,7 +72,7 @@ contract ReentrancyLock is IReentrancyLock, ReentrancyLockStorageLayout, AccessC
 
     /// @inheritdoc IReentrancyLock
     function isTrustedRouter(address router) public view returns (bool) {
-        return _getReentrancyLockStorageLocation().trustedRouters[router];
+        return _getReentrancyLockStorage().trustedRouters[router];
     }
 
     /* ============ Private View/Pure Functions ============ */

@@ -9,7 +9,7 @@ import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/
 /// @notice ERC-7201 namespaced storage layout for MinterGateway.
 abstract contract MinterGatewayStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.MinterGateway
-    struct MinterGatewayStorageStruct {
+    struct MinterGatewayStorage {
         uint32 mintDelay; // ──╮ Delay in seconds before a mint can be executed.
         uint32 mintTTL; //     │ Time to live in seconds for a mint proposal.
         uint48 mintNonce; // ──╯ Incremental counter for generating unique mint IDs.
@@ -27,7 +27,7 @@ abstract contract MinterGatewayStorageLayout {
     bytes32 private constant _MINTER_GATEWAY_STORAGE_LOCATION =
         0xda46dec3db1918d8d4832c5443057c953d7a27444565c41e9c2acac962bf4c00;
 
-    function _getMinterGatewayStorageLocation() internal pure returns (MinterGatewayStorageStruct storage $) {
+    function _getMinterGatewayStorage() internal pure returns (MinterGatewayStorage storage $) {
         assembly {
             $.slot := _MINTER_GATEWAY_STORAGE_LOCATION
         }
@@ -81,7 +81,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
         if (amount == 0) revert ZeroMintAmount();
         if (recipient == address(0)) revert ZeroMintRecipient();
 
-        MinterGatewayStorageStruct storage $ = _getMinterGatewayStorageLocation();
+        MinterGatewayStorage storage $ = _getMinterGatewayStorage();
         mintId = ++$.mintNonce;
 
         uint40 createdAt = uint40(block.timestamp);
@@ -100,7 +100,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
     /// @inheritdoc IMinterGateway
     function mint(uint48 mintId) external {
-        MinterGatewayStorageStruct storage $ = _getMinterGatewayStorageLocation();
+        MinterGatewayStorage storage $ = _getMinterGatewayStorage();
         MintProposal storage proposal = $.mintProposals[mintId];
 
         if (proposal.createdAt == 0) revert InvalidMintProposal();
@@ -132,7 +132,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
     /// @inheritdoc IMinterGateway
     function cancelMint(uint48 mintId) external {
-        MinterGatewayStorageStruct storage $ = _getMinterGatewayStorageLocation();
+        MinterGatewayStorage storage $ = _getMinterGatewayStorage();
         MintProposal storage proposal = $.mintProposals[mintId];
 
         if (proposal.createdAt == 0) revert InvalidMintProposal();
@@ -150,24 +150,24 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
 
     /// @inheritdoc IMinterGateway
     function mintDelay() external view returns (uint32) {
-        return _getMinterGatewayStorageLocation().mintDelay;
+        return _getMinterGatewayStorage().mintDelay;
     }
 
     /// @inheritdoc IMinterGateway
     function mintTTL() external view returns (uint32) {
-        return _getMinterGatewayStorageLocation().mintTTL;
+        return _getMinterGatewayStorage().mintTTL;
     }
 
     /// @inheritdoc IMinterGateway
     function mintNonce() external view returns (uint48) {
-        return _getMinterGatewayStorageLocation().mintNonce;
+        return _getMinterGatewayStorage().mintNonce;
     }
 
     /// @inheritdoc IMinterGateway
     function getMintProposal(
         uint48 mintId
     ) external view returns (uint40 createdAt, address minter, address recipient, uint256 amount) {
-        MintProposal memory proposal = _getMinterGatewayStorageLocation().mintProposals[mintId];
+        MintProposal memory proposal = _getMinterGatewayStorage().mintProposals[mintId];
         return (proposal.createdAt, proposal.minter, proposal.recipient, proposal.amount);
     }
 
@@ -188,7 +188,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
     /// @notice Updates the mint delay
     /// @param mintDelay_ The mint delay in seconds
     function _setMintDelay(uint32 mintDelay_) internal {
-        MinterGatewayStorageStruct storage $ = _getMinterGatewayStorageLocation();
+        MinterGatewayStorage storage $ = _getMinterGatewayStorage();
 
         if ($.mintDelay == mintDelay_) return;
 
@@ -201,7 +201,7 @@ contract MinterGateway is IMinterGateway, MinterGatewayStorageLayout, AccessCont
     function _setMintTTL(uint32 mintTTL_) internal {
         if (mintTTL_ == 0) revert ZeroMintTTL();
 
-        MinterGatewayStorageStruct storage $ = _getMinterGatewayStorageLocation();
+        MinterGatewayStorage storage $ = _getMinterGatewayStorage();
 
         if ($.mintTTL == mintTTL_) return;
 

@@ -27,7 +27,7 @@ contract RateLimiterHarness is RateLimiter {
         uint256 remainingAmount,
         uint40 lastRefillTime
     ) external {
-        RateLimiterStorageStruct storage $ = _getRateLimiterStorageLocation();
+        RateLimiterStorage storage $ = _getRateLimiterStorage();
         Bucket storage bucket = $.issuerBuckets[issuer];
 
         bucket.capacity = capacity;
@@ -44,7 +44,7 @@ contract RateLimiterHarness is RateLimiter {
         view
         returns (uint256 capacity, uint256 refillPerSecond, uint256 remainingAmount, uint40 lastRefillTime)
     {
-        RateLimiterStorageStruct storage $ = _getRateLimiterStorageLocation();
+        RateLimiterStorage storage $ = _getRateLimiterStorage();
         Bucket storage bucket = $.issuerBuckets[issuer];
 
         capacity = bucket.capacity;

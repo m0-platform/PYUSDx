@@ -32,7 +32,7 @@ contract RateLimiterTests is Test {
             UnsafeUpgrades.deployTransparentProxy(implementation, admin, "")
         );
 
-        vm.expectRevert(IRateLimiter.ZeroRateLimiter.selector);
+        vm.expectRevert(IRateLimiter.ZeroRateLimitManager.selector);
         newLimiter.initialize(address(0));
     }
 

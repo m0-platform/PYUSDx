@@ -13,7 +13,7 @@ import { Extension } from "../Extension.sol";
 
 abstract contract YieldToOneStorageLayout {
     /// @custom:storage-location erc7201:PYUSDX.storage.YieldToOne
-    struct YieldToOneStorageStruct {
+    struct YieldToOneStorage {
         uint256 totalSupply;
         address yieldRecipient;
         mapping(address account => uint256 balance) balanceOf;
@@ -23,7 +23,7 @@ abstract contract YieldToOneStorageLayout {
     bytes32 private constant _YIELD_TO_ONE_STORAGE_LOCATION =
         0xdeb0f77528a555c599f306cdb984f1f31ca08f014cad1aa7b02fa3fece5e2e00;
 
-    function _getYieldToOneStorage() internal pure returns (YieldToOneStorageStruct storage $) {
+    function _getYieldToOneStorage() internal pure returns (YieldToOneStorage storage $) {
         bytes32 location = _YIELD_TO_ONE_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -222,7 +222,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
      * @param amount    The amount of tokens to mint.
      */
     function _mint(address recipient, uint256 amount) internal override {
-        YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
+        YieldToOneStorage storage $ = _getYieldToOneStorage();
 
         $.totalSupply += amount;
         $.balanceOf[recipient] += amount;
@@ -236,7 +236,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
      * @param amount  The amount of tokens to burn.
      */
     function _burn(address account, uint256 amount) internal override {
-        YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
+        YieldToOneStorage storage $ = _getYieldToOneStorage();
 
         // NOTE: `amount` is verified to not exceed `$.balanceOf[account]` by the caller, so
         //       subtraction cannot underflow. `totalSupply >= balanceOf[account]` by invariant.
@@ -255,7 +255,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
      * @param amount    The amount to transfer.
      */
     function _update(address sender, address recipient, uint256 amount) internal override {
-        YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
+        YieldToOneStorage storage $ = _getYieldToOneStorage();
 
         // NOTE: `amount` is verified to not exceed `$.balanceOf[sender]` by the caller, so
         //       subtraction cannot underflow. Addition cannot overflow because `totalSupply`
@@ -273,7 +273,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     function _setYieldRecipient(address yieldRecipient_) internal {
         if (yieldRecipient_ == address(0)) revert ZeroYieldRecipient();
 
-        YieldToOneStorageStruct storage $ = _getYieldToOneStorage();
+        YieldToOneStorage storage $ = _getYieldToOneStorage();
 
         if (yieldRecipient_ == $.yieldRecipient) return;
 

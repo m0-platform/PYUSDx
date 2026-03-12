@@ -17,7 +17,7 @@ interface IRateLimiter {
     error InvalidRateLimitRemoval(uint256 capacity, uint256 refillPerSecond);
 
     /// @notice Reverted when rate limit manager is the zero address.
-    error ZeroRateLimiter();
+    error ZeroRateLimitManager();
 
     /* ============ Events ============ */
 
@@ -25,8 +25,8 @@ interface IRateLimiter {
     /// @param  issuer          Address of the issuer.
     /// @param  capacity        Maximum bucket capacity.
     /// @param  refillPerSecond Refill rate per second.
-    /// @param  status          True when configured/updated, false when removed.
-    event RateLimitSet(address indexed issuer, uint256 capacity, uint256 refillPerSecond, bool status);
+    /// @param  enabled         True when configured/updated, false when removed.
+    event RateLimitSet(address indexed issuer, uint256 capacity, uint256 refillPerSecond, bool enabled);
 
     /* ============ Interactive Functions ============ */
 
@@ -35,8 +35,8 @@ interface IRateLimiter {
     /// @param  issuer           Address of the issuer.
     /// @param  capacity         Maximum bucket capacity.
     /// @param  refillPerSecond  Refill rate per second. Set to 0 for a one-time mint cap with no refill.
-    /// @param  status           True to configure/update. False to remove (requires zero capacity/refillPerSecond).
-    function setRateLimit(address issuer, uint256 capacity, uint256 refillPerSecond, bool status) external;
+    /// @param  enabled          True to configure/update. False to remove (requires zero capacity/refillPerSecond).
+    function setRateLimit(address issuer, uint256 capacity, uint256 refillPerSecond, bool enabled) external;
 
     /* ============ View/Pure Functions ============ */
 

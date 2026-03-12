@@ -16,7 +16,7 @@ abstract contract RateLimiterStorageLayout {
     }
 
     /// @custom:storage-location erc7201:M0.storage.RateLimiter
-    struct RateLimiterStorageStruct {
+    struct RateLimiterStorage {
         mapping(address issuer => Bucket) issuerBuckets;
     }
 
@@ -24,7 +24,7 @@ abstract contract RateLimiterStorageLayout {
     bytes32 private constant _RATE_LIMITER_STORAGE_LOCATION =
         0xc562a0e1896fd38c0f41afa7c978cf8f41d7fa854ad2693d24bd9854180da900;
 
-    function _getRateLimiterStorageLocation() internal pure returns (RateLimiterStorageStruct storage $) {
+    function _getRateLimiterStorage() internal pure returns (RateLimiterStorage storage $) {
         assembly {
             $.slot := _RATE_LIMITER_STORAGE_LOCATION
         }
@@ -44,7 +44,7 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
     /// @dev   Initializes the rate limiter with a rate limit manager.
     /// @param rateLimitManager The address that will receive RATE_LIMITER_ROLE.
     function __RateLimiter_init(address rateLimitManager) internal onlyInitializing {
-        if (rateLimitManager == address(0)) revert ZeroRateLimiter();
+        if (rateLimitManager == address(0)) revert ZeroRateLimitManager();
         _grantRole(RATE_LIMITER_ROLE, rateLimitManager);
     }
 
@@ -55,14 +55,14 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
         address issuer,
         uint256 capacity,
         uint256 refillPerSecond,
-        bool status
+        bool enabled
     ) external onlyRole(RATE_LIMITER_ROLE) {
-        RateLimiterStorageStruct storage $ = _getRateLimiterStorageLocation();
+        RateLimiterStorage storage $ = _getRateLimiterStorage();
         Bucket storage bucket = $.issuerBuckets[issuer];
 
-        emit RateLimitSet(issuer, capacity, refillPerSecond, status);
+        emit RateLimitSet(issuer, capacity, refillPerSecond, enabled);
 
-        if (!status) {
+        if (!enabled) {
             if (capacity != 0 || refillPerSecond != 0) revert InvalidRateLimitRemoval(capacity, refillPerSecond);
 
             delete $.issuerBuckets[issuer];
@@ -92,7 +92,7 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
 
     /// @inheritdoc IRateLimiter
     function getRateLimitConfig(address issuer) external view returns (uint256 capacity, uint256 refillPerSecond) {
-        Bucket storage bucket = _getRateLimiterStorageLocation().issuerBuckets[issuer];
+        Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];
 
         // NOTE: Unconfigured issuers have unlimited capacity
         if (bucket.lastRefillTime == 0) return (type(uint256).max, 0);
@@ -102,7 +102,7 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
 
     /// @inheritdoc IRateLimiter
     function getRemainingAmount(address issuer) external view returns (uint256) {
-        Bucket storage bucket = _getRateLimiterStorageLocation().issuerBuckets[issuer];
+        Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];
 
         // NOTE: Unconfigured issuers have unlimited capacity
         if (bucket.lastRefillTime == 0) return type(uint256).max;
@@ -122,7 +122,7 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
     /// @param  issuer Issuer key.
     /// @param  amount The amount to check.
     function _enforceRateLimit(address issuer, uint256 amount) internal {
-        Bucket storage bucket = _getRateLimiterStorageLocation().issuerBuckets[issuer];
+        Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];
 
         // NOTE: Unconfigured issuers have unlimited capacity
         if (bucket.lastRefillTime == 0) return;
