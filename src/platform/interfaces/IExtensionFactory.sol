@@ -56,8 +56,8 @@ interface IExtensionFactory {
 
     /// @notice Emitted when an extension's active status is set.
     /// @param  extension The address of the extension.
-    /// @param  active    True if the extension is active, false otherwise.
-    event ExtensionStatusSet(address indexed extension, bool indexed active);
+    /// @param  enabled   True if the extension is active, false otherwise.
+    event ExtensionStatusSet(address indexed extension, bool indexed enabled);
 
     /// @notice Emitted when an implementation address is set for an extension type.
     /// @param  extensionType  The type of extension.
