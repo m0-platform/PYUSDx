@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.26;
+pragma solidity 0.8.34;
 
 /// @title PYUSDX Mock
 /// @notice Minimal mock for testing IssuerGateway unit tests
-contract PYUSDXMock {
+contract MockPYUSDX {
     address public issuerGateway;
 
     mapping(address => uint256) public balanceOf;

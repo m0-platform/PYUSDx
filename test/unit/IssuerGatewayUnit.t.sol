@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.26;
+pragma solidity 0.8.34;
 
 import { IssuerGatewayBaseUnitTest } from "../utils/IssuerGatewayBaseUnitTest.sol";
 import { IIssuerGateway } from "../../src/core/IIssuerGateway.sol";

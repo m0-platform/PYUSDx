@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity 0.8.34;
 
 import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
@@ -15,7 +15,7 @@ import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IER
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 import { MockERC20 } from "../mock/MockERC20.sol";
-import { FeeOnTransferMock } from "../mock/FeeOnTransferMock.sol";
+import { MockFeeOnTransfer } from "../mock/MockFeeOnTransfer.sol";
 
 contract MultiMintTest is Test {
     IssuerGatewayMock public issuerGateway;
@@ -230,7 +230,7 @@ contract MultiMintTest is Test {
     }
 
     function test_wrap_asset_revert_feeOnTransfer() public {
-        FeeOnTransferMock feeToken = new FeeOnTransferMock("FeeToken", "FEE", 6);
+        MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
 
         vm.prank(assetCapManager);
         extension.setAssetCap(address(feeToken), 1_000_000e6);

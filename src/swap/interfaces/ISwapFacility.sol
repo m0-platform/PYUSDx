@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-
-pragma solidity 0.8.26;
+pragma solidity ^0.8.34;
 
 /// @title  Swap Facility interface.
 /// @author M0 Labs
@@ -47,9 +46,6 @@ interface ISwapFacility {
     event MultiMintAssetReplaced(address indexed asset, address indexed extensionOut, uint256 amount);
 
     /* ============ Custom Errors ============ */
-
-    /// @notice Thrown if the extension is 0x0.
-    error ZeroExtension();
 
     /// @notice Thrown in the constructor if the extension factory is 0x0.
     error ZeroExtensionFactory();

@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.26;
+pragma solidity 0.8.34;
 
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 
 /// @title Issuer Gateway Mock
 /// @notice Mock contract to test PYUSDX mint functionality
+<<<<<<<< HEAD:test/mock/IssuerGatewayMock.sol
 contract IssuerGatewayMock {
+========
+contract MockMinterGateway {
+>>>>>>>> c3ce391 (chore: use Solidity version 0.8.34 (#19)):test/mock/MockMinterGateway.sol
     IPYUSDX public pyusdx;
 
     constructor(address pyusdx_) {

@@ -1,6 +1,9 @@
 {
   "lib/evm-m-extensions": {
-    "rev": "a578136c47cb881c1cace33385a948f6513ef64d"
+    "branch": {
+      "name": "proto-890-use-solidity-0834",
+      "rev": "7573cf94c4363b6ab6ca2eb35aa5d7e0d4dd86a1"
+    }
   },
   "lib/forge-std": {
     "branch": {

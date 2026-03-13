@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-
-pragma solidity 0.8.26;
+pragma solidity ^0.8.34;
 
 import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 

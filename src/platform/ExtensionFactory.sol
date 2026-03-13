@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
-
-pragma solidity 0.8.26;
+pragma solidity 0.8.34;
 
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import { DeployHelpers } from "../../lib/evm-m-extensions/lib/common/script/deploy/DeployHelpers.sol";
 
 import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
-import { IExtension } from "./interfaces/IExtension.sol";
-import { IExtensionFactory } from "./interfaces/IExtensionFactory.sol";
-
 import { MultiMint } from "./projects/MultiMint.sol";
 import { YieldToOne } from "./projects/YieldToOne.sol";
+import { IExtension } from "./interfaces/IExtension.sol";
+import { IExtensionFactory } from "./interfaces/IExtensionFactory.sol";
 
 /// @notice ERC-7201 namespaced storage layout for ExtensionFactory.
 abstract contract ExtensionFactoryStorageLayout {
@@ -77,11 +75,20 @@ contract ExtensionFactory is
     /* ============ Initializer ============ */
 
     /// @notice Initializes the ExtensionFactory proxy.
-    /// @param  admin          The address of the admin.
-    /// @param  factoryManager The address of the factory manager.
-    function initialize(address admin, address factoryManager) external initializer {
+    /// @param  admin                    The address of the admin.
+    /// @param  factoryManager           The address of the factory manager.
+    /// @param  yieldToOneImplementation The YieldToOne implementation address.
+    /// @param  multiMintImplementation  The MultiMint implementation address.
+    function initialize(
+        address admin,
+        address factoryManager,
+        address yieldToOneImplementation,
+        address multiMintImplementation
+    ) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
         if (factoryManager == address(0)) revert ZeroFactoryManager();
+        _revertIfInvalidImplementation(yieldToOneImplementation);
+        _revertIfInvalidImplementation(multiMintImplementation);
 
         __AccessControl_init();
 
@@ -89,8 +96,8 @@ contract ExtensionFactory is
         _grantRole(FACTORY_MANAGER_ROLE, factoryManager);
 
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
-        $.yieldToOneImplementation = address(new YieldToOne(pyusdx, swapFacility));
-        $.multiMintImplementation = address(new MultiMint(pyusdx, swapFacility));
+        $.yieldToOneImplementation = yieldToOneImplementation;
+        $.multiMintImplementation = multiMintImplementation;
     }
 
     /* ============ External Functions ============ */
@@ -169,18 +176,20 @@ contract ExtensionFactory is
     }
 
     /// @inheritdoc IExtensionFactory
-    function setExtensionStatus(address extension, bool status) external override onlyRole(FACTORY_MANAGER_ROLE) {
+    function setExtensionStatus(address extension, bool enabled) external override onlyRole(FACTORY_MANAGER_ROLE) {
+        if (extension == address(0)) revert ZeroExtension();
+
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
 
         if ($.extensionTypes[extension] == ExtensionType.NONE) {
             revert ExtensionNotRegistered(extension);
         }
 
-        if ($.activeExtensions[extension] == status) return;
+        if ($.activeExtensions[extension] == enabled) return;
 
-        $.activeExtensions[extension] = status;
+        $.activeExtensions[extension] = enabled;
 
-        emit ExtensionStatusSet(extension, status);
+        emit ExtensionStatusSet(extension, enabled);
     }
 
     /// @inheritdoc IExtensionFactory
@@ -192,8 +201,7 @@ contract ExtensionFactory is
             revert InvalidExtensionType();
         }
 
-        if (IExtension(implementation).pyusdx() != pyusdx || IExtension(implementation).swapFacility() != swapFacility)
-            revert InvalidImplementation();
+        _revertIfInvalidImplementation(implementation);
 
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
 
@@ -279,5 +287,14 @@ contract ExtensionFactory is
     /// @param admin The admin address to check.
     function _revertIfZeroAdmin(address admin) internal pure {
         if (admin == address(0)) revert ZeroAdmin();
+    }
+
+    /// @dev   Reverts if the implementation address is zero or wired to wrong pyusdx/swapFacility.
+    /// @param implementation The implementation address to validate.
+    function _revertIfInvalidImplementation(address implementation) internal view {
+        if (implementation == address(0)) revert ZeroImplementation();
+
+        if (IExtension(implementation).pyusdx() != pyusdx || IExtension(implementation).swapFacility() != swapFacility)
+            revert InvalidImplementation();
     }
 }
