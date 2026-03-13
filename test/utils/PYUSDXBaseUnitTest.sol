@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.34;
 
 import { IndexingMath } from "../../lib/evm-m-extensions/lib/common/src/libs/IndexingMath.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
@@ -7,13 +7,13 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { IssuerGatewayMock } from "../mock/IssuerGatewayMock.sol";
+import { MockIssuerGateway } from "../mock/MockIssuerGateway.sol";
 import { BaseTest } from "./BaseTest.sol";
 
 /// @title PYUSDX Base Unit Test
 /// @notice Base test contract with common setup for PYUSDX tests
 abstract contract PYUSDXBaseUnitTest is BaseTest {
-    IssuerGatewayMock public issuerGateway;
+    MockIssuerGateway public issuerGateway;
     PYUSDXHarness public pyusdx;
 
     function setUp() public virtual override {
@@ -21,7 +21,7 @@ abstract contract PYUSDXBaseUnitTest is BaseTest {
 
         // Deploy issuer gateway mock first with dummy address (will be updated later)
         // TODO: figure out how to avoid this circular dependency
-        issuerGateway = new IssuerGatewayMock(address(0));
+        issuerGateway = new MockIssuerGateway(address(0));
 
         address implementation = address(new PYUSDXHarness());
 

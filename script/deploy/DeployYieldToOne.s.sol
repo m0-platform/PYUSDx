@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
-
-pragma solidity 0.8.26;
+pragma solidity 0.8.34;
 
 import { console } from "../../lib/forge-std/src/console.sol";
 
+import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 
 import { DeployBase } from "./DeployBase.s.sol";
@@ -11,19 +11,24 @@ import { DeployBase } from "./DeployBase.s.sol";
 contract DeployYieldToOne is DeployBase {
     function run() public {
         address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
-        YieldToOneConfig memory config = _loadYieldToOneConfig();
+        string memory extensionName = vm.envString("EXTENSION_NAME");
         address factory = _getFactory();
+
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: vm.envString("EXTENSION_TOKEN_NAME"),
+            symbol: vm.envString("EXTENSION_TOKEN_SYMBOL"),
+            yieldRecipient: vm.envAddress("YIELD_RECIPIENT"),
+            admin: vm.envAddress("ADMIN"),
+            freezeManager: vm.envAddress("FREEZE_MANAGER"),
+            yieldRecipientManager: vm.envAddress("YIELD_RECIPIENT_MANAGER"),
+            pauser: vm.envAddress("PAUSER")
+        });
 
         vm.startBroadcast(deployer);
 
         (address proxy, address proxyAdmin, address implementation) = ExtensionFactory(factory).deployYieldToOne(
-            config.name,
-            config.symbol,
-            config.yieldRecipient,
-            config.admin,
-            config.freezeManager,
-            config.yieldRecipientManager,
-            config.pauser
+            extensionName,
+            params
         );
 
         vm.stopBroadcast();
@@ -33,15 +38,5 @@ contract DeployYieldToOne is DeployBase {
         console.log("YieldToOne ProxyAdmin:    ", proxyAdmin);
 
         _writeDeployment(block.chainid, _getExtensionName(), proxy);
-    }
-
-    function _loadYieldToOneConfig() private view returns (YieldToOneConfig memory config) {
-        config.name = vm.envString("EXTENSION_NAME");
-        config.symbol = vm.envString("EXTENSION_SYMBOL");
-        config.yieldRecipient = vm.envAddress("YIELD_RECIPIENT");
-        config.admin = vm.envAddress("ADMIN");
-        config.freezeManager = vm.envAddress("FREEZE_MANAGER");
-        config.yieldRecipientManager = vm.envAddress("YIELD_RECIPIENT_MANAGER");
-        config.pauser = vm.envAddress("PAUSER");
     }
 }

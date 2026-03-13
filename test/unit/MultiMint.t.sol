@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity 0.8.34;
 
 import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
@@ -7,7 +7,7 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { IssuerGatewayMock } from "../mock/IssuerGatewayMock.sol";
+import { MockIssuerGateway } from "../mock/MockIssuerGateway.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
@@ -15,10 +15,10 @@ import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IER
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 import { MockERC20 } from "../mock/MockERC20.sol";
-import { FeeOnTransferMock } from "../mock/FeeOnTransferMock.sol";
+import { MockFeeOnTransfer } from "../mock/MockFeeOnTransfer.sol";
 
 contract MultiMintTest is Test {
-    IssuerGatewayMock public issuerGateway;
+    MockIssuerGateway public issuerGateway;
     PYUSDXHarness public pyusdx;
     MockSwapFacility public swapFacility;
     MultiMint public extension;
@@ -42,7 +42,7 @@ contract MultiMintTest is Test {
     uint256 public constant MINT_AMOUNT = 1000e6;
 
     function setUp() public {
-        issuerGateway = new IssuerGatewayMock(address(0));
+        issuerGateway = new MockIssuerGateway(address(0));
         address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
@@ -230,7 +230,7 @@ contract MultiMintTest is Test {
     }
 
     function test_wrap_asset_revert_feeOnTransfer() public {
-        FeeOnTransferMock feeToken = new FeeOnTransferMock("FeeToken", "FEE", 6);
+        MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
 
         vm.prank(assetCapManager);
         extension.setAssetCap(address(feeToken), 1_000_000e6);

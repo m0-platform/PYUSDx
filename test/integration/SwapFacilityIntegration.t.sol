@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.26;
+pragma solidity 0.8.34;
 
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
@@ -23,16 +23,18 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
         super.setUp();
 
         // Deploy YieldToOne through factory
+        IExtensionFactory.YieldToOneParams memory ytoParams = IExtensionFactory.YieldToOneParams({
+            name: "YieldToOne",
+            symbol: "YTO",
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            freezeManager: freezeManager,
+            yieldRecipientManager: admin,
+            pauser: pauser
+        });
+
         vm.prank(admin);
-        (address yieldToOneProxy, , ) = factory.deployYieldToOne(
-            "YieldToOne",
-            "YTO",
-            yieldRecipient,
-            admin,
-            freezeManager,
-            admin,
-            pauser
-        );
+        (address yieldToOneProxy, , ) = factory.deployYieldToOne(string("yto-swap-integration"), ytoParams);
         yieldToOne = YieldToOne(yieldToOneProxy);
 
         // Enable earning for YieldToOne
@@ -40,17 +42,19 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
         pyusdx.setAccountInfo(address(yieldToOne), 500, 0, yieldRecipient);
 
         // Deploy MultiMint through factory
+        IExtensionFactory.MultiMintParams memory mmParams = IExtensionFactory.MultiMintParams({
+            name: "MultiMint",
+            symbol: "MM",
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            assetCapManager: assetCapManager,
+            freezeManager: freezeManager,
+            pauser: pauser,
+            yieldRecipientManager: admin
+        });
+
         vm.prank(admin);
-        (address multiMintProxy, , ) = factory.deployMultiMint(
-            "MultiMint",
-            "MM",
-            yieldRecipient,
-            admin,
-            assetCapManager,
-            freezeManager,
-            pauser,
-            admin
-        );
+        (address multiMintProxy, , ) = factory.deployMultiMint(string("mm-swap-integration"), mmParams);
         multiMintExtension = MultiMint(multiMintProxy);
 
         // Allow USDC in MultiMint by setting asset cap
@@ -214,8 +218,8 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
                 yieldRecipient,
                 admin,
                 freezeManager,
-                admin,
-                pauser
+                pauser,
+                admin
             )
         );
 

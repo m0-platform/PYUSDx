@@ -1,10 +1,34 @@
 // SPDX-License-Identifier: BUSL-1.1
-
-pragma solidity 0.8.26;
+pragma solidity ^0.8.34;
 
 /// @title  PYUSDX Extension Factory interface.
 /// @author M0 Labs
 interface IExtensionFactory {
+    /* ============ Structs ============ */
+
+    /// @notice Parameters for deploying a YieldToOne extension.
+    struct YieldToOneParams {
+        string name;
+        string symbol;
+        address yieldRecipient;
+        address admin;
+        address freezeManager;
+        address pauser;
+        address yieldRecipientManager;
+    }
+
+    /// @notice Parameters for deploying a MultiMint extension.
+    struct MultiMintParams {
+        string name;
+        string symbol;
+        address yieldRecipient;
+        address admin;
+        address assetCapManager;
+        address freezeManager;
+        address pauser;
+        address yieldRecipientManager;
+    }
+
     /* ============ Enums ============ */
 
     /// @notice The type of PYUSDX extension.
@@ -32,15 +56,15 @@ interface IExtensionFactory {
 
     /// @notice Emitted when an extension's active status is set.
     /// @param  extension The address of the extension.
-    /// @param  active    True if the extension is active, false otherwise.
-    event ExtensionStatusSet(address indexed extension, bool indexed active);
+    /// @param  enabled   True if the extension is active, false otherwise.
+    event ExtensionStatusSet(address indexed extension, bool indexed enabled);
 
     /// @notice Emitted when an implementation address is set for an extension type.
     /// @param  extensionType  The type of extension.
     /// @param  implementation The new implementation address.
     event ImplementationSet(ExtensionType indexed extensionType, address indexed implementation);
 
-    /* ============ Custom Errors ============ */
+    /* ============ Errors ============ */
 
     /// @notice Thrown if the admin is 0x0.
     error ZeroAdmin();
@@ -60,6 +84,9 @@ interface IExtensionFactory {
     /// @notice Thrown if the extension is 0x0.
     error ZeroExtension();
 
+    /// @notice Thrown if an implementation address is 0x0.
+    error ZeroImplementation();
+
     /// @notice Thrown if the extension is not registered in the factory.
     error ExtensionNotRegistered(address extension);
 
@@ -74,10 +101,11 @@ interface IExtensionFactory {
     /// @notice The role identifier for the factory manager role.
     function FACTORY_MANAGER_ROLE() external view returns (bytes32);
 
-    /// @notice Returns true if the extension is approved (active).
-    /// @param  extension The address of the extension to check.
-    /// @return True if approved, false otherwise.
-    function isApprovedExtension(address extension) external view returns (bool);
+    /// @notice Returns the predicted deployment address for an extension with the given extension name and deployer.
+    /// @param  deployer      The address of the deployer (embedded in salt for deployer-specific addresses).
+    /// @param  extensionName The name of the extension (determines the deployment address).
+    /// @return The predicted proxy address.
+    function getExtensionAddress(address deployer, string calldata extensionName) external view returns (address);
 
     /// @notice Returns the extension type for a given extension address.
     /// @param  extension The address of the extension.
@@ -89,6 +117,11 @@ interface IExtensionFactory {
     /// @return The implementation address.
     function getImplementation(ExtensionType extensionType) external view returns (address);
 
+    /// @notice Returns true if the extension is approved (active).
+    /// @param  extension The address of the extension to check.
+    /// @return True if approved, false otherwise.
+    function isApprovedExtension(address extension) external view returns (bool);
+
     /// @notice The address of the PYUSDX token contract.
     function pyusdx() external view returns (address);
 
@@ -98,47 +131,25 @@ interface IExtensionFactory {
     /* ============ Deployment Functions ============ */
 
     /// @notice Deploys a new YieldToOne extension.
-    /// @param  name                  The name of the token.
-    /// @param  symbol                The symbol of the token.
-    /// @param  yieldRecipient        The address of the yield recipient.
-    /// @param  admin                 The address of the admin (also used as proxy admin owner).
-    /// @param  freezeManager         The address of the freeze manager.
-    /// @param  yieldRecipientManager The address of the yield recipient manager.
-    /// @param  pauser                The address of the pauser.
-    /// @return proxy                 The address of the deployed proxy.
-    /// @return proxyAdmin            The address of the deployed ProxyAdmin.
-    /// @return implementation        The address of the deployed implementation.
+    /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
+    /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
+    /// @return proxy         The address of the deployed proxy.
+    /// @return proxyAdmin    The address of the deployed ProxyAdmin.
+    /// @return implementation The address of the deployed implementation.
     function deployYieldToOne(
-        string calldata name,
-        string calldata symbol,
-        address yieldRecipient,
-        address admin,
-        address freezeManager,
-        address yieldRecipientManager,
-        address pauser
+        string calldata extensionName,
+        YieldToOneParams calldata params
     ) external returns (address proxy, address proxyAdmin, address implementation);
 
     /// @notice Deploys a new MultiMint extension.
-    /// @param  name                  The name of the token.
-    /// @param  symbol                The symbol of the token.
-    /// @param  yieldRecipient        The address of the yield recipient.
-    /// @param  admin                 The address of the admin (also used as proxy admin owner).
-    /// @param  assetCapManager       The address of the asset cap manager.
-    /// @param  freezeManager         The address of the freeze manager.
-    /// @param  pauser                The address of the pauser.
-    /// @param  yieldRecipientManager The address of the yield recipient manager.
-    /// @return proxy                 The address of the deployed proxy.
-    /// @return proxyAdmin            The address of the deployed ProxyAdmin.
-    /// @return implementation        The address of the deployed implementation.
+    /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
+    /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
+    /// @return proxy         The address of the deployed proxy.
+    /// @return proxyAdmin    The address of the deployed ProxyAdmin.
+    /// @return implementation The address of the deployed implementation.
     function deployMultiMint(
-        string calldata name,
-        string calldata symbol,
-        address yieldRecipient,
-        address admin,
-        address assetCapManager,
-        address freezeManager,
-        address pauser,
-        address yieldRecipientManager
+        string calldata extensionName,
+        MultiMintParams calldata params
     ) external returns (address proxy, address proxyAdmin, address implementation);
 
     /* ============ Admin Functions ============ */
@@ -146,8 +157,8 @@ interface IExtensionFactory {
     /// @notice Sets whether an extension is active.
     /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.
     /// @param  extension The address of the extension.
-    /// @param  status    True if the extension should be active, false otherwise.
-    function setExtensionStatus(address extension, bool status) external;
+    /// @param  enabled   True if the extension should be active, false otherwise.
+    function setExtensionStatus(address extension, bool enabled) external;
 
     /// @notice Sets the cached implementation address for a given extension type.
     /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.

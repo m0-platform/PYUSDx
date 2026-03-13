@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.26;
+pragma solidity 0.8.34;
 
 import { ERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 /// @notice ERC20 mock that deducts a 1% fee on every transfer.
-contract FeeOnTransferMock is ERC20 {
+contract MockFeeOnTransfer is ERC20 {
     uint8 private _decimals;
 
     constructor(string memory name_, string memory symbol_, uint8 decimals_) ERC20(name_, symbol_) {

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-
-pragma solidity 0.8.26;
+pragma solidity ^0.8.34;
 
 import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
@@ -31,15 +30,13 @@ abstract contract YieldToOneStorageLayout {
     }
 }
 
-/**
- * @title  YieldToOne
- * @notice Upgradeable ERC20 token wrapping PYUSDX into a branded non-rebasing stablecoin
- *         with all yield claimable by a single recipient.
- * @dev    Yield accrues on the extension's PYUSDX balance via PYUSDX's per-account earning
- *         system. When the extension's pending yield is claimed, it is first realized from
- *         PYUSDX (net of PYUSDX's fee), then minted as extension tokens to the yield recipient.
- * @author M0 Labs
- */
+/// @title  YieldToOne
+/// @notice Upgradeable ERC20 token wrapping PYUSDX into a branded non-rebasing stablecoin
+///         with all yield claimable by a single recipient.
+/// @dev    Yield accrues on the extension's PYUSDX balance via PYUSDX's per-account earning
+///         system. When the extension's pending yield is claimed, it is first realized from
+///         PYUSDX (net of PYUSDX's fee), then minted as extension tokens to the yield recipient.
+/// @author M0 Labs
 contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezable, Pausable {
     /* ============ Variables ============ */
 
@@ -48,56 +45,50 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
 
     /* ============ Constructor ============ */
 
-    /**
-     * @custom:oz-upgrades-unsafe-allow constructor
-     * @param pyusdx_       The address of the PYUSDX token.
-     * @param swapFacility_ The address of the swap facility.
-     */
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    /// @param pyusdx_       The address of the PYUSDX token.
+    /// @param swapFacility_ The address of the swap facility.
     constructor(address pyusdx_, address swapFacility_) Extension(pyusdx_, swapFacility_) {}
 
     /* ============ Initializer ============ */
 
-    /**
-     * @notice Initializes the YieldToOne extension token.
-     * @param  name                  The name of the token.
-     * @param  symbol                The symbol of the token.
-     * @param  yieldRecipient_       The address of the yield recipient.
-     * @param  admin                 The address of the admin.
-     * @param  freezeManager         The address of the freeze manager.
-     * @param  yieldRecipientManager The address of the yield recipient manager.
-     * @param  pauser                The address of the pauser.
-     */
+    /// @notice Initializes the YieldToOne extension token.
+    /// @param  name                  The name of the token.
+    /// @param  symbol                The symbol of the token.
+    /// @param  yieldRecipient_       The address of the yield recipient.
+    /// @param  admin                 The address of the admin.
+    /// @param  freezeManager         The address of the freeze manager.
+    /// @param  pauser                The address of the pauser.
+    /// @param  yieldRecipientManager The address of the yield recipient manager.
     function initialize(
         string memory name,
         string memory symbol,
         address yieldRecipient_,
         address admin,
         address freezeManager,
-        address yieldRecipientManager,
-        address pauser
+        address pauser,
+        address yieldRecipientManager
     ) public virtual initializer {
-        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, yieldRecipientManager, pauser);
+        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, pauser, yieldRecipientManager);
     }
 
-    /**
-     * @dev   Internal initializer. Sets up ERC20 metadata, roles, and the
-     *        yield recipient.
-     * @param name                  The name of the token.
-     * @param symbol                The symbol of the token.
-     * @param yieldRecipient_       The address of the yield recipient.
-     * @param admin                 The address of the admin.
-     * @param freezeManager         The address of the freeze manager.
-     * @param yieldRecipientManager The address of the yield recipient manager.
-     * @param pauser                The address of the pauser.
-     */
+    /// @dev   Internal initializer. Sets up ERC20 metadata, roles, and the
+    ///        yield recipient.
+    /// @param name                  The name of the token.
+    /// @param symbol                The symbol of the token.
+    /// @param yieldRecipient_       The address of the yield recipient.
+    /// @param admin                 The address of the admin.
+    /// @param freezeManager         The address of the freeze manager.
+    /// @param pauser                The address of the pauser.
+    /// @param yieldRecipientManager The address of the yield recipient manager.
     function __YieldToOne_init(
         string memory name,
         string memory symbol,
         address yieldRecipient_,
         address admin,
         address freezeManager,
-        address yieldRecipientManager,
-        address pauser
+        address pauser,
+        address yieldRecipientManager
     ) internal onlyInitializing {
         if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
         if (admin == address(0)) revert ZeroAdmin();
@@ -166,22 +157,18 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
 
     /* ============ Hooks ============ */
 
-    /**
-     * @dev   Hook called before approval. Reverts if frozen.
-     * @param account The account granting approval.
-     * @param spender The account being approved.
-     */
+    /// @dev   Hook called before approval. Reverts if frozen.
+    /// @param account The account granting approval.
+    /// @param spender The account being approved.
     function _beforeApprove(address account, address spender, uint256) internal view virtual override {
         FreezableStorageStruct storage $ = _getFreezableStorageLocation();
         _revertIfFrozen($, account);
         _revertIfFrozen($, spender);
     }
 
-    /**
-     * @dev   Hook called before wrapping PYUSDX into extension tokens.
-     * @param account   The account depositing PYUSDX.
-     * @param recipient The account receiving extension tokens.
-     */
+    /// @dev   Hook called before wrapping PYUSDX into extension tokens.
+    /// @param account   The account depositing PYUSDX.
+    /// @param recipient The account receiving extension tokens.
     function _beforeWrap(address account, address recipient, uint256) internal view virtual override {
         _requireNotPaused();
         FreezableStorageStruct storage $ = _getFreezableStorageLocation();
@@ -189,20 +176,16 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         _revertIfFrozen($, recipient);
     }
 
-    /**
-     * @dev   Hook called before unwrapping extension tokens for PYUSDX.
-     * @param account The account from which extension tokens are burned.
-     */
+    /// @dev   Hook called before unwrapping extension tokens for PYUSDX.
+    /// @param account The account from which extension tokens are burned.
     function _beforeUnwrap(address account, uint256) internal view virtual override {
         _requireNotPaused();
         _revertIfFrozen(_getFreezableStorageLocation(), account);
     }
 
-    /**
-     * @dev   Hook called before transferring extension tokens.
-     * @param sender    The address sending tokens.
-     * @param recipient The address receiving tokens.
-     */
+    /// @dev   Hook called before transferring extension tokens.
+    /// @param sender    The address sending tokens.
+    /// @param recipient The address receiving tokens.
     function _beforeTransfer(address sender, address recipient, uint256) internal view virtual override {
         _requireNotPaused();
         FreezableStorageStruct storage $ = _getFreezableStorageLocation();
@@ -211,16 +194,14 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         _revertIfFrozen($, recipient);
     }
 
-    /// @dev   Hook called before claiming yield.
+    /// @dev Hook called before claiming yield.
     function _beforeClaimYield() internal view virtual {}
 
     /* ============ Internal Interactive Functions ============ */
 
-    /**
-     * @dev   Mints `amount` extension tokens to `recipient`.
-     * @param recipient The address receiving the minted tokens.
-     * @param amount    The amount of tokens to mint.
-     */
+    /// @dev   Mints `amount` extension tokens to `recipient`.
+    /// @param recipient The address receiving the minted tokens.
+    /// @param amount    The amount of tokens to mint.
     function _mint(address recipient, uint256 amount) internal override {
         YieldToOneStorage storage $ = _getYieldToOneStorage();
 
@@ -230,11 +211,9 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         emit Transfer(address(0), recipient, amount);
     }
 
-    /**
-     * @dev   Burns `amount` extension tokens from `account`.
-     * @param account The address from which tokens are burned.
-     * @param amount  The amount of tokens to burn.
-     */
+    /// @dev   Burns `amount` extension tokens from `account`.
+    /// @param account The address from which tokens are burned.
+    /// @param amount  The amount of tokens to burn.
     function _burn(address account, uint256 amount) internal override {
         YieldToOneStorage storage $ = _getYieldToOneStorage();
 
@@ -248,12 +227,10 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         emit Transfer(account, address(0), amount);
     }
 
-    /**
-     * @dev   Internal balance update on transfer.
-     * @param sender    The address sending tokens.
-     * @param recipient The address receiving tokens.
-     * @param amount    The amount to transfer.
-     */
+    /// @dev   Internal balance update on transfer.
+    /// @param sender    The address sending tokens.
+    /// @param recipient The address receiving tokens.
+    /// @param amount    The amount to transfer.
     function _update(address sender, address recipient, uint256 amount) internal override {
         YieldToOneStorage storage $ = _getYieldToOneStorage();
 
@@ -266,10 +243,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         }
     }
 
-    /**
-     * @dev   Sets the yield recipient. Reverts if address(0).
-     * @param yieldRecipient_ The address of the new yield recipient.
-     */
+    /// @dev   Sets the yield recipient. Reverts if address(0).
+    /// @param yieldRecipient_ The address of the new yield recipient.
     function _setYieldRecipient(address yieldRecipient_) internal {
         if (yieldRecipient_ == address(0)) revert ZeroYieldRecipient();
 

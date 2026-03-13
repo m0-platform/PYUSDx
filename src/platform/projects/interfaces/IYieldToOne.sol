@@ -1,24 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.34;
 
-pragma solidity 0.8.26;
-
-/**
- * @title  PYUSDX Extension where all yield is claimable by a single recipient.
- * @author M0 Labs
- */
+/// @title  PYUSDX Extension where all yield is claimable by a single recipient.
+/// @author M0 Labs
 interface IYieldToOne {
     /* ============ Events ============ */
 
-    /**
-     * @notice Emitted when this contract's excess PYUSDX yield is claimed.
-     * @param  yield The amount of yield claimed.
-     */
+    /// @notice Emitted when this contract's excess PYUSDX yield is claimed.
+    /// @param  yield The amount of yield claimed.
     event YieldClaimed(uint256 yield);
 
-    /**
-     * @notice Emitted when the yield recipient is set.
-     * @param  yieldRecipient The address of the new yield recipient.
-     */
+    /// @notice Emitted when the yield recipient is set.
+    /// @param  yieldRecipient The address of the new yield recipient.
     event YieldRecipientSet(address indexed yieldRecipient);
 
     /* ============ Custom Errors ============ */
@@ -34,20 +27,16 @@ interface IYieldToOne {
 
     /* ============ Interactive Functions ============ */
 
-    /**
-     * @notice Claims accrued yield to the yield recipient.
-     * @dev    Calls `pyusdx.claimFor(address(this))` to realize pending yield,
-     *         then mints extension tokens for the resulting increase in totalSupply.
-     */
+    /// @notice Claims accrued yield to the yield recipient.
+    /// @dev    Calls `pyusdx.claimFor(address(this))` to realize pending yield,
+    ///         then mints extension tokens for the resulting increase in totalSupply.
     function claimYield() external returns (uint256);
 
-    /**
-     * @notice Sets the yield recipient.
-     * @dev    MUST only be callable by the YIELD_RECIPIENT_MANAGER_ROLE.
-     * @dev    SHOULD revert if `yieldRecipient` is 0x0.
-     * @dev    SHOULD return early if the `yieldRecipient` is already the actual yield recipient.
-     * @param  yieldRecipient The address of the new yield recipient.
-     */
+    /// @notice Sets the yield recipient.
+    /// @dev    MUST only be callable by the YIELD_RECIPIENT_MANAGER_ROLE.
+    /// @dev    SHOULD revert if `yieldRecipient` is 0x0.
+    /// @dev    SHOULD return early if the `yieldRecipient` is already the actual yield recipient.
+    /// @param  yieldRecipient The address of the new yield recipient.
     function setYieldRecipient(address yieldRecipient) external;
 
     /* ============ View/Pure Functions ============ */

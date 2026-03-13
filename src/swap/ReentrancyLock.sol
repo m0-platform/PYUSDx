@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-
-pragma solidity 0.8.26;
+pragma solidity 0.8.34;
 
 import { Locker } from "../../lib/evm-m-extensions/lib/uniswap-v4-periphery/src/libraries/Locker.sol";
 
@@ -44,10 +43,8 @@ contract ReentrancyLock is IReentrancyLock, ReentrancyLockStorageLayout, AccessC
 
     /* ============ Initializer ============ */
 
-    /**
-     * @notice Initializes the contract with the given admin.
-     * @param admin The address of an admin.
-     */
+    /// @notice Initializes the contract with the given admin.
+    /// @param  admin The address of an admin.
     function __ReentrancyLock_init(address admin) internal onlyInitializing {
         if (admin == address(0)) revert ZeroAdmin();
 
