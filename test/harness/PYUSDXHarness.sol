@@ -13,20 +13,20 @@ contract PYUSDXHarness is PYUSDX {
     /// @param account The account to configure
     /// @param principal The principal amount to set
     function setEarningPrincipal(address account, uint112 principal) external {
-        _getPYUSDXStorageLocation().accounts[account].earningPrincipal = principal;
+        _getPYUSDXStorage().accounts[account].earningPrincipal = principal;
     }
 
     /// @notice Sets the total supply directly
     /// @param supply The total supply to set
     function setTotalSupply(uint256 supply) external {
-        _getPYUSDXStorageLocation().totalSupply = supply;
+        _getPYUSDXStorage().totalSupply = supply;
     }
 
     /// @notice Sets an account's balance directly
     /// @param account The account to configure
     /// @param balance The balance to set
     function setBalance(address account, uint256 balance) external {
-        _getPYUSDXStorageLocation().accounts[account].balance = balance;
+        _getPYUSDXStorage().accounts[account].balance = balance;
     }
 
     /// @notice Gets the internal storage structure for an account
@@ -37,19 +37,19 @@ contract PYUSDXHarness is PYUSDX {
     function getAccountStorage(
         address account
     ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient) {
-        Account memory accountData = _getPYUSDXStorageLocation().accounts[account];
+        Account memory accountData = _getPYUSDXStorage().accounts[account];
         return (accountData.earnerRate, accountData.feeRate, accountData.claimRecipient);
     }
 
     /// @notice Expose internal _addEarningAmount for testing
     function addEarningAmount(address account, uint256 amount) external {
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        PYUSDXStorage storage $ = _getPYUSDXStorage();
         _addEarningAmount($, account, amount);
     }
 
     /// @notice Expose internal _addNonEarningAmount for testing
     function addNonEarningAmount(address account, uint256 amount) external {
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        PYUSDXStorage storage $ = _getPYUSDXStorage();
         _addNonEarningAmount($, account, amount);
     }
 
@@ -57,15 +57,15 @@ contract PYUSDXHarness is PYUSDX {
     /// @param account The account to configure
     /// @param newIndex The index value to set
     function setAccountLastIndex(address account, uint128 newIndex) external {
-        _getPYUSDXStorageLocation().accounts[account].lastIndex = newIndex;
-        _getPYUSDXStorageLocation().accounts[account].lastUpdateTimestamp = uint40(block.timestamp);
+        _getPYUSDXStorage().accounts[account].lastIndex = newIndex;
+        _getPYUSDXStorage().accounts[account].lastUpdateTimestamp = uint40(block.timestamp);
     }
 
     /// @notice Set the per-account earner rate directly for testing
     /// @param account The account to configure
     /// @param newRateBps The rate in basis points
     function setAccountRateBps(address account, uint32 newRateBps) external {
-        _getPYUSDXStorageLocation().accounts[account].earnerRate = newRateBps;
+        _getPYUSDXStorage().accounts[account].earnerRate = newRateBps;
     }
 
     /// @notice Sets rate-limit storage directly for edge-case testing.
@@ -76,7 +76,7 @@ contract PYUSDXHarness is PYUSDX {
         uint256 remainingAmount,
         uint40 lastRefillTime
     ) external {
-        Bucket storage bucket = _getRateLimiterStorageLocation().issuerBuckets[issuer];
+        Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];
 
         bucket.capacity = capacity;
         bucket.refillPerSecond = refillPerSecond;

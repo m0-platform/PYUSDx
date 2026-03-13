@@ -11,7 +11,7 @@ contract DeployAll is DeployBase {
         address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
 
         PYUSDXConfig memory pyusdxConfig = _loadPYUSDXConfig();
-        MinterGatewayConfig memory minterConfig = _loadMinterGatewayConfig();
+        IssuerGatewayConfig memory issuerGatewayConfig = _loadIssuerGatewayConfig();
         SwapFacilityConfig memory swapConfig = _loadSwapFacilityConfig();
         FactoryConfig memory factoryConfig = _loadFactoryConfig();
 
@@ -20,7 +20,7 @@ contract DeployAll is DeployBase {
         CoreDeployments memory deployment = _deployCore(
             deployer,
             pyusdxConfig,
-            minterConfig,
+            issuerGatewayConfig,
             swapConfig,
             factoryConfig
         );
@@ -31,9 +31,9 @@ contract DeployAll is DeployBase {
         console.log("PYUSDX Proxy:                     ", deployment.pyusdxProxy);
         console.log("PYUSDX ProxyAdmin:                ", deployment.pyusdxProxyAdmin);
         console.log("PYUSDX Implementation:            ", deployment.pyusdxImplementation);
-        console.log("MinterGateway Proxy:              ", deployment.minterGatewayProxy);
-        console.log("MinterGateway ProxyAdmin:         ", deployment.minterGatewayProxyAdmin);
-        console.log("MinterGateway Implementation:     ", deployment.minterGatewayImplementation);
+        console.log("IssuerGateway Proxy:              ", deployment.issuerGatewayProxy);
+        console.log("IssuerGateway ProxyAdmin:         ", deployment.issuerGatewayProxyAdmin);
+        console.log("IssuerGateway Implementation:     ", deployment.issuerGatewayImplementation);
         console.log("SwapFacility Proxy:               ", deployment.swapFacilityProxy);
         console.log("SwapFacility ProxyAdmin:          ", deployment.swapFacilityProxyAdmin);
         console.log("SwapFacility Implementation:      ", deployment.swapFacilityImplementation);
@@ -43,7 +43,7 @@ contract DeployAll is DeployBase {
         console.log("================================================================================");
 
         _writeDeployment(block.chainid, "pyusdx", deployment.pyusdxProxy);
-        _writeDeployment(block.chainid, "minterGateway", deployment.minterGatewayProxy);
+        _writeDeployment(block.chainid, "issuerGateway", deployment.issuerGatewayProxy);
         _writeDeployment(block.chainid, "swapFacility", deployment.swapFacilityProxy);
         _writeDeployment(block.chainid, "extensionFactory", deployment.factoryProxy);
     }
@@ -59,11 +59,11 @@ contract DeployAll is DeployBase {
         config.rateManager = vm.envAddress("PYUSDX_RATE_MANAGER");
     }
 
-    function _loadMinterGatewayConfig() private view returns (MinterGatewayConfig memory config) {
-        config.admin = vm.envAddress("MINTER_GATEWAY_ADMIN");
-        config.minter = vm.envAddress("MINTER_GATEWAY_MINTER");
-        config.mintDelay = uint32(vm.envUint("MINTER_GATEWAY_MINT_DELAY"));
-        config.mintTTL = uint32(vm.envUint("MINTER_GATEWAY_MINT_TTL"));
+    function _loadIssuerGatewayConfig() private view returns (IssuerGatewayConfig memory config) {
+        config.admin = vm.envAddress("ISSUER_GATEWAY_ADMIN");
+        config.minter = vm.envAddress("ISSUER_GATEWAY_MINTER");
+        config.mintDelay = uint32(vm.envUint("ISSUER_GATEWAY_MINT_DELAY"));
+        config.mintTTL = uint32(vm.envUint("ISSUER_GATEWAY_MINT_TTL"));
     }
 
     function _loadSwapFacilityConfig() private view returns (SwapFacilityConfig memory config) {

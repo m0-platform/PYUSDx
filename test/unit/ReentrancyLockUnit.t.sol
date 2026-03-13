@@ -69,7 +69,7 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
     }
 
     function _setupSwapIn(address user, uint256 amount) internal {
-        minterGateway.mint(user, amount);
+        issuerGateway.mint(user, amount);
 
         vm.prank(user);
         IERC20(address(pyusdx)).approve(address(swapFacility), amount);

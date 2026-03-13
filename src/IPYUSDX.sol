@@ -41,9 +41,9 @@ interface IPYUSDX {
 
     /**
      * @notice Emitted when the earner manager is set or updated.
-     * @param  account The address of the new earner manager.
+     * @param  earnerManager The address of the new earner manager.
      */
-    event EarnerManagerSet(address indexed account);
+    event EarnerManagerSet(address indexed earnerManager);
 
     /// @notice Emitted when an account's index is updated.
     event IndexUpdated(address indexed account, uint128 currentIndex);
@@ -88,9 +88,6 @@ interface IPYUSDX {
 
     /// @notice Thrown when an amount is zero.
     error ZeroAmount();
-
-    /// @notice Thrown when the caller does not have the ISSUER_ROLE.
-    error NotIssuer();
 
     /// @notice Thrown when the caller is not the earner manager.
     error NotEarnerManager();

@@ -86,7 +86,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
     /* ============ Helpers ============ */
 
     function _setupSwapIn(address user, uint256 amount) internal {
-        minterGateway.mint(user, amount);
+        issuerGateway.mint(user, amount);
 
         vm.prank(user);
         IERC20(address(pyusdx)).approve(address(swapFacility), amount);
@@ -203,7 +203,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
     }
 
     function test_swapIn_insufficientAllowance() public {
-        minterGateway.mint(alice, AMOUNT);
+        issuerGateway.mint(alice, AMOUNT);
 
         vm.expectRevert(
             abi.encodeWithSelector(IERC20Extended.InsufficientAllowance.selector, address(swapFacility), 0, AMOUNT)
@@ -476,7 +476,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         swapFacility.swap(address(mockUSDC), address(multiMintExtension), AMOUNT, alice);
 
         // Now, replace USDC with PYUSDX from extensionB
-        minterGateway.mint(bob, AMOUNT);
+        issuerGateway.mint(bob, AMOUNT);
 
         vm.prank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
@@ -531,7 +531,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         swapFacility.swap(address(mockUSDC), address(multiMintExtension), AMOUNT, alice);
 
         // Bob uses raw PYUSDX to replace the asset
-        minterGateway.mint(bob, AMOUNT);
+        issuerGateway.mint(bob, AMOUNT);
 
         vm.prank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
@@ -729,7 +729,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         swapFacility.swap(address(mockUSDC), address(multiMintExtension), AMOUNT, alice);
 
         // Bob uses raw PYUSDX with permit (mock permit is no-op, so we also approve)
-        minterGateway.mint(bob, AMOUNT);
+        issuerGateway.mint(bob, AMOUNT);
         vm.prank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
 
@@ -758,7 +758,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         swapFacility.swap(address(mockUSDC), address(multiMintExtension), AMOUNT, alice);
 
         // Bob uses raw PYUSDX with permit (mock permit is no-op, so we also approve)
-        minterGateway.mint(bob, AMOUNT);
+        issuerGateway.mint(bob, AMOUNT);
         vm.prank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
 

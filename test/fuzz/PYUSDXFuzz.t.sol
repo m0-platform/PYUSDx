@@ -19,7 +19,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
         uint256 totalSupplyBefore = pyusdx.totalSupply();
 
-        minterGateway.mint(alice, boundedAmount);
+        issuerGateway.mint(alice, boundedAmount);
 
         assertEq(pyusdx.balanceOf(alice), boundedAmount);
         assertEq(pyusdx.totalSupply(), totalSupplyBefore + boundedAmount);
@@ -56,7 +56,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             vm.expectRevert(UIntMath.InvalidUInt112.selector);
         }
 
-        minterGateway.mint(alice, boundedAmount);
+        issuerGateway.mint(alice, boundedAmount);
 
         if (!amountExceedsUInt240 && !wouldOverflowPrincipal) {
             uint112 expectedPrincipal = _expectedPrincipalRoundDown(uint240(boundedAmount), actualIndex);
@@ -88,7 +88,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         vm.warp(boundedCurrentTime);
 
         pyusdx.setRateLimitState(
-            address(minterGateway),
+            address(issuerGateway),
             boundedCapacity,
             boundedRefillPerSecond,
             boundedBucketRemaining,
@@ -96,7 +96,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         );
 
         // Calculate available amount after refill (caps at capacity)
-        uint256 available = pyusdx.getRemainingAmount(address(minterGateway));
+        uint256 available = pyusdx.getRemainingAmount(address(issuerGateway));
 
         bool isZeroAmount = boundedMintAmount == 0;
         bool exceedsRateLimit = boundedMintAmount > available;
@@ -109,13 +109,13 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             );
         }
 
-        minterGateway.mint(alice, boundedMintAmount);
+        issuerGateway.mint(alice, boundedMintAmount);
 
         // Only test refill behavior if mint succeeded
         if (!exceedsRateLimit && !isZeroAmount) {
             vm.warp(block.timestamp + boundedElapsedAfterMint);
 
-            uint256 availableAfterMint = pyusdx.getRemainingAmount(address(minterGateway));
+            uint256 availableAfterMint = pyusdx.getRemainingAmount(address(issuerGateway));
 
             assertLe(availableAfterMint, boundedCapacity);
         }
@@ -127,16 +127,16 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         uint40 boundedElapsed = uint40(bound(elapsed, 1, type(uint40).max));
 
         vm.prank(rateLimitManager);
-        pyusdx.setRateLimit(address(minterGateway), boundedCapacity, 0, true);
+        pyusdx.setRateLimit(address(issuerGateway), boundedCapacity, 0, true);
 
-        assertEq(pyusdx.getRemainingAmount(address(minterGateway)), boundedCapacity);
+        assertEq(pyusdx.getRemainingAmount(address(issuerGateway)), boundedCapacity);
 
-        minterGateway.mint(alice, boundedAmount);
-        assertEq(pyusdx.getRemainingAmount(address(minterGateway)), boundedCapacity - boundedAmount);
+        issuerGateway.mint(alice, boundedAmount);
+        assertEq(pyusdx.getRemainingAmount(address(issuerGateway)), boundedCapacity - boundedAmount);
 
         // Time passes but no refill (zero refillPerSecond)
         vm.warp(block.timestamp + boundedElapsed);
-        assertEq(pyusdx.getRemainingAmount(address(minterGateway)), boundedCapacity - boundedAmount);
+        assertEq(pyusdx.getRemainingAmount(address(issuerGateway)), boundedCapacity - boundedAmount);
     }
 
     /* ============ Fuzz: burn ============ */
@@ -144,7 +144,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     function testFuzz_burn_nonEarningAccount(uint256 mintAmount, uint256 burnAmount) public {
         burnAmount = bound(burnAmount, 1, type(uint240).max);
         mintAmount = bound(mintAmount, 1, type(uint240).max);
-        minterGateway.mint(alice, mintAmount);
+        issuerGateway.mint(alice, mintAmount);
 
         bool wouldExceedBalance = burnAmount > mintAmount;
 
@@ -154,7 +154,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             );
         }
 
-        minterGateway.burn(alice, burnAmount);
+        issuerGateway.burn(alice, burnAmount);
 
         if (!wouldExceedBalance) {
             assertEq(pyusdx.balanceOf(alice), mintAmount - burnAmount);
@@ -180,7 +180,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         vm.assume(mintAmount <= type(uint256).max / 1e12);
         vm.assume((uint256(mintAmount) * 1e12) / actualIndex <= type(uint112).max);
 
-        minterGateway.mint(alice, mintAmount);
+        issuerGateway.mint(alice, mintAmount);
 
         // Get state before burn
         uint256 balanceBefore = pyusdx.balanceOf(alice);
@@ -195,7 +195,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             );
         }
 
-        minterGateway.burn(alice, burnAmount);
+        issuerGateway.burn(alice, burnAmount);
 
         // Verify state when no revert
         if (!wouldExceedBalance) {
@@ -234,7 +234,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
         if (boundedPath == 0) {
             // N -> N
-            minterGateway.mint(alice, boundedAmount);
+            issuerGateway.mint(alice, boundedAmount);
             uint256 aliceBalance = pyusdx.balanceOf(alice);
             bool wouldExceedBalance = boundedAmount > aliceBalance;
 
@@ -262,7 +262,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             pyusdx.setAccountLastIndex(alice, boundedIndex);
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
-            minterGateway.mint(alice, boundedAmount);
+            issuerGateway.mint(alice, boundedAmount);
             uint256 aliceBalance = pyusdx.balanceOf(alice);
             bool wouldExceedBalance = boundedAmount > aliceBalance;
 
@@ -295,7 +295,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
-            minterGateway.mint(alice, boundedAmount);
+            issuerGateway.mint(alice, boundedAmount);
             uint256 aliceBalance = pyusdx.balanceOf(alice);
             bool wouldExceedBalance = boundedAmount > aliceBalance;
 
@@ -328,7 +328,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
 
             pyusdx.setAccountLastIndex(alice, boundedIndex);
 
-            minterGateway.mint(alice, boundedAmount);
+            issuerGateway.mint(alice, boundedAmount);
             uint256 aliceBalance = pyusdx.balanceOf(alice);
             bool wouldExceedBalance = boundedAmount > aliceBalance;
 
@@ -364,7 +364,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             pyusdx.setAccountLastIndex(alice, boundedIndex);
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
-            minterGateway.mint(alice, boundedAmount);
+            issuerGateway.mint(alice, boundedAmount);
             uint256 aliceBalance = pyusdx.balanceOf(alice);
             bool wouldExceedBalance = boundedAmount > aliceBalance;
 
@@ -401,7 +401,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             pyusdx.setAccountLastIndex(alice, boundedIndex);
             pyusdx.setAccountLastIndex(bob, boundedIndex);
 
-            minterGateway.mint(alice, boundedAmount);
+            issuerGateway.mint(alice, boundedAmount);
             uint256 aliceBalance = pyusdx.balanceOf(alice);
             bool wouldExceedBalance = boundedAmount > aliceBalance;
 
@@ -428,7 +428,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             }
         } else {
             // Path 6: Extra variation (N -> N basic transfer)
-            minterGateway.mint(alice, boundedAmount);
+            issuerGateway.mint(alice, boundedAmount);
             uint256 aliceBalance = pyusdx.balanceOf(alice);
             bool wouldExceedBalance = boundedAmount > aliceBalance;
 

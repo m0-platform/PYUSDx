@@ -19,7 +19,7 @@ import { IPYUSDX } from "./IPYUSDX.sol";
 /// @notice ERC-7201 namespaced storage layout for PYUSDX.
 abstract contract PYUSDXStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.PYUSDX
-    struct PYUSDXStorageStruct {
+    struct PYUSDXStorage {
         // Supply tracking
         uint256 totalSupply;
         // earner manager address (can manage earners and receive fees from their accounts)
@@ -46,7 +46,7 @@ abstract contract PYUSDXStorageLayout {
     bytes32 private constant _PYUSDX_STORAGE_LOCATION =
         0xc1b8ab2f33ccbf01222f9cf35bd888d518c2bda5deec0a0df8b0cd454fcb8500;
 
-    function _getPYUSDXStorageLocation() internal pure returns (PYUSDXStorageStruct storage $) {
+    function _getPYUSDXStorage() internal pure returns (PYUSDXStorage storage $) {
         assembly {
             $.slot := _PYUSDX_STORAGE_LOCATION
         }
@@ -131,7 +131,7 @@ contract PYUSDX is
         _revertIfFrozen(account);
         _revertIfZeroAmount(amount);
 
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        PYUSDXStorage storage $ = _getPYUSDXStorage();
 
         if (isEarning(account)) {
             _subtractEarningAmount($, account, amount);
@@ -212,24 +212,24 @@ contract PYUSDX is
 
     /// @inheritdoc IPYUSDX
     function earnerManager() public view returns (address) {
-        return _getPYUSDXStorageLocation().earnerManager;
+        return _getPYUSDXStorage().earnerManager;
     }
 
     /// @inheritdoc IERC20
     function totalSupply() public view returns (uint256) {
-        return _getPYUSDXStorageLocation().totalSupply;
+        return _getPYUSDXStorage().totalSupply;
     }
 
     /// @inheritdoc IERC20
     function balanceOf(address account) public view override returns (uint256) {
-        return _getPYUSDXStorageLocation().accounts[account].balance;
+        return _getPYUSDXStorage().accounts[account].balance;
     }
 
     /// @inheritdoc IPYUSDX
     function accruedYieldAndFeeOf(
         address account
     ) public view returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) {
-        Account storage accountInfo = _getPYUSDXStorageLocation().accounts[account];
+        Account storage accountInfo = _getPYUSDXStorage().accounts[account];
 
         if (accountInfo.earnerRate == 0) return (0, 0, 0);
 
@@ -239,6 +239,8 @@ contract PYUSDX is
 
         if (feeRate == 0 || yieldWithFee == 0) return (yieldWithFee, 0, yieldWithFee);
 
+        // NOTE: `feeRate` is capped at `ONE_HUNDRED_PERCENT` (10,000 bps), so `fee <= yieldWithFee`
+        //       and subtraction cannot underflow.
         unchecked {
             fee = (yieldWithFee * feeRate) / ONE_HUNDRED_PERCENT;
             yieldNetOfFee = yieldWithFee - fee;
@@ -264,51 +266,51 @@ contract PYUSDX is
 
     /// @inheritdoc IPYUSDX
     function balanceWithYieldOf(address account) external view returns (uint256) {
-        unchecked {
-            return balanceOf(account) + accruedYieldOf(account);
-        }
+        return balanceOf(account) + accruedYieldOf(account);
     }
 
     /// @inheritdoc IPYUSDX
     function isEarning(address account) public view returns (bool) {
-        return _getPYUSDXStorageLocation().accounts[account].earnerRate > 0;
+        return _getPYUSDXStorage().accounts[account].earnerRate != 0;
     }
 
     /// @inheritdoc IPYUSDX
     function getAccountEarningInfo(
         address account
     ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient) {
-        Account memory accountInfo = _getPYUSDXStorageLocation().accounts[account];
+        Account memory accountInfo = _getPYUSDXStorage().accounts[account];
         return (accountInfo.earnerRate, accountInfo.feeRate, claimRecipientFor(account));
     }
 
     /// @inheritdoc IPYUSDX
     function claimRecipientFor(address account) public view returns (address) {
-        address claimRecipient = _getPYUSDXStorageLocation().accounts[account].claimRecipient;
+        address claimRecipient = _getPYUSDXStorage().accounts[account].claimRecipient;
         return claimRecipient == address(0) ? account : claimRecipient;
     }
 
     /// @inheritdoc IPYUSDX
     function earningPrincipalOf(address account) external view returns (uint112) {
-        return _getPYUSDXStorageLocation().accounts[account].earningPrincipal;
+        return _getPYUSDXStorage().accounts[account].earningPrincipal;
     }
 
     /// @inheritdoc IPYUSDX
     function lastIndexOf(address account) public view returns (uint128) {
-        return _getPYUSDXStorageLocation().accounts[account].lastIndex;
+        return _getPYUSDXStorage().accounts[account].lastIndex;
     }
 
     /// @inheritdoc IPYUSDX
     function lastUpdateTimestampOf(address account) external view returns (uint40) {
-        return _getPYUSDXStorageLocation().accounts[account].lastUpdateTimestamp;
+        return _getPYUSDXStorage().accounts[account].lastUpdateTimestamp;
     }
 
     /// @inheritdoc IPYUSDX
     function currentIndexOf(address account) public view returns (uint128) {
-        Account storage accountInfo = _getPYUSDXStorageLocation().accounts[account];
+        Account storage accountInfo = _getPYUSDXStorage().accounts[account];
 
         if (accountInfo.earnerRate == 0) return EXP_SCALED_ONE;
 
+        // NOTE: Result is bounded by `UIntMath.bound128()` which caps at `type(uint128).max`,
+        //       preventing overflow.
         unchecked {
             return
                 UIntMath.bound128(
@@ -346,7 +348,7 @@ contract PYUSDX is
     function _setEarnerManager(address earnerManager_) internal {
         if (earnerManager_ == address(0)) revert ZeroEarnerManager();
 
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        PYUSDXStorage storage $ = _getPYUSDXStorage();
 
         // If the new earner manager is the same as the current one, do nothing.
         if (earnerManager_ == $.earnerManager) return;
@@ -371,7 +373,7 @@ contract PYUSDX is
         // No change for a non-earner, no-op action.
         if (!wasEarning && !willBeEarning) return;
 
-        Account storage accountInfo = _getPYUSDXStorageLocation().accounts[account];
+        Account storage accountInfo = _getPYUSDXStorage().accounts[account];
 
         // No change for an earner, no-op action. Happens rarely, consider removing.
         if (
@@ -415,7 +417,7 @@ contract PYUSDX is
     function _updateIndexOf(address account) internal returns (uint128 currentIndex) {
         if (!isEarning(account)) return EXP_SCALED_ONE;
 
-        Account storage accountInfo = _getPYUSDXStorageLocation().accounts[account];
+        Account storage accountInfo = _getPYUSDXStorage().accounts[account];
 
         accountInfo.lastIndex = currentIndex = currentIndexOf(account);
         accountInfo.lastUpdateTimestamp = uint40(block.timestamp);
@@ -433,7 +435,7 @@ contract PYUSDX is
         emit YieldClaimed(account, yieldNetOfFee);
         emit Transfer(address(0), account, yieldWithFee);
 
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        PYUSDXStorage storage $ = _getPYUSDXStorage();
 
         // No change in principal, only the balance is updated to include the newly claimed yield.
         $.totalSupply += yieldWithFee;
@@ -462,7 +464,7 @@ contract PYUSDX is
         // If account is not an earner, return early.
         if (!isEarning(account)) return;
 
-        Account storage accountInfo = _getPYUSDXStorageLocation().accounts[account];
+        Account storage accountInfo = _getPYUSDXStorage().accounts[account];
 
         // Clean up all account info fields except balance.
         delete accountInfo.earningPrincipal;
@@ -475,11 +477,11 @@ contract PYUSDX is
         emit StoppedEarning(account);
     }
 
-    /// @dev Adds non-earning amount to an account's balance and total supply.
+    /// @dev Adds amount to a non-earning account's balance.
     /// @param $ The storage pointer.
     /// @param account The account to add the amount to.
     /// @param amount The amount to add (must be safe240).
-    function _addNonEarningAmount(PYUSDXStorageStruct storage $, address account, uint256 amount) internal {
+    function _addNonEarningAmount(PYUSDXStorage storage $, address account, uint256 amount) internal {
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `mint`.
         unchecked {
             $.accounts[account].balance += amount;
@@ -490,7 +492,7 @@ contract PYUSDX is
     /// @param $ The storage pointer.
     /// @param account The account to add the amount to.
     /// @param amount The present amount to add.
-    function _addEarningAmount(PYUSDXStorageStruct storage $, address account, uint256 amount) internal {
+    function _addEarningAmount(PYUSDXStorage storage $, address account, uint256 amount) internal {
         uint112 principal = _getPrincipalAmountRoundedDown(amount, _updateIndexOf(account));
 
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `mint`.
@@ -500,11 +502,11 @@ contract PYUSDX is
         }
     }
 
-    /// @dev Subtracts non-earning amount from an account's balance and total supply.
+    /// @dev Subtracts amount from a non-earning account's balance.
     /// @param $ The storage pointer.
     /// @param account The account to subtract the amount from.
     /// @param amount The amount to subtract (must be safe240).
-    function _subtractNonEarningAmount(PYUSDXStorageStruct storage $, address account, uint256 amount) internal {
+    function _subtractNonEarningAmount(PYUSDXStorage storage $, address account, uint256 amount) internal {
         uint256 accountBalance = $.accounts[account].balance;
 
         if (accountBalance < amount) {
@@ -516,11 +518,11 @@ contract PYUSDX is
         }
     }
 
-    /// @dev Subtracts earning amount from an account's balance and total earning supply/principal.
+    /// @dev Subtracts amount from an earning account's balance and principal.
     /// @param $ The storage pointer.
     /// @param account The account to subtract the amount from.
     /// @param amount The present amount to subtract (must be safe240).
-    function _subtractEarningAmount(PYUSDXStorageStruct storage $, address account, uint256 amount) internal {
+    function _subtractEarningAmount(PYUSDXStorage storage $, address account, uint256 amount) internal {
         uint256 accountBalance = $.accounts[account].balance;
 
         if (accountBalance < amount) {
@@ -552,7 +554,7 @@ contract PYUSDX is
 
         if (amount == 0) return;
 
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        PYUSDXStorage storage $ = _getPYUSDXStorage();
 
         // Subtract from sender
         if (isEarning(sender)) {
@@ -582,7 +584,7 @@ contract PYUSDX is
 
         if (amount == 0) return;
 
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        PYUSDXStorage storage $ = _getPYUSDXStorage();
 
         // Subtract from frozen (non-earning) account
         _subtractNonEarningAmount($, frozenAccount, amount);
@@ -604,7 +606,7 @@ contract PYUSDX is
         _revertIfZeroAmount(amount);
         _enforceRateLimit(msg.sender, amount);
 
-        PYUSDXStorageStruct storage $ = _getPYUSDXStorageLocation();
+        PYUSDXStorage storage $ = _getPYUSDXStorage();
 
         $.totalSupply += amount;
 

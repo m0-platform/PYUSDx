@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-/// @title IMinterGateway
-/// @notice Interface for the MinterGateway contract that manages minting and burning of PYUSDX tokens
-/// @dev Defines all events, errors, and functions for the MinterGateway
-interface IMinterGateway {
+/// @title IIssuerGateway
+/// @notice Interface for the IssuerGateway contract that manages minting and burning of PYUSDX tokens
+/// @dev Defines all events, errors, and functions for the IssuerGateway
+interface IIssuerGateway {
     /* ============ Events ============ */
 
     /// @notice Emitted when a new mint is proposed
@@ -97,7 +97,7 @@ interface IMinterGateway {
 
     /* ============ Initializer ============ */
 
-    /// @notice Initializes the MinterGateway contract
+    /// @notice Initializes the IssuerGateway contract
     /// @dev    Can only be called once due to initializer modifier
     /// @param  admin     The address that will have the default admin role
     /// @param  minter    The address that will have the minter role
@@ -108,7 +108,7 @@ interface IMinterGateway {
     /* ============ Interactive Functions ============ */
 
     /// @notice Proposes a new mint operation
-    /// @dev    Only callable by addresses with MINTER_ROLE
+    /// @dev    Only callable by addresses with ISSUER_ROLE
     /// @param  amount    The amount of PYUSDX to mint
     /// @param  recipient The address that will receive the minted tokens
     /// @return mintId    The unique identifier for the mint proposal
@@ -120,7 +120,7 @@ interface IMinterGateway {
     function mint(uint48 mintId) external;
 
     /// @notice Burns PYUSDX tokens from the caller's balance
-    /// @dev    Only callable by addresses with MINTER_ROLE
+    /// @dev    Only callable by addresses with ISSUER_ROLE
     /// @param  amount The amount of PYUSDX to burn
     function burn(uint256 amount) external;
 
