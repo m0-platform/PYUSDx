@@ -5,11 +5,7 @@ import { IPYUSDX } from "../../src/IPYUSDX.sol";
 
 /// @title Issuer Gateway Mock
 /// @notice Mock contract to test PYUSDX mint functionality
-<<<<<<<< HEAD:test/mock/IssuerGatewayMock.sol
-contract IssuerGatewayMock {
-========
-contract MockMinterGateway {
->>>>>>>> c3ce391 (chore: use Solidity version 0.8.34 (#19)):test/mock/MockMinterGateway.sol
+contract MockIssuerGateway {
     IPYUSDX public pyusdx;
 
     constructor(address pyusdx_) {

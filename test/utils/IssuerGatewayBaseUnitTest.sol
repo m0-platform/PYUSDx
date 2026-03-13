@@ -46,7 +46,7 @@ abstract contract IssuerGatewayBaseUnitTest is Test {
         );
 
         // Deploy MockPYUSDX - lands at predicted address
-        pyusdx = new MockPYUSDX(address(minterGateway));
+        pyusdx = new MockPYUSDX(address(issuerGateway));
         assertEq(address(pyusdx), predictedPyusdx, "address prediction failed");
     }
 

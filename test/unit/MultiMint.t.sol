@@ -7,7 +7,7 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { IssuerGatewayMock } from "../mock/IssuerGatewayMock.sol";
+import { MockIssuerGateway } from "../mock/MockIssuerGateway.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
@@ -18,7 +18,7 @@ import { MockERC20 } from "../mock/MockERC20.sol";
 import { MockFeeOnTransfer } from "../mock/MockFeeOnTransfer.sol";
 
 contract MultiMintTest is Test {
-    IssuerGatewayMock public issuerGateway;
+    MockIssuerGateway public issuerGateway;
     PYUSDXHarness public pyusdx;
     MockSwapFacility public swapFacility;
     MultiMint public extension;
@@ -42,7 +42,7 @@ contract MultiMintTest is Test {
     uint256 public constant MINT_AMOUNT = 1000e6;
 
     function setUp() public {
-        issuerGateway = new IssuerGatewayMock(address(0));
+        issuerGateway = new MockIssuerGateway(address(0));
         address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(

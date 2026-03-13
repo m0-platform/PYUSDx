@@ -18,7 +18,7 @@ import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
 
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { IssuerGatewayMock } from "../mock/IssuerGatewayMock.sol";
+import { MockIssuerGateway } from "../mock/MockIssuerGateway.sol";
 
 contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     event Transfer(address indexed from, address indexed to, uint256 value);

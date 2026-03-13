@@ -103,7 +103,7 @@ interface IExtensionFactory {
 
     /// @notice Returns the predicted deployment address for an extension with the given extension name and deployer.
     /// @param  deployer      The address of the deployer (embedded in salt for deployer-specific addresses).
-    /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
+    /// @param  extensionName The name of the extension (determines the deployment address).
     /// @return The predicted proxy address.
     function getExtensionAddress(address deployer, string calldata extensionName) external view returns (address);
 

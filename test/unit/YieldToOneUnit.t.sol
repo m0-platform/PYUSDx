@@ -7,7 +7,7 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { IssuerGatewayMock } from "../mock/IssuerGatewayMock.sol";
+import { MockIssuerGateway } from "../mock/MockIssuerGateway.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.sol";
@@ -17,7 +17,7 @@ import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interf
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 
 contract YieldToOneUnitTests is Test {
-    IssuerGatewayMock public issuerGateway;
+    MockIssuerGateway public issuerGateway;
     PYUSDXHarness public pyusdx;
     MockSwapFacility public swapFacility;
     YieldToOne public extension;
@@ -36,7 +36,7 @@ contract YieldToOneUnitTests is Test {
     uint256 public constant MINT_AMOUNT = 1000e6;
 
     function setUp() public {
-        issuerGateway = new IssuerGatewayMock(address(0));
+        issuerGateway = new MockIssuerGateway(address(0));
 
         address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(
