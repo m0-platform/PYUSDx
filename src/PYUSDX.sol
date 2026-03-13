@@ -271,7 +271,7 @@ contract PYUSDX is
 
     /// @inheritdoc IPYUSDX
     function isEarning(address account) public view returns (bool) {
-        return _getPYUSDXStorage().accounts[account].earnerRate > 0;
+        return _getPYUSDXStorage().accounts[account].earnerRate != 0;
     }
 
     /// @inheritdoc IPYUSDX
