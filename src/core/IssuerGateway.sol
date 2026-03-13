@@ -34,7 +34,7 @@ abstract contract IssuerGatewayStorageLayout {
     }
 }
 
-/// @title IssuerGateway
+/// @title  IssuerGateway
 /// @author M0 Labs
 /// @notice Gateway contract for proposing and executing mints on PYUSDX with a time delay.
 contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessControlUpgradeable {
@@ -51,7 +51,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /* ============ Constructor ============ */
 
     /// @notice Constructs the IssuerGateway implementation contract.
-    /// @param pyusdx_ The PYUSDX token contract address.
+    /// @param  pyusdx_ The PYUSDX token contract address.
     constructor(address pyusdx_) {
         if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDXToken();
 
@@ -186,7 +186,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /* ============ Internal Functions ============ */
 
     /// @notice Updates the mint delay
-    /// @param mintDelay_ The mint delay in seconds
+    /// @param  mintDelay_ The mint delay in seconds
     function _setMintDelay(uint32 mintDelay_) internal {
         IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
 
@@ -197,7 +197,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     }
 
     /// @notice Updates the mint TTL
-    /// @param mintTTL_ The mint TTL in seconds
+    /// @param  mintTTL_ The mint TTL in seconds
     function _setMintTTL(uint32 mintTTL_) internal {
         if (mintTTL_ == 0) revert ZeroMintTTL();
 

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
-/// @title IIssuerGateway
+/// @title  IIssuerGateway
 /// @notice Interface for the IssuerGateway contract that manages minting and burning of PYUSDX tokens
-/// @dev Defines all events, errors, and functions for the IssuerGateway
+/// @dev    Defines all events, errors, and functions for the IssuerGateway
 interface IIssuerGateway {
     /* ============ Events ============ */
 

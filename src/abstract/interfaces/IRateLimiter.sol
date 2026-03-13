@@ -32,10 +32,10 @@ interface IRateLimiter {
 
     /// @notice Sets/removes issuer mint rate-limit configuration.
     /// @dev    MUST only be callable by RATE_LIMITER_ROLE.
-    /// @param  issuer           Address of the issuer.
-    /// @param  capacity         Maximum bucket capacity.
-    /// @param  refillPerSecond  Refill rate per second. Set to 0 for a one-time mint cap with no refill.
-    /// @param  enabled          True to configure/update. False to remove (requires zero capacity/refillPerSecond).
+    /// @param  issuer          Address of the issuer.
+    /// @param  capacity        Maximum bucket capacity.
+    /// @param  refillPerSecond Refill rate per second. Set to 0 for a one-time mint cap with no refill.
+    /// @param  enabled         True to configure/update. False to remove (requires zero capacity/refillPerSecond).
     function setRateLimit(address issuer, uint256 capacity, uint256 refillPerSecond, bool enabled) external;
 
     /* ============ View/Pure Functions ============ */

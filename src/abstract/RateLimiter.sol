@@ -118,9 +118,9 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
 
     /* ============ Internal Functions ============ */
 
-    /// @dev    Enforces the rate limit, reverting if amount exceeds available capacity.
-    /// @param  issuer Issuer key.
-    /// @param  amount The amount to check.
+    /// @dev   Enforces the rate limit, reverting if amount exceeds available capacity.
+    /// @param issuer Issuer key.
+    /// @param amount The amount to check.
     function _enforceRateLimit(address issuer, uint256 amount) internal {
         Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];
 

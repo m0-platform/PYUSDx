@@ -7,24 +7,24 @@ interface ISwapFacility {
     //// ============ Events ============ */
 
     /// @notice Emitted when PYUSDX Extension is swapped for another PYUSDX Extension.
-    /// @param extensionIn  The address of the input PYUSDX Extension.
-    /// @param extensionOut The address of the output PYUSDX Extension.
-    /// @param amount       The amount swapped.
-    /// @param recipient    The address to receive the output PYUSDX Extension token.
+    /// @param  extensionIn  The address of the input PYUSDX Extension.
+    /// @param  extensionOut The address of the output PYUSDX Extension.
+    /// @param  amount       The amount swapped.
+    /// @param  recipient    The address to receive the output PYUSDX Extension token.
     event Swapped(address indexed extensionIn, address indexed extensionOut, uint256 amount, address indexed recipient);
 
     /// @notice Emitted when PYUSDX token is swapped for PYUSDX Extension.
-    /// @param token        The address of the PYUSDX token.
-    /// @param extensionOut The address of the output PYUSDX Extension.
-    /// @param amount       The amount swapped.
-    /// @param recipient    The address to receive the output PYUSDX Extension token.
+    /// @param  token        The address of the PYUSDX token.
+    /// @param  extensionOut The address of the output PYUSDX Extension.
+    /// @param  amount       The amount swapped.
+    /// @param  recipient    The address to receive the output PYUSDX Extension token.
     event SwappedIn(address indexed token, address indexed extensionOut, uint256 amount, address indexed recipient);
 
     /// @notice Emitted when PYUSDX Extension is swapped for PYUSDX token.
-    /// @param token        The address of the PYUSDX token.
-    /// @param extensionIn  The address of the input PYUSDX Extension.
-    /// @param amount       The amount swapped.
-    /// @param recipient    The address to receive the PYUSDX token.
+    /// @param  token       The address of the PYUSDX token.
+    /// @param  extensionIn The address of the input PYUSDX Extension.
+    /// @param  amount      The amount swapped.
+    /// @param  recipient   The address to receive the PYUSDX token.
     event SwappedOut(address indexed extensionIn, address indexed token, uint256 amount, address indexed recipient);
 
     /// @notice Emitted when PYUSDX token is swapped for MultiMint Extension.

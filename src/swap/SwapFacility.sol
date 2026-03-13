@@ -14,11 +14,9 @@ import { IExtensionFactory } from "../platform/interfaces/IExtensionFactory.sol"
 
 import { ISwapFacility } from "./interfaces/ISwapFacility.sol";
 
-/**
- * @title  Swap Facility
- * @notice A contract responsible for swapping between PYUSDX Extensions.
- * @author M0 Labs
- */
+/// @title  Swap Facility
+/// @notice A contract responsible for swapping between PYUSDX Extensions.
+/// @author M0 Labs
 contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     using SafeERC20 for IERC20;
 
@@ -30,13 +28,11 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable extensionFactory;
 
-    /**
-     * @custom:oz-upgrades-unsafe-allow constructor
-     * @notice Constructs SwapFacility Implementation contract
-     * @dev    Sets immutable storage.
-     * @param  pyusdx_            The address of PYUSDX token.
-     * @param  extensionFactory_  The address of the PYUSDX Extension Factory.
-     */
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    /// @notice Constructs SwapFacility Implementation contract
+    /// @dev    Sets immutable storage.
+    /// @param  pyusdx_           The address of PYUSDX token.
+    /// @param  extensionFactory_ The address of the PYUSDX Extension Factory.
     constructor(address pyusdx_, address extensionFactory_) {
         _disableInitializers();
 
@@ -46,12 +42,10 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
 
     /* ============ Initializer ============ */
 
-    /**
-     * @notice Initializes SwapFacility Proxy.
-     * @dev    Used to initialize SwapFacility when deploying for the first time.
-     * @param  admin  Address of the SwapFacility admin.
-     * @param  pauser Address of the SwapFacility pauser.
-     */
+    /// @notice Initializes SwapFacility Proxy.
+    /// @dev    Used to initialize SwapFacility when deploying for the first time.
+    /// @param  admin  Address of the SwapFacility admin.
+    /// @param  pauser Address of the SwapFacility pauser.
     function initialize(address admin, address pauser) external initializer {
         __ReentrancyLock_init(admin);
         __Pausable_init(pauser);
@@ -203,13 +197,11 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
 
     /* ============ Private Interactive Functions ============ */
 
-    /**
-     * @notice Swaps between two tokens, which can be PYUSDX token, PYUSDX Extensions, or an external asset used by MultiMint Extensions.
-     * @param  tokenIn   The address of the token to swap from.
-     * @param  tokenOut  The address of the token to swap to.
-     * @param  amount    The amount to swap.
-     * @param  recipient The address to receive the swapped tokens.
-     */
+    /// @notice Swaps between two tokens, which can be PYUSDX token, PYUSDX Extensions, or an external asset used by MultiMint Extensions.
+    /// @param  tokenIn   The address of the token to swap from.
+    /// @param  tokenOut  The address of the token to swap to.
+    /// @param  amount    The amount to swap.
+    /// @param  recipient The address to receive the swapped tokens.
     function _swap(address tokenIn, address tokenOut, uint256 amount, address recipient) private {
         _requireNotPaused();
 
@@ -236,13 +228,11 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         revert InvalidSwapPath(tokenIn, tokenOut);
     }
 
-    /**
-     * @notice Swaps one PYUSDX Extension to another.
-     * @param  extensionIn  The address of the PYUSDX Extension to swap from.
-     * @param  extensionOut The address of the PYUSDX Extension to swap to.
-     * @param  amount       The amount to swap.
-     * @param  recipient    The address to receive the swapped PYUSDX Extension tokens.
-     */
+    /// @notice Swaps one PYUSDX Extension to another.
+    /// @param  extensionIn  The address of the PYUSDX Extension to swap from.
+    /// @param  extensionOut The address of the PYUSDX Extension to swap to.
+    /// @param  amount       The amount to swap.
+    /// @param  recipient    The address to receive the swapped PYUSDX Extension tokens.
     function _swapExtensions(address extensionIn, address extensionOut, uint256 amount, address recipient) private {
         uint256 pyusdxBalanceBefore = _pyusdxBalanceOf(address(this));
 
@@ -258,12 +248,10 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         emit Swapped(extensionIn, extensionOut, amount, recipient);
     }
 
-    /**
-     * @notice Swaps PYUSDX token to PYUSDX Extension.
-     * @param  extensionOut The address of the PYUSDX Extension to swap to.
-     * @param  amount       The amount of PYUSDX token to swap.
-     * @param  recipient    The address to receive the swapped PYUSDX Extension tokens.
-     */
+    /// @notice Swaps PYUSDX token to PYUSDX Extension.
+    /// @param  extensionOut The address of the PYUSDX Extension to swap to.
+    /// @param  amount       The amount of PYUSDX token to swap.
+    /// @param  recipient    The address to receive the swapped PYUSDX Extension tokens.
     function _swapIn(address extensionOut, uint256 amount, address recipient) private {
         _revertIfNotApprovedExtension(extensionOut);
 
@@ -274,13 +262,11 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         emit SwappedIn(pyusdx, extensionOut, amount, recipient);
     }
 
-    /**
-     * @notice Swaps `amount` of `asset` to MultiMint Extension tokens.
-     * @param  asset        The address of the asset to swap.
-     * @param  extensionOut The address of the MultiMint Extension to swap to.
-     * @param  amount       The amount of `asset` to swap.
-     * @param  recipient    The address to receive `amount` of MultiMint Extension tokens.
-     */
+    /// @notice Swaps `amount` of `asset` to MultiMint Extension tokens.
+    /// @param  asset        The address of the asset to swap.
+    /// @param  extensionOut The address of the MultiMint Extension to swap to.
+    /// @param  amount       The amount of `asset` to swap.
+    /// @param  recipient    The address to receive `amount` of MultiMint Extension tokens.
     function _swapInMultiMint(address asset, address extensionOut, uint256 amount, address recipient) private {
         _revertIfCannotMultiMint(asset, extensionOut);
 
@@ -293,14 +279,12 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         emit SwappedInMultiMint(asset, extensionOut, amount, recipient);
     }
 
-    /**
-     * @notice Replaces `amount` of `asset` held in a MultiMint Extension with PYUSDX.
-     * @param  asset        The address of the asset.
-     * @param  tokenIn      The address of PYUSDX or a PYUSDX extension to provide PYUSDX from.
-     * @param  extensionOut The address of a MultiMint Extension.
-     * @param  amount       The amount of PYUSDX to replace.
-     * @param  recipient    The address to receive `amount` of `asset` tokens.
-     */
+    /// @notice Replaces `amount` of `asset` held in a MultiMint Extension with PYUSDX.
+    /// @param  asset        The address of the asset.
+    /// @param  tokenIn      The address of PYUSDX or a PYUSDX extension to provide PYUSDX from.
+    /// @param  extensionOut The address of a MultiMint Extension.
+    /// @param  amount       The amount of PYUSDX to replace.
+    /// @param  recipient    The address to receive `amount` of `asset` tokens.
     function _replaceAsset(
         address asset,
         address tokenIn,
@@ -337,12 +321,10 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         emit MultiMintAssetReplaced(asset, extensionOut, amount);
     }
 
-    /**
-     * @notice Swaps PYUSDX Extension to PYUSDX token.
-     * @param  extensionIn The address of the PYUSDX Extension to swap from.
-     * @param  amount      The amount of PYUSDX Extension tokens to swap.
-     * @param  recipient   The address to receive PYUSDX tokens.
-     */
+    /// @notice Swaps PYUSDX Extension to PYUSDX token.
+    /// @param  extensionIn The address of the PYUSDX Extension to swap from.
+    /// @param  amount      The amount of PYUSDX Extension tokens to swap.
+    /// @param  recipient   The address to receive PYUSDX tokens.
     function _swapOut(address extensionIn, uint256 amount, address recipient) private {
         _revertIfNotApprovedExtension(extensionIn);
 
@@ -363,28 +345,22 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
 
     /* ============ Private View/Pure Functions ============ */
 
-    /**
-     * @dev    Returns the PYUSDX Token balance of `account`.
-     * @param  account The account being queried.
-     * @return balance The PYUSDX Token balance of the account.
-     */
+    /// @dev    Returns the PYUSDX Token balance of `account`.
+    /// @param  account The account being queried.
+    /// @return balance The PYUSDX Token balance of the account.
     function _pyusdxBalanceOf(address account) internal view returns (uint256) {
         return IERC20(pyusdx).balanceOf(account);
     }
 
-    /**
-     * @dev   Reverts if `extension` is not an approved earner or an admin-approved extension.
-     * @param extension Address of an extension.
-     */
+    /// @dev   Reverts if `extension` is not an approved earner or an admin-approved extension.
+    /// @param extension Address of an extension.
     function _revertIfNotApprovedExtension(address extension) private view {
         if (!isApprovedExtension(extension)) revert NotApprovedExtension(extension);
     }
 
-    /**
-     * @dev   Reverts if `asset` is not an allowed asset in MultiMint Extension.
-     * @param asset        Address of the asset to check.
-     * @param extensionOut Address of the MultiMint Extension.
-     */
+    /// @dev   Reverts if `asset` is not an allowed asset in MultiMint Extension.
+    /// @param asset        Address of the asset to check.
+    /// @param extensionOut Address of the MultiMint Extension.
     function _revertIfCannotMultiMint(address asset, address extensionOut) private view {
         try IMultiMint(extensionOut).isAllowedAsset(asset) returns (bool allowed) {
             if (!allowed) revert InvalidSwapPath(asset, extensionOut);

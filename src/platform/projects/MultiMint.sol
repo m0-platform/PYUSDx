@@ -37,15 +37,13 @@ abstract contract MultiMintStorageLayout {
     }
 }
 
-/**
- * @title  MultiMint
- * @notice Upgradeable ERC20 token for wrapping PYUSDX or approved alternative stablecoins
- *         into a token with yield claimable by a single recipient.
- * @dev    Extends YieldToOne with a multi-collateral backing model. Users
- *         can mint by depositing PYUSDX. Unwrapping always returns PYUSDX, other
- *         stablecoins can only be extracted via `replaceAsset`.
- * @author M0 Labs
- */
+/// @title  MultiMint
+/// @notice Upgradeable ERC20 token for wrapping PYUSDX or approved alternative stablecoins
+///         into a token with yield claimable by a single recipient.
+/// @dev    Extends YieldToOne with a multi-collateral backing model. Users
+///         can mint by depositing PYUSDX. Unwrapping always returns PYUSDX, other
+///         stablecoins can only be extracted via `replaceAsset`.
+/// @author M0 Labs
 contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     using SafeERC20 for IERC20Metadata;
 
@@ -59,26 +57,22 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
     /* ============ Constructor ============ */
 
-    /**
-     * @custom:oz-upgrades-unsafe-allow constructor
-     * @param pyusdx_       The address of the PYUSDX token.
-     * @param swapFacility_ The address of the swap facility.
-     */
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    /// @param pyusdx_       The address of the PYUSDX token.
+    /// @param swapFacility_ The address of the swap facility.
     constructor(address pyusdx_, address swapFacility_) YieldToOne(pyusdx_, swapFacility_) {}
 
     /* ============ Initializer ============ */
 
-    /**
-     * @notice Initializes the MultiMint extension token.
-     * @param  name                  The name of the token.
-     * @param  symbol                The symbol of the token.
-     * @param  yieldRecipient_       The address of the yield recipient.
-     * @param  admin                 The address of the admin.
-     * @param  assetCapManager       The address of the asset cap manager.
-     * @param  freezeManager         The address of the freeze manager.
-     * @param  pauser                The address of the pauser.
-     * @param  yieldRecipientManager The address of the yield recipient manager.
-     */
+    /// @notice Initializes the MultiMint extension token.
+    /// @param  name                  The name of the token.
+    /// @param  symbol                The symbol of the token.
+    /// @param  yieldRecipient_       The address of the yield recipient.
+    /// @param  admin                 The address of the admin.
+    /// @param  assetCapManager       The address of the asset cap manager.
+    /// @param  freezeManager         The address of the freeze manager.
+    /// @param  pauser                The address of the pauser.
+    /// @param  yieldRecipientManager The address of the yield recipient manager.
     function initialize(
         string memory name,
         string memory symbol,
@@ -101,18 +95,16 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         );
     }
 
-    /**
-     * @dev   Internal initializer for MultiMint. Grants ASSET_CAP_MANAGER_ROLE
-     *        and delegates to `__YieldToOne_init`.
-     * @param name                  The name of the token.
-     * @param symbol                The symbol of the token.
-     * @param yieldRecipient_       The address of the yield recipient.
-     * @param admin                 The address of the admin.
-     * @param assetCapManager       The address of the asset cap manager.
-     * @param freezeManager         The address of the freeze manager.
-     * @param pauser                The address of the pauser.
-     * @param yieldRecipientManager The address of the yield recipient manager.
-     */
+    /// @dev   Internal initializer for MultiMint. Grants ASSET_CAP_MANAGER_ROLE
+    ///        and delegates to `__YieldToOne_init`.
+    /// @param name                  The name of the token.
+    /// @param symbol                The symbol of the token.
+    /// @param yieldRecipient_       The address of the yield recipient.
+    /// @param admin                 The address of the admin.
+    /// @param assetCapManager       The address of the asset cap manager.
+    /// @param freezeManager         The address of the freeze manager.
+    /// @param pauser                The address of the pauser.
+    /// @param yieldRecipientManager The address of the yield recipient manager.
     function __MultiMint_init(
         string memory name,
         string memory symbol,
@@ -202,26 +194,22 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
     /* ============ Hooks ============ */
 
-    /**
-     * @dev   Hook called before wrapping `asset` into extension's tokens.
-     * @param asset     Address of the asset being deposited.
-     * @param account   The account initiating the wrap.
-     * @param recipient The address that will receive extension tokens.
-     * @param amount    The amount of `asset` being deposited.
-     */
+    /// @dev   Hook called before wrapping `asset` into extension's tokens.
+    /// @param asset     Address of the asset being deposited.
+    /// @param account   The account initiating the wrap.
+    /// @param recipient The address that will receive extension tokens.
+    /// @param amount    The amount of `asset` being deposited.
     function _beforeWrap(address asset, address account, address recipient, uint256 amount) internal view virtual {
         if (!isAllowedToWrap(asset, amount)) revert AssetCapReached(asset);
 
         super._beforeWrap(account, recipient, amount);
     }
 
-    /**
-     * @dev   Hook called before unwrapping extension tokens for PYUSDX.
-     *        Adds PYUSDX backing check before the inherited pause+freeze
-     *        checks.
-     * @param account The account from which tokens are burned.
-     * @param amount  The amount of extension tokens to unwrap.
-     */
+    /// @dev   Hook called before unwrapping extension tokens for PYUSDX.
+    ///        Adds PYUSDX backing check before the inherited pause+freeze
+    ///        checks.
+    /// @param account The account from which tokens are burned.
+    /// @param amount  The amount of extension tokens to unwrap.
     function _beforeUnwrap(address account, uint256 amount) internal view virtual override {
         _revertIfInsufficientPYUSDXBacking(amount);
 
@@ -230,14 +218,12 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
     /* ============ Internal Interactive Functions ============ */
 
-    /**
-     * @dev   Mints extension tokens by pulling `asset` from `msg.sender`.
-     *        Reverts on fee-on-transfer tokens or if the asset cap is reached.
-     * @param asset     Address of the asset to deposit.
-     * @param account   The original caller (resolved via swap facility).
-     * @param recipient Address that will receive the extension tokens.
-     * @param amount    Amount of `asset` tokens to deposit (in asset decimals).
-     */
+    /// @dev   Mints extension tokens by pulling `asset` from `msg.sender`.
+    ///        Reverts on fee-on-transfer tokens or if the asset cap is reached.
+    /// @param asset     Address of the asset to deposit.
+    /// @param account   The original caller (resolved via swap facility).
+    /// @param recipient Address that will receive the extension tokens.
+    /// @param amount    Amount of `asset` tokens to deposit (in asset decimals).
     function _wrapAsset(address asset, address account, address recipient, uint256 amount) internal virtual {
         _revertIfInvalidAsset(asset);
         _revertIfZeroAccount(recipient);
@@ -270,14 +256,12 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         emit AssetWrapped(asset, amount, recipient, extensionAmount_);
     }
 
-    /**
-     * @dev   Pulls PYUSDX from `msg.sender` and sends `asset` from reserves
-     *        to `recipient`.
-     * @param asset     Address of the asset to receive from reserves.
-     * @param account   The original caller (resolved via swap facility).
-     * @param recipient Address that will receive the `asset` tokens.
-     * @param amount    Amount of PYUSDX to deposit (in PYUSDX decimals).
-     */
+    /// @dev   Pulls PYUSDX from `msg.sender` and sends `asset` from reserves
+    ///        to `recipient`.
+    /// @param asset     Address of the asset to receive from reserves.
+    /// @param account   The original caller (resolved via swap facility).
+    /// @param recipient Address that will receive the `asset` tokens.
+    /// @param amount    Amount of PYUSDX to deposit (in PYUSDX decimals).
     function _replaceAsset(address asset, address account, address recipient, uint256 amount) internal virtual {
         _requireNotPaused();
 
@@ -326,62 +310,50 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         return _pyusdxBalanceOf(address(this));
     }
 
-    /**
-     * @dev   Reverts if `asset` is address(0) or PYUSDX.
-     * @param asset Address of the asset to validate.
-     */
+    /// @dev   Reverts if `asset` is address(0) or PYUSDX.
+    /// @param asset Address of the asset to validate.
     function _revertIfInvalidAsset(address asset) internal view {
         if (asset == address(0) || asset == pyusdx) revert InvalidAsset(asset);
     }
 
-    /**
-     * @dev   Reverts if PYUSDX backing is insufficient for `amount`.
-     * @param amount Amount of PYUSDX required.
-     */
+    /// @dev   Reverts if PYUSDX backing is insufficient for `amount`.
+    /// @param amount Amount of PYUSDX required.
     function _revertIfInsufficientPYUSDXBacking(uint256 amount) internal view {
         uint256 backing_ = _pyusdxBacking();
         if (amount > backing_) revert InsufficientPYUSDXBacking(amount, backing_);
     }
 
-    /**
-     * @dev   Reverts if the extension holds less than `amount` of `asset`.
-     * @param asset  Address of the asset.
-     * @param amount Amount of `asset` required (in asset decimals).
-     */
+    /// @dev   Reverts if the extension holds less than `amount` of `asset`.
+    /// @param asset  Address of the asset.
+    /// @param amount Amount of `asset` required (in asset decimals).
     function _revertIfInsufficientAssetBacking(address asset, uint256 amount) internal view {
         uint256 assetBacking_ = assetBalanceOf(asset);
         if (amount > assetBacking_) revert InsufficientAssetBacking(asset, amount, assetBacking_);
     }
 
-    /**
-     * @dev    Converts `amount` from asset decimals to extension decimals.
-     * @param  asset  Address of the asset.
-     * @param  amount Amount in asset decimals.
-     * @return Amount in extension decimals.
-     */
+    /// @dev    Converts `amount` from asset decimals to extension decimals.
+    /// @param  asset  Address of the asset.
+    /// @param  amount Amount in asset decimals.
+    /// @return Amount in extension decimals.
     function _fromAssetToExtensionAmount(address asset, uint256 amount) internal view returns (uint256) {
         return _convertAmounts(assetDecimals(asset), PYUSDX_DECIMALS, amount);
     }
 
-    /**
-     * @dev    Converts `amount` from extension decimals to asset decimals.
-     * @param  asset  Address of the asset.
-     * @param  amount Amount in extension decimals.
-     * @return Amount in asset decimals.
-     */
+    /// @dev    Converts `amount` from extension decimals to asset decimals.
+    /// @param  asset  Address of the asset.
+    /// @param  amount Amount in extension decimals.
+    /// @return Amount in asset decimals.
     function _fromExtensionToAssetAmount(address asset, uint256 amount) internal view returns (uint256) {
         return _convertAmounts(PYUSDX_DECIMALS, assetDecimals(asset), amount);
     }
 
     /* ============ Internal Pure Functions ============ */
 
-    /**
-     * @dev    Converts `amount` between decimal representations.
-     * @param  fromDecimals Decimals of the input amount.
-     * @param  toDecimals   Decimals of the output amount.
-     * @param  amount       The amount to convert.
-     * @return The converted amount.
-     */
+    /// @dev    Converts `amount` between decimal representations.
+    /// @param  fromDecimals Decimals of the input amount.
+    /// @param  toDecimals   Decimals of the output amount.
+    /// @param  amount       The amount to convert.
+    /// @return The converted amount.
     function _convertAmounts(uint8 fromDecimals, uint8 toDecimals, uint256 amount) internal pure returns (uint256) {
         if (fromDecimals == toDecimals) return amount;
 

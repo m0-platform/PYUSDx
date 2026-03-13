@@ -52,7 +52,7 @@ abstract contract PYUSDXStorageLayout {
     }
 }
 
-/// @title PYUSDX
+/// @title  PYUSDX
 /// @author M0 Labs
 /// @notice PYUSDX upgradeable ERC20 non-rebasing token with claimable yield.
 contract PYUSDX is
@@ -93,7 +93,7 @@ contract PYUSDX is
     /* ============ Initializer ============ */
 
     /// @notice Initializes the PYUSDX contract.
-    /// @param params The initialization parameters.
+    /// @param  params The initialization parameters.
     function initialize(InitializeParams calldata params) external initializer {
         if (params.admin == address(0)) revert ZeroAdmin();
         if (params.issuer == address(0)) revert ZeroIssuer();
@@ -326,10 +326,8 @@ contract PYUSDX is
 
     /* ============ Internal Hooks ============ */
 
-    /**
-     * @dev   Hook called before freezing an account.
-     * @param account   The account to be frozen.
-     */
+    /// @dev   Hook called before freezing an account.
+    /// @param account   The account to be frozen.
     function _beforeFreeze(address account) internal override {
         _claimFor(account);
 
@@ -340,10 +338,8 @@ contract PYUSDX is
 
     /* ============ Internal Interactive Functions ============ */
 
-    /**
-     * @dev Sets the earner manager.
-     * @param earnerManager_ The address of the new earner manager.
-     */
+    /// @dev   Sets the earner manager.
+    /// @param earnerManager_ The address of the new earner manager.
     function _setEarnerManager(address earnerManager_) internal {
         if (earnerManager_ == address(0)) revert ZeroEarnerManager();
 
@@ -476,10 +472,10 @@ contract PYUSDX is
         emit StoppedEarning(account);
     }
 
-    /// @dev Adds amount to a non-earning account's balance.
-    /// @param $ The storage pointer.
+    /// @dev   Adds amount to a non-earning account's balance.
+    /// @param $       The storage pointer.
     /// @param account The account to add the amount to.
-    /// @param amount The amount to add (must be safe240).
+    /// @param amount  The amount to add (must be safe240).
     function _addNonEarningAmount(PYUSDXStorage storage $, address account, uint256 amount) internal {
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `mint`.
         unchecked {
@@ -487,10 +483,10 @@ contract PYUSDX is
         }
     }
 
-    /// @dev Adds earning amount to an account's balance and earning principal.
-    /// @param $ The storage pointer.
+    /// @dev   Adds earning amount to an account's balance and earning principal.
+    /// @param $       The storage pointer.
     /// @param account The account to add the amount to.
-    /// @param amount The present amount to add.
+    /// @param amount  The present amount to add.
     function _addEarningAmount(PYUSDXStorage storage $, address account, uint256 amount) internal {
         uint112 principal = _getPrincipalAmountRoundedDown(amount, _updateIndexOf(account));
 
@@ -501,10 +497,10 @@ contract PYUSDX is
         }
     }
 
-    /// @dev Subtracts amount from a non-earning account's balance.
-    /// @param $ The storage pointer.
+    /// @dev   Subtracts amount from a non-earning account's balance.
+    /// @param $       The storage pointer.
     /// @param account The account to subtract the amount from.
-    /// @param amount The amount to subtract (must be safe240).
+    /// @param amount  The amount to subtract (must be safe240).
     function _subtractNonEarningAmount(PYUSDXStorage storage $, address account, uint256 amount) internal {
         uint256 accountBalance = $.accounts[account].balance;
 
@@ -517,10 +513,10 @@ contract PYUSDX is
         }
     }
 
-    /// @dev Subtracts amount from an earning account's balance and principal.
-    /// @param $ The storage pointer.
+    /// @dev   Subtracts amount from an earning account's balance and principal.
+    /// @param $       The storage pointer.
     /// @param account The account to subtract the amount from.
-    /// @param amount The present amount to subtract (must be safe240).
+    /// @param amount  The present amount to subtract (must be safe240).
     function _subtractEarningAmount(PYUSDXStorage storage $, address account, uint256 amount) internal {
         uint256 accountBalance = $.accounts[account].balance;
 
@@ -539,7 +535,7 @@ contract PYUSDX is
         }
     }
 
-    /// @dev Required override for ERC20ExtendedUpgradeable.
+    /// @dev   Required override for ERC20ExtendedUpgradeable.
     /// @param sender    The sender's address.
     /// @param recipient The recipient's address.
     /// @param amount    The amount to be transferred.
