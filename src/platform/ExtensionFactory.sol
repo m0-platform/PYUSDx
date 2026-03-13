@@ -44,7 +44,7 @@ contract ExtensionFactory is
     ExtensionFactoryStorageLayout,
     DeployHelpers
 {
-    /* ============ State Variables ============ */
+    /* ============ Variables ============ */
 
     /// @inheritdoc IExtensionFactory
     bytes32 public constant FACTORY_MANAGER_ROLE = keccak256("FACTORY_MANAGER_ROLE");
@@ -258,6 +258,8 @@ contract ExtensionFactory is
     ///         This ensures CreateX's `_guard` takes the `SenderBytes.MsgSender` path (since
     ///         the Factory is CreateX's `msg.sender`), while the deployer-specific hash in
     ///         bytes 21-31 provides per-deployer uniqueness.
+    ///         Note: the salt is scoped to deployer+name only, not extension type — the same
+    ///         extensionName cannot be reused across YieldToOne and MultiMint by the same deployer.
     /// @param  deployer      The address of the deployer (e.g. `msg.sender` in deploy functions).
     /// @param  extensionName The human-readable extension name.
     /// @return The computed salt.
