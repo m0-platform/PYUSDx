@@ -9,6 +9,8 @@ import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/o
 
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
+import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
+import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
@@ -40,12 +42,14 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         // After super.setUp(), nonce is 4
         // new SwapFacility impl: 4 -> 5
         // deployTransparentProxy: 5 -> 6
-        // new Factory impl: 6 -> 7
-        // deployTransparentProxy: 7 -> 8
-        // Factory proxy is at nonce 7 = 4 + 3
+        // new YieldToOne impl: 6 -> 7
+        // new MultiMint impl: 7 -> 8
+        // new Factory impl: 8 -> 9
+        // deployTransparentProxy: 9 -> 10
+        // Factory proxy is at nonce 9 = 4 + 5
 
         uint64 nonceBeforeDeployments = vm.getNonce(address(this));
-        address predictedFactory = vm.computeCreateAddress(address(this), nonceBeforeDeployments + 3);
+        address predictedFactory = vm.computeCreateAddress(address(this), nonceBeforeDeployments + 5);
 
         // Deploy SwapFacility with predicted factory address
         swapFacility = SwapFacility(
@@ -56,12 +60,22 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
             )
         );
 
+        // Deploy dummy implementations (unit tests use mocks, not real extensions)
+        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+
         // Deploy factory with actual SwapFacility address
         factory = ExtensionFactoryHarness(
             UnsafeUpgrades.deployTransparentProxy(
                 address(new ExtensionFactoryHarness(address(pyusdx), address(swapFacility))),
                 admin,
-                abi.encodeWithSelector(ExtensionFactory.initialize.selector, admin, factoryManager)
+                abi.encodeWithSelector(
+                    ExtensionFactory.initialize.selector,
+                    admin,
+                    factoryManager,
+                    yieldToOneImpl,
+                    multiMintImpl
+                )
             )
         );
 

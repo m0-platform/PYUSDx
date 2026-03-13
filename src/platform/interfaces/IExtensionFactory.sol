@@ -56,8 +56,8 @@ interface IExtensionFactory {
 
     /// @notice Emitted when an extension's active status is set.
     /// @param  extension The address of the extension.
-    /// @param  active    True if the extension is active, false otherwise.
-    event ExtensionStatusSet(address indexed extension, bool indexed active);
+    /// @param  enabled   True if the extension is active, false otherwise.
+    event ExtensionStatusSet(address indexed extension, bool indexed enabled);
 
     /// @notice Emitted when an implementation address is set for an extension type.
     /// @param  extensionType  The type of extension.
@@ -83,6 +83,9 @@ interface IExtensionFactory {
 
     /// @notice Thrown if the extension is 0x0.
     error ZeroExtension();
+
+    /// @notice Thrown if an implementation address is 0x0.
+    error ZeroImplementation();
 
     /// @notice Thrown if the extension is not registered in the factory.
     error ExtensionNotRegistered(address extension);
@@ -154,8 +157,8 @@ interface IExtensionFactory {
     /// @notice Sets whether an extension is active.
     /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.
     /// @param  extension The address of the extension.
-    /// @param  status    True if the extension should be active, false otherwise.
-    function setExtensionStatus(address extension, bool status) external;
+    /// @param  enabled   True if the extension should be active, false otherwise.
+    function setExtensionStatus(address extension, bool enabled) external;
 
     /// @notice Sets the cached implementation address for a given extension type.
     /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.

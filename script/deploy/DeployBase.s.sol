@@ -11,6 +11,8 @@ import { MinterGateway } from "../../src/core/MinterGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
+import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
+import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 
 import { ScriptBase } from "../ScriptBase.s.sol";
@@ -110,6 +112,8 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address deployer,
         address pyusdxProxy,
         address swapFacilityProxy,
+        address yieldToOneImpl,
+        address multiMintImpl,
         FactoryConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
         // NOTE: SwapFacility must already be deployed since constructor calls ISwapFacility(swapFacility).pyusdx()
@@ -118,7 +122,13 @@ contract DeployBase is DeployHelpers, ScriptBase {
         proxy = _deployCreate3TransparentProxy(
             implementation,
             config.admin,
-            abi.encodeWithSelector(ExtensionFactory.initialize.selector, config.admin, config.factoryManager),
+            abi.encodeWithSelector(
+                ExtensionFactory.initialize.selector,
+                config.admin,
+                config.factoryManager,
+                yieldToOneImpl,
+                multiMintImpl
+            ),
             _computeSalt(deployer, "PYUSDXExtensionFactory")
         );
 
@@ -172,12 +182,18 @@ contract DeployBase is DeployHelpers, ScriptBase {
 
         require(deployment.swapFacilityProxy == predictedSwapFacility, "SwapFacility proxy address mismatch");
 
-        // 5. Deploy Factory (implementation needs actual PYUSDX + SwapFacility proxies)
+        // 5. Deploy extension implementations
+        address yieldToOneImpl = address(new YieldToOne(deployment.pyusdxProxy, deployment.swapFacilityProxy));
+        address multiMintImpl = address(new MultiMint(deployment.pyusdxProxy, deployment.swapFacilityProxy));
+
+        // 6. Deploy Factory (implementation needs actual PYUSDX + SwapFacility proxies)
         //    Constructor validates swapFacility.pyusdx(), so SwapFacility must be deployed first
         (deployment.factoryProxy, deployment.factoryProxyAdmin, deployment.factoryImplementation) = _deployFactory(
             deployer,
             deployment.pyusdxProxy,
             deployment.swapFacilityProxy,
+            yieldToOneImpl,
+            multiMintImpl,
             factoryConfig
         );
 

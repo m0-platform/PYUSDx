@@ -47,9 +47,6 @@ interface ISwapFacility {
 
     /* ============ Custom Errors ============ */
 
-    /// @notice Thrown if the extension is 0x0.
-    error ZeroExtension();
-
     /// @notice Thrown in the constructor if the extension factory is 0x0.
     error ZeroExtensionFactory();
 

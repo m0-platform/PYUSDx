@@ -39,21 +39,115 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
 
     function test_initialize_zeroAdmin() public {
         address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+
         vm.expectRevert(IExtensionFactory.ZeroAdmin.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
             admin,
-            abi.encodeWithSelector(ExtensionFactory.initialize.selector, address(0), factoryManager)
+            abi.encodeWithSelector(
+                ExtensionFactory.initialize.selector,
+                address(0),
+                factoryManager,
+                yieldToOneImpl,
+                multiMintImpl
+            )
         );
     }
 
     function test_initialize_zeroFactoryManager() public {
         address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+
         vm.expectRevert(IExtensionFactory.ZeroFactoryManager.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
             admin,
-            abi.encodeWithSelector(ExtensionFactory.initialize.selector, admin, address(0))
+            abi.encodeWithSelector(
+                ExtensionFactory.initialize.selector,
+                admin,
+                address(0),
+                yieldToOneImpl,
+                multiMintImpl
+            )
+        );
+    }
+
+    function test_initialize_zeroYtoImplementation() public {
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+
+        vm.expectRevert(IExtensionFactory.ZeroImplementation.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                ExtensionFactory.initialize.selector,
+                admin,
+                factoryManager,
+                address(0),
+                multiMintImpl
+            )
+        );
+    }
+
+    function test_initialize_zeroMmImplementation() public {
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+
+        vm.expectRevert(IExtensionFactory.ZeroImplementation.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                ExtensionFactory.initialize.selector,
+                admin,
+                factoryManager,
+                yieldToOneImpl,
+                address(0)
+            )
+        );
+    }
+
+    function test_initialize_invalidYtoImplementation() public {
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address wrongPyusdx = makeAddr("wrongPyusdx");
+        address yieldToOneImpl = address(new YieldToOne(wrongPyusdx, address(swapFacility)));
+        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+
+        vm.expectRevert(IExtensionFactory.InvalidImplementation.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                ExtensionFactory.initialize.selector,
+                admin,
+                factoryManager,
+                yieldToOneImpl,
+                multiMintImpl
+            )
+        );
+    }
+
+    function test_initialize_invalidMmImplementation() public {
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        address wrongSwap = makeAddr("wrongSwap");
+        address multiMintImpl = address(new MultiMint(address(pyusdx), wrongSwap));
+
+        vm.expectRevert(IExtensionFactory.InvalidImplementation.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                ExtensionFactory.initialize.selector,
+                admin,
+                factoryManager,
+                yieldToOneImpl,
+                multiMintImpl
+            )
         );
     }
 
@@ -74,8 +168,11 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     }
 
     function test_initialize_alreadyInitialized() public {
+        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        factory.initialize(admin, factoryManager);
+        factory.initialize(admin, factoryManager, yieldToOneImpl, multiMintImpl);
     }
 
     /* ============ deployYieldToOne Tests ============ */
@@ -488,6 +585,13 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         assertTrue(factory.isApprovedExtension(proxy));
     }
 
+    function test_setExtensionStatus_zeroExtension() public {
+        vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
+
+        vm.prank(factoryManager);
+        factory.setExtensionStatus(address(0), true);
+    }
+
     function test_setExtensionStatus_notRegistered() public {
         vm.expectRevert(abi.encodeWithSelector(IExtensionFactory.ExtensionNotRegistered.selector, alice));
 
@@ -630,7 +734,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     }
 
     function test_setImplementation_zeroAddress() public {
-        vm.expectRevert();
+        vm.expectRevert(IExtensionFactory.ZeroImplementation.selector);
 
         vm.prank(factoryManager);
         factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, address(0));
