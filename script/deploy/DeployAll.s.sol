@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.34;
+
+import { console } from "../../lib/forge-std/src/console.sol";
+
+import { DeployBase } from "./DeployBase.s.sol";
+
+contract DeployAll is DeployBase {
+    function run() public {
+        address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
+
+        PYUSDXConfig memory pyusdxConfig = _loadPYUSDXConfig();
+        IssuerGatewayConfig memory issuerGatewayConfig = _loadIssuerGatewayConfig();
+        SwapFacilityConfig memory swapConfig = _loadSwapFacilityConfig();
+        FactoryConfig memory factoryConfig = _loadFactoryConfig();
+
+        vm.startBroadcast(deployer);
+
+        CoreDeployments memory deployment = _deployCore(
+            deployer,
+            pyusdxConfig,
+            issuerGatewayConfig,
+            swapConfig,
+            factoryConfig
+        );
+
+        vm.stopBroadcast();
+
+        console.log("================================================================================");
+        console.log("PYUSDX Proxy:                     ", deployment.pyusdxProxy);
+        console.log("PYUSDX ProxyAdmin:                ", deployment.pyusdxProxyAdmin);
+        console.log("PYUSDX Implementation:            ", deployment.pyusdxImplementation);
+        console.log("IssuerGateway Proxy:              ", deployment.issuerGatewayProxy);
+        console.log("IssuerGateway ProxyAdmin:         ", deployment.issuerGatewayProxyAdmin);
+        console.log("IssuerGateway Implementation:     ", deployment.issuerGatewayImplementation);
+        console.log("SwapFacility Proxy:               ", deployment.swapFacilityProxy);
+        console.log("SwapFacility ProxyAdmin:          ", deployment.swapFacilityProxyAdmin);
+        console.log("SwapFacility Implementation:      ", deployment.swapFacilityImplementation);
+        console.log("Factory Proxy:                    ", deployment.factoryProxy);
+        console.log("Factory ProxyAdmin:               ", deployment.factoryProxyAdmin);
+        console.log("Factory Implementation:           ", deployment.factoryImplementation);
+        console.log("================================================================================");
+
+        _writeDeployment(block.chainid, "pyusdx", deployment.pyusdxProxy);
+        _writeDeployment(block.chainid, "issuerGateway", deployment.issuerGatewayProxy);
+        _writeDeployment(block.chainid, "swapFacility", deployment.swapFacilityProxy);
+        _writeDeployment(block.chainid, "extensionFactory", deployment.factoryProxy);
+    }
+
+    function _loadPYUSDXConfig() private view returns (PYUSDXConfig memory config) {
+        config.name = vm.envString("PYUSDX_NAME");
+        config.symbol = vm.envString("PYUSDX_SYMBOL");
+        config.admin = vm.envAddress("PYUSDX_ADMIN");
+        config.pauser = vm.envAddress("PYUSDX_PAUSER");
+        config.freezeManager = vm.envAddress("PYUSDX_FREEZE_MANAGER");
+        config.forcedTransferManager = vm.envAddress("PYUSDX_FORCED_TRANSFER_MANAGER");
+        config.earnerManager = vm.envAddress("PYUSDX_EARNER_MANAGER");
+        config.rateManager = vm.envAddress("PYUSDX_RATE_MANAGER");
+    }
+
+    function _loadIssuerGatewayConfig() private view returns (IssuerGatewayConfig memory config) {
+        config.admin = vm.envAddress("ISSUER_GATEWAY_ADMIN");
+        config.minter = vm.envAddress("ISSUER_GATEWAY_MINTER");
+        config.mintDelay = uint32(vm.envUint("ISSUER_GATEWAY_MINT_DELAY"));
+        config.mintTTL = uint32(vm.envUint("ISSUER_GATEWAY_MINT_TTL"));
+    }
+
+    function _loadSwapFacilityConfig() private view returns (SwapFacilityConfig memory config) {
+        config.admin = vm.envAddress("SWAP_FACILITY_ADMIN");
+        config.pauser = vm.envAddress("SWAP_FACILITY_PAUSER");
+    }
+
+    function _loadFactoryConfig() private view returns (FactoryConfig memory config) {
+        config.admin = vm.envAddress("FACTORY_ADMIN");
+        config.factoryManager = vm.envAddress("FACTORY_MANAGER");
+    }
+}
