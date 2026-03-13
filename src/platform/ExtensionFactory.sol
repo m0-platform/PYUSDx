@@ -87,8 +87,8 @@ contract ExtensionFactory is
     ) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
         if (factoryManager == address(0)) revert ZeroFactoryManager();
-        if (yieldToOneImplementation == address(0)) revert ZeroImplementation();
-        if (multiMintImplementation == address(0)) revert ZeroImplementation();
+        _revertIfInvalidImplementation(yieldToOneImplementation);
+        _revertIfInvalidImplementation(multiMintImplementation);
 
         __AccessControl_init();
 
@@ -197,14 +197,11 @@ contract ExtensionFactory is
         ExtensionType extensionType,
         address implementation
     ) external override onlyRole(FACTORY_MANAGER_ROLE) {
-        if (implementation == address(0)) revert ZeroImplementation();
-
         if (extensionType != ExtensionType.YIELD_TO_ONE && extensionType != ExtensionType.MULTI_MINT) {
             revert InvalidExtensionType();
         }
 
-        if (IExtension(implementation).pyusdx() != pyusdx || IExtension(implementation).swapFacility() != swapFacility)
-            revert InvalidImplementation();
+        _revertIfInvalidImplementation(implementation);
 
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
 
@@ -290,5 +287,14 @@ contract ExtensionFactory is
     /// @param admin The admin address to check.
     function _revertIfZeroAdmin(address admin) internal pure {
         if (admin == address(0)) revert ZeroAdmin();
+    }
+
+    /// @dev   Reverts if the implementation address is zero or wired to wrong pyusdx/swapFacility.
+    /// @param implementation The implementation address to validate.
+    function _revertIfInvalidImplementation(address implementation) internal view {
+        if (implementation == address(0)) revert ZeroImplementation();
+
+        if (IExtension(implementation).pyusdx() != pyusdx || IExtension(implementation).swapFacility() != swapFacility)
+            revert InvalidImplementation();
     }
 }

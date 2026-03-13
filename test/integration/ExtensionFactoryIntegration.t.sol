@@ -111,6 +111,46 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         );
     }
 
+    function test_initialize_invalidYtoImplementation() public {
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address wrongPyusdx = makeAddr("wrongPyusdx");
+        address yieldToOneImpl = address(new YieldToOne(wrongPyusdx, address(swapFacility)));
+        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+
+        vm.expectRevert(IExtensionFactory.InvalidImplementation.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                ExtensionFactory.initialize.selector,
+                admin,
+                factoryManager,
+                yieldToOneImpl,
+                multiMintImpl
+            )
+        );
+    }
+
+    function test_initialize_invalidMmImplementation() public {
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        address wrongSwap = makeAddr("wrongSwap");
+        address multiMintImpl = address(new MultiMint(address(pyusdx), wrongSwap));
+
+        vm.expectRevert(IExtensionFactory.InvalidImplementation.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                ExtensionFactory.initialize.selector,
+                admin,
+                factoryManager,
+                yieldToOneImpl,
+                multiMintImpl
+            )
+        );
+    }
+
     function test_initialState() public view {
         assertEq(factory.pyusdx(), address(pyusdx));
         assertEq(factory.swapFacility(), address(swapFacility));
