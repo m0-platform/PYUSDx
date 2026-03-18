@@ -15,6 +15,8 @@ import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IER
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
+import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
+import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 contract YieldToOneUnitTests is Test {
     MockIssuerGateway public issuerGateway;
@@ -366,5 +368,157 @@ contract YieldToOneUnitTests is Test {
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
         swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
         vm.stopPrank();
+    }
+
+    /* ============ Pausable ============ */
+
+    function test_wrap_revert_paused() public {
+        issuerGateway.mint(alice, MINT_AMOUNT);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        vm.startPrank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), MINT_AMOUNT);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+    }
+
+    function test_transfer_revert_paused() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        vm.prank(alice);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        extension.transfer(bob, 400e6);
+    }
+
+    function test_claimYield_succeedsWhenPaused() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        uint256 claimed = extension.claimYield();
+        assertGt(claimed, 0);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
+    }
+
+    /* ============ Freezable – Unfreeze ============ */
+
+    function test_unfreeze_resumesOperations() public {
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+
+        vm.startPrank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), MINT_AMOUNT);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+
+        vm.prank(freezeManager);
+        extension.unfreeze(alice);
+
+        vm.startPrank(alice);
+        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+
+        assertEq(extension.balanceOf(alice), MINT_AMOUNT);
+    }
+
+    function test_transferFrom_revert_frozenCaller() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(alice);
+        extension.approve(bob, MINT_AMOUNT);
+
+        vm.prank(freezeManager);
+        extension.freeze(bob);
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+        extension.transferFrom(alice, bob, 400e6);
+    }
+
+    /* ============ Access Control ============ */
+
+    function test_setYieldRecipient_revert_notManager() public {
+        vm.startPrank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                extension.YIELD_RECIPIENT_MANAGER_ROLE()
+            )
+        );
+        extension.setYieldRecipient(makeAddr("newRecipient"));
+        vm.stopPrank();
+    }
+
+    function test_setYieldRecipient_revert_zeroAddress() public {
+        vm.prank(yieldRecipientManager);
+        vm.expectRevert(IYieldToOne.ZeroYieldRecipient.selector);
+        extension.setYieldRecipient(address(0));
+    }
+
+    /* ============ Initialization Reverts ============ */
+
+    function test_initialize_revert_zeroAdmin() public {
+        address impl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        vm.expectRevert(IYieldToOne.ZeroAdmin.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                YieldToOne.initialize.selector,
+                "Branded USD",
+                "bUSD",
+                yieldRecipient,
+                address(0),
+                freezeManager,
+                pauser,
+                yieldRecipientManager
+            )
+        );
+    }
+
+    function test_initialize_revert_zeroYieldRecipientManager() public {
+        address impl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        vm.expectRevert(IYieldToOne.ZeroYieldRecipientManager.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                YieldToOne.initialize.selector,
+                "Branded USD",
+                "bUSD",
+                yieldRecipient,
+                admin,
+                freezeManager,
+                pauser,
+                address(0)
+            )
+        );
+    }
+
+    /* ============ Event Emission ============ */
+
+    function test_claimYield_emitsYieldClaimed() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 expectedYield = extension.yield();
+        assertGt(expectedYield, 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit IYieldToOne.YieldClaimed(expectedYield);
+
+        extension.claimYield();
     }
 }
