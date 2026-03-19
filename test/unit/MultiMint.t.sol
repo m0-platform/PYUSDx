@@ -14,6 +14,7 @@ import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.so
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
+import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { MockERC20 } from "../mock/MockERC20.sol";
 import { MockFeeOnTransfer } from "../mock/MockFeeOnTransfer.sol";
 
@@ -560,5 +561,121 @@ contract MultiMintTest is Test {
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
         vm.stopPrank();
+    }
+
+    /* ============ Initialization — ZeroAssetCapManager ============ */
+
+    function test_initialize_revert_zeroAssetCapManager() public {
+        address impl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+        vm.expectRevert(IMultiMint.ZeroAssetCapManager.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                MultiMint.initialize.selector,
+                "MM",
+                "MM",
+                yieldRecipient,
+                admin,
+                address(0),
+                freezeManager,
+                pauser,
+                yieldRecipientManager
+            )
+        );
+    }
+
+    /* ============ InvalidAsset — PYUSDX branch ============ */
+
+    function test_setAssetCap_revert_invalidAsset_pyusdx() public {
+        vm.prank(assetCapManager);
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
+        extension.setAssetCap(address(pyusdx), 100e6);
+    }
+
+    function test_replaceAsset_revert_invalidAsset_pyusdx() public {
+        vm.prank(address(swapFacility));
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
+        extension.replaceAsset(address(pyusdx), bob, 50e6);
+    }
+
+    /* ============ Frozen Recipient (caller != recipient) ============ */
+
+    function test_wrap_asset_revert_frozen_recipient() public {
+        vm.prank(freezeManager);
+        extension.freeze(bob);
+
+        usdc.mint(alice, 100e6);
+        vm.startPrank(alice);
+        usdc.approve(address(swapFacility), 100e6);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+        swapFacility.swapInAsset(address(extension), address(usdc), 100e6, bob);
+        vm.stopPrank();
+    }
+
+    function test_replaceAsset_revert_frozen_recipient() public {
+        _wrapAssetFor(alice, address(usdc), 100e6);
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        issuerGateway.mint(bob, 50e6);
+        vm.startPrank(bob);
+        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, alice);
+        vm.stopPrank();
+    }
+
+    /* ============ Pausable — Unwrap ============ */
+
+    function test_unwrap_revert_paused() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        vm.startPrank(alice);
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+    }
+
+    /* ============ Zero-Amount / Zero-Recipient ============ */
+
+    function test_replaceAsset_revert_zeroAmount() public {
+        vm.prank(address(swapFacility));
+        vm.expectRevert(IExtension.ZeroAmount.selector);
+        extension.replaceAsset(address(usdc), bob, 0);
+    }
+
+    function test_wrap_asset_revert_zeroRecipient() public {
+        usdc.mint(alice, 100e6);
+        vm.startPrank(alice);
+        usdc.approve(address(swapFacility), 100e6);
+        vm.expectRevert(IExtension.ZeroAccount.selector);
+        swapFacility.swapInAsset(address(extension), address(usdc), 100e6, address(0));
+        vm.stopPrank();
+    }
+
+    /* ============ Event Emission ============ */
+
+    function test_wrap_asset_emitsEvent() public {
+        dai.mint(alice, 500e18);
+        vm.startPrank(alice);
+        dai.approve(address(swapFacility), 500e18);
+        vm.expectEmit(true, true, false, true, address(extension));
+        emit IMultiMint.AssetWrapped(address(dai), 500e18, alice, 500e6);
+        swapFacility.swapInAsset(address(extension), address(dai), 500e18, alice);
+        vm.stopPrank();
+    }
+
+    function test_setAssetCap_emitsEvent() public {
+        MockERC20 newToken = new MockERC20("New", "NEW", 8);
+        vm.prank(assetCapManager);
+        vm.expectEmit(true, false, false, true, address(extension));
+        emit IMultiMint.AssetCapSet(address(newToken), 500e8);
+        extension.setAssetCap(address(newToken), 500e8);
     }
 }
