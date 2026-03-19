@@ -678,4 +678,36 @@ contract MultiMintTest is Test {
         emit IMultiMint.AssetCapSet(address(newToken), 500e8);
         extension.setAssetCap(address(newToken), 500e8);
     }
+
+    /* ============ isAllowedToReplaceAssetWithPYUSDX ============ */
+
+    function test_isAllowedToReplaceAssetWithPYUSDX() public {
+        _wrapAssetFor(alice, address(usdc), 100e6);
+
+        assertTrue(extension.isAllowedToReplaceAssetWithPYUSDX(address(usdc), 50e6));
+        assertTrue(extension.isAllowedToReplaceAssetWithPYUSDX(address(usdc), 100e6));
+        assertFalse(extension.isAllowedToReplaceAssetWithPYUSDX(address(usdc), 0));
+        assertFalse(extension.isAllowedToReplaceAssetWithPYUSDX(address(usdc), 101e6));
+    }
+
+    /* ============ InsufficientAssetReceived ============ */
+
+    function test_wrap_asset_revert_insufficientAssetReceived() public {
+        MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
+
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(feeToken), 1_000_000e6);
+
+        // Pre-fund swap facility so safeTransferFrom (L238) succeeds despite prior fee loss.
+        feeToken.mint(address(swapFacility), 100e6);
+
+        feeToken.mint(alice, 200e6);
+        vm.startPrank(alice);
+        feeToken.approve(address(swapFacility), 200e6);
+        vm.expectRevert(
+            abi.encodeWithSelector(IMultiMint.InsufficientAssetReceived.selector, address(feeToken), 200e6, 198e6)
+        );
+        swapFacility.swapInAsset(address(extension), address(feeToken), 200e6, alice);
+        vm.stopPrank();
+    }
 }
