@@ -522,7 +522,7 @@ contract YieldToOneUnitTests is Test {
         extension.claimYield();
     }
 
-    /* ============ Extension constructor — zero address checks ============ */
+    /* ============ constructor ============ */
 
     function test_constructor_revert_zeroPYUSDX() public {
         vm.expectRevert(IExtension.ZeroPYUSDX.selector);
@@ -534,7 +534,7 @@ contract YieldToOneUnitTests is Test {
         new YieldToOne(address(pyusdx), address(0));
     }
 
-    /* ============ Extension — InsufficientBalance ============ */
+    /* ============ transfer ============ */
 
     function test_transfer_revert_insufficientBalance() public {
         _wrapFor(alice, alice, MINT_AMOUNT);

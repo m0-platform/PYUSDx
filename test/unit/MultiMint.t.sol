@@ -686,6 +686,11 @@ contract MultiMintTest is Test {
 
         assertTrue(extension.isAllowedToReplaceAssetWithPYUSDX(address(usdc), 50e6));
         assertTrue(extension.isAllowedToReplaceAssetWithPYUSDX(address(usdc), 100e6));
+    }
+
+    function test_isAllowedToReplaceAssetWithPYUSDX_zeroOrExcessive() public {
+        _wrapAssetFor(alice, address(usdc), 100e6);
+
         assertFalse(extension.isAllowedToReplaceAssetWithPYUSDX(address(usdc), 0));
         assertFalse(extension.isAllowedToReplaceAssetWithPYUSDX(address(usdc), 101e6));
     }

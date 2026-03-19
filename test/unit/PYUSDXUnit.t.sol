@@ -2835,7 +2835,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.currentIndexOf(alice), uint128(PRECISION));
     }
 
-    /* ============ initialize — ZeroIssuer ============ */
+    /* ============ initialize ============ */
 
     function test_initialize_revertIfZeroIssuer() public {
         address implementation = address(new PYUSDXHarness());
@@ -2903,11 +2903,11 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.claimFor(new address[](0));
     }
 
-    /* ============ setAccountInfo batch — ArrayLengthMismatch ============ */
+    /* ============ setAccountInfo ============ */
 
     function test_setAccountInfo_batch_revert_arrayLengthMismatch() public {
         vm.prank(earnerManager);
-        vm.expectRevert(abi.encodeWithSignature("ArrayLengthMismatch()"));
+        vm.expectRevert(IForcedTransferable.ArrayLengthMismatch.selector);
         pyusdx.setAccountInfo(new address[](2), new uint32[](1), new uint16[](2), new address[](2));
     }
 
@@ -2917,9 +2917,9 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.setAccountInfo(new address[](1), new uint32[](1), new uint16[](1), new address[](1));
     }
 
-    /* ============ View function coverage ============ */
+    /* ============ accruedFeeOf ============ */
 
-    function test_viewFunctions_earningAccount() public {
+    function test_accruedFeeOf() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 1000, bob);
 
@@ -2929,8 +2929,40 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.warp(block.timestamp + 365 days);
 
         assertGt(pyusdx.accruedFeeOf(alice), 0);
+    }
+
+    /* ============ claimRecipientFor ============ */
+
+    function test_claimRecipientFor() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 1000, bob);
+
         assertEq(pyusdx.claimRecipientFor(alice), bob);
+    }
+
+    /* ============ lastIndexOf ============ */
+
+    function test_lastIndexOf() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 1000, bob);
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+        pyusdx.setAccountRateBps(alice, 500);
+
         assertGt(pyusdx.lastIndexOf(alice), 0);
+    }
+
+    /* ============ lastUpdateTimestampOf ============ */
+
+    function test_lastUpdateTimestampOf() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 1000, bob);
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+        pyusdx.setAccountRateBps(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
         assertGt(pyusdx.lastUpdateTimestampOf(alice), 0);
     }
 }
