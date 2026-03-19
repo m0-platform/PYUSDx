@@ -521,4 +521,28 @@ contract YieldToOneUnitTests is Test {
 
         extension.claimYield();
     }
+
+    /* ============ Extension constructor — zero address checks ============ */
+
+    function test_constructor_revert_zeroPYUSDX() public {
+        vm.expectRevert(IExtension.ZeroPYUSDX.selector);
+        new YieldToOne(address(0), address(swapFacility));
+    }
+
+    function test_constructor_revert_zeroSwapFacility() public {
+        vm.expectRevert(IExtension.ZeroSwapFacility.selector);
+        new YieldToOne(address(pyusdx), address(0));
+    }
+
+    /* ============ Extension — InsufficientBalance ============ */
+
+    function test_transfer_revert_insufficientBalance() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(IExtension.InsufficientBalance.selector, alice, MINT_AMOUNT, MINT_AMOUNT + 1)
+        );
+        extension.transfer(bob, MINT_AMOUNT + 1);
+    }
 }
