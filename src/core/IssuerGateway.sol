@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.34;
 
+import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+
 import { IIssuerGateway } from "./IIssuerGateway.sol";
 import { IPYUSDX } from "../IPYUSDX.sol";
-
-import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 /// @notice ERC-7201 namespaced storage layout for IssuerGateway.
 abstract contract IssuerGatewayStorageLayout {
@@ -193,6 +193,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         if ($.mintDelay == mintDelay_) return;
 
         $.mintDelay = mintDelay_;
+
         emit MintDelaySet(mintDelay_);
     }
 
@@ -206,6 +207,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         if ($.mintTTL == mintTTL_) return;
 
         $.mintTTL = mintTTL_;
+
         emit MintTTLSet(mintTTL_);
     }
 }

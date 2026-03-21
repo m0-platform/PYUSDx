@@ -156,6 +156,7 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
     /// @param amount    The amount to be transferred.
     function _transfer(address sender, address recipient, uint256 amount) internal override {
         _revertIfZeroAccount(recipient);
+
         _beforeTransfer(sender, recipient, amount);
 
         emit Transfer(sender, recipient, amount);

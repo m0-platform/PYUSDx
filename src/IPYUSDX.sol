@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.34;
+pragma solidity 0.8.34;
 
 /// @title  IPYUSDX
 /// @author M0 Labs
@@ -169,14 +169,17 @@ interface IPYUSDX {
 
     /* ============ View/Pure Functions ============ */
 
-    /// @notice The earner manager address.
-    function earnerManager() external view returns (address);
-
     /// @notice The maximum fee rate (10000 = 100%).
     function ONE_HUNDRED_PERCENT() external view returns (uint16);
 
+    /// @notice Precision scaling for index calculations (1e12).
+    function EXP_SCALED_ONE() external view returns (uint128);
+
     /// @notice The role that can issue (mint/burn) PYUSDX tokens.
     function ISSUER_ROLE() external view returns (bytes32);
+
+    /// @notice The earner manager address.
+    function earnerManager() external view returns (address);
 
     /// @notice Returns whether an account is earning.
     /// @param  account The account to query.

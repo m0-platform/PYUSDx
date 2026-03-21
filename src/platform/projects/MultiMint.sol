@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.34;
 
-import { IERC20Metadata } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-
 import { SafeERC20 } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import { UIntMath } from "../../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
+
+import { IERC20Metadata } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { YieldToOne } from "./YieldToOne.sol";
+
 import { IMultiMint } from "./interfaces/IMultiMint.sol";
 import { ISwapFacility } from "../../swap/interfaces/ISwapFacility.sol";
 
@@ -232,28 +232,27 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         // Checks asset cap + pause + freeze via 4-arg hook.
         _beforeWrap(asset, account, recipient, amount);
 
-        uint256 assetBalanceBefore_ = IERC20Metadata(asset).balanceOf(address(this));
+        uint256 assetBalanceBefore = IERC20Metadata(asset).balanceOf(address(this));
 
         // Pull asset from caller.
         IERC20Metadata(asset).safeTransferFrom(msg.sender, address(this), amount);
 
         // Fee-on-transfer detection.
-        uint256 amountReceived_ = IERC20Metadata(asset).balanceOf(address(this)) - assetBalanceBefore_;
-        if (amountReceived_ < amount) revert InsufficientAssetReceived(asset, amount, amountReceived_);
+        uint256 amountReceived = IERC20Metadata(asset).balanceOf(address(this)) - assetBalanceBefore;
+        if (amountReceived < amount) revert InsufficientAssetReceived(asset, amount, amountReceived);
 
         // Convert to extension decimals and revert if it truncates to zero.
-        uint256 extensionAmount_ = _fromAssetToExtensionAmount(asset, amount);
-        _revertIfZeroAmount(extensionAmount_);
+        uint256 extensionAmount = _fromAssetToExtensionAmount(asset, amount);
+        _revertIfZeroAmount(extensionAmount);
 
         MultiMintStorage storage $ = _getMultiMintStorage();
 
         // Update non-PYUSDX asset backing.
         $.assets[asset].balance += UIntMath.safe240(amount);
-        $.totalAssets += extensionAmount_;
+        $.totalAssets += extensionAmount;
+        _mint(recipient, extensionAmount);
 
-        _mint(recipient, extensionAmount_);
-
-        emit AssetWrapped(asset, amount, recipient, extensionAmount_);
+        emit AssetWrapped(asset, amount, recipient, extensionAmount);
     }
 
     /// @dev   Pulls PYUSDX from `msg.sender` and sends `asset` from reserves
@@ -265,32 +264,32 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     function _replaceAsset(address asset, address account, address recipient, uint256 amount) internal virtual {
         _requireNotPaused();
 
-        FreezableStorageStruct storage $f = _getFreezableStorageLocation();
-        _revertIfFrozen($f, account);
-        _revertIfFrozen($f, recipient);
-
         _revertIfInvalidAsset(asset);
         _revertIfZeroAccount(recipient);
         _revertIfZeroAmount(amount);
 
+        FreezableStorageStruct storage $f = _getFreezableStorageLocation();
+        _revertIfFrozen($f, account);
+        _revertIfFrozen($f, recipient);
+
         // Convert PYUSDX amount to asset decimals and revert if truncates to zero.
-        uint256 assetAmount_ = _fromExtensionToAssetAmount(asset, amount);
-        _revertIfZeroAmount(assetAmount_);
-        _revertIfInsufficientAssetBacking(asset, assetAmount_);
+        uint256 assetAmount = _fromExtensionToAssetAmount(asset, amount);
+        _revertIfZeroAmount(assetAmount);
+        _revertIfInsufficientAssetBacking(asset, assetAmount);
 
         MultiMintStorage storage $ = _getMultiMintStorage();
 
         // Update non-PYUSDX asset backing.
-        $.assets[asset].balance -= UIntMath.safe240(assetAmount_);
+        $.assets[asset].balance -= UIntMath.safe240(assetAmount);
         $.totalAssets -= amount;
 
         // Pull PYUSDX from caller.
         IERC20(pyusdx).transferFrom(msg.sender, address(this), amount);
 
         // Send alt-asset to recipient.
-        IERC20Metadata(asset).safeTransfer(recipient, assetAmount_);
+        IERC20Metadata(asset).safeTransfer(recipient, assetAmount);
 
-        emit AssetReplacedWithPYUSDX(asset, assetAmount_, recipient, amount);
+        emit AssetReplacedWithPYUSDX(asset, assetAmount, recipient, amount);
     }
 
     /* ============ Internal View Functions ============ */
@@ -300,9 +299,11 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         uint256 pyusdxBalance = _pyusdxBalanceOf(address(this));
         uint256 totalAssets_ = totalAssets();
         uint256 totalSupply_ = totalSupply();
-        uint256 pyusdxBackedSupply = totalSupply_ > totalAssets_ ? totalSupply_ - totalAssets_ : 0;
 
-        return pyusdxBalance > pyusdxBackedSupply ? pyusdxBalance - pyusdxBackedSupply : 0;
+        unchecked {
+            uint256 pyusdxBackedSupply = totalSupply_ > totalAssets_ ? totalSupply_ - totalAssets_ : 0;
+            return pyusdxBalance > pyusdxBackedSupply ? pyusdxBalance - pyusdxBackedSupply : 0;
+        }
     }
 
     /// @dev Returns the current supply of PYUSDX backing the extension token.
