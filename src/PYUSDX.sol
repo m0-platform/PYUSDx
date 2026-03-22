@@ -11,8 +11,6 @@ import { IndexingMath } from "../lib/evm-m-extensions/lib/common/src/libs/Indexi
 
 import { IERC20 } from "../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { RateLimiter } from "./abstract/RateLimiter.sol";
-
 import { IPYUSDX } from "./IPYUSDX.sol";
 
 /// @notice ERC-7201 namespaced storage layout for PYUSDX.
@@ -55,15 +53,7 @@ abstract contract PYUSDXStorageLayout {
 /// @title  PYUSDX
 /// @author M0 Labs
 /// @notice PYUSDX upgradeable ERC20 non-rebasing token with claimable yield.
-contract PYUSDX is
-    IPYUSDX,
-    RateLimiter,
-    PYUSDXStorageLayout,
-    ERC20ExtendedUpgradeable,
-    Freezable,
-    ForcedTransferable,
-    Pausable
-{
+contract PYUSDX is IPYUSDX, PYUSDXStorageLayout, ERC20ExtendedUpgradeable, Freezable, ForcedTransferable, Pausable {
     /* ============ Constants ============ */
 
     /// @inheritdoc IPYUSDX
@@ -102,7 +92,6 @@ contract PYUSDX is
         __ForcedTransferable_init(params.forcedTransferManager);
         __Freezable_init(params.freezeManager);
         __Pausable_init(params.pauser);
-        __RateLimiter_init(params.rateLimitManager);
 
         _setEarnerManager(params.earnerManager);
 
@@ -584,8 +573,6 @@ contract PYUSDX is
         _revertIfZeroAccount(account);
         _revertIfFrozen(account);
         _revertIfZeroAmount(amount);
-
-        _enforceRateLimit(msg.sender, amount);
 
         PYUSDXStorage storage $ = _getPYUSDXStorage();
 

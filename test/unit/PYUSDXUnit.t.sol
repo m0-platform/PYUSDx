@@ -14,8 +14,6 @@ import { VmSafe } from "../../lib/evm-m-extensions/lib/forge-std/src/Vm.sol";
 
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
-import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
-
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
 import { MockIssuerGateway } from "../mock/MockIssuerGateway.sol";
@@ -42,7 +40,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
                 freezeManager: freezeManager,
                 forcedTransferManager: forcedTransferManager,
                 earnerManager: earnerManager,
-                rateLimitManager: rateLimitManager,
                 issuer: address(issuerGateway)
             })
         );
@@ -65,7 +62,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
                 freezeManager: freezeManager,
                 forcedTransferManager: forcedTransferManager,
                 earnerManager: earnerManager,
-                rateLimitManager: rateLimitManager,
                 issuer: address(issuerGateway)
             })
         );
@@ -86,7 +82,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
                 freezeManager: freezeManager,
                 forcedTransferManager: forcedTransferManager,
                 earnerManager: address(0),
-                rateLimitManager: rateLimitManager,
                 issuer: address(issuerGateway)
             })
         );
@@ -104,7 +99,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
                 freezeManager: freezeManager,
                 forcedTransferManager: forcedTransferManager,
                 earnerManager: earnerManager,
-                rateLimitManager: rateLimitManager,
                 issuer: address(issuerGateway)
             })
         );
@@ -360,46 +354,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.expectRevert(IPYUSDX.ZeroAmount.selector);
         vm.prank(earnerManager);
         pyusdx.distributeReward(alice, 0);
-    }
-
-    /* ============ Rate Limit ============ */
-
-    function test_setRateLimit_revertIfNotManager() public {
-        vm.expectRevert();
-        pyusdx.setRateLimit(address(issuerGateway), 100e6, 10e6, true);
-    }
-
-    function test_setRateLimit() public {
-        vm.prank(rateLimitManager);
-        pyusdx.setRateLimit(address(issuerGateway), 100e6, 10e6, true);
-
-        (uint256 capacity, uint256 refillPerSecond) = pyusdx.getRateLimitConfig(address(issuerGateway));
-
-        assertEq(capacity, 100e6);
-        assertEq(refillPerSecond, 10e6);
-        assertEq(pyusdx.getRemainingAmount(address(issuerGateway)), 100e6);
-    }
-
-    function test_mint_consumesRateLimit() public {
-        vm.prank(rateLimitManager);
-        pyusdx.setRateLimit(address(issuerGateway), 100e6, 0, true);
-
-        issuerGateway.mint(alice, 30e6);
-        assertEq(pyusdx.getRemainingAmount(address(issuerGateway)), 70e6);
-
-        // issuerGateway.mint(bob, 20e6);
-        // assertEq(pyusdx.getRemainingAmount(address(issuerGateway)), 50e6);
-    }
-
-    function test_mint_revertIfRateLimitExceeded() public {
-        vm.prank(rateLimitManager);
-        pyusdx.setRateLimit(address(issuerGateway), 100e6, 0, true);
-
-        issuerGateway.mint(alice, 60e6);
-        assertEq(pyusdx.getRemainingAmount(address(issuerGateway)), 40e6);
-
-        vm.expectRevert(abi.encodeWithSelector(IRateLimiter.RateLimitExceeded.selector, 50e6, 40e6));
-        issuerGateway.mint(bob, 50e6);
     }
 
     /* ============ burn ============ */

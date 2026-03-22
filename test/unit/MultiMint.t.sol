@@ -59,7 +59,6 @@ contract MultiMintTest is Test {
                             freezeManager: freezeManager,
                             forcedTransferManager: address(1),
                             earnerManager: earnerManager,
-                            rateLimitManager: rateManager,
                             issuer: address(issuerGateway)
                         })
                     )

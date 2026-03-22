@@ -54,10 +54,10 @@ interface IIssuerGateway {
     error ZeroPYUSDX();
 
     /// @notice Thrown when the admin address is zero
-    error ZeroAdminAddress();
+    error ZeroAdmin();
 
-    /// @notice Thrown when the minter address is zero
-    error ZeroMinterAddress();
+    /// @notice Thrown when the issuer address is zero
+    error ZeroIssuer();
 
     /// @notice Thrown when attempting to propose a mint with zero amount
     error ZeroMintAmount();
@@ -100,10 +100,17 @@ interface IIssuerGateway {
     /// @notice Initializes the IssuerGateway contract
     /// @dev    Can only be called once due to initializer modifier
     /// @param  admin     The address that will have the default admin role
-    /// @param  minter    The address that will have the minter role
+    /// @param  issuer    The address that will have the issuer role
+    /// @param  rateLimitManager The address that will manage rate limits
     /// @param  mintDelay The delay in seconds before a mint can be executed after proposal
     /// @param  mintTTL   The time to live in seconds for a mint proposal before it expires
-    function initialize(address admin, address minter, uint32 mintDelay, uint32 mintTTL) external;
+    function initialize(
+        address admin,
+        address issuer,
+        address rateLimitManager,
+        uint32 mintDelay,
+        uint32 mintTTL
+    ) external;
 
     /* ============ Interactive Functions ============ */
 

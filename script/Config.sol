@@ -12,12 +12,12 @@ contract Config {
         address freezeManager;
         address forcedTransferManager;
         address earnerManager;
-        address rateManager;
     }
 
     struct IssuerGatewayConfig {
         address admin;
         address minter;
+        address rateLimitManager;
         uint32 mintDelay;
         uint32 mintTTL;
     }

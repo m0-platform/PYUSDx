@@ -56,7 +56,6 @@ contract DeployBase is DeployHelpers, ScriptBase {
                         freezeManager: config.freezeManager,
                         forcedTransferManager: config.forcedTransferManager,
                         earnerManager: config.earnerManager,
-                        rateLimitManager: config.rateManager,
                         issuer: issuerGatewayProxy
                     })
                 )
@@ -81,6 +80,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
                 IssuerGateway.initialize.selector,
                 config.admin,
                 config.minter,
+                config.rateLimitManager,
                 config.mintDelay,
                 config.mintTTL
             ),

@@ -3,6 +3,8 @@ pragma solidity 0.8.34;
 
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
+import { RateLimiter } from "../abstract/RateLimiter.sol";
+
 import { IIssuerGateway } from "./IIssuerGateway.sol";
 import { IPYUSDX } from "../IPYUSDX.sol";
 
@@ -37,7 +39,7 @@ abstract contract IssuerGatewayStorageLayout {
 /// @title  IssuerGateway
 /// @author M0 Labs
 /// @notice Gateway contract for proposing and executing mints on PYUSDX with a time delay.
-contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessControlUpgradeable {
+contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessControlUpgradeable, RateLimiter {
     /* ============ Constants ============ */
 
     /// @inheritdoc IIssuerGateway
@@ -61,14 +63,21 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /* ============ Initializer ============ */
 
     /// @inheritdoc IIssuerGateway
-    function initialize(address admin, address minter, uint32 mintDelay_, uint32 mintTTL_) external initializer {
-        if (admin == address(0)) revert ZeroAdminAddress();
-        if (minter == address(0)) revert ZeroMinterAddress();
+    function initialize(
+        address admin,
+        address issuer,
+        address rateLimitManager,
+        uint32 mintDelay_,
+        uint32 mintTTL_
+    ) external initializer {
+        if (admin == address(0)) revert ZeroAdmin();
+        if (issuer == address(0)) revert ZeroIssuer();
 
         __AccessControl_init();
+        __RateLimiter_init(rateLimitManager);
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(ISSUER_ROLE, minter);
+        _grantRole(ISSUER_ROLE, issuer);
 
         _setMintDelay(mintDelay_);
         _setMintTTL(mintTTL_);
@@ -130,6 +139,8 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
 
         address recipient = proposal.recipient;
         uint256 amount = proposal.amount;
+
+        _enforceRateLimit(proposal.minter, amount);
 
         delete $.mintProposals[mintId];
 

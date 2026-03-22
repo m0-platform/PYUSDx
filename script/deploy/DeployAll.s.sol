@@ -55,12 +55,12 @@ contract DeployAll is DeployBase {
         config.freezeManager = vm.envAddress("PYUSDX_FREEZE_MANAGER");
         config.forcedTransferManager = vm.envAddress("PYUSDX_FORCED_TRANSFER_MANAGER");
         config.earnerManager = vm.envAddress("PYUSDX_EARNER_MANAGER");
-        config.rateManager = vm.envAddress("PYUSDX_RATE_MANAGER");
     }
 
     function _loadIssuerGatewayConfig() private view returns (IssuerGatewayConfig memory config) {
         config.admin = vm.envAddress("ISSUER_GATEWAY_ADMIN");
         config.minter = vm.envAddress("ISSUER_GATEWAY_MINTER");
+        config.rateLimitManager = vm.envAddress("ISSUER_GATEWAY_RATE_LIMIT_MANAGER");
         config.mintDelay = uint32(vm.envUint("ISSUER_GATEWAY_MINT_DELAY"));
         config.mintTTL = uint32(vm.envUint("ISSUER_GATEWAY_MINT_TTL"));
     }

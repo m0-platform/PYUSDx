@@ -16,6 +16,7 @@ abstract contract IssuerGatewayBaseUnitTest is Test {
     // Test addresses
     address public admin = makeAddr("admin");
     address public minter = makeAddr("minter");
+    address public rateLimitManager = makeAddr("rateLimitManager");
     address public recipient = makeAddr("recipient");
     address public caller = makeAddr("caller");
     address public other = makeAddr("other");
@@ -39,6 +40,7 @@ abstract contract IssuerGatewayBaseUnitTest is Test {
                     IssuerGateway.initialize.selector,
                     admin,
                     minter,
+                    rateLimitManager,
                     DEFAULT_MINT_DELAY,
                     DEFAULT_MINT_TTL
                 )

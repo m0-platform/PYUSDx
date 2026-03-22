@@ -58,7 +58,6 @@ interface IPYUSDX {
         address freezeManager;
         address forcedTransferManager;
         address earnerManager;
-        address rateLimitManager;
         address issuer;
     }
 

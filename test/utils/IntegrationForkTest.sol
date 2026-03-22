@@ -55,10 +55,15 @@ abstract contract IntegrationForkTest is BaseForkTest {
                 pauser: pauser,
                 freezeManager: freezeManager,
                 forcedTransferManager: forcedTransferManager,
-                earnerManager: earnerManager,
-                rateManager: rateManager
+                earnerManager: earnerManager
             }),
-            Config.IssuerGatewayConfig({ admin: admin, minter: minter, mintDelay: MINT_DELAY, mintTTL: MINT_TTL }),
+            Config.IssuerGatewayConfig({
+                admin: admin,
+                minter: minter,
+                rateLimitManager: rateLimitManager,
+                mintDelay: MINT_DELAY,
+                mintTTL: MINT_TTL
+            }),
             Config.SwapFacilityConfig({ admin: admin, pauser: pauser }),
             Config.FactoryConfig({ admin: admin, factoryManager: factoryManager })
         );
