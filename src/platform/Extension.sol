@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.34;
+pragma solidity 0.8.34;
 
 import { ERC20ExtendedUpgradeable } from "../../lib/evm-m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
 
@@ -37,10 +37,10 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
     /// @param  pyusdx_       The address of the PYUSDX token.
     /// @param  swapFacility_ The address of the swap facility.
     constructor(address pyusdx_, address swapFacility_) {
-        _disableInitializers();
-
         if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDX();
         if ((swapFacility = swapFacility_) == address(0)) revert ZeroSwapFacility();
+
+        _disableInitializers();
     }
 
     /* ============ Initializer ============ */
@@ -156,6 +156,7 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
     /// @param amount    The amount to be transferred.
     function _transfer(address sender, address recipient, uint256 amount) internal override {
         _revertIfZeroAccount(recipient);
+
         _beforeTransfer(sender, recipient, amount);
 
         emit Transfer(sender, recipient, amount);
