@@ -131,7 +131,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
     /// @inheritdoc IMultiMint
     function replaceAsset(address asset, address recipient, uint256 amount) external onlySwapFacility {
-        _replaceAsset(asset, ISwapFacility(msg.sender).msgSender(), recipient, amount);
+        _replaceAssetWithPYUSDX(asset, recipient, amount);
     }
 
     /// @inheritdoc IMultiMint
@@ -258,19 +258,14 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     /// @dev   Pulls PYUSDX from `msg.sender` and sends `asset` from reserves
     ///        to `recipient`.
     /// @param asset     Address of the asset to receive from reserves.
-    /// @param account   The original caller (resolved via swap facility).
     /// @param recipient Address that will receive the `asset` tokens.
     /// @param amount    Amount of PYUSDX to deposit (in PYUSDX decimals).
-    function _replaceAsset(address asset, address account, address recipient, uint256 amount) internal virtual {
+    function _replaceAssetWithPYUSDX(address asset, address recipient, uint256 amount) internal virtual {
         _requireNotPaused();
 
         _revertIfInvalidAsset(asset);
         _revertIfZeroAccount(recipient);
         _revertIfZeroAmount(amount);
-
-        FreezableStorageStruct storage $f = _getFreezableStorageLocation();
-        _revertIfFrozen($f, account);
-        _revertIfFrozen($f, recipient);
 
         // Convert PYUSDX amount to asset decimals and revert if truncates to zero.
         uint256 assetAmount = _fromExtensionToAssetAmount(asset, amount);
@@ -297,18 +292,21 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     /// @dev Returns the excess PYUSDX balance that is not backing extension tokens.
     function _excess() internal view virtual override returns (uint256) {
         uint256 pyusdxBalance = _pyusdxBalanceOf(address(this));
+        uint256 pyusdxBacking = _pyusdxBacking();
+
+        unchecked {
+            return pyusdxBalance > pyusdxBacking ? pyusdxBalance - pyusdxBacking : 0;
+        }
+    }
+
+    /// @dev Returns the current supply of PYUSDX backing the extension token excluding yield and donation amounts.
+    function _pyusdxBacking() internal view returns (uint256) {
         uint256 totalAssets_ = totalAssets();
         uint256 totalSupply_ = totalSupply();
 
         unchecked {
-            uint256 pyusdxBackedSupply = totalSupply_ > totalAssets_ ? totalSupply_ - totalAssets_ : 0;
-            return pyusdxBalance > pyusdxBackedSupply ? pyusdxBalance - pyusdxBackedSupply : 0;
+            return totalSupply_ > totalAssets_ ? totalSupply_ - totalAssets_ : 0;
         }
-    }
-
-    /// @dev Returns the current supply of PYUSDX backing the extension token.
-    function _pyusdxBacking() internal view returns (uint256) {
-        return _pyusdxBalanceOf(address(this));
     }
 
     /// @dev   Reverts if `asset` is address(0) or PYUSDX.

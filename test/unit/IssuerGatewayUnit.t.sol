@@ -12,7 +12,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
     /* ============ Constructor ============ */
 
     function test_constructor_revertIfZeroPYUSDX() public {
-        vm.expectRevert(IIssuerGateway.ZeroPYUSDXToken.selector);
+        vm.expectRevert(IIssuerGateway.ZeroPYUSDX.selector);
         new IssuerGateway(address(0));
     }
 

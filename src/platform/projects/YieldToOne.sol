@@ -112,7 +112,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         // NOTE: Realize any pending PYUSDX yield
         IPYUSDX(pyusdx).claimFor(address(this));
 
-        // NOTE: Excess accounts for the newly claimed yield and any prior unclaimed yield.
+        // NOTE: Excess accounts for the newly claimed yield and any prior claimed yield not via this contract or PYUSDX donation.
         uint256 excess = _excess();
 
         if (excess == 0) return 0;
@@ -209,7 +209,9 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         YieldToOneStorage storage $ = _getYieldToOneStorage();
 
         $.totalSupply += amount;
-        $.balanceOf[recipient] += amount;
+        unchecked {
+            $.balanceOf[recipient] += amount;
+        }
 
         emit Transfer(address(0), recipient, amount);
     }

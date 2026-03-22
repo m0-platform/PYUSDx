@@ -546,19 +546,4 @@ contract MultiMintTest is Test {
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
         swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
     }
-
-    function test_replaceAsset_revert_frozen() public {
-        _wrapAssetFor(alice, address(usdc), 100e6);
-
-        issuerGateway.mint(bob, 50e6);
-
-        vm.prank(freezeManager);
-        extension.freeze(bob);
-
-        vm.startPrank(bob);
-        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
-        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
-        vm.stopPrank();
-    }
 }

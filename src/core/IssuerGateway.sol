@@ -53,7 +53,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /// @notice Constructs the IssuerGateway implementation contract.
     /// @param  pyusdx_ The PYUSDX token contract address.
     constructor(address pyusdx_) {
-        if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDXToken();
+        if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDX();
 
         _disableInitializers();
     }
@@ -82,6 +82,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         if (recipient == address(0)) revert ZeroMintRecipient();
 
         IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
+
         mintId = ++$.mintNonce;
 
         uint40 createdAt = uint40(block.timestamp);
@@ -96,6 +97,22 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         });
 
         emit MintProposed(mintId, msg.sender, amount, recipient, activeAt, expiresAt);
+    }
+
+    /// @inheritdoc IIssuerGateway
+    function cancelMint(uint48 mintId) external {
+        IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
+        MintProposal storage proposal = $.mintProposals[mintId];
+
+        if (proposal.createdAt == 0) revert InvalidMintProposal();
+        if (proposal.minter != msg.sender) revert NotMintProposalCreator();
+
+        uint40 activeAt = proposal.createdAt + $.mintDelay;
+        if (block.timestamp >= activeAt) revert ActiveMintProposal(activeAt);
+
+        delete $.mintProposals[mintId];
+
+        emit MintCanceled(mintId, msg.sender);
     }
 
     /// @inheritdoc IIssuerGateway
@@ -130,20 +147,16 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         emit BurnExecuted(msg.sender, amount);
     }
 
+    /* ============ Admin Functions ============ */
+
     /// @inheritdoc IIssuerGateway
-    function cancelMint(uint48 mintId) external {
-        IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
-        MintProposal storage proposal = $.mintProposals[mintId];
+    function setMintDelay(uint32 mintDelay_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setMintDelay(mintDelay_);
+    }
 
-        if (proposal.createdAt == 0) revert InvalidMintProposal();
-        if (proposal.minter != msg.sender) revert NotMintProposalCreator();
-
-        uint40 activeAt = proposal.createdAt + $.mintDelay;
-        if (block.timestamp >= activeAt) revert ActiveMintProposal(activeAt);
-
-        delete $.mintProposals[mintId];
-
-        emit MintCanceled(mintId, msg.sender);
+    /// @inheritdoc IIssuerGateway
+    function setMintTTL(uint32 mintTTL_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setMintTTL(mintTTL_);
     }
 
     /* ============ View Functions ============ */
@@ -169,18 +182,6 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     ) external view returns (uint40 createdAt, address minter, address recipient, uint256 amount) {
         MintProposal memory proposal = _getIssuerGatewayStorage().mintProposals[mintId];
         return (proposal.createdAt, proposal.minter, proposal.recipient, proposal.amount);
-    }
-
-    /* ============ Admin Functions ============ */
-
-    /// @inheritdoc IIssuerGateway
-    function setMintDelay(uint32 mintDelay_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _setMintDelay(mintDelay_);
-    }
-
-    /// @inheritdoc IIssuerGateway
-    function setMintTTL(uint32 mintTTL_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _setMintTTL(mintTTL_);
     }
 
     /* ============ Internal Functions ============ */

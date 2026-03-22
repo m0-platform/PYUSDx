@@ -51,7 +51,7 @@ interface IIssuerGateway {
     /* ============ Errors ============ */
 
     /// @notice Thrown when the PYUSDX token address is zero
-    error ZeroPYUSDXToken();
+    error ZeroPYUSDX();
 
     /// @notice Thrown when the admin address is zero
     error ZeroAdminAddress();
