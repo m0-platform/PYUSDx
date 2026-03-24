@@ -157,6 +157,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         assertEq(USDC.balanceOf(alice), AMOUNT);
         assertEq(multiMint.assetBalanceOf(address(USDC)), 0);
+        assertEq(USDC.balanceOf(address(multiMint)), 0);
         assertEq(multiMint.totalAssets(), 0);
         assertEq(pyusdx.balanceOf(address(multiMint)), AMOUNT);
         assertEq(multiMint.totalSupply(), AMOUNT);
@@ -243,6 +244,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         assertGt(claimed, 0);
         assertEq(multiMint.yield(), 0);
         assertEq(multiMint.balanceOf(yieldRecipient), claimed);
+        assertEq(pyusdx.balanceOf(address(multiMint)), 500e6 + claimed);
     }
 
     function testIntegration_yield_excessAccountsForTotalAssets() public {
@@ -261,10 +263,12 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         IERC20(address(pyusdx)).transfer(address(multiMint), 200e6);
 
         // Excess = 700 - 500 = 200
-        assertGe(multiMint.yield(), 200e6);
+        assertEq(multiMint.yield(), 200e6);
 
-        multiMint.claimYield();
+        uint256 claimed = multiMint.claimYield();
 
+        assertGe(claimed, 200e6);
+        assertEq(multiMint.balanceOf(yieldRecipient), claimed);
         assertEq(multiMint.yield(), 0);
     }
 
@@ -345,6 +349,8 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         assertEq(multiMint.assetBalanceOf(address(PYUSD)), 400e6);
         assertEq(multiMint.totalAssets(), 1000e6);
         assertEq(multiMint.totalSupply(), 1000e6);
+        assertEq(USDC.balanceOf(address(multiMint)), 600e6);
+        assertEq(PYUSD.balanceOf(address(multiMint)), 400e6);
 
         // Set tight cap on USDC
         vm.prank(assetCapManager);
@@ -401,6 +407,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         // Only yield tokens remain (held by yield recipient)
         assertEq(multiMint.totalSupply(), claimed);
+        assertEq(pyusdx.balanceOf(address(multiMint)), claimed);
     }
 
     function testIntegration_claimYield_afterPartialReplacement() public {

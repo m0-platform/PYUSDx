@@ -29,7 +29,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ constructor ============ */
 
-    function test_constructor() public {
+    function testUnit_constructor() public {
         PYUSDXHarness newPyusdx = new PYUSDXHarness();
         // Constructor disables initializers, so cannot initialize the implementation directly
         vm.expectRevert();
@@ -50,7 +50,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ initialize ============ */
 
-    function test_initialize_revertIfZeroAdmin() public {
+    function testUnit_initialize_revertIfZeroAdmin() public {
         address implementation = address(new PYUSDXHarness());
         PYUSDXHarness newPyusdx = PYUSDXHarness(UnsafeUpgrades.deployTransparentProxy(implementation, admin, ""));
 
@@ -71,7 +71,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         );
     }
 
-    function test_initialize_revertIfZeroEarnerManager() public {
+    function testUnit_initialize_revertIfZeroEarnerManager() public {
         address implementation = address(new PYUSDXHarness());
         PYUSDXHarness newPyusdx = PYUSDXHarness(UnsafeUpgrades.deployTransparentProxy(implementation, admin, ""));
 
@@ -92,7 +92,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         );
     }
 
-    function test_initialize_cannotReinitialize() public {
+    function testUnit_initialize_cannotReinitialize() public {
         vm.expectRevert();
 
         pyusdx.initialize(
@@ -110,7 +110,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         );
     }
 
-    function test_initialize() public {
+    function testUnit_initialize() public {
         assertEq(pyusdx.name(), "PayPal USD Yield");
         assertEq(pyusdx.symbol(), "PYUSDX");
         assertEq(pyusdx.decimals(), 6);
@@ -120,7 +120,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ mint ============ */
 
-    function test_mint_revertIfCallerNotIssuer() public {
+    function testUnit_mint_revertIfCallerNotIssuer() public {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -133,7 +133,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.mint(bob, MINT_AMOUNT);
     }
 
-    function test_mint_revertIfPaused() public {
+    function testUnit_mint_revertIfPaused() public {
         vm.prank(pauser);
         pyusdx.pause();
 
@@ -142,19 +142,19 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         issuerGateway.mint(alice, MINT_AMOUNT);
     }
 
-    function test_mint_revertIfZeroAmount() public {
+    function testUnit_mint_revertIfZeroAmount() public {
         vm.expectRevert(IPYUSDX.ZeroAmount.selector);
 
         issuerGateway.mint(alice, 0);
     }
 
-    function test_mint_revertIfZeroAccount() public {
+    function testUnit_mint_revertIfZeroAccount() public {
         vm.expectRevert(IPYUSDX.ZeroAccount.selector);
 
         issuerGateway.mint(address(0), MINT_AMOUNT);
     }
 
-    function test_mint_revertIfAccountFrozen() public {
+    function testUnit_mint_revertIfAccountFrozen() public {
         vm.prank(freezeManager);
         pyusdx.freeze(alice);
 
@@ -165,7 +165,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         issuerGateway.mint(alice, MINT_AMOUNT);
     }
 
-    function test_mint_nonEarningAccount() public {
+    function testUnit_mint_nonEarningAccount() public {
         uint256 balanceBefore = pyusdx.balanceOf(alice);
         uint256 totalSupplyBefore = pyusdx.totalSupply();
 
@@ -180,7 +180,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore + MINT_AMOUNT);
     }
 
-    function test_mint_earningAccount() public {
+    function testUnit_mint_earningAccount() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -202,7 +202,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipal);
     }
 
-    function testFuzz_mint_earningAccount(uint256 amount, uint128 index) public {
+    function testFuzzUnit_mint_earningAccount(uint256 amount, uint128 index) public {
         uint256 boundedAmount = bound(amount, 1, uint256(type(uint112).max) - 1);
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
@@ -222,7 +222,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), principalBefore + expectedPrincipal);
     }
 
-    function test_mint_earningAccount_withIndexGrowth() public {
+    function testUnit_mint_earningAccount_withIndexGrowth() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -241,7 +241,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(indexAfterMint >= indexAfterWarp);
     }
 
-    function test_mint_maxSafeAmount() public {
+    function testUnit_mint_maxSafeAmount() public {
         // The maximum safe amount is limited by uint240 totalSupply
         uint240 maxSafeAmount = type(uint240).max;
 
@@ -251,7 +251,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), uint256(maxSafeAmount));
     }
 
-    function test_mint_nonEarningToEarning_transition() public {
+    function testUnit_mint_nonEarningToEarning_transition() public {
         // Mint to alice as non-earning
         issuerGateway.mint(alice, MINT_AMOUNT);
         assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
@@ -276,7 +276,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), principalBefore + expectedPrincipal);
     }
 
-    function test_mint_earningToNonEarning_transition() public {
+    function testUnit_mint_earningToNonEarning_transition() public {
         // Set alice as earning first
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
@@ -309,7 +309,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ distributeReward ============ */
 
-    function test_distributeReward_happyPath() public {
+    function testUnit_distributeReward_happyPath() public {
         uint256 balanceBefore = pyusdx.balanceOf(alice);
         uint256 totalSupplyBefore = pyusdx.totalSupply();
 
@@ -326,13 +326,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore + MINT_AMOUNT);
     }
 
-    function test_distributeReward_revert_notEarnerManager() public {
+    function testUnit_distributeReward_revert_notEarnerManager() public {
         vm.expectRevert(IPYUSDX.NotEarnerManager.selector);
         vm.prank(alice);
         pyusdx.distributeReward(bob, MINT_AMOUNT);
     }
 
-    function test_distributeReward_revert_whenPaused() public {
+    function testUnit_distributeReward_revert_whenPaused() public {
         vm.prank(pauser);
         pyusdx.pause();
 
@@ -341,7 +341,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.distributeReward(alice, MINT_AMOUNT);
     }
 
-    function test_distributeReward_revert_frozenAccount() public {
+    function testUnit_distributeReward_revert_frozenAccount() public {
         vm.prank(freezeManager);
         pyusdx.freeze(alice);
 
@@ -350,13 +350,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.distributeReward(alice, MINT_AMOUNT);
     }
 
-    function test_distributeReward_revert_zeroAccount() public {
+    function testUnit_distributeReward_revert_zeroAccount() public {
         vm.expectRevert(IPYUSDX.ZeroAccount.selector);
         vm.prank(earnerManager);
         pyusdx.distributeReward(address(0), MINT_AMOUNT);
     }
 
-    function test_distributeReward_revert_zeroAmount() public {
+    function testUnit_distributeReward_revert_zeroAmount() public {
         vm.expectRevert(IPYUSDX.ZeroAmount.selector);
         vm.prank(earnerManager);
         pyusdx.distributeReward(alice, 0);
@@ -364,12 +364,12 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ Rate Limit ============ */
 
-    function test_setRateLimit_revertIfNotManager() public {
+    function testUnit_setRateLimit_revertIfNotManager() public {
         vm.expectRevert();
         pyusdx.setRateLimit(address(issuerGateway), 100e6, 10e6, true);
     }
 
-    function test_setRateLimit() public {
+    function testUnit_setRateLimit() public {
         vm.prank(rateLimitManager);
         pyusdx.setRateLimit(address(issuerGateway), 100e6, 10e6, true);
 
@@ -380,7 +380,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.getRemainingAmount(address(issuerGateway)), 100e6);
     }
 
-    function test_mint_consumesRateLimit() public {
+    function testUnit_mint_consumesRateLimit() public {
         vm.prank(rateLimitManager);
         pyusdx.setRateLimit(address(issuerGateway), 100e6, 0, true);
 
@@ -391,7 +391,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         // assertEq(pyusdx.getRemainingAmount(address(issuerGateway)), 50e6);
     }
 
-    function test_mint_revertIfRateLimitExceeded() public {
+    function testUnit_mint_revertIfRateLimitExceeded() public {
         vm.prank(rateLimitManager);
         pyusdx.setRateLimit(address(issuerGateway), 100e6, 0, true);
 
@@ -404,7 +404,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ burn ============ */
 
-    function test_burn_revertIfCallerNotIssuer() public {
+    function testUnit_burn_revertIfCallerNotIssuer() public {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -417,7 +417,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.burn(bob, BURN_AMOUNT);
     }
 
-    function test_burn_revertIfPaused() public {
+    function testUnit_burn_revertIfPaused() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         vm.prank(pauser);
@@ -428,7 +428,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         issuerGateway.burn(alice, BURN_AMOUNT);
     }
 
-    function test_burn_revertIfZeroAmount() public {
+    function testUnit_burn_revertIfZeroAmount() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         vm.expectRevert(IPYUSDX.ZeroAmount.selector);
@@ -436,7 +436,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         issuerGateway.burn(alice, 0);
     }
 
-    function test_burn_revertIfAccountFrozen() public {
+    function testUnit_burn_revertIfAccountFrozen() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         vm.prank(freezeManager);
@@ -449,7 +449,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         issuerGateway.burn(alice, BURN_AMOUNT);
     }
 
-    function test_burn_revertIfInsufficientBalance() public {
+    function testUnit_burn_revertIfInsufficientBalance() public {
         issuerGateway.mint(alice, 100e6);
 
         vm.expectRevert(abi.encodeWithSelector(IPYUSDX.InsufficientBalance.selector, alice, 100e6, 101e6));
@@ -457,7 +457,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         issuerGateway.burn(alice, 101e6);
     }
 
-    function test_burn_nonEarningAccount() public {
+    function testUnit_burn_nonEarningAccount() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         uint256 balanceBefore = pyusdx.balanceOf(alice);
@@ -474,7 +474,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore - BURN_AMOUNT);
     }
 
-    function test_burn_earningAccount() public {
+    function testUnit_burn_earningAccount() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -500,7 +500,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipalAfter);
     }
 
-    function testFuzz_burn_earningAccount(uint256 amount, uint128 index) public {
+    function testFuzzUnit_burn_earningAccount(uint256 amount, uint128 index) public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -523,7 +523,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipalAfter);
     }
 
-    function test_burn_earningAccount_withIndexGrowth() public {
+    function testUnit_burn_earningAccount_withIndexGrowth() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
         pyusdx.setAccountRateBps(alice, uint24(500));
@@ -549,7 +549,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), principalBefore - expectedPrincipalSubtracted);
     }
 
-    function test_burn_fullBalance() public {
+    function testUnit_burn_fullBalance() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         uint256 fullBalance = pyusdx.balanceOf(alice);
@@ -560,7 +560,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), 0);
     }
 
-    function test_burn_fullBalance_earning() public {
+    function testUnit_burn_fullBalance_earning() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -574,7 +574,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
     }
 
-    function test_burn_nonEarningToEarning_transition() public {
+    function testUnit_burn_nonEarningToEarning_transition() public {
         // Mint as non-earning
         issuerGateway.mint(alice, MINT_AMOUNT);
         assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
@@ -608,7 +608,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), principalBeforeBurn - expectedPrincipalSubtracted);
     }
 
-    function test_burn_earningAccount_principalUnderflowProtection() public {
+    function testUnit_burn_earningAccount_principalUnderflowProtection() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -630,7 +630,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ transfer ============ */
 
-    function test_transfer_revertIfPaused() public {
+    function testUnit_transfer_revertIfPaused() public {
         vm.prank(pauser);
         pyusdx.pause();
 
@@ -640,7 +640,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.transfer(bob, TRANSFER_AMOUNT);
     }
 
-    function test_transfer_revertIfFrozen_sender() public {
+    function testUnit_transfer_revertIfFrozen_sender() public {
         vm.prank(freezeManager);
         pyusdx.freeze(alice);
 
@@ -652,7 +652,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.transfer(bob, TRANSFER_AMOUNT);
     }
 
-    function test_transfer_revertIfFrozen_recipient() public {
+    function testUnit_transfer_revertIfFrozen_recipient() public {
         vm.prank(freezeManager);
         pyusdx.freeze(bob);
 
@@ -664,7 +664,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.transfer(bob, TRANSFER_AMOUNT);
     }
 
-    function test_transfer_revertIfFrozen_msgSender() public {
+    function testUnit_transfer_revertIfFrozen_msgSender() public {
         // Approve carol to spend alice's tokens
         vm.prank(alice);
         pyusdx.approve(carol, TRANSFER_AMOUNT);
@@ -681,7 +681,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.transferFrom(alice, bob, TRANSFER_AMOUNT);
     }
 
-    function test_transfer_insufficientBalance() public {
+    function testUnit_transfer_insufficientBalance() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         vm.expectRevert(
@@ -692,7 +692,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.transfer(bob, MINT_AMOUNT + 1);
     }
 
-    function test_transfer_toZeroAddress() public {
+    function testUnit_transfer_toZeroAddress() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         vm.expectRevert(IPYUSDX.ZeroAccount.selector);
@@ -701,7 +701,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.transfer(address(0), TRANSFER_AMOUNT);
     }
 
-    function test_transfer_nonEarningToNonEarning() public {
+    function testUnit_transfer_nonEarningToNonEarning() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
@@ -721,7 +721,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function testFuzz_transfer_nonEarningToNonEarning(uint256 amount) public {
+    function testFuzzUnit_transfer_nonEarningToNonEarning(uint256 amount) public {
         uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
 
         issuerGateway.mint(alice, boundedAmount);
@@ -738,7 +738,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function test_transfer_earningToEarning() public {
+    function testUnit_transfer_earningToEarning() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -768,7 +768,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
     }
 
-    function test_transfer_earningToEarning_withIndexGrowth() public {
+    function testUnit_transfer_earningToEarning_withIndexGrowth() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -801,7 +801,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipalAdded);
     }
 
-    function testFuzz_transfer_earningToEarning(uint256 amount, uint128 index) public {
+    function testFuzzUnit_transfer_earningToEarning(uint256 amount, uint128 index) public {
         uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
@@ -831,7 +831,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipal);
     }
 
-    function test_transfer_nonEarningToEarning() public {
+    function testUnit_transfer_nonEarningToEarning() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(bob, 500, 0, address(0));
 
@@ -854,7 +854,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(bob), expectedPrincipal);
     }
 
-    function test_transfer_earningToNonEarning() public {
+    function testUnit_transfer_earningToNonEarning() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -878,7 +878,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function testFuzz_transfer_earningToNonEarning(uint256 amount, uint128 index) public {
+    function testFuzzUnit_transfer_earningToNonEarning(uint256 amount, uint128 index) public {
         uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
@@ -904,7 +904,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function test_transfer_toSelf() public {
+    function testUnit_transfer_toSelf() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         uint256 balanceBefore = pyusdx.balanceOf(alice);
@@ -921,7 +921,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function test_transfer_zeroAmount() public {
+    function testUnit_transfer_zeroAmount() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
@@ -940,7 +940,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function test_transfer_fullBalance() public {
+    function testUnit_transfer_fullBalance() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         uint256 fullBalance = pyusdx.balanceOf(alice);
@@ -952,7 +952,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(bob), fullBalance);
     }
 
-    function test_transfer_fullBalance_earningToEarning() public {
+    function testUnit_transfer_fullBalance_earningToEarning() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -975,7 +975,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(bob), alicePrincipalBefore);
     }
 
-    function test_transfer_earningToNonEarning_indexGrowth() public {
+    function testUnit_transfer_earningToNonEarning_indexGrowth() public {
         vm.warp(365 days);
 
         vm.prank(earnerManager);
@@ -1001,7 +1001,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(principalSubtracted >= principalRoundedDown);
     }
 
-    function testFuzz_transfer_nonEarningToEarning(uint256 amount, uint128 index) public {
+    function testFuzzUnit_transfer_nonEarningToEarning(uint256 amount, uint128 index) public {
         uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
@@ -1027,7 +1027,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ 3.1 Index Initialization Tests ============ */
 
-    function test_mint_earningAccount_atInitialIndex() public {
+    function testUnit_mint_earningAccount_atInitialIndex() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1046,7 +1046,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.currentIndexOf(alice), indexBefore); // Index unchanged at 1e12
     }
 
-    function test_transfer_earningToEarning_atInitialIndex() public {
+    function testUnit_transfer_earningToEarning_atInitialIndex() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1070,7 +1070,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.currentIndexOf(alice), indexBefore);
     }
 
-    function test_burn_earningAccount_atInitialIndex() public {
+    function testUnit_burn_earningAccount_atInitialIndex() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1090,7 +1090,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ 3.2 Precision Loss Tests ============ */
 
-    function test_mint_earningAccount_smallAmount_highIndex() public {
+    function testUnit_mint_earningAccount_smallAmount_highIndex() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1109,7 +1109,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(alice), 100);
     }
 
-    function test_mint_earningAccount_principalRoundsToZero() public {
+    function testUnit_mint_earningAccount_principalRoundsToZero() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1128,7 +1128,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(alice), 10);
     }
 
-    function test_transfer_earningToEarning_smallAmount_highIndex() public {
+    function testUnit_transfer_earningToEarning_smallAmount_highIndex() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1155,7 +1155,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + 1);
     }
 
-    function test_burn_earningAccount_smallAmount_nearZeroPrincipal() public {
+    function testUnit_burn_earningAccount_smallAmount_nearZeroPrincipal() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1183,7 +1183,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ 3.3 Extreme Index Tests ============ */
 
-    function test_mint_earningAccount_after10YearsCompounding() public {
+    function testUnit_mint_earningAccount_after10YearsCompounding() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1210,7 +1210,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(expectedPrincipal < MINT_AMOUNT);
     }
 
-    function test_transfer_earningToEarning_after50Years() public {
+    function testUnit_transfer_earningToEarning_after50Years() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1244,7 +1244,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(expectedPrincipalSubtracted < TRANSFER_AMOUNT);
     }
 
-    function test_burn_earningAccount_after100YearsMaxRate() public {
+    function testUnit_burn_earningAccount_after100YearsMaxRate() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1267,7 +1267,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(expectedPrincipal < BURN_AMOUNT);
     }
 
-    function test_index_growth_capsAtMax() public {
+    function testUnit_index_growth_capsAtMax() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1288,7 +1288,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ 3.4 Rate Change Tests ============ */
 
-    function test_mint_earningAccount_withRateChange() public {
+    function testUnit_mint_earningAccount_withRateChange() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1314,7 +1314,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(pyusdx.currentIndexOf(alice) >= indexAt5Percent);
     }
 
-    function test_transfer_earningToEarning_withRateChange() public {
+    function testUnit_transfer_earningToEarning_withRateChange() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1352,7 +1352,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipalAdded);
     }
 
-    function test_burn_earningAccount_withRateChange() public {
+    function testUnit_burn_earningAccount_withRateChange() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1383,7 +1383,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ 3.5 Rounding Invariant Tests ============ */
 
-    function test_invariant_mint_principalMatchesRoundedDown() public {
+    function testUnit_invariant_mint_principalMatchesRoundedDown() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1404,7 +1404,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         }
     }
 
-    function test_invariant_burn_principalMatchesRoundedUp() public {
+    function testUnit_invariant_burn_principalMatchesRoundedUp() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1427,7 +1427,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         }
     }
 
-    function test_invariant_transfer_principalMatchesRoundedUp() public {
+    function testUnit_invariant_transfer_principalMatchesRoundedUp() public {
         vm.startPrank(earnerManager);
 
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
@@ -1458,7 +1458,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         }
     }
 
-    function test_invariant_transfer_crossEarning_principalAsymmetry() public {
+    function testUnit_invariant_transfer_crossEarning_principalAsymmetry() public {
         // Test E->N and N->E paths to verify different rounding behavior
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
@@ -1506,7 +1506,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ Principal Depletion Tests ============ */
 
-    function test_burn_earningAccount_depletesPrincipal_nonZeroBalanceRemains() public {
+    function testUnit_burn_earningAccount_depletesPrincipal_nonZeroBalanceRemains() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1536,7 +1536,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         }
     }
 
-    function test_transfer_earningToEarning_depletesPrincipal() public {
+    function testUnit_transfer_earningToEarning_depletesPrincipal() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1567,7 +1567,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(bob), 100);
     }
 
-    function test_transfer_crossEarning_depletesPrincipal() public {
+    function testUnit_transfer_crossEarning_depletesPrincipal() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1595,7 +1595,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ Repeated Operations Compound Rounding Tests ============ */
 
-    function test_repeatedTransfers_principalConsistency() public {
+    function testUnit_repeatedTransfers_principalConsistency() public {
         vm.startPrank(earnerManager);
 
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
@@ -1629,7 +1629,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(aliceFinalPrincipal < aliceInitialPrincipal);
     }
 
-    function test_repeatedMintBurn_principalConsistency() public {
+    function testUnit_repeatedMintBurn_principalConsistency() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1658,7 +1658,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(finalPrincipal > 0);
     }
 
-    function test_repeatedMintTransfer_principalConsistency() public {
+    function testUnit_repeatedMintTransfer_principalConsistency() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1692,7 +1692,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ Small Amounts at High Index Tests ============ */
 
-    function test_mint_smallAmount_highIndex_principalRoundsToZero() public {
+    function testUnit_mint_smallAmount_highIndex_principalRoundsToZero() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1710,7 +1710,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(alice), 1);
     }
 
-    function test_burn_smallAmount_highIndex_principalRoundsUp() public {
+    function testUnit_burn_smallAmount_highIndex_principalRoundsUp() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1731,7 +1731,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(alice), 1e6 - 1);
     }
 
-    function test_transfer_smallAmount_highIndex_roundingAsymmetry() public {
+    function testUnit_transfer_smallAmount_highIndex_roundingAsymmetry() public {
         vm.startPrank(earnerManager);
 
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
@@ -1762,7 +1762,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ Large Amounts at Low Index Tests ============ */
 
-    function test_mint_largeAmount_totalSupplyOverflow() public {
+    function testUnit_mint_largeAmount_totalSupplyOverflow() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1774,7 +1774,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         issuerGateway.mint(alice, 100);
     }
 
-    function test_transfer_largeAmount_lowIndex_principalOverflow() public {
+    function testUnit_transfer_largeAmount_lowIndex_principalOverflow() public {
         vm.startPrank(earnerManager);
 
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
@@ -1803,7 +1803,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ min112 Capping Behavior Tests ============ */
 
-    function test_transfer_insufficientPrincipal_min112Caps() public {
+    function testUnit_transfer_insufficientPrincipal_min112Caps() public {
         vm.startPrank(earnerManager);
 
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
@@ -1842,7 +1842,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(bob), bobBalanceBefore + 50);
     }
 
-    function test_burn_insufficientPrincipal_min112Caps() public {
+    function testUnit_burn_insufficientPrincipal_min112Caps() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -1866,7 +1866,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
     }
 
-    function test_transfer_min112_recipientGetsPrincipal() public {
+    function testUnit_transfer_min112_recipientGetsPrincipal() public {
         vm.startPrank(earnerManager);
 
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
@@ -1902,12 +1902,12 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ accruedYieldOf ============ */
 
-    function test_accruedYieldOf_nonEarner() public view {
+    function testUnit_accruedYieldOf_nonEarner() public view {
         uint256 yield_ = pyusdx.accruedYieldOf(alice);
         assertEq(yield_, 0, "Non-earner should have 0 accrued yield");
     }
 
-    function test_accruedYieldOf_earner() public {
+    function testUnit_accruedYieldOf_earner() public {
         // Mint tokens to alice first (as non-earner)
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
@@ -1935,11 +1935,11 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ accruedYieldToSelfOf ============ */
 
-    function test_accruedYieldToSelfOf_nonEarner() public view {
+    function testUnit_accruedYieldToSelfOf_nonEarner() public view {
         assertEq(pyusdx.accruedYieldToSelfOf(alice), 0);
     }
 
-    function test_accruedYieldToSelfOf_earnerNoRedirect() public {
+    function testUnit_accruedYieldToSelfOf_earnerNoRedirect() public {
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
 
@@ -1957,7 +1957,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertGt(yieldToSelf, 0, "Should have positive yield");
     }
 
-    function test_accruedYieldToSelfOf_yieldRedirected() public {
+    function testUnit_accruedYieldToSelfOf_yieldRedirected() public {
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
 
@@ -1974,7 +1974,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ balanceWithYieldOf ============ */
 
-    function test_balanceWithYieldOf() public {
+    function testUnit_balanceWithYieldOf() public {
         // Mint tokens to alice first (as non-earner)
         issuerGateway.mint(alice, 1000e6);
 
@@ -1994,7 +1994,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ claimFor ============ */
 
-    function test_claimFor_happyPath() public {
+    function testUnit_claimFor_happyPath() public {
         // Mint tokens to alice first (as non-earner)
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
@@ -2031,7 +2031,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.accruedYieldOf(alice), 0, "Accrued yield should be 0 after claim");
     }
 
-    function test_claimFor_revert_whenPaused() public {
+    function testUnit_claimFor_revert_whenPaused() public {
         // Mint tokens to alice first (as non-earner)
         issuerGateway.mint(alice, 1000e6);
 
@@ -2045,7 +2045,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.claimFor(alice);
     }
 
-    function test_claimFor_revert_frozenAccount() public {
+    function testUnit_claimFor_revert_frozenAccount() public {
         issuerGateway.mint(alice, 1000e6);
 
         vm.prank(earnerManager);
@@ -2060,7 +2060,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ setEarningDetails ============ */
 
-    function test_setAccountInfo_enableEarning() public {
+    function testUnit_setAccountInfo_enableEarning() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 500, bob);
 
@@ -2070,7 +2070,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(recipient, bob);
     }
 
-    function test_setAccountInfo_disableEarning() public {
+    function testUnit_setAccountInfo_disableEarning() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 500, bob);
 
@@ -2080,25 +2080,25 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertFalse(pyusdx.isEarning(alice));
     }
 
-    function test_setAccountInfo_revert_zeroAccount() public {
+    function testUnit_setAccountInfo_revert_zeroAccount() public {
         vm.expectRevert(IPYUSDX.ZeroAccount.selector);
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(address(0), 500, 500, bob);
     }
 
-    function test_setAccountInfo_revert_feeRateTooHigh() public {
+    function testUnit_setAccountInfo_revert_feeRateTooHigh() public {
         vm.expectRevert(abi.encodeWithSelector(IPYUSDX.FeeRateTooHigh.selector, 10001));
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 10001, bob);
     }
 
-    function test_setAccountInfo_revert_invalidAccountInfo() public {
+    function testUnit_setAccountInfo_revert_invalidAccountInfo() public {
         vm.expectRevert(IPYUSDX.InvalidAccountInfo.selector);
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 0, 500, bob);
     }
 
-    function test_setAccountInfo_batch() public {
+    function testUnit_setAccountInfo_batch() public {
         address[] memory batchAccounts = new address[](2);
         batchAccounts[0] = alice;
         batchAccounts[1] = bob;
@@ -2122,13 +2122,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(pyusdx.isEarning(bob));
     }
 
-    function test_setAccountInfo_batch_revert_arrayLengthZero() public {
+    function testUnit_setAccountInfo_batch_revert_arrayLengthZero() public {
         vm.expectRevert(IPYUSDX.ArrayLengthZero.selector);
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(new address[](0), new uint32[](0), new uint16[](0), new address[](0));
     }
 
-    function test_setAccountInfo_noop_alreadyDisabled() public {
+    function testUnit_setAccountInfo_noop_alreadyDisabled() public {
         // Alice is not earning (default state)
         assertFalse(pyusdx.isEarning(alice));
 
@@ -2147,7 +2147,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertFalse(pyusdx.isEarning(alice));
     }
 
-    function test_setAccountInfo_noop_sameSettings() public {
+    function testUnit_setAccountInfo_noop_sameSettings() public {
         // First enable earning for alice
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 500, bob);
@@ -2175,7 +2175,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(recipient, bob);
     }
 
-    function test_setAccountInfo_changedFeeRate_emitsEvent() public {
+    function testUnit_setAccountInfo_changedFeeRate_emitsEvent() public {
         // First enable earning for alice
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 500, bob);
@@ -2191,7 +2191,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(feeRate, 1000);
     }
 
-    function test_setAccountInfo_changedClaimRecipient_emitsEvent() public {
+    function testUnit_setAccountInfo_changedClaimRecipient_emitsEvent() public {
         // First enable earning for alice
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 500, bob);
@@ -2209,7 +2209,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(recipient, charlie);
     }
 
-    function test_setAccountInfo_earnerManagerCanUpdate() public {
+    function testUnit_setAccountInfo_earnerManagerCanUpdate() public {
         // First earner manager sets earning details for alice
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 500, bob);
@@ -2222,7 +2222,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(feeRate, 1000);
     }
 
-    function test_setAccountInfo_revert_notEarnerManager() public {
+    function testUnit_setAccountInfo_revert_notEarnerManager() public {
         address randomCaller = makeAddr("randomCaller");
 
         vm.expectRevert(IPYUSDX.NotEarnerManager.selector);
@@ -2232,7 +2232,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ freeze / freezeAccounts (earning stop) ============ */
 
-    function test_freeze_earningAccount_claimsYieldAndStopsEarning() public {
+    function testUnit_freeze_earningAccount_claimsYieldAndStopsEarning() public {
         // Mint tokens to alice
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
@@ -2276,7 +2276,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(aliceBalanceAfter, aliceBalanceBefore + expectedYield);
     }
 
-    function test_freeze_earningAccount_clearsAllEarningData() public {
+    function testUnit_freeze_earningAccount_clearsAllEarningData() public {
         // Mint tokens to alice
         issuerGateway.mint(alice, 1000e6);
 
@@ -2302,7 +2302,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
     }
 
-    function test_freeze_earningAccount_totalSupplyUnchanged() public {
+    function testUnit_freeze_earningAccount_totalSupplyUnchanged() public {
         // Mint tokens to alice
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
@@ -2322,7 +2322,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
     }
 
-    function test_freeze_nonEarningAccount_noStoppedEarningEvent() public {
+    function testUnit_freeze_nonEarningAccount_noStoppedEarningEvent() public {
         // Mint tokens to alice (non-earner by default)
         issuerGateway.mint(alice, 1000e6);
         assertFalse(pyusdx.isEarning(alice));
@@ -2343,7 +2343,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         }
     }
 
-    function test_freeze_alreadyFrozenAccount_noop() public {
+    function testUnit_freeze_alreadyFrozenAccount_noop() public {
         // Mint and set up alice as earner
         issuerGateway.mint(alice, 1000e6);
         vm.prank(earnerManager);
@@ -2371,7 +2371,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         }
     }
 
-    function test_freezeAccounts_batch_stopsEarningForAll() public {
+    function testUnit_freezeAccounts_batch_stopsEarningForAll() public {
         // Mint tokens to alice, bob, carol
         issuerGateway.mint(alice, 1000e6);
         issuerGateway.mint(bob, 2000e6);
@@ -2420,7 +2420,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(feeRate, 0);
     }
 
-    function test_freezeAccounts_emitsEventsInOrder() public {
+    function testUnit_freezeAccounts_emitsEventsInOrder() public {
         // Mint tokens
         issuerGateway.mint(alice, 1000e6);
         issuerGateway.mint(bob, 1000e6);
@@ -2453,13 +2453,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.freezeAccounts(accountsToFreeze);
     }
 
-    function test_freeze_revert_notFreezeManager() public {
+    function testUnit_freeze_revert_notFreezeManager() public {
         vm.expectRevert();
         vm.prank(alice);
         pyusdx.freeze(bob);
     }
 
-    function test_freezeAccounts_revert_notFreezeManager() public {
+    function testUnit_freezeAccounts_revert_notFreezeManager() public {
         address[] memory accountsToFreeze = new address[](1);
         accountsToFreeze[0] = alice;
 
@@ -2470,7 +2470,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ forceTransfer ============ */
 
-    function test_forceTransfer_happyPath_nonEarningToNonEarning() public {
+    function testUnit_forceTransfer_happyPath_nonEarningToNonEarning() public {
         // Mint to alice
         issuerGateway.mint(alice, MINT_AMOUNT);
 
@@ -2498,7 +2498,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function test_forceTransfer_happyPath_nonEarningToEarning() public {
+    function testUnit_forceTransfer_happyPath_nonEarningToEarning() public {
         // Make bob earning
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(bob, 500, 0, address(0));
@@ -2531,7 +2531,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function test_forceTransfer_revert_accountNotFrozen() public {
+    function testUnit_forceTransfer_revert_accountNotFrozen() public {
         // Mint to alice but don't freeze
         issuerGateway.mint(alice, MINT_AMOUNT);
 
@@ -2542,7 +2542,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.forceTransfer(alice, bob, TRANSFER_AMOUNT);
     }
 
-    function test_forceTransfer_revert_zeroRecipient() public {
+    function testUnit_forceTransfer_revert_zeroRecipient() public {
         // Mint and freeze alice
         issuerGateway.mint(alice, MINT_AMOUNT);
         vm.prank(freezeManager);
@@ -2555,7 +2555,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.forceTransfer(alice, address(0), TRANSFER_AMOUNT);
     }
 
-    function test_forceTransfer_revert_insufficientBalance() public {
+    function testUnit_forceTransfer_revert_insufficientBalance() public {
         // Mint small amount to alice
         issuerGateway.mint(alice, MINT_AMOUNT);
 
@@ -2574,7 +2574,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.forceTransfer(alice, bob, excessiveAmount);
     }
 
-    function test_forceTransfer_zeroAmount() public {
+    function testUnit_forceTransfer_zeroAmount() public {
         // Mint and freeze alice
         issuerGateway.mint(alice, MINT_AMOUNT);
         vm.prank(freezeManager);
@@ -2598,7 +2598,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(bob), bobBalanceBefore);
     }
 
-    function test_forceTransfer_revert_notForcedTransferManager() public {
+    function testUnit_forceTransfer_revert_notForcedTransferManager() public {
         // Mint and freeze alice
         issuerGateway.mint(alice, MINT_AMOUNT);
         vm.prank(freezeManager);
@@ -2610,7 +2610,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.forceTransfer(alice, bob, TRANSFER_AMOUNT);
     }
 
-    function test_forceTransfers_batch() public {
+    function testUnit_forceTransfers_batch() public {
         // Mint to alice and bob
         issuerGateway.mint(alice, MINT_AMOUNT);
         issuerGateway.mint(bob, MINT_AMOUNT);
@@ -2649,7 +2649,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ claimFor (fee and recipient paths) ============ */
 
-    function test_claimFor_withFee() public {
+    function testUnit_claimFor_withFee() public {
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
 
@@ -2675,7 +2675,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore + expectedYieldWithFee);
     }
 
-    function test_claimFor_withFeeAndClaimRecipient() public {
+    function testUnit_claimFor_withFeeAndClaimRecipient() public {
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
 
@@ -2704,7 +2704,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(earnerManager), earnerManagerBalanceBefore + expectedFee);
     }
 
-    function test_claimFor_withClaimRecipient_noFee() public {
+    function testUnit_claimFor_withClaimRecipient_noFee() public {
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
 
@@ -2728,7 +2728,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.balanceOf(earnerManager), earnerManagerBalanceBefore);
     }
 
-    function test_claimFor_zeroYield() public {
+    function testUnit_claimFor_zeroYield() public {
         issuerGateway.mint(alice, 1000e6);
 
         vm.prank(earnerManager);
@@ -2744,7 +2744,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function test_claimFor_nonEarner() public {
+    function testUnit_claimFor_nonEarner() public {
         issuerGateway.mint(alice, 1000e6);
 
         uint256 balanceBefore = pyusdx.balanceOf(alice);
@@ -2759,7 +2759,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ Per-account index isolation ============ */
 
-    function test_perAccountIndexIsolation() public {
+    function testUnit_perAccountIndexIsolation() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
         vm.prank(earnerManager);
@@ -2784,7 +2784,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ setAccountInfo: yield claim on update ============ */
 
-    function test_setAccountInfo_claimsYieldOnUpdate() public {
+    function testUnit_setAccountInfo_claimsYieldOnUpdate() public {
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
 
@@ -2811,7 +2811,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ setAccountInfo: disable earning clears all fields ============ */
 
-    function test_setAccountInfo_disableEarning_clearsAllFields() public {
+    function testUnit_setAccountInfo_disableEarning_clearsAllFields() public {
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
 
@@ -2835,9 +2835,23 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.currentIndexOf(alice), uint128(PRECISION));
     }
 
+    /* ============ setAccountInfo (batch) ============ */
+
+    function testUnit_setAccountInfo_batch_revert_arrayLengthMismatch() public {
+        vm.prank(earnerManager);
+        vm.expectRevert(IForcedTransferable.ArrayLengthMismatch.selector);
+        pyusdx.setAccountInfo(new address[](2), new uint32[](1), new uint16[](2), new address[](2));
+    }
+
+    function testUnit_setAccountInfo_batch_revert_notEarnerManager() public {
+        vm.prank(alice);
+        vm.expectRevert(IPYUSDX.NotEarnerManager.selector);
+        pyusdx.setAccountInfo(new address[](1), new uint32[](1), new uint16[](1), new address[](1));
+    }
+
     /* ============ initialize ============ */
 
-    function test_initialize_revertIfZeroIssuer() public {
+    function testUnit_initialize_revertIfZeroIssuer() public {
         address implementation = address(new PYUSDXHarness());
         PYUSDXHarness newPyusdx = PYUSDXHarness(UnsafeUpgrades.deployTransparentProxy(implementation, admin, ""));
 
@@ -2860,8 +2874,11 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ setEarnerManager ============ */
 
-    function test_setEarnerManager() public {
+    function testUnit_setEarnerManager() public {
         address newManager = makeAddr("newEarnerManager");
+
+        vm.expectEmit();
+        emit IPYUSDX.EarnerManagerSet(newManager);
 
         vm.prank(admin);
         pyusdx.setEarnerManager(newManager);
@@ -2871,7 +2888,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ claimFor (batch) ============ */
 
-    function test_claimFor_batch() public {
+    function testUnit_claimFor_batch() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -2898,28 +2915,14 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(yieldWithFees[1], yieldNetOfFees[1]);
     }
 
-    function test_claimFor_batch_revert_arrayLengthZero() public {
+    function testUnit_claimFor_batch_revert_arrayLengthZero() public {
         vm.expectRevert(IPYUSDX.ArrayLengthZero.selector);
         pyusdx.claimFor(new address[](0));
     }
 
-    /* ============ setAccountInfo ============ */
-
-    function test_setAccountInfo_batch_revert_arrayLengthMismatch() public {
-        vm.prank(earnerManager);
-        vm.expectRevert(IForcedTransferable.ArrayLengthMismatch.selector);
-        pyusdx.setAccountInfo(new address[](2), new uint32[](1), new uint16[](2), new address[](2));
-    }
-
-    function test_setAccountInfo_batch_revert_notEarnerManager() public {
-        vm.prank(alice);
-        vm.expectRevert(IPYUSDX.NotEarnerManager.selector);
-        pyusdx.setAccountInfo(new address[](1), new uint32[](1), new uint16[](1), new address[](1));
-    }
-
     /* ============ accruedFeeOf ============ */
 
-    function test_accruedFeeOf() public {
+    function testUnit_accruedFeeOf() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 1000, bob);
 
@@ -2933,7 +2936,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ claimRecipientFor ============ */
 
-    function test_claimRecipientFor() public {
+    function testUnit_claimRecipientFor() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 1000, bob);
 
@@ -2942,19 +2945,19 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     /* ============ lastIndexOf ============ */
 
-    function test_lastIndexOf() public {
+    function testUnit_lastIndexOf() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 1000, bob);
 
         issuerGateway.mint(alice, MINT_AMOUNT);
         pyusdx.setAccountRateBps(alice, 500);
 
-        assertGt(pyusdx.lastIndexOf(alice), 0);
+        assertEq(pyusdx.lastIndexOf(alice), 1e12);
     }
 
     /* ============ lastUpdateTimestampOf ============ */
 
-    function test_lastUpdateTimestampOf() public {
+    function testUnit_lastUpdateTimestampOf() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 1000, bob);
 
@@ -2963,6 +2966,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         vm.warp(block.timestamp + 365 days);
 
-        assertGt(pyusdx.lastUpdateTimestampOf(alice), 0);
+        assertEq(pyusdx.lastUpdateTimestampOf(alice), 1);
     }
 }

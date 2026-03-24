@@ -65,6 +65,7 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         assertEq(yieldToOne.balanceOf(yieldRecipient), recipientBalanceBefore + claimed);
         assertEq(yieldToOne.totalSupply(), totalSupplyBefore + claimed);
         assertEq(yieldToOne.yield(), 0);
+        assertEq(pyusdx.balanceOf(address(yieldToOne)), AMOUNT + claimed);
     }
 
     function testIntegration_claimYield_withFee() public {
@@ -79,6 +80,8 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         // Fee goes to earnerManager at the PYUSDX level
         uint256 earnerManagerPyusdxBefore = pyusdx.balanceOf(earnerManager);
 
+        (uint256 grossYield, , ) = pyusdx.accruedYieldAndFeeOf(address(yieldToOne));
+
         uint256 claimed = yieldToOne.claimYield();
 
         assertGt(claimed, 0);
@@ -86,6 +89,9 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         // earnerManager should have received PYUSDX fee
         uint256 feeReceived = pyusdx.balanceOf(earnerManager) - earnerManagerPyusdxBefore;
         assertGt(feeReceived, 0);
+
+        // claimed + feeReceived should equal the gross yield
+        assertEq(claimed + feeReceived, grossYield);
 
         // Yield recipient gets extension tokens (net of PYUSDX-level fee)
         assertEq(yieldToOne.balanceOf(yieldRecipient), claimed);
@@ -102,12 +108,12 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         IERC20(address(pyusdx)).transfer(address(yieldToOne), extraAmount);
 
         // yield() should reflect the excess
-        assertGe(yieldToOne.yield(), extraAmount);
+        assertEq(yieldToOne.yield(), extraAmount);
 
         uint256 claimed = yieldToOne.claimYield();
 
         // Should recover excess to recipient
-        assertGe(claimed, extraAmount);
+        assertEq(claimed, extraAmount);
         assertEq(yieldToOne.yield(), 0);
     }
 
@@ -116,15 +122,21 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
 
         vm.warp(block.timestamp + 365 days);
 
+        // Store yield before claimFor
+        uint256 yieldBefore = yieldToOne.yield();
+        assertGt(yieldBefore, 0);
+
         // Call claimFor directly on PYUSDX — realizes yield but doesn't mint extension tokens
         pyusdx.claimFor(address(yieldToOne));
 
-        // yield() should reflect realized but unminted yield
-        assertGt(yieldToOne.yield(), 0);
+        // yield() should reflect realized but unminted yield — same value, shifted from accrued to excess
+        uint256 yieldAfterClaim = yieldToOne.yield();
+        assertEq(yieldAfterClaim, yieldBefore);
+        assertGt(yieldAfterClaim, 0);
 
         uint256 claimed = yieldToOne.claimYield();
 
-        assertGt(claimed, 0);
+        assertEq(claimed, yieldAfterClaim);
         assertEq(yieldToOne.yield(), 0);
     }
 
@@ -149,9 +161,9 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         vm.warp(block.timestamp + 365 days);
 
         uint256 newRecipientBefore = yieldToOne.balanceOf(newRecipient);
-        yieldToOne.claimYield();
+        uint256 claimed = yieldToOne.claimYield();
 
-        assertGt(yieldToOne.balanceOf(newRecipient), newRecipientBefore);
+        assertEq(yieldToOne.balanceOf(newRecipient), newRecipientBefore + claimed);
     }
 
     /* ============ yield ============ */
@@ -222,11 +234,18 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         vm.prank(freezeManager);
         yieldToOne.freeze(alice);
 
-        vm.prank(freezeManager);
-        yieldToOne.unfreeze(alice);
-
+        // Swap should fail while frozen
         vm.prank(alice);
         IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+
+        vm.prank(alice);
+        swapFacility.swapIn(address(yieldToOne), AMOUNT, alice);
+
+        // Unfreeze and swap should succeed
+        vm.prank(freezeManager);
+        yieldToOne.unfreeze(alice);
 
         vm.prank(alice);
         swapFacility.swapIn(address(yieldToOne), AMOUNT, alice);
@@ -329,7 +348,7 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
     function testIntegration_freeze_recipientBlocksWrapToRecipient() public {
         _mintPYUSDX(alice, AMOUNT);
 
-        // Freeze the recipient, not the payer
+        // Freeze the recipient, not the caller
         vm.prank(freezeManager);
         yieldToOne.freeze(bob);
 
@@ -397,8 +416,9 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         pyusdx.setAccountInfo(address(yieldToOne), 500, 0, carol);
 
         // Pre-redirect yield was realized to YTO (old config was self), capture it
+        uint256 expectedExcess = pyusdx.balanceOf(address(yieldToOne)) - yieldToOne.totalSupply();
         uint256 preRedirectYield = yieldToOne.claimYield();
-        assertGt(preRedirectYield, 0);
+        assertEq(preRedirectYield, expectedExcess);
 
         // New yield accrues under redirected config
         vm.warp(block.timestamp + 365 days);

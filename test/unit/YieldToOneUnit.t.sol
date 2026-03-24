@@ -104,7 +104,7 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Initialization ============ */
 
-    function test_initialize() public view {
+    function testUnit_initialize() public view {
         assertEq(extension.name(), "Branded USD");
         assertEq(extension.symbol(), "bUSD");
         assertEq(extension.decimals(), 6);
@@ -115,9 +115,47 @@ contract YieldToOneUnitTests is Test {
         assertTrue(extension.hasRole(extension.YIELD_RECIPIENT_MANAGER_ROLE(), yieldRecipientManager));
     }
 
+    function testUnit_initialize_revert_zeroAdmin() public {
+        address impl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        vm.expectRevert(IYieldToOne.ZeroAdmin.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                YieldToOne.initialize.selector,
+                "Branded USD",
+                "bUSD",
+                yieldRecipient,
+                address(0),
+                freezeManager,
+                pauser,
+                yieldRecipientManager
+            )
+        );
+    }
+
+    function testUnit_initialize_revert_zeroYieldRecipientManager() public {
+        address impl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        vm.expectRevert(IYieldToOne.ZeroYieldRecipientManager.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                YieldToOne.initialize.selector,
+                "Branded USD",
+                "bUSD",
+                yieldRecipient,
+                admin,
+                freezeManager,
+                pauser,
+                address(0)
+            )
+        );
+    }
+
     /* ============ Wrap ============ */
 
-    function test_wrap() public {
+    function testUnit_wrap() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         assertEq(extension.balanceOf(alice), MINT_AMOUNT);
@@ -126,14 +164,14 @@ contract YieldToOneUnitTests is Test {
         assertEq(pyusdx.balanceOf(alice), 0);
     }
 
-    function test_wrap_toRecipient() public {
+    function testUnit_wrap_toRecipient() public {
         _wrapFor(alice, bob, MINT_AMOUNT);
 
         assertEq(extension.balanceOf(alice), 0);
         assertEq(extension.balanceOf(bob), MINT_AMOUNT);
     }
 
-    function test_wrap_revert_notSwapFacility() public {
+    function testUnit_wrap_revert_notSwapFacility() public {
         vm.prank(alice);
         vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.wrap(alice, MINT_AMOUNT);
@@ -141,7 +179,7 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Unwrap ============ */
 
-    function test_unwrap() public {
+    function testUnit_unwrap() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         vm.startPrank(alice);
@@ -154,7 +192,7 @@ contract YieldToOneUnitTests is Test {
         assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
     }
 
-    function test_unwrap_revert_notSwapFacility() public {
+    function testUnit_unwrap_revert_notSwapFacility() public {
         vm.prank(alice);
         vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.unwrap(MINT_AMOUNT);
@@ -162,7 +200,7 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Swap Extensions ============ */
 
-    function test_swapExtensions() public {
+    function testUnit_swapExtensions() public {
         // Deploy a second extension sharing the same swap facility.
         address extensionBImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
         YieldToOne extensionB = YieldToOne(
@@ -195,7 +233,7 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Transfer ============ */
 
-    function test_transfer() public {
+    function testUnit_transfer() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         vm.prank(alice);
@@ -206,7 +244,7 @@ contract YieldToOneUnitTests is Test {
         assertEq(extension.totalSupply(), MINT_AMOUNT);
     }
 
-    function test_transferFrom() public {
+    function testUnit_transferFrom() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         vm.prank(alice);
@@ -221,7 +259,7 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ ClaimYield ============ */
 
-    function test_claimYield() public {
+    function testUnit_claimYield() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         vm.warp(block.timestamp + 365 days);
@@ -237,7 +275,7 @@ contract YieldToOneUnitTests is Test {
         assertEq(extension.yield(), 0);
     }
 
-    function test_claimYield_noYield() public {
+    function testUnit_claimYield_noYield() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         uint256 claimed = extension.claimYield();
@@ -245,7 +283,7 @@ contract YieldToOneUnitTests is Test {
         assertEq(extension.balanceOf(yieldRecipient), 0);
     }
 
-    function test_claimYield_withFee() public {
+    function testUnit_claimYield_withFee() public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(address(extension), 500, 1000, address(0));
 
@@ -263,7 +301,7 @@ contract YieldToOneUnitTests is Test {
         assertGt(pyusdx.balanceOf(earnerManager), 0);
     }
 
-    function test_claimYield_zeroWhenYieldRedirected() public {
+    function testUnit_claimYield_zeroWhenYieldRedirected() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         // Redirect yield away from the extension
@@ -281,7 +319,7 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ SetYieldRecipient ============ */
 
-    function test_setYieldRecipient() public {
+    function testUnit_setYieldRecipient() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
@@ -301,7 +339,7 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Yield View ============ */
 
-    function test_yield_includesExcessAfterDirectClaimFor() public {
+    function testUnit_yield_includesExcessAfterDirectClaimFor() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
@@ -323,7 +361,7 @@ contract YieldToOneUnitTests is Test {
         assertEq(extension.yield(), 0);
     }
 
-    function test_yield_includesRandomPyusdxTransfer() public {
+    function testUnit_yield_includesRandomPyusdxTransfer() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         // Someone sends PYUSDX directly to the extension.
@@ -343,7 +381,7 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Freeze via SwapFacility ============ */
 
-    function test_unwrap_revert_frozen() public {
+    function testUnit_unwrap_revert_frozen() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         vm.prank(alice);
@@ -357,7 +395,7 @@ contract YieldToOneUnitTests is Test {
         swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
     }
 
-    function test_wrap_revert_frozen() public {
+    function testUnit_wrap_revert_frozen() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         vm.prank(freezeManager);
@@ -372,7 +410,7 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Pausable ============ */
 
-    function test_wrap_revert_paused() public {
+    function testUnit_wrap_revert_paused() public {
         issuerGateway.mint(alice, MINT_AMOUNT);
 
         vm.prank(pauser);
@@ -385,7 +423,7 @@ contract YieldToOneUnitTests is Test {
         vm.stopPrank();
     }
 
-    function test_transfer_revert_paused() public {
+    function testUnit_transfer_revert_paused() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         vm.prank(pauser);
@@ -396,7 +434,7 @@ contract YieldToOneUnitTests is Test {
         extension.transfer(bob, 400e6);
     }
 
-    function test_claimYield_succeedsWhenPaused() public {
+    function testUnit_claimYield_succeedsWhenPaused() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
@@ -410,7 +448,7 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Freezable – Unfreeze ============ */
 
-    function test_unfreeze_resumesOperations() public {
+    function testUnit_unfreeze_resumesOperations() public {
         vm.prank(freezeManager);
         extension.freeze(alice);
 
@@ -432,7 +470,7 @@ contract YieldToOneUnitTests is Test {
         assertEq(extension.balanceOf(alice), MINT_AMOUNT);
     }
 
-    function test_transferFrom_revert_frozenCaller() public {
+    function testUnit_transferFrom_revert_frozenCaller() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         vm.prank(alice);
@@ -448,8 +486,9 @@ contract YieldToOneUnitTests is Test {
 
     /* ============ Access Control ============ */
 
-    function test_setYieldRecipient_revert_notManager() public {
-        vm.startPrank(alice);
+    function testUnit_setYieldRecipient_revert_notManager() public {
+        address newRecipient = makeAddr("newRecipient");
+
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -457,86 +496,34 @@ contract YieldToOneUnitTests is Test {
                 extension.YIELD_RECIPIENT_MANAGER_ROLE()
             )
         );
-        extension.setYieldRecipient(makeAddr("newRecipient"));
-        vm.stopPrank();
+        vm.prank(alice);
+        extension.setYieldRecipient(newRecipient);
     }
 
-    function test_setYieldRecipient_revert_zeroAddress() public {
+    function testUnit_setYieldRecipient_revert_zeroAddress() public {
         vm.prank(yieldRecipientManager);
         vm.expectRevert(IYieldToOne.ZeroYieldRecipient.selector);
         extension.setYieldRecipient(address(0));
     }
 
-    /* ============ Initialization Reverts ============ */
-
-    function test_initialize_revert_zeroAdmin() public {
-        address impl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
-        vm.expectRevert(IYieldToOne.ZeroAdmin.selector);
-        UnsafeUpgrades.deployTransparentProxy(
-            impl,
-            admin,
-            abi.encodeWithSelector(
-                YieldToOne.initialize.selector,
-                "Branded USD",
-                "bUSD",
-                yieldRecipient,
-                address(0),
-                freezeManager,
-                pauser,
-                yieldRecipientManager
-            )
-        );
-    }
-
-    function test_initialize_revert_zeroYieldRecipientManager() public {
-        address impl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
-        vm.expectRevert(IYieldToOne.ZeroYieldRecipientManager.selector);
-        UnsafeUpgrades.deployTransparentProxy(
-            impl,
-            admin,
-            abi.encodeWithSelector(
-                YieldToOne.initialize.selector,
-                "Branded USD",
-                "bUSD",
-                yieldRecipient,
-                admin,
-                freezeManager,
-                pauser,
-                address(0)
-            )
-        );
-    }
-
     /* ============ Event Emission ============ */
 
-    function test_claimYield_emitsYieldClaimed() public {
+    function testUnit_claimYield_emitsYieldClaimed() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
         uint256 expectedYield = extension.yield();
         assertGt(expectedYield, 0);
 
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit IYieldToOne.YieldClaimed(expectedYield);
 
         extension.claimYield();
     }
 
-    /* ============ constructor ============ */
-
-    function test_constructor_revert_zeroPYUSDX() public {
-        vm.expectRevert(IExtension.ZeroPYUSDX.selector);
-        new YieldToOne(address(0), address(swapFacility));
-    }
-
-    function test_constructor_revert_zeroSwapFacility() public {
-        vm.expectRevert(IExtension.ZeroSwapFacility.selector);
-        new YieldToOne(address(pyusdx), address(0));
-    }
-
     /* ============ transfer ============ */
 
-    function test_transfer_revert_insufficientBalance() public {
+    function testUnit_transfer_revert_insufficientBalance() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
         vm.prank(alice);

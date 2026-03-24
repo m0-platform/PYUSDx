@@ -172,9 +172,9 @@ contract MockMultiMint is ERC20, IMultiMint {
     }
 
     /**
-     * @notice Checks if replacing `asset` with PYUSDX is allowed.
+     * @notice Checks if replacing `asset` with backing asset is allowed.
      */
-    function isAllowedToReplaceAssetWithPYUSDX(address asset, uint256 amount) external view override returns (bool) {
+    function isAllowedToReplaceAsset(address asset, uint256 amount) external view override returns (bool) {
         return allowedAssets[asset] && assetBalances[asset] >= amount;
     }
 
