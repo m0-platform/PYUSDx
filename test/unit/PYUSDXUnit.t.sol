@@ -202,7 +202,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipal);
     }
 
-    function testFuzz_mint_earningAccount(uint256 amount, uint128 index) public {
+    function testFuzzUnit_mint_earningAccount(uint256 amount, uint128 index) public {
         uint256 boundedAmount = bound(amount, 1, uint256(type(uint112).max) - 1);
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
@@ -500,7 +500,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), expectedPrincipalAfter);
     }
 
-    function testFuzz_burn_earningAccount(uint256 amount, uint128 index) public {
+    function testFuzzUnit_burn_earningAccount(uint256 amount, uint128 index) public {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
@@ -721,7 +721,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function testFuzz_transfer_nonEarningToNonEarning(uint256 amount) public {
+    function testFuzzUnit_transfer_nonEarningToNonEarning(uint256 amount) public {
         uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
 
         issuerGateway.mint(alice, boundedAmount);
@@ -801,7 +801,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(bob), bobPrincipalBefore + expectedPrincipalAdded);
     }
 
-    function testFuzz_transfer_earningToEarning(uint256 amount, uint128 index) public {
+    function testFuzzUnit_transfer_earningToEarning(uint256 amount, uint128 index) public {
         uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
@@ -878,7 +878,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
-    function testFuzz_transfer_earningToNonEarning(uint256 amount, uint128 index) public {
+    function testFuzzUnit_transfer_earningToNonEarning(uint256 amount, uint128 index) public {
         uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
@@ -1001,7 +1001,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(principalSubtracted >= principalRoundedDown);
     }
 
-    function testFuzz_transfer_nonEarningToEarning(uint256 amount, uint128 index) public {
+    function testFuzzUnit_transfer_nonEarningToEarning(uint256 amount, uint128 index) public {
         uint256 boundedAmount = bound(amount, 1, type(uint112).max - 1);
         uint128 boundedIndex = uint128(bound(index, PRECISION, type(uint128).max));
 
@@ -2833,5 +2833,139 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(feeRate, 0);
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
         assertEq(pyusdx.currentIndexOf(alice), uint128(PRECISION));
+    }
+
+    /* ============ setAccountInfo (batch) ============ */
+
+    function test_setAccountInfo_batch_revert_arrayLengthMismatch() public {
+        vm.prank(earnerManager);
+        vm.expectRevert(IForcedTransferable.ArrayLengthMismatch.selector);
+        pyusdx.setAccountInfo(new address[](2), new uint32[](1), new uint16[](2), new address[](2));
+    }
+
+    function test_setAccountInfo_batch_revert_notEarnerManager() public {
+        vm.prank(alice);
+        vm.expectRevert(IPYUSDX.NotEarnerManager.selector);
+        pyusdx.setAccountInfo(new address[](1), new uint32[](1), new uint16[](1), new address[](1));
+    }
+
+    /* ============ initialize ============ */
+
+    function test_initialize_revertIfZeroIssuer() public {
+        address implementation = address(new PYUSDXHarness());
+        PYUSDXHarness newPyusdx = PYUSDXHarness(UnsafeUpgrades.deployTransparentProxy(implementation, admin, ""));
+
+        vm.expectRevert(IPYUSDX.ZeroIssuer.selector);
+
+        newPyusdx.initialize(
+            IPYUSDX.InitializeParams({
+                name: "PayPal USD Yield",
+                symbol: "PYUSDX",
+                admin: admin,
+                pauser: pauser,
+                freezeManager: freezeManager,
+                forcedTransferManager: forcedTransferManager,
+                earnerManager: earnerManager,
+                rateLimitManager: rateLimitManager,
+                issuer: address(0)
+            })
+        );
+    }
+
+    /* ============ setEarnerManager ============ */
+
+    function test_setEarnerManager() public {
+        address newManager = makeAddr("newEarnerManager");
+
+        vm.expectEmit();
+        emit IPYUSDX.EarnerManagerSet(newManager);
+
+        vm.prank(admin);
+        pyusdx.setEarnerManager(newManager);
+
+        assertEq(pyusdx.earnerManager(), newManager);
+    }
+
+    /* ============ claimFor (batch) ============ */
+
+    function test_claimFor_batch() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 0, address(0));
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(bob, 500, 0, address(0));
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+        issuerGateway.mint(bob, MINT_AMOUNT);
+
+        pyusdx.setAccountRateBps(alice, 500);
+        pyusdx.setAccountRateBps(bob, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        address[] memory claimAccounts = new address[](2);
+        claimAccounts[0] = alice;
+        claimAccounts[1] = bob;
+
+        (uint256[] memory yieldWithFees, , uint256[] memory yieldNetOfFees) = pyusdx.claimFor(claimAccounts);
+
+        assertGt(yieldWithFees[0], 0);
+        assertGt(yieldWithFees[1], 0);
+        assertEq(yieldWithFees[0], yieldNetOfFees[0]);
+        assertEq(yieldWithFees[1], yieldNetOfFees[1]);
+    }
+
+    function test_claimFor_batch_revert_arrayLengthZero() public {
+        vm.expectRevert(IPYUSDX.ArrayLengthZero.selector);
+        pyusdx.claimFor(new address[](0));
+    }
+
+    /* ============ accruedFeeOf ============ */
+
+    function test_accruedFeeOf() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 1000, bob);
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+        pyusdx.setAccountRateBps(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        assertGt(pyusdx.accruedFeeOf(alice), 0);
+    }
+
+    /* ============ claimRecipientFor ============ */
+
+    function test_claimRecipientFor() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 1000, bob);
+
+        assertEq(pyusdx.claimRecipientFor(alice), bob);
+    }
+
+    /* ============ lastIndexOf ============ */
+
+    function test_lastIndexOf() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 1000, bob);
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+        pyusdx.setAccountRateBps(alice, 500);
+
+        assertEq(pyusdx.lastIndexOf(alice), 1e12);
+    }
+
+    /* ============ lastUpdateTimestampOf ============ */
+
+    function test_lastUpdateTimestampOf() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 1000, bob);
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+        pyusdx.setAccountRateBps(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        assertEq(pyusdx.lastUpdateTimestampOf(alice), 1);
     }
 }

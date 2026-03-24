@@ -113,7 +113,7 @@ interface IMultiMint is IYieldToOne {
     /// @dev    `amount` MUST be formatted in extension's decimals (6).
     function isAllowedToUnwrap(uint256 amount) external view returns (bool);
 
-    /// @notice Checks if replacing `asset` with PYUSDX is allowed.
+    /// @notice Checks if replacing `asset` with the backing asset is allowed.
     /// @dev    `amount` MUST be formatted in `asset`'s decimals.
-    function isAllowedToReplaceAssetWithPYUSDX(address asset, uint256 amount) external view returns (bool);
+    function isAllowedToReplaceAsset(address asset, uint256 amount) external view returns (bool);
 }
