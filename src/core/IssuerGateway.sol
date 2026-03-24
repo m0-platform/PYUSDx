@@ -18,7 +18,7 @@ abstract contract IssuerGatewayStorageLayout {
 
     struct MintProposal {
         uint40 createdAt; // ──╮ Timestamp when the proposal was created, good for 100+ years.
-        address minter; //       Address that proposed the mint.
+        address minter; // ────╯ Address that proposed the mint.
         address recipient; //    Address that will receive the minted tokens.
         uint256 amount; //       Amount of PYUSDX to mint.
     }
@@ -83,11 +83,20 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
 
         IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
 
-        mintId = ++$.mintNonce;
+        // NOTE: safe to use unchecked, it would overflow after 281 trillion proposals.
+        unchecked {
+            mintId = ++$.mintNonce;
+        }
 
         uint40 createdAt = uint40(block.timestamp);
-        uint40 activeAt = createdAt + $.mintDelay;
-        uint40 expiresAt = activeAt + $.mintTTL;
+        uint40 activeAt;
+        uint40 expiresAt;
+
+        // NOTE: safe to use unchecked, uint40 timestamp + uint32 delay cannot overflow uint40 for millennia.
+        unchecked {
+            activeAt = createdAt + $.mintDelay;
+            expiresAt = activeAt + $.mintTTL;
+        }
 
         $.mintProposals[mintId] = MintProposal({
             createdAt: createdAt,
@@ -107,7 +116,13 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         if (proposal.createdAt == 0) revert InvalidMintProposal();
         if (proposal.minter != msg.sender) revert NotMintProposalCreator();
 
-        uint40 activeAt = proposal.createdAt + $.mintDelay;
+        uint40 activeAt;
+
+        // NOTE: safe to use unchecked, uint40 timestamp + uint32 delay cannot overflow uint40 for millennia.
+        unchecked {
+            activeAt = proposal.createdAt + $.mintDelay;
+        }
+
         if (block.timestamp >= activeAt) revert ActiveMintProposal(activeAt);
 
         delete $.mintProposals[mintId];
@@ -122,10 +137,21 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
 
         if (proposal.createdAt == 0) revert InvalidMintProposal();
 
-        uint40 activeAt = proposal.createdAt + $.mintDelay;
+        uint40 activeAt;
+        uint40 expiresAt;
+
+        // NOTE: safe to use unchecked, uint40 timestamp + uint32 delay cannot overflow uint40 for millennia.
+        unchecked {
+            activeAt = proposal.createdAt + $.mintDelay;
+        }
+
         if (block.timestamp < activeAt) revert PendingMintProposal(activeAt);
 
-        uint40 expiresAt = activeAt + $.mintTTL;
+        // NOTE: safe to use unchecked, uint40 timestamp + uint32 TTL cannot overflow uint40 for millennia.
+        unchecked {
+            expiresAt = activeAt + $.mintTTL;
+        }
+
         if (block.timestamp > expiresAt) revert ExpiredMintProposal(expiresAt);
 
         address recipient = proposal.recipient;
