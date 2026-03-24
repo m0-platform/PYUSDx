@@ -159,18 +159,18 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
 
         delete $.mintProposals[mintId];
 
-        IPYUSDX(pyusdx).mint(recipient, amount);
-
         emit MintExecuted(mintId, msg.sender, amount, recipient);
+
+        IPYUSDX(pyusdx).mint(recipient, amount);
     }
 
     /// @inheritdoc IIssuerGateway
     function burn(uint256 amount) external onlyRole(ISSUER_ROLE) {
         if (amount == 0) revert ZeroBurnAmount();
 
-        IPYUSDX(pyusdx).burn(msg.sender, amount);
-
         emit BurnExecuted(msg.sender, amount);
+
+        IPYUSDX(pyusdx).burn(msg.sender, amount);
     }
 
     /* ============ Admin Functions ============ */
