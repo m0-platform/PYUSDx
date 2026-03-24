@@ -28,13 +28,6 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable extensionFactory;
 
-    /* ============ Modifiers ============ */
-
-    modifier isNotPaused() {
-        _requireNotPaused();
-        _;
-    }
-
     /* ============ Constructor ============ */
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -68,7 +61,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         address tokenOut,
         uint256 amount,
         address recipient
-    ) external isNotLocked isNotPaused {
+    ) external isNotLocked whenNotPaused {
         _swap(tokenIn, tokenOut, amount, recipient);
     }
 
@@ -82,7 +75,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external isNotLocked isNotPaused {
+    ) external isNotLocked whenNotPaused {
         try IExtension(tokenIn).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
         _swap(tokenIn, tokenOut, amount, recipient);
     }
@@ -95,18 +88,18 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         address recipient,
         uint256 deadline,
         bytes calldata signature
-    ) external isNotLocked isNotPaused {
+    ) external isNotLocked whenNotPaused {
         try IExtension(tokenIn).permit(msg.sender, address(this), amount, deadline, signature) {} catch {}
         _swap(tokenIn, tokenOut, amount, recipient);
     }
 
     /// @inheritdoc ISwapFacility
-    function swapIn(address extensionOut, uint256 amount, address recipient) external isNotLocked isNotPaused {
+    function swapIn(address extensionOut, uint256 amount, address recipient) external isNotLocked whenNotPaused {
         _swap(pyusdx, extensionOut, amount, recipient);
     }
 
     /// @inheritdoc ISwapFacility
-    function swapOut(address extensionIn, uint256 amount, address recipient) external isNotLocked isNotPaused {
+    function swapOut(address extensionIn, uint256 amount, address recipient) external isNotLocked whenNotPaused {
         _swap(extensionIn, pyusdx, amount, recipient);
     }
 
@@ -117,7 +110,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         address extensionOut,
         uint256 amount,
         address recipient
-    ) external isNotLocked isNotPaused {
+    ) external isNotLocked whenNotPaused {
         _replaceAsset(asset, tokenIn, extensionOut, amount, recipient);
     }
 
@@ -132,7 +125,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external isNotLocked isNotPaused {
+    ) external isNotLocked whenNotPaused {
         try IERC20Extended(tokenIn).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
         _replaceAsset(asset, tokenIn, extensionOut, amount, recipient);
     }
@@ -146,7 +139,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         address recipient,
         uint256 deadline,
         bytes calldata signature
-    ) external isNotLocked isNotPaused {
+    ) external isNotLocked whenNotPaused {
         try IERC20Extended(tokenIn).permit(msg.sender, address(this), amount, deadline, signature) {} catch {}
         _replaceAsset(asset, tokenIn, extensionOut, amount, recipient);
     }

@@ -560,8 +560,8 @@ contract PYUSDX is
     /// @param amount        The amount to transfer.
     function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
         _revertIfZeroAccount(recipient);
+        _revertIfFrozen(recipient);
         _revertIfNotFrozen(frozenAccount);
-        // _revertIfFrozen(recipient); // TODO: consider adding revert fro frozen accounts
 
         emit Transfer(frozenAccount, recipient, amount);
         emit ForcedTransfer(frozenAccount, recipient, msg.sender, amount);
