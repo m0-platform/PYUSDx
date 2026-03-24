@@ -26,7 +26,7 @@ contract RateLimiterTests is Test {
 
     /* ============ Constructor ============ */
 
-    function testUnit_initialize_revertIfZeroManager() public {
+    function test_initialize_revertIfZeroManager() public {
         address implementation = address(new RateLimiterHarness());
         RateLimiterHarness newLimiter = RateLimiterHarness(
             UnsafeUpgrades.deployTransparentProxy(implementation, admin, "")
@@ -36,19 +36,19 @@ contract RateLimiterTests is Test {
         newLimiter.initialize(address(0));
     }
 
-    function testUnit_initialize() public {
+    function test_initialize() public {
         assertEq(limiter.RATE_LIMITER_ROLE(), keccak256("RATE_LIMITER_ROLE"));
         assertTrue(limiter.hasRole(limiter.RATE_LIMITER_ROLE(), manager));
     }
 
     /* ============ setRateLimit ============ */
 
-    function testUnit_setRateLimit_revertIfNotManager() public {
+    function test_setRateLimit_revertIfNotManager() public {
         vm.expectRevert();
         limiter.setRateLimit(issuer, 100e6, 1, true);
     }
 
-    function testUnit_setRateLimit_initialSetup() public {
+    function test_setRateLimit_initialSetup() public {
         vm.expectEmit();
         emit IRateLimiter.RateLimitSet(issuer, 100e6, 10e6, true);
 
@@ -62,7 +62,7 @@ contract RateLimiterTests is Test {
         assertEq(limiter.getRemainingAmount(issuer), 100e6);
     }
 
-    function testUnit_setRateLimit_updateKeepsRefilledAmount() public {
+    function test_setRateLimit_updateKeepsRefilledAmount() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10e6, true); // 10e6 per second
 
@@ -86,7 +86,7 @@ contract RateLimiterTests is Test {
         assertEq(refillPerSecond, 5e6);
     }
 
-    function testUnit_setRateLimit_updateCapsAtNewCapacity() public {
+    function test_setRateLimit_updateCapsAtNewCapacity() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10e6, true); // 10e6 per second
 
@@ -104,7 +104,7 @@ contract RateLimiterTests is Test {
         assertEq(limiter.getRemainingAmount(issuer), 30e6);
     }
 
-    function testUnit_setRateLimit_remove() public {
+    function test_setRateLimit_remove() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10, true);
 
@@ -122,7 +122,7 @@ contract RateLimiterTests is Test {
         assertEq(limiter.getRemainingAmount(issuer), type(uint256).max);
     }
 
-    function testUnit_setRateLimit_remove_revertIfNonZeroCapacity() public {
+    function test_setRateLimit_remove_revertIfNonZeroCapacity() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10, true);
 
@@ -132,7 +132,7 @@ contract RateLimiterTests is Test {
         limiter.setRateLimit(issuer, 50e6, 0, false);
     }
 
-    function testUnit_setRateLimit_remove_revertIfNonZeroRefillPerSecond() public {
+    function test_setRateLimit_remove_revertIfNonZeroRefillPerSecond() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10, true);
 
@@ -142,7 +142,7 @@ contract RateLimiterTests is Test {
         limiter.setRateLimit(issuer, 0, 5, false);
     }
 
-    function testUnit_setRateLimit_zeroRefillPerSecond() public {
+    function test_setRateLimit_zeroRefillPerSecond() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 0, true);
 
@@ -155,7 +155,7 @@ contract RateLimiterTests is Test {
 
     /* ============ getRateLimitConfig ============ */
 
-    function testUnit_getRateLimitConfig_unconfiguredIssuer() public {
+    function test_getRateLimitConfig_unconfiguredIssuer() public {
         (uint256 capacity, uint256 refillPerSecond) = limiter.getRateLimitConfig(makeAddr("unknown"));
 
         assertEq(capacity, type(uint256).max);
@@ -164,11 +164,11 @@ contract RateLimiterTests is Test {
 
     /* ============ getRemainingAmount ============ */
 
-    function testUnit_getRemainingAmount_unconfiguredIssuer() public {
+    function test_getRemainingAmount_unconfiguredIssuer() public {
         assertEq(limiter.getRemainingAmount(makeAddr("unknown")), type(uint256).max);
     }
 
-    function testUnit_getRemainingAmount_noRefill() public {
+    function test_getRemainingAmount_noRefill() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 0, true);
 
@@ -180,7 +180,7 @@ contract RateLimiterTests is Test {
         assertEq(limiter.getRemainingAmount(issuer), 70e6);
     }
 
-    function testUnit_getRemainingAmount_withRefill() public {
+    function test_getRemainingAmount_withRefill() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 5e6, true); // 5e6 per second
 
@@ -192,7 +192,7 @@ contract RateLimiterTests is Test {
         assertEq(limiter.getRemainingAmount(issuer), 100e6); // Capped at capacity
     }
 
-    function testUnit_getRemainingAmount_refillCapsAtCapacity() public {
+    function test_getRemainingAmount_refillCapsAtCapacity() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 1000e6, true); // 1000e6 per second
 
@@ -204,7 +204,7 @@ contract RateLimiterTests is Test {
         assertEq(limiter.getRemainingAmount(issuer), 100e6);
     }
 
-    function testUnit_getRemainingAmount_overflowCapsAtCapacity() public {
+    function test_getRemainingAmount_overflowCapsAtCapacity() public {
         // Set up bucket with values that would cause overflow
         limiter.setBucketState(issuer, 100e6, type(uint256).max, 1, uint40(block.timestamp));
 
@@ -216,12 +216,12 @@ contract RateLimiterTests is Test {
 
     /* ============ enforceRateLimit ============ */
 
-    function testUnit_enforceRateLimit_unconfiguredIssuer() public {
+    function test_enforceRateLimit_unconfiguredIssuer() public {
         // Should not revert for unconfigured issuer
         limiter.enforceRateLimit(makeAddr("unknown"), 1e18);
     }
 
-    function testUnit_enforceRateLimit_withinLimit() public {
+    function test_enforceRateLimit_withinLimit() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 0, true);
 
@@ -229,7 +229,7 @@ contract RateLimiterTests is Test {
         assertEq(limiter.getRemainingAmount(issuer), 50e6);
     }
 
-    function testUnit_enforceRateLimit_exceedsLimit() public {
+    function test_enforceRateLimit_exceedsLimit() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 0, true);
 
@@ -237,7 +237,7 @@ contract RateLimiterTests is Test {
         limiter.enforceRateLimit(issuer, 150e6);
     }
 
-    function testUnit_enforceRateLimit_updatesLastRefillTime() public {
+    function test_enforceRateLimit_updatesLastRefillTime() public {
         vm.warp(block.timestamp + 1000);
 
         vm.prank(manager);
@@ -261,7 +261,7 @@ contract RateLimiterTests is Test {
         assertEq(limiter.getRemainingAmount(issuer), 100e6);
     }
 
-    function testUnit_enforceRateLimit_multipleConsumptions() public {
+    function test_enforceRateLimit_multipleConsumptions() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 0, true);
 

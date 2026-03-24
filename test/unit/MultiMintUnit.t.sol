@@ -128,7 +128,7 @@ contract MultiMintTest is Test {
 
     /* ============ Initialization ============ */
 
-    function testUnit_initialize() public view {
+    function test_initialize() public view {
         assertEq(extension.name(), "MultiMint");
         assertEq(extension.symbol(), "MM");
         assertEq(extension.decimals(), 6);
@@ -142,7 +142,7 @@ contract MultiMintTest is Test {
 
     /* ============ PYUSDX Wrapping (inherited) ============ */
 
-    function testUnit_wrap_pyusdx() public {
+    function test_wrap_pyusdx() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
 
         assertEq(extension.balanceOf(alice), MINT_AMOUNT);
@@ -152,25 +152,25 @@ contract MultiMintTest is Test {
 
     /* ============ Gating ============ */
 
-    function testUnit_wrap_revert_notSwapFacility() public {
+    function test_wrap_revert_notSwapFacility() public {
         vm.prank(alice);
         vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.wrap(alice, MINT_AMOUNT);
     }
 
-    function testUnit_unwrap_revert_notSwapFacility() public {
+    function test_unwrap_revert_notSwapFacility() public {
         vm.prank(alice);
         vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.unwrap(MINT_AMOUNT);
     }
 
-    function testUnit_wrapAsset_revert_notSwapFacility() public {
+    function test_wrapAsset_revert_notSwapFacility() public {
         vm.prank(alice);
         vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.wrap(address(usdc), alice, MINT_AMOUNT);
     }
 
-    function testUnit_replaceAsset_revert_notSwapFacility() public {
+    function test_replaceAsset_revert_notSwapFacility() public {
         vm.prank(alice);
         vm.expectRevert(IExtension.NotSwapFacility.selector);
         extension.replaceAsset(address(usdc), alice, MINT_AMOUNT);
@@ -178,7 +178,7 @@ contract MultiMintTest is Test {
 
     /* ============ Multi-Asset Wrapping ============ */
 
-    function testUnit_wrap_asset_6decimals() public {
+    function test_wrap_asset_6decimals() public {
         _wrapAssetFor(alice, address(usdc), 500e6);
 
         assertEq(extension.balanceOf(alice), 500e6);
@@ -188,7 +188,7 @@ contract MultiMintTest is Test {
         assertEq(usdc.balanceOf(address(extension)), 500e6);
     }
 
-    function testUnit_wrap_asset_18decimals() public {
+    function test_wrap_asset_18decimals() public {
         _wrapAssetFor(alice, address(dai), 500e18);
 
         assertEq(extension.balanceOf(alice), 500e6);
@@ -197,7 +197,7 @@ contract MultiMintTest is Test {
         assertEq(extension.assetBalanceOf(address(dai)), 500e18);
     }
 
-    function testUnit_wrap_asset_4decimals() public {
+    function test_wrap_asset_4decimals() public {
         _wrapAssetFor(alice, address(fourDec), 500e4);
 
         assertEq(extension.balanceOf(alice), 500e6);
@@ -206,19 +206,19 @@ contract MultiMintTest is Test {
         assertEq(extension.assetBalanceOf(address(fourDec)), 500e4);
     }
 
-    function testUnit_wrap_asset_revert_invalidAsset_zero() public {
+    function test_wrap_asset_revert_invalidAsset_zero() public {
         vm.prank(address(swapFacility));
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
         extension.wrap(address(0), alice, 100e6);
     }
 
-    function testUnit_wrap_asset_revert_invalidAsset_pyusdx() public {
+    function test_wrap_asset_revert_invalidAsset_pyusdx() public {
         vm.prank(address(swapFacility));
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
         extension.wrap(address(pyusdx), alice, 100e6);
     }
 
-    function testUnit_wrap_asset_revert_capReached() public {
+    function test_wrap_asset_revert_capReached() public {
         vm.prank(assetCapManager);
         extension.setAssetCap(address(usdc), 100e6);
 
@@ -230,7 +230,7 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function testUnit_wrap_asset_revert_feeOnTransfer() public {
+    function test_wrap_asset_revert_feeOnTransfer() public {
         MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
 
         vm.prank(assetCapManager);
@@ -246,13 +246,13 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function testUnit_wrap_asset_revert_zeroAmount() public {
+    function test_wrap_asset_revert_zeroAmount() public {
         vm.prank(address(swapFacility));
         vm.expectRevert(IExtension.ZeroAmount.selector);
         extension.wrap(address(usdc), alice, 0);
     }
 
-    function testUnit_wrap_asset_revert_frozen() public {
+    function test_wrap_asset_revert_frozen() public {
         vm.prank(freezeManager);
         extension.freeze(alice);
 
@@ -264,7 +264,7 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function testUnit_wrap_asset_revert_paused() public {
+    function test_wrap_asset_revert_paused() public {
         vm.prank(pauser);
         extension.pause();
 
@@ -276,7 +276,7 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function testUnit_wrap_asset_revert_truncatesToZero() public {
+    function test_wrap_asset_revert_truncatesToZero() public {
         dai.mint(alice, 1);
         vm.startPrank(alice);
         dai.approve(address(swapFacility), 1);
@@ -287,7 +287,7 @@ contract MultiMintTest is Test {
 
     /* ============ Unwrap with Backing Constraint ============ */
 
-    function testUnit_unwrap_revert_insufficientPYUSDXBacking() public {
+    function test_unwrap_revert_insufficientPYUSDXBacking() public {
         _wrapPyusdxFor(alice, alice, 60e6);
         _wrapAssetFor(alice, address(usdc), 40e6);
 
@@ -301,7 +301,7 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function testUnit_unwrap_fullPYUSDXBacking() public {
+    function test_unwrap_fullPYUSDXBacking() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
 
         vm.startPrank(alice);
@@ -313,7 +313,7 @@ contract MultiMintTest is Test {
         assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT);
     }
 
-    function testUnit_unwrap_partialWithAltAssets() public {
+    function test_unwrap_partialWithAltAssets() public {
         _wrapPyusdxFor(alice, alice, 60e6);
         _wrapAssetFor(alice, address(usdc), 40e6);
 
@@ -328,7 +328,7 @@ contract MultiMintTest is Test {
 
     /* ============ Replace Asset with PYUSDX ============ */
 
-    function testUnit_replaceAsset() public {
+    function test_replaceAsset() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         issuerGateway.mint(bob, 50e6);
@@ -344,7 +344,7 @@ contract MultiMintTest is Test {
         assertEq(extension.totalSupply(), 100e6);
     }
 
-    function testUnit_replaceAsset_revert_insufficientAssetBacking() public {
+    function test_replaceAsset_revert_insufficientAssetBacking() public {
         _wrapAssetFor(alice, address(usdc), 50e6);
 
         issuerGateway.mint(bob, 100e6);
@@ -357,13 +357,13 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function testUnit_replaceAsset_revert_invalidAsset() public {
+    function test_replaceAsset_revert_invalidAsset() public {
         vm.prank(address(swapFacility));
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
         extension.replaceAsset(address(0), bob, 50e6);
     }
 
-    function testUnit_replaceAsset_crossDecimal() public {
+    function test_replaceAsset_crossDecimal() public {
         _wrapAssetFor(alice, address(dai), 500e18);
 
         issuerGateway.mint(bob, 200e6);
@@ -377,7 +377,7 @@ contract MultiMintTest is Test {
         assertEq(extension.totalAssets(), 300e6);
     }
 
-    function testUnit_replaceAsset_revert_paused() public {
+    function test_replaceAsset_revert_paused() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         issuerGateway.mint(bob, 50e6);
@@ -393,7 +393,7 @@ contract MultiMintTest is Test {
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
     }
 
-    function testUnit_replaceAsset_emitsEvent() public {
+    function test_replaceAsset_emitsEvent() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         issuerGateway.mint(bob, 50e6);
@@ -407,7 +407,7 @@ contract MultiMintTest is Test {
 
     /* ============ Asset Cap Management ============ */
 
-    function testUnit_setAssetCap() public {
+    function test_setAssetCap() public {
         MockERC20 newToken = new MockERC20("New", "NEW", 8);
 
         vm.prank(assetCapManager);
@@ -418,19 +418,19 @@ contract MultiMintTest is Test {
         assertTrue(extension.isAllowedAsset(address(newToken)));
     }
 
-    function testUnit_setAssetCap_revert_unauthorized() public {
+    function test_setAssetCap_revert_unauthorized() public {
         vm.prank(alice);
         vm.expectRevert();
         extension.setAssetCap(address(usdc), 999e6);
     }
 
-    function testUnit_setAssetCap_revert_invalidAsset() public {
+    function test_setAssetCap_revert_invalidAsset() public {
         vm.prank(assetCapManager);
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
         extension.setAssetCap(address(0), 100e6);
     }
 
-    function testUnit_setAssetCap_disableAsset() public {
+    function test_setAssetCap_disableAsset() public {
         vm.prank(assetCapManager);
         extension.setAssetCap(address(usdc), 0);
 
@@ -446,7 +446,7 @@ contract MultiMintTest is Test {
 
     /* ============ Yield ============ */
 
-    function testUnit_yield_withAltAssets() public {
+    function test_yield_withAltAssets() public {
         _wrapPyusdxFor(alice, alice, 60e6);
         _wrapAssetFor(alice, address(usdc), 40e6);
 
@@ -471,7 +471,7 @@ contract MultiMintTest is Test {
         assertEq(extension.totalSupply(), 100e6 + claimed);
     }
 
-    function testUnit_claimYield() public {
+    function test_claimYield() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
 
         vm.warp(block.timestamp + 365 days);
@@ -484,7 +484,7 @@ contract MultiMintTest is Test {
         assertEq(extension.yield(), 0);
     }
 
-    function testUnit_claimYield_directBypass() public {
+    function test_claimYield_directBypass() public {
         _wrapPyusdxFor(alice, alice, 60e6);
         _wrapAssetFor(alice, address(usdc), 40e6);
 
@@ -501,7 +501,7 @@ contract MultiMintTest is Test {
         assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 
-    function testUnit_setYieldRecipient() public {
+    function test_setYieldRecipient() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
@@ -516,17 +516,17 @@ contract MultiMintTest is Test {
 
     /* ============ View Functions ============ */
 
-    function testUnit_isAllowedAsset() public {
+    function test_isAllowedAsset() public {
         assertTrue(extension.isAllowedAsset(address(usdc)));
         assertFalse(extension.isAllowedAsset(makeAddr("randomToken")));
     }
 
-    function testUnit_isAllowedToWrap() public {
+    function test_isAllowedToWrap() public {
         assertTrue(extension.isAllowedToWrap(address(usdc), 100e6));
         assertFalse(extension.isAllowedToWrap(address(usdc), 0));
     }
 
-    function testUnit_isAllowedToUnwrap() public {
+    function test_isAllowedToUnwrap() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
         assertTrue(extension.isAllowedToUnwrap(500e6));
         assertFalse(extension.isAllowedToUnwrap(0));
@@ -534,7 +534,7 @@ contract MultiMintTest is Test {
 
     /* ============ Freeze via SwapFacility ============ */
 
-    function testUnit_unwrap_revert_frozen() public {
+    function test_unwrap_revert_frozen() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
 
         vm.prank(alice);
@@ -548,7 +548,7 @@ contract MultiMintTest is Test {
         swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
     }
 
-    function testUnit_replaceAsset_revert_frozen() public {
+    function test_replaceAsset_revert_frozen() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         issuerGateway.mint(bob, 50e6);
@@ -565,7 +565,7 @@ contract MultiMintTest is Test {
 
     /* ============ Initialization — ZeroAssetCapManager ============ */
 
-    function testUnit_initialize_revert_zeroAssetCapManager() public {
+    function test_initialize_revert_zeroAssetCapManager() public {
         address impl = address(new MultiMint(address(pyusdx), address(swapFacility)));
         vm.expectRevert(IMultiMint.ZeroAssetCapManager.selector);
         UnsafeUpgrades.deployTransparentProxy(
@@ -587,13 +587,13 @@ contract MultiMintTest is Test {
 
     /* ============ InvalidAsset — PYUSDX branch ============ */
 
-    function testUnit_setAssetCap_revert_invalidAsset_pyusdx() public {
+    function test_setAssetCap_revert_invalidAsset_pyusdx() public {
         vm.prank(assetCapManager);
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
         extension.setAssetCap(address(pyusdx), 100e6);
     }
 
-    function testUnit_replaceAsset_revert_invalidAsset_pyusdx() public {
+    function test_replaceAsset_revert_invalidAsset_pyusdx() public {
         vm.prank(address(swapFacility));
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
         extension.replaceAsset(address(pyusdx), bob, 50e6);
@@ -601,7 +601,7 @@ contract MultiMintTest is Test {
 
     /* ============ Frozen Recipient (caller != recipient) ============ */
 
-    function testUnit_wrap_asset_revert_frozen_recipient() public {
+    function test_wrap_asset_revert_frozen_recipient() public {
         vm.prank(freezeManager);
         extension.freeze(bob);
 
@@ -613,7 +613,7 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function testUnit_replaceAsset_revert_frozen_recipient() public {
+    function test_replaceAsset_revert_frozen_recipient() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         vm.prank(freezeManager);
@@ -629,7 +629,7 @@ contract MultiMintTest is Test {
 
     /* ============ Pausable — Unwrap ============ */
 
-    function testUnit_unwrap_revert_paused() public {
+    function test_unwrap_revert_paused() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
 
         vm.prank(pauser);
@@ -644,13 +644,13 @@ contract MultiMintTest is Test {
 
     /* ============ Zero-Amount / Zero-Recipient ============ */
 
-    function testUnit_replaceAsset_revert_zeroAmount() public {
+    function test_replaceAsset_revert_zeroAmount() public {
         vm.prank(address(swapFacility));
         vm.expectRevert(IExtension.ZeroAmount.selector);
         extension.replaceAsset(address(usdc), bob, 0);
     }
 
-    function testUnit_wrap_asset_revert_zeroRecipient() public {
+    function test_wrap_asset_revert_zeroRecipient() public {
         usdc.mint(alice, 100e6);
         vm.startPrank(alice);
         usdc.approve(address(swapFacility), 100e6);
@@ -661,7 +661,7 @@ contract MultiMintTest is Test {
 
     /* ============ Event Emission ============ */
 
-    function testUnit_wrap_asset_emitsEvent() public {
+    function test_wrap_asset_emitsEvent() public {
         dai.mint(alice, 500e18);
         vm.startPrank(alice);
         dai.approve(address(swapFacility), 500e18);
@@ -671,7 +671,7 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function testUnit_setAssetCap_emitsEvent() public {
+    function test_setAssetCap_emitsEvent() public {
         MockERC20 newToken = new MockERC20("New", "NEW", 8);
         vm.prank(assetCapManager);
         vm.expectEmit(true, false, false, true, address(extension));
@@ -681,14 +681,14 @@ contract MultiMintTest is Test {
 
     /* ============ isAllowedToReplaceAsset ============ */
 
-    function testUnit_isAllowedToReplaceAsset() public {
+    function test_isAllowedToReplaceAsset() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         assertTrue(extension.isAllowedToReplaceAsset(address(usdc), 50e6));
         assertTrue(extension.isAllowedToReplaceAsset(address(usdc), 100e6));
     }
 
-    function testUnit_isAllowedToReplaceAsset_zeroOrExcessive() public {
+    function test_isAllowedToReplaceAsset_zeroOrExcessive() public {
         _wrapAssetFor(alice, address(usdc), 100e6);
 
         assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 0));
@@ -697,7 +697,7 @@ contract MultiMintTest is Test {
 
     /* ============ InsufficientAssetReceived ============ */
 
-    function testUnit_wrap_asset_revert_insufficientAssetReceived() public {
+    function test_wrap_asset_revert_insufficientAssetReceived() public {
         MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
 
         vm.prank(assetCapManager);
