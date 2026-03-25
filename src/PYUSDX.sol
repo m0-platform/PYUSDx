@@ -127,9 +127,7 @@ contract PYUSDX is
 
         isEarning(account) ? _subtractEarningAmount($, account, amount) : _subtractNonEarningAmount($, account, amount);
 
-        unchecked {
-            $.totalSupply -= amount;
-        }
+        $.totalSupply -= amount;
 
         emit Transfer(account, address(0), amount);
     }
