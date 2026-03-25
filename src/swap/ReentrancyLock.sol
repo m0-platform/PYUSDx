@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.34;
 
-import { Locker } from "../../lib/evm-m-extensions/lib/uniswap-v4-periphery/src/libraries/Locker.sol";
-
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
-import { IMsgSender } from "../../lib/evm-m-extensions/lib/uniswap-v4-periphery/src/interfaces/IMsgSender.sol";
-
+import { IMsgSender } from "./interfaces/IMsgSender.sol";
 import { IReentrancyLock } from "./interfaces/IReentrancyLock.sol";
 
 abstract contract ReentrancyLockStorageLayout {
@@ -26,19 +23,20 @@ abstract contract ReentrancyLockStorageLayout {
     }
 }
 
-// TODO: Use transient storage if we upgrade to use Solidity 0.8.29+
 /// @notice A transient reentrancy lock, that stores the caller's address as the lock
 contract ReentrancyLock is IReentrancyLock, ReentrancyLockStorageLayout, AccessControlUpgradeable {
+    /// @notice Transiently holds the address of the locker
+    /// @dev    Transient storage doesn't affect permanent storage layout
+    address internal transient _locker;
+
     /* ============ Modifiers ============ */
 
     modifier isNotLocked() {
-        if (Locker.get() != address(0)) revert ContractLocked();
+        if (_locker != address(0)) revert ContractLocked();
 
-        address caller_ = isTrustedRouter(msg.sender) ? IMsgSender(msg.sender).msgSender() : msg.sender;
-
-        Locker.set(caller_);
+        _locker = isTrustedRouter(msg.sender) ? IMsgSender(msg.sender).msgSender() : msg.sender;
         _;
-        Locker.set(address(0));
+        _locker = address(0);
     }
 
     /* ============ Initializer ============ */
@@ -75,6 +73,6 @@ contract ReentrancyLock is IReentrancyLock, ReentrancyLockStorageLayout, AccessC
     /* ============ Private View/Pure Functions ============ */
 
     function _getLocker() internal view returns (address) {
-        return Locker.get();
+        return _locker;
     }
 }
