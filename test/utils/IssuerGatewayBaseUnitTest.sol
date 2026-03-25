@@ -15,6 +15,7 @@ abstract contract IssuerGatewayBaseUnitTest is Test {
 
     // Test addresses
     address public admin = makeAddr("admin");
+    address public issuer = makeAddr("issuer");
     address public minter = makeAddr("minter");
     address public recipient = makeAddr("recipient");
     address public caller = makeAddr("caller");
@@ -38,6 +39,7 @@ abstract contract IssuerGatewayBaseUnitTest is Test {
                 abi.encodeWithSelector(
                     IssuerGateway.initialize.selector,
                     admin,
+                    issuer,
                     minter,
                     DEFAULT_MINT_DELAY,
                     DEFAULT_MINT_TTL
@@ -52,12 +54,12 @@ abstract contract IssuerGatewayBaseUnitTest is Test {
 
     /* ============ Helper Functions ============ */
 
-    /// @notice Proposes a mint from the minter account
+    /// @notice Proposes a mint from the issuer account
     /// @param amount The amount to mint
     /// @param recipient_ The recipient address
     /// @return mintId The ID of the created mint proposal
     function _proposeMint(uint256 amount, address recipient_) internal returns (uint48 mintId) {
-        vm.prank(minter);
+        vm.prank(issuer);
         mintId = issuerGateway.proposeMint(amount, recipient_);
     }
 

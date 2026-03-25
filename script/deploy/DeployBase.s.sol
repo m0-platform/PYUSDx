@@ -80,6 +80,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
             abi.encodeWithSelector(
                 IssuerGateway.initialize.selector,
                 config.admin,
+                config.issuer,
                 config.minter,
                 config.mintDelay,
                 config.mintTTL

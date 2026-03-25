@@ -43,6 +43,9 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /// @inheritdoc IIssuerGateway
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
 
+    /// @inheritdoc IIssuerGateway
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
     /* ============ Immutable Variables ============ */
 
     /// @inheritdoc IIssuerGateway
@@ -61,14 +64,22 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /* ============ Initializer ============ */
 
     /// @inheritdoc IIssuerGateway
-    function initialize(address admin, address minter, uint32 mintDelay_, uint32 mintTTL_) external initializer {
+    function initialize(
+        address admin,
+        address issuer,
+        address minter,
+        uint32 mintDelay_,
+        uint32 mintTTL_
+    ) external initializer {
         if (admin == address(0)) revert ZeroAdminAddress();
-        if (minter == address(0)) revert ZeroMinterAddress();
+        if (issuer == address(0)) revert ZeroIssuer();
+        if (minter == address(0)) revert ZeroMinter();
 
         __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(ISSUER_ROLE, minter);
+        _grantRole(ISSUER_ROLE, issuer);
+        _grantRole(MINTER_ROLE, minter);
 
         _setMintDelay(mintDelay_);
         _setMintTTL(mintTTL_);
@@ -131,7 +142,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     }
 
     /// @inheritdoc IIssuerGateway
-    function mint(uint48 mintId) external {
+    function mint(uint48 mintId) external onlyRole(MINTER_ROLE) {
         IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
         MintProposal storage proposal = $.mintProposals[mintId];
 

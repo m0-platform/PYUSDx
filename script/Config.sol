@@ -17,6 +17,7 @@ contract Config {
 
     struct IssuerGatewayConfig {
         address admin;
+        address issuer;
         address minter;
         uint32 mintDelay;
         uint32 mintTTL;

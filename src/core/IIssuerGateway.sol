@@ -56,8 +56,11 @@ interface IIssuerGateway {
     /// @notice Thrown when the admin address is zero
     error ZeroAdminAddress();
 
+    /// @notice Thrown when the issuer address is zero
+    error ZeroIssuer();
+
     /// @notice Thrown when the minter address is zero
-    error ZeroMinterAddress();
+    error ZeroMinter();
 
     /// @notice Thrown when attempting to propose a mint with zero amount
     error ZeroMintAmount();
@@ -95,15 +98,20 @@ interface IIssuerGateway {
     /// @return The bytes32 role identifier
     function ISSUER_ROLE() external view returns (bytes32);
 
+    /// @notice Returns the role identifier for minter role
+    /// @return The bytes32 role identifier
+    function MINTER_ROLE() external view returns (bytes32);
+
     /* ============ Initializer ============ */
 
     /// @notice Initializes the IssuerGateway contract
     /// @dev    Can only be called once due to initializer modifier
     /// @param  admin     The address that will have the default admin role
+    /// @param  issuer    The address that will have the issuer role
     /// @param  minter    The address that will have the minter role
     /// @param  mintDelay The delay in seconds before a mint can be executed after proposal
     /// @param  mintTTL   The time to live in seconds for a mint proposal before it expires
-    function initialize(address admin, address minter, uint32 mintDelay, uint32 mintTTL) external;
+    function initialize(address admin, address issuer, address minter, uint32 mintDelay, uint32 mintTTL) external;
 
     /* ============ Interactive Functions ============ */
 
@@ -115,7 +123,7 @@ interface IIssuerGateway {
     function proposeMint(uint256 amount, address recipient) external returns (uint48 mintId);
 
     /// @notice Executes a proposed mint after the delay has elapsed
-    /// @dev    Can be called by anyone after the mint delay has passed and before TTL expires
+    /// @dev    Only callable by addresses with MINTER_ROLE
     /// @param  mintId The unique identifier for the mint proposal
     function mint(uint48 mintId) external;
 

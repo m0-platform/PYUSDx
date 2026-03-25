@@ -16,6 +16,7 @@ abstract contract BaseTest is Test {
     address public rateManager = makeAddr("rateManager");
     address public yieldRecipient = makeAddr("yieldRecipient");
     address public yieldRecipientManager = makeAddr("yieldRecipientManager");
+    address public issuer = makeAddr("issuer");
     address public minter = makeAddr("minter");
     address public assetCapManager = makeAddr("assetCapManager");
     address public factoryManager = makeAddr("factoryManager");
