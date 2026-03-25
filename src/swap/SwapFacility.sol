@@ -166,7 +166,6 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     function _swap(address tokenIn, address tokenOut, uint256 amount, address recipient) internal {
         // Prevent self-swaps (e.g., PYUSDX -> PYUSDX or extension -> same extension)
         if (tokenIn == tokenOut) revert InvalidSwapPath(tokenIn, tokenOut);
-        // if (!canSwapViaPath(tokenIn, tokenOut)) revert InvalidSwapPath(tokenIn, tokenOut);
 
         // If the input token is PYUSDX, we swap it for the output token, which must be an approved extension
         // This is checked in _swapIn

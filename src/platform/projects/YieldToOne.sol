@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.34;
+pragma solidity ^0.8.34;
 
 import { Freezable } from "../../../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
 import { Pausable } from "../../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
-import { Extension } from "../Extension.sol";
 
 import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { IYieldToOne } from "./interfaces/IYieldToOne.sol";
 import { IPYUSDX } from "../../IPYUSDX.sol";
+
+import { Extension } from "../Extension.sol";
+
+import { IYieldToOne } from "./interfaces/IYieldToOne.sol";
 
 abstract contract YieldToOneStorageLayout {
     /// @custom:storage-location erc7201:PYUSDX.storage.YieldToOne
@@ -112,7 +114,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         // NOTE: Realize any pending PYUSDX yield
         IPYUSDX(pyusdx).claimFor(address(this));
 
-        // NOTE: Excess accounts for the newly claimed yield and any prior claimed yield not via this contract or PYUSDX donation.
+        // NOTE: Excess accounts for the newly claimed yield and any prior unclaimed yield
+        //       (i.e. PYUSDX donation or `claimFor()` the extension at the PYUSDX level)
         uint256 excess = _excess();
 
         if (excess == 0) return 0;
@@ -209,6 +212,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         YieldToOneStorage storage $ = _getYieldToOneStorage();
 
         $.totalSupply += amount;
+
         unchecked {
             $.balanceOf[recipient] += amount;
         }
