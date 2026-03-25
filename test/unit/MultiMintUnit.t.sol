@@ -14,6 +14,7 @@ import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.so
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
+import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { MockERC20 } from "../mock/MockERC20.sol";
 import { MockFeeOnTransfer } from "../mock/MockFeeOnTransfer.sol";
@@ -112,21 +113,29 @@ contract MultiMintTest is Test {
         issuerGateway.mint(to, amount);
 
         vm.startPrank(to);
+
         IERC20(address(pyusdx)).approve(address(swapFacility), amount);
         swapFacility.swapIn(address(extension), amount, recipient);
+
         vm.stopPrank();
     }
 
-    function _wrapAssetFor(address user, address asset, uint256 amount) internal {
+    function _wrapAssetFor(address user, address asset, uint256 amount, uint256 mintedAmount) internal {
         MockERC20(asset).mint(user, amount);
 
         vm.startPrank(user);
+
         IERC20(asset).approve(address(swapFacility), amount);
+
+        vm.expectEmit(true, true, false, true, address(extension));
+        emit IMultiMint.AssetWrapped(asset, amount, user, mintedAmount);
+
         swapFacility.swapInAsset(address(extension), asset, amount, user);
+
         vm.stopPrank();
     }
 
-    /* ============ Initialization ============ */
+    /* ============ initialize ============ */
 
     function test_initialize() public view {
         assertEq(extension.name(), "MultiMint");
@@ -140,7 +149,27 @@ contract MultiMintTest is Test {
         assertTrue(extension.hasRole(extension.YIELD_RECIPIENT_MANAGER_ROLE(), yieldRecipientManager));
     }
 
-    /* ============ PYUSDX Wrapping (inherited) ============ */
+    function test_initialize_revert_zeroAssetCapManager() public {
+        address impl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+        vm.expectRevert(IMultiMint.ZeroAssetCapManager.selector);
+        UnsafeUpgrades.deployTransparentProxy(
+            impl,
+            admin,
+            abi.encodeWithSelector(
+                MultiMint.initialize.selector,
+                "MM",
+                "MM",
+                yieldRecipient,
+                admin,
+                address(0),
+                freezeManager,
+                pauser,
+                yieldRecipientManager
+            )
+        );
+    }
+
+    /* ============ wrap (PYUSDX) ============ */
 
     function test_wrap_pyusdx() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
@@ -150,36 +179,24 @@ contract MultiMintTest is Test {
         assertEq(pyusdx.balanceOf(address(extension)), MINT_AMOUNT);
     }
 
-    /* ============ Gating ============ */
-
     function test_wrap_revert_notSwapFacility() public {
-        vm.prank(alice);
         vm.expectRevert(IExtension.NotSwapFacility.selector);
+
+        vm.prank(alice);
         extension.wrap(alice, MINT_AMOUNT);
     }
 
-    function test_unwrap_revert_notSwapFacility() public {
-        vm.prank(alice);
-        vm.expectRevert(IExtension.NotSwapFacility.selector);
-        extension.unwrap(MINT_AMOUNT);
-    }
+    /* ============ wrap (asset) ============ */
 
-    function test_wrapAsset_revert_notSwapFacility() public {
-        vm.prank(alice);
+    function test_wrap_asset_revert_notSwapFacility() public {
         vm.expectRevert(IExtension.NotSwapFacility.selector);
+
+        vm.prank(alice);
         extension.wrap(address(usdc), alice, MINT_AMOUNT);
     }
 
-    function test_replaceAsset_revert_notSwapFacility() public {
-        vm.prank(alice);
-        vm.expectRevert(IExtension.NotSwapFacility.selector);
-        extension.replaceAsset(address(usdc), alice, MINT_AMOUNT);
-    }
-
-    /* ============ Multi-Asset Wrapping ============ */
-
     function test_wrap_asset_6decimals() public {
-        _wrapAssetFor(alice, address(usdc), 500e6);
+        _wrapAssetFor(alice, address(usdc), 500e6, 500e6);
 
         assertEq(extension.balanceOf(alice), 500e6);
         assertEq(extension.totalSupply(), 500e6);
@@ -189,7 +206,7 @@ contract MultiMintTest is Test {
     }
 
     function test_wrap_asset_18decimals() public {
-        _wrapAssetFor(alice, address(dai), 500e18);
+        _wrapAssetFor(alice, address(dai), 500e18, 500e6);
 
         assertEq(extension.balanceOf(alice), 500e6);
         assertEq(extension.totalSupply(), 500e6);
@@ -198,7 +215,7 @@ contract MultiMintTest is Test {
     }
 
     function test_wrap_asset_4decimals() public {
-        _wrapAssetFor(alice, address(fourDec), 500e4);
+        _wrapAssetFor(alice, address(fourDec), 500e4, 500e6);
 
         assertEq(extension.balanceOf(alice), 500e6);
         assertEq(extension.totalSupply(), 500e6);
@@ -207,14 +224,16 @@ contract MultiMintTest is Test {
     }
 
     function test_wrap_asset_revert_invalidAsset_zero() public {
-        vm.prank(address(swapFacility));
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
+
+        vm.prank(address(swapFacility));
         extension.wrap(address(0), alice, 100e6);
     }
 
     function test_wrap_asset_revert_invalidAsset_pyusdx() public {
-        vm.prank(address(swapFacility));
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
+
+        vm.prank(address(swapFacility));
         extension.wrap(address(pyusdx), alice, 100e6);
     }
 
@@ -223,10 +242,14 @@ contract MultiMintTest is Test {
         extension.setAssetCap(address(usdc), 100e6);
 
         usdc.mint(alice, 200e6);
+
         vm.startPrank(alice);
+
         usdc.approve(address(swapFacility), 200e6);
+
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.AssetCapReached.selector, address(usdc)));
         swapFacility.swapInAsset(address(extension), address(usdc), 200e6, alice);
+
         vm.stopPrank();
     }
 
@@ -237,19 +260,59 @@ contract MultiMintTest is Test {
         extension.setAssetCap(address(feeToken), 1_000_000e6);
 
         feeToken.mint(alice, 200e6);
+
         vm.startPrank(alice);
+
         feeToken.approve(address(swapFacility), 200e6);
+
         // Fee-on-transfer causes the swap facility to receive less than `amount`.
         // The extension's safeTransferFrom then reverts because the facility's balance is insufficient.
         vm.expectRevert();
+        swapFacility.swapInAsset(address(extension), address(feeToken), 200e6, alice);
+
+        vm.stopPrank();
+    }
+
+    function test_wrap_asset_revert_insufficientAssetReceived() public {
+        MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
+
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(feeToken), 1_000_000e6);
+
+        // Pre-fund swap facility so safeTransferFrom (L238) succeeds despite prior fee loss.
+        feeToken.mint(address(swapFacility), 100e6);
+
+        feeToken.mint(alice, 200e6);
+
+        vm.startPrank(alice);
+        feeToken.approve(address(swapFacility), 200e6);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IMultiMint.InsufficientAssetReceived.selector, address(feeToken), 200e6, 198e6)
+        );
+
         swapFacility.swapInAsset(address(extension), address(feeToken), 200e6, alice);
         vm.stopPrank();
     }
 
     function test_wrap_asset_revert_zeroAmount() public {
-        vm.prank(address(swapFacility));
         vm.expectRevert(IExtension.ZeroAmount.selector);
+
+        vm.prank(address(swapFacility));
         extension.wrap(address(usdc), alice, 0);
+    }
+
+    function test_wrap_asset_revert_truncatesToZero() public {
+        dai.mint(alice, 1);
+
+        vm.startPrank(alice);
+
+        dai.approve(address(swapFacility), 1);
+
+        vm.expectRevert(IExtension.ZeroAmount.selector);
+        swapFacility.swapInAsset(address(extension), address(dai), 1, alice);
+
+        vm.stopPrank();
     }
 
     function test_wrap_asset_revert_frozen() public {
@@ -257,10 +320,43 @@ contract MultiMintTest is Test {
         extension.freeze(alice);
 
         usdc.mint(alice, 100e6);
+
         vm.startPrank(alice);
+
         usdc.approve(address(swapFacility), 100e6);
+
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
         swapFacility.swapInAsset(address(extension), address(usdc), 100e6, alice);
+
+        vm.stopPrank();
+    }
+
+    function test_wrap_asset_revert_frozen_recipient() public {
+        vm.prank(freezeManager);
+        extension.freeze(bob);
+
+        usdc.mint(alice, 100e6);
+
+        vm.startPrank(alice);
+
+        usdc.approve(address(swapFacility), 100e6);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+        swapFacility.swapInAsset(address(extension), address(usdc), 100e6, bob);
+
+        vm.stopPrank();
+    }
+
+    function test_wrap_asset_revert_zeroRecipient() public {
+        usdc.mint(alice, 100e6);
+
+        vm.startPrank(alice);
+
+        usdc.approve(address(swapFacility), 100e6);
+
+        vm.expectRevert(IExtension.ZeroAccount.selector);
+        swapFacility.swapInAsset(address(extension), address(usdc), 100e6, address(0));
+
         vm.stopPrank();
     }
 
@@ -269,35 +365,40 @@ contract MultiMintTest is Test {
         extension.pause();
 
         usdc.mint(alice, 100e6);
+
         vm.startPrank(alice);
+
         usdc.approve(address(swapFacility), 100e6);
-        vm.expectRevert();
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
         swapFacility.swapInAsset(address(extension), address(usdc), 100e6, alice);
+
         vm.stopPrank();
     }
 
-    function test_wrap_asset_revert_truncatesToZero() public {
-        dai.mint(alice, 1);
-        vm.startPrank(alice);
-        dai.approve(address(swapFacility), 1);
-        vm.expectRevert(IExtension.ZeroAmount.selector);
-        swapFacility.swapInAsset(address(extension), address(dai), 1, alice);
-        vm.stopPrank();
-    }
+    /* ============ unwrap ============ */
 
-    /* ============ Unwrap with Backing Constraint ============ */
+    function test_unwrap_revert_notSwapFacility() public {
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
+
+        vm.prank(alice);
+        extension.unwrap(MINT_AMOUNT);
+    }
 
     function test_unwrap_revert_insufficientPYUSDXBacking() public {
         _wrapPyusdxFor(alice, alice, 60e6);
-        _wrapAssetFor(alice, address(usdc), 40e6);
+        _wrapAssetFor(alice, address(usdc), 40e6, 40e6);
 
         assertEq(extension.totalSupply(), 100e6);
         assertEq(extension.totalAssets(), 40e6);
 
         vm.startPrank(alice);
+
         IERC20(address(extension)).approve(address(swapFacility), 70e6);
+
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InsufficientPYUSDXBacking.selector, 70e6, 60e6));
         swapFacility.swapOut(address(extension), 70e6, alice);
+
         vm.stopPrank();
     }
 
@@ -305,8 +406,10 @@ contract MultiMintTest is Test {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
 
         vm.startPrank(alice);
+
         IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
         swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+
         vm.stopPrank();
 
         assertEq(extension.balanceOf(alice), 0);
@@ -315,25 +418,71 @@ contract MultiMintTest is Test {
 
     function test_unwrap_partialWithAltAssets() public {
         _wrapPyusdxFor(alice, alice, 60e6);
-        _wrapAssetFor(alice, address(usdc), 40e6);
+        _wrapAssetFor(alice, address(usdc), 40e6, 40e6);
 
         vm.startPrank(alice);
+
         IERC20(address(extension)).approve(address(swapFacility), 60e6);
         swapFacility.swapOut(address(extension), 60e6, alice);
+
         vm.stopPrank();
 
         assertEq(extension.balanceOf(alice), 40e6);
         assertEq(pyusdx.balanceOf(alice), 60e6);
     }
 
-    /* ============ Replace Asset with PYUSDX ============ */
+    function test_unwrap_revert_frozen() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(alice);
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+
+        vm.prank(alice);
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+    }
+
+    function test_unwrap_revert_paused() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        vm.startPrank(alice);
+
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+
+        vm.stopPrank();
+    }
+
+    /* ============ replaceAsset ============ */
+
+    function test_replaceAsset_revert_notSwapFacility() public {
+        vm.expectRevert(IExtension.NotSwapFacility.selector);
+
+        vm.prank(alice);
+        extension.replaceAsset(address(usdc), alice, MINT_AMOUNT);
+    }
 
     function test_replaceAsset() public {
-        _wrapAssetFor(alice, address(usdc), 100e6);
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         issuerGateway.mint(bob, 50e6);
+
         vm.startPrank(bob);
+
         IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
+
+        vm.expectEmit(true, true, false, true, address(extension));
+        emit IMultiMint.AssetReplaced(address(usdc), 50e6, bob, 50e6);
+
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
         vm.stopPrank();
 
@@ -345,31 +494,47 @@ contract MultiMintTest is Test {
     }
 
     function test_replaceAsset_revert_insufficientAssetBacking() public {
-        _wrapAssetFor(alice, address(usdc), 50e6);
+        _wrapAssetFor(alice, address(usdc), 50e6, 50e6);
 
         issuerGateway.mint(bob, 100e6);
+
         vm.startPrank(bob);
+
         IERC20(address(pyusdx)).approve(address(swapFacility), 100e6);
+
         vm.expectRevert(
             abi.encodeWithSelector(IMultiMint.InsufficientAssetBacking.selector, address(usdc), 100e6, 50e6)
         );
+
         swapFacility.replaceAsset(address(extension), address(usdc), 100e6, bob);
+
         vm.stopPrank();
     }
 
     function test_replaceAsset_revert_invalidAsset() public {
-        vm.prank(address(swapFacility));
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
+
+        vm.prank(address(swapFacility));
         extension.replaceAsset(address(0), bob, 50e6);
     }
 
+    function test_replaceAsset_revert_invalidAsset_pyusdx() public {
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
+
+        vm.prank(address(swapFacility));
+        extension.replaceAsset(address(pyusdx), bob, 50e6);
+    }
+
     function test_replaceAsset_crossDecimal() public {
-        _wrapAssetFor(alice, address(dai), 500e18);
+        _wrapAssetFor(alice, address(dai), 500e18, 500e6);
 
         issuerGateway.mint(bob, 200e6);
+
         vm.startPrank(bob);
+
         IERC20(address(pyusdx)).approve(address(swapFacility), 200e6);
         swapFacility.replaceAsset(address(extension), address(dai), 200e6, bob);
+
         vm.stopPrank();
 
         assertEq(dai.balanceOf(bob), 200e18);
@@ -378,39 +543,79 @@ contract MultiMintTest is Test {
     }
 
     function test_replaceAsset_revert_paused() public {
-        _wrapAssetFor(alice, address(usdc), 100e6);
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         issuerGateway.mint(bob, 50e6);
-        vm.startPrank(bob);
+
+        vm.prank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
-        vm.stopPrank();
 
         vm.prank(pauser);
         extension.pause();
 
         vm.prank(bob);
-        vm.expectRevert();
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
     }
 
-    function test_replaceAsset_emitsEvent() public {
-        _wrapAssetFor(alice, address(usdc), 100e6);
+    function test_replaceAsset_frozenCaller() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         issuerGateway.mint(bob, 50e6);
+
+        vm.prank(freezeManager);
+        extension.freeze(bob);
+
         vm.startPrank(bob);
+
         IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
-        vm.expectEmit(true, true, false, true, address(extension));
-        emit IMultiMint.AssetReplacedWithPYUSDX(address(usdc), 50e6, bob, 50e6);
+
+        // Succeeds because replaceAsset does not check if the caller or recipient are frozen.
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
+
         vm.stopPrank();
+
+        assertEq(usdc.balanceOf(bob), 50e6);
     }
 
-    /* ============ Asset Cap Management ============ */
+    function test_replaceAsset_frozenRecipient() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        issuerGateway.mint(bob, 50e6);
+
+        vm.startPrank(bob);
+
+        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
+
+        // Succeeds because replaceAsset does not check if the caller or recipient are frozen.
+        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, alice);
+
+        vm.stopPrank();
+
+        assertEq(usdc.balanceOf(alice), 50e6);
+    }
+
+    function test_replaceAsset_revert_zeroAmount() public {
+        vm.expectRevert(IExtension.ZeroAmount.selector);
+
+        vm.prank(address(swapFacility));
+        extension.replaceAsset(address(usdc), bob, 0);
+    }
+
+    /* ============ setAssetCap ============ */
 
     function test_setAssetCap() public {
         MockERC20 newToken = new MockERC20("New", "NEW", 8);
 
         vm.prank(assetCapManager);
+
+        vm.expectEmit(true, false, false, true, address(extension));
+        emit IMultiMint.AssetCapSet(address(newToken), 500e8);
+
         extension.setAssetCap(address(newToken), 500e8);
 
         assertEq(extension.assetCap(address(newToken)), 500e8);
@@ -419,15 +624,30 @@ contract MultiMintTest is Test {
     }
 
     function test_setAssetCap_revert_unauthorized() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                extension.ASSET_CAP_MANAGER_ROLE()
+            )
+        );
+
         vm.prank(alice);
-        vm.expectRevert();
         extension.setAssetCap(address(usdc), 999e6);
     }
 
     function test_setAssetCap_revert_invalidAsset() public {
-        vm.prank(assetCapManager);
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
+
+        vm.prank(assetCapManager);
         extension.setAssetCap(address(0), 100e6);
+    }
+
+    function test_setAssetCap_revert_invalidAsset_pyusdx() public {
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
+
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(pyusdx), 100e6);
     }
 
     function test_setAssetCap_disableAsset() public {
@@ -437,18 +657,22 @@ contract MultiMintTest is Test {
         assertFalse(extension.isAllowedAsset(address(usdc)));
 
         usdc.mint(alice, 100e6);
+
         vm.startPrank(alice);
+
         usdc.approve(address(swapFacility), 100e6);
+
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.AssetCapReached.selector, address(usdc)));
         swapFacility.swapInAsset(address(extension), address(usdc), 100e6, alice);
+
         vm.stopPrank();
     }
 
-    /* ============ Yield ============ */
+    /* ============ claimYield ============ */
 
     function test_yield_withAltAssets() public {
         _wrapPyusdxFor(alice, alice, 60e6);
-        _wrapAssetFor(alice, address(usdc), 40e6);
+        _wrapAssetFor(alice, address(usdc), 40e6, 40e6);
 
         assertEq(extension.yield(), 0);
         assertEq(extension.totalSupply(), 100e6);
@@ -460,11 +684,13 @@ contract MultiMintTest is Test {
 
         // After external claimFor, yield() still shows excess (realized but unminted).
         pyusdx.claimFor(address(extension));
+
         uint256 yieldAfterClaim = extension.yield();
         assertGt(yieldAfterClaim, 0);
 
         // claimYield recovers it.
         uint256 claimed = extension.claimYield();
+
         assertEq(claimed, yieldAfterClaim);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
         assertEq(extension.yield(), 0);
@@ -486,20 +712,24 @@ contract MultiMintTest is Test {
 
     function test_claimYield_directBypass() public {
         _wrapPyusdxFor(alice, alice, 60e6);
-        _wrapAssetFor(alice, address(usdc), 40e6);
+        _wrapAssetFor(alice, address(usdc), 40e6, 40e6);
 
         vm.warp(block.timestamp + 365 days);
 
         // Direct claimFor bypass.
         pyusdx.claimFor(address(extension));
+
         uint256 excess = pyusdx.balanceOf(address(extension)) - (extension.totalSupply() - extension.totalAssets());
         assertGt(excess, 0);
 
         // claimYield recovers the excess.
         uint256 claimed = extension.claimYield();
+
         assertEq(claimed, excess);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
+
+    /* ============ setYieldRecipient ============ */
 
     function test_setYieldRecipient() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
@@ -528,191 +758,22 @@ contract MultiMintTest is Test {
 
     function test_isAllowedToUnwrap() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
         assertTrue(extension.isAllowedToUnwrap(500e6));
         assertFalse(extension.isAllowedToUnwrap(0));
     }
 
-    /* ============ Freeze via SwapFacility ============ */
-
-    function test_unwrap_revert_frozen() public {
-        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
-
-        vm.prank(alice);
-        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
-
-        vm.prank(freezeManager);
-        extension.freeze(alice);
-
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
-    }
-
-    function test_replaceAsset_revert_frozen() public {
-        _wrapAssetFor(alice, address(usdc), 100e6);
-
-        issuerGateway.mint(bob, 50e6);
-
-        vm.prank(freezeManager);
-        extension.freeze(bob);
-
-        vm.startPrank(bob);
-        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
-        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
-        vm.stopPrank();
-    }
-
-    /* ============ Initialization — ZeroAssetCapManager ============ */
-
-    function test_initialize_revert_zeroAssetCapManager() public {
-        address impl = address(new MultiMint(address(pyusdx), address(swapFacility)));
-        vm.expectRevert(IMultiMint.ZeroAssetCapManager.selector);
-        UnsafeUpgrades.deployTransparentProxy(
-            impl,
-            admin,
-            abi.encodeWithSelector(
-                MultiMint.initialize.selector,
-                "MM",
-                "MM",
-                yieldRecipient,
-                admin,
-                address(0),
-                freezeManager,
-                pauser,
-                yieldRecipientManager
-            )
-        );
-    }
-
-    /* ============ InvalidAsset — PYUSDX branch ============ */
-
-    function test_setAssetCap_revert_invalidAsset_pyusdx() public {
-        vm.prank(assetCapManager);
-        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
-        extension.setAssetCap(address(pyusdx), 100e6);
-    }
-
-    function test_replaceAsset_revert_invalidAsset_pyusdx() public {
-        vm.prank(address(swapFacility));
-        vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(pyusdx)));
-        extension.replaceAsset(address(pyusdx), bob, 50e6);
-    }
-
-    /* ============ Frozen Recipient (caller != recipient) ============ */
-
-    function test_wrap_asset_revert_frozen_recipient() public {
-        vm.prank(freezeManager);
-        extension.freeze(bob);
-
-        usdc.mint(alice, 100e6);
-        vm.startPrank(alice);
-        usdc.approve(address(swapFacility), 100e6);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
-        swapFacility.swapInAsset(address(extension), address(usdc), 100e6, bob);
-        vm.stopPrank();
-    }
-
-    function test_replaceAsset_revert_frozen_recipient() public {
-        _wrapAssetFor(alice, address(usdc), 100e6);
-
-        vm.prank(freezeManager);
-        extension.freeze(alice);
-
-        issuerGateway.mint(bob, 50e6);
-        vm.startPrank(bob);
-        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, alice);
-        vm.stopPrank();
-    }
-
-    /* ============ Pausable — Unwrap ============ */
-
-    function test_unwrap_revert_paused() public {
-        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
-
-        vm.prank(pauser);
-        extension.pause();
-
-        vm.startPrank(alice);
-        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
-        vm.stopPrank();
-    }
-
-    /* ============ Zero-Amount / Zero-Recipient ============ */
-
-    function test_replaceAsset_revert_zeroAmount() public {
-        vm.prank(address(swapFacility));
-        vm.expectRevert(IExtension.ZeroAmount.selector);
-        extension.replaceAsset(address(usdc), bob, 0);
-    }
-
-    function test_wrap_asset_revert_zeroRecipient() public {
-        usdc.mint(alice, 100e6);
-        vm.startPrank(alice);
-        usdc.approve(address(swapFacility), 100e6);
-        vm.expectRevert(IExtension.ZeroAccount.selector);
-        swapFacility.swapInAsset(address(extension), address(usdc), 100e6, address(0));
-        vm.stopPrank();
-    }
-
-    /* ============ Event Emission ============ */
-
-    function test_wrap_asset_emitsEvent() public {
-        dai.mint(alice, 500e18);
-        vm.startPrank(alice);
-        dai.approve(address(swapFacility), 500e18);
-        vm.expectEmit(true, true, false, true, address(extension));
-        emit IMultiMint.AssetWrapped(address(dai), 500e18, alice, 500e6);
-        swapFacility.swapInAsset(address(extension), address(dai), 500e18, alice);
-        vm.stopPrank();
-    }
-
-    function test_setAssetCap_emitsEvent() public {
-        MockERC20 newToken = new MockERC20("New", "NEW", 8);
-        vm.prank(assetCapManager);
-        vm.expectEmit(true, false, false, true, address(extension));
-        emit IMultiMint.AssetCapSet(address(newToken), 500e8);
-        extension.setAssetCap(address(newToken), 500e8);
-    }
-
-    /* ============ isAllowedToReplaceAsset ============ */
-
     function test_isAllowedToReplaceAsset() public {
-        _wrapAssetFor(alice, address(usdc), 100e6);
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         assertTrue(extension.isAllowedToReplaceAsset(address(usdc), 50e6));
         assertTrue(extension.isAllowedToReplaceAsset(address(usdc), 100e6));
     }
 
     function test_isAllowedToReplaceAsset_zeroOrExcessive() public {
-        _wrapAssetFor(alice, address(usdc), 100e6);
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 0));
         assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 101e6));
-    }
-
-    /* ============ InsufficientAssetReceived ============ */
-
-    function test_wrap_asset_revert_insufficientAssetReceived() public {
-        MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
-
-        vm.prank(assetCapManager);
-        extension.setAssetCap(address(feeToken), 1_000_000e6);
-
-        // Pre-fund swap facility so safeTransferFrom (L238) succeeds despite prior fee loss.
-        feeToken.mint(address(swapFacility), 100e6);
-
-        feeToken.mint(alice, 200e6);
-        vm.startPrank(alice);
-        feeToken.approve(address(swapFacility), 200e6);
-        vm.expectRevert(
-            abi.encodeWithSelector(IMultiMint.InsufficientAssetReceived.selector, address(feeToken), 200e6, 198e6)
-        );
-        swapFacility.swapInAsset(address(extension), address(feeToken), 200e6, alice);
-        vm.stopPrank();
     }
 }

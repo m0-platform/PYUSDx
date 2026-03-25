@@ -131,7 +131,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
     /// @inheritdoc IMultiMint
     function replaceAsset(address asset, address recipient, uint256 amount) external onlySwapFacility {
-        _replaceAssetWithPYUSDX(asset, recipient, amount);
+        _replaceAsset(asset, recipient, amount);
     }
 
     /// @inheritdoc IMultiMint
@@ -260,7 +260,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     /// @param asset     Address of the asset to receive from reserves.
     /// @param recipient Address that will receive the `asset` tokens.
     /// @param amount    Amount of PYUSDX to deposit (in PYUSDX decimals).
-    function _replaceAssetWithPYUSDX(address asset, address recipient, uint256 amount) internal virtual {
+    function _replaceAsset(address asset, address recipient, uint256 amount) internal virtual {
         _requireNotPaused();
 
         _revertIfInvalidAsset(asset);
@@ -269,6 +269,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
         // Convert PYUSDX amount to asset decimals and revert if truncates to zero.
         uint256 assetAmount = _fromExtensionToAssetAmount(asset, amount);
+
         _revertIfZeroAmount(assetAmount);
         _revertIfInsufficientAssetBacking(asset, assetAmount);
 
@@ -284,7 +285,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         // Send alt-asset to recipient.
         IERC20Metadata(asset).safeTransfer(recipient, assetAmount);
 
-        emit AssetReplacedWithPYUSDX(asset, assetAmount, recipient, amount);
+        emit AssetReplaced(asset, assetAmount, recipient, amount);
     }
 
     /* ============ Internal View Functions ============ */
