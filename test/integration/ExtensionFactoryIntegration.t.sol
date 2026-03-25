@@ -75,11 +75,11 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         );
     }
 
-    function test_initialize_zeroYtoImplementation() public {
+    function test_initialize_zeroYieldToOneImplementation() public {
         address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
         address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
 
-        vm.expectRevert(IExtensionFactory.ZeroImplementation.selector);
+        vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
             admin,
@@ -93,11 +93,11 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         );
     }
 
-    function test_initialize_zeroMmImplementation() public {
+    function test_initialize_zeroMultiMintImplementation() public {
         address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
         address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
 
-        vm.expectRevert(IExtensionFactory.ZeroImplementation.selector);
+        vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
             admin,
@@ -111,13 +111,13 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         );
     }
 
-    function test_initialize_invalidYtoImplementation() public {
+    function test_initialize_invalidYieldToOneImplementation() public {
         address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
         address wrongPyusdx = makeAddr("wrongPyusdx");
         address yieldToOneImpl = address(new YieldToOne(wrongPyusdx, address(swapFacility)));
         address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
 
-        vm.expectRevert(IExtensionFactory.InvalidImplementation.selector);
+        vm.expectRevert(IExtensionFactory.InvalidExtension.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
             admin,
@@ -131,13 +131,13 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         );
     }
 
-    function test_initialize_invalidMmImplementation() public {
+    function test_initialize_invalidMultiMintImplementation() public {
         address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
         address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
         address wrongSwap = makeAddr("wrongSwap");
         address multiMintImpl = address(new MultiMint(address(pyusdx), wrongSwap));
 
-        vm.expectRevert(IExtensionFactory.InvalidImplementation.selector);
+        vm.expectRevert(IExtensionFactory.InvalidExtension.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
             admin,
@@ -480,7 +480,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     }
 
     function test_extensionType_correctPerDeployment() public {
-        IExtensionFactory.YieldToOneParams memory ytoParams = IExtensionFactory.YieldToOneParams({
+        IExtensionFactory.YieldToOneParams memory yieldToOneParams = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
             yieldRecipient: yieldRecipient,
@@ -501,16 +501,16 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipientManager: admin
         });
 
-        (address ytoProxy, , ) = factory.deployYieldToOne(string("yto-type-test"), ytoParams);
-        (address mmProxy, , ) = factory.deployMultiMint(string("mm-type-test"), mmParams);
+        (address yieldToOneProxy, , ) = factory.deployYieldToOne(string("yto-type-test"), yieldToOneParams);
+        (address multiMintProxy, , ) = factory.deployMultiMint(string("mm-type-test"), mmParams);
 
-        assertEq(uint8(factory.getExtensionType(ytoProxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
-        assertEq(uint8(factory.getExtensionType(mmProxy)), uint8(IExtensionFactory.ExtensionType.MULTI_MINT));
+        assertEq(uint8(factory.getExtensionType(yieldToOneProxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(multiMintProxy)), uint8(IExtensionFactory.ExtensionType.MULTI_MINT));
     }
 
-    /* ============ setExtensionStatus Tests ============ */
+    /* ============ setExtensionType Tests ============ */
 
-    function test_setExtensionStatus() public {
+    function test_setExtensionType() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
@@ -524,20 +524,19 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         (address proxy, , ) = factory.deployYieldToOne(string("yto-status-test"), params);
 
         assertTrue(factory.isApprovedExtension(proxy));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
 
         vm.expectEmit();
-        emit IExtensionFactory.ExtensionStatusSet(proxy, false);
+        emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionFactory.ExtensionType.NONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionStatus(proxy, false);
+        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.NONE);
 
         assertFalse(factory.isApprovedExtension(proxy));
-
-        // Type is preserved even when inactive
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.NONE));
     }
 
-    function test_setExtensionStatus_reactivate() public {
+    function test_setExtensionType_reactivate() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
@@ -551,21 +550,21 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         (address proxy, , ) = factory.deployYieldToOne(string("yto-reactivate-test"), params);
 
         vm.prank(factoryManager);
-        factory.setExtensionStatus(proxy, false);
+        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.NONE);
 
         assertFalse(factory.isApprovedExtension(proxy));
 
         vm.expectEmit();
-        emit IExtensionFactory.ExtensionStatusSet(proxy, true);
+        emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionStatus(proxy, true);
+        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         assertTrue(factory.isApprovedExtension(proxy));
         assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
     }
 
-    function test_setExtensionStatus_idempotent() public {
+    function test_setExtensionType_idempotent() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
@@ -578,28 +577,33 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
 
         (address proxy, , ) = factory.deployYieldToOne(string("yto-idempotent-test"), params);
 
-        // Already active, should not emit event
+        // Already YIELD_TO_ONE, should not emit event
         vm.prank(factoryManager);
-        factory.setExtensionStatus(proxy, true);
+        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         assertTrue(factory.isApprovedExtension(proxy));
     }
 
-    function test_setExtensionStatus_zeroExtension() public {
+    function test_setExtensionType_zeroExtension() public {
         vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
 
         vm.prank(factoryManager);
-        factory.setExtensionStatus(address(0), true);
+        factory.setExtensionType(address(0), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
     }
 
-    function test_setExtensionStatus_notRegistered() public {
-        vm.expectRevert(abi.encodeWithSelector(IExtensionFactory.ExtensionNotRegistered.selector, alice));
+    function test_setExtensionType_invalidExtension() public {
+        // Setting NONE on unregistered address is idempotent (no-op)
+        vm.prank(factoryManager);
+        factory.setExtensionType(alice, IExtensionFactory.ExtensionType.NONE);
+
+        // Setting non-NONE on an invalid address reverts (EOA has no code)
+        vm.expectRevert();
 
         vm.prank(factoryManager);
-        factory.setExtensionStatus(alice, true);
+        factory.setExtensionType(alice, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
     }
 
-    function test_setExtensionStatus_notManager() public {
+    function test_setExtensionType_notManager() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
@@ -621,12 +625,12 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         );
 
         vm.prank(alice);
-        factory.setExtensionStatus(proxy, false);
+        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.NONE);
     }
 
     /* ============ setImplementation Tests ============ */
 
-    function test_setImplementation_yto() public {
+    function test_setImplementation_yieldToOne() public {
         address newImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
 
         vm.expectEmit();
@@ -717,7 +721,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         address wrongPyusdx = makeAddr("wrongPyusdx");
         address newImpl = address(new YieldToOne(wrongPyusdx, address(swapFacility)));
 
-        vm.expectRevert(IExtensionFactory.InvalidImplementation.selector);
+        vm.expectRevert(IExtensionFactory.InvalidExtension.selector);
 
         vm.prank(factoryManager);
         factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
@@ -727,14 +731,14 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         address wrongSwap = makeAddr("wrongSwap");
         address newImpl = address(new YieldToOne(address(pyusdx), wrongSwap));
 
-        vm.expectRevert(IExtensionFactory.InvalidImplementation.selector);
+        vm.expectRevert(IExtensionFactory.InvalidExtension.selector);
 
         vm.prank(factoryManager);
         factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
     }
 
     function test_setImplementation_zeroAddress() public {
-        vm.expectRevert(IExtensionFactory.ZeroImplementation.selector);
+        vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
 
         vm.prank(factoryManager);
         factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, address(0));

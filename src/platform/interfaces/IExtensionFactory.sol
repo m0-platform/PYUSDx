@@ -54,10 +54,10 @@ interface IExtensionFactory {
         address indexed deployer
     );
 
-    /// @notice Emitted when an extension's active status is set.
-    /// @param  extension The address of the extension.
-    /// @param  enabled   True if the extension is active, false otherwise.
-    event ExtensionStatusSet(address indexed extension, bool indexed enabled);
+    /// @notice Emitted when an extension's type is set (or cleared to NONE).
+    /// @param  extension     The address of the extension.
+    /// @param  extensionType The new extension type.
+    event ExtensionTypeSet(address indexed extension, ExtensionType indexed extensionType);
 
     /// @notice Emitted when an implementation address is set for an extension type.
     /// @param  extensionType  The type of extension.
@@ -84,14 +84,8 @@ interface IExtensionFactory {
     /// @notice Thrown if the extension is 0x0.
     error ZeroExtension();
 
-    /// @notice Thrown if an implementation address is 0x0.
-    error ZeroImplementation();
-
-    /// @notice Thrown if the extension is not registered in the factory.
-    error ExtensionNotRegistered(address extension);
-
-    /// @notice Thrown if the implementation address is invalid (e.g., wrong pyusdx/swapFacility wiring).
-    error InvalidImplementation();
+    /// @notice Thrown if the extension address is invalid (e.g. wrong pyusdx/swapFacility wiring).
+    error InvalidExtension();
 
     /// @notice Thrown if the extension type is invalid for setting implementation.
     error InvalidExtensionType();
@@ -154,11 +148,12 @@ interface IExtensionFactory {
 
     /* ============ Admin Functions ============ */
 
-    /// @notice Sets whether an extension is active.
+    /// @notice Sets the extension type for a given extension address. Setting to NONE revokes approval.
     /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.
-    /// @param  extension The address of the extension.
-    /// @param  enabled   True if the extension should be active, false otherwise.
-    function setExtensionStatus(address extension, bool enabled) external;
+    ///         Validates the extension via `_revertIfInvalidExtension` when setting to a non-NONE type.
+    /// @param  extension     The address of the extension.
+    /// @param  extensionType The extension type to assign (NONE to revoke).
+    function setExtensionType(address extension, ExtensionType extensionType) external;
 
     /// @notice Sets the cached implementation address for a given extension type.
     /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.
