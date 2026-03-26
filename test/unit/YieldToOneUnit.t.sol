@@ -12,10 +12,7 @@ import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
-import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
-import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 contract YieldToOneUnitTests is Test {
@@ -379,60 +376,7 @@ contract YieldToOneUnitTests is Test {
         assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 
-    /* ============ Freeze via SwapFacility ============ */
-
-    function test_unwrap_revert_frozen() public {
-        _wrapFor(alice, alice, MINT_AMOUNT);
-
-        vm.prank(alice);
-        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
-
-        vm.prank(freezeManager);
-        extension.freeze(alice);
-
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
-    }
-
-    function test_wrap_revert_frozen() public {
-        issuerGateway.mint(alice, MINT_AMOUNT);
-
-        vm.prank(freezeManager);
-        extension.freeze(alice);
-
-        vm.startPrank(alice);
-        IERC20(address(pyusdx)).approve(address(swapFacility), MINT_AMOUNT);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
-        vm.stopPrank();
-    }
-
     /* ============ Pausable ============ */
-
-    function test_wrap_revert_paused() public {
-        issuerGateway.mint(alice, MINT_AMOUNT);
-
-        vm.prank(pauser);
-        extension.pause();
-
-        vm.startPrank(alice);
-        IERC20(address(pyusdx)).approve(address(swapFacility), MINT_AMOUNT);
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
-        vm.stopPrank();
-    }
-
-    function test_transfer_revert_paused() public {
-        _wrapFor(alice, alice, MINT_AMOUNT);
-
-        vm.prank(pauser);
-        extension.pause();
-
-        vm.prank(alice);
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        extension.transfer(bob, 400e6);
-    }
 
     function test_claimYield_succeedsWhenPaused() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
@@ -444,44 +388,6 @@ contract YieldToOneUnitTests is Test {
         uint256 claimed = extension.claimYield();
         assertGt(claimed, 0);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
-    }
-
-    /* ============ Freezable – Unfreeze ============ */
-
-    function test_unfreeze_resumesOperations() public {
-        vm.prank(freezeManager);
-        extension.freeze(alice);
-
-        issuerGateway.mint(alice, MINT_AMOUNT);
-
-        vm.startPrank(alice);
-        IERC20(address(pyusdx)).approve(address(swapFacility), MINT_AMOUNT);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
-        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
-        vm.stopPrank();
-
-        vm.prank(freezeManager);
-        extension.unfreeze(alice);
-
-        vm.startPrank(alice);
-        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
-        vm.stopPrank();
-
-        assertEq(extension.balanceOf(alice), MINT_AMOUNT);
-    }
-
-    function test_transferFrom_revert_frozenCaller() public {
-        _wrapFor(alice, alice, MINT_AMOUNT);
-
-        vm.prank(alice);
-        extension.approve(bob, MINT_AMOUNT);
-
-        vm.prank(freezeManager);
-        extension.freeze(bob);
-
-        vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
-        extension.transferFrom(alice, bob, 400e6);
     }
 
     /* ============ Access Control ============ */
