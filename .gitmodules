@@ -5,6 +5,3 @@
 [submodule "lib/evm-m-extensions"]
 	path = lib/evm-m-extensions
 	url = https://github.com/m0-foundation/evm-m-extensions
-[submodule "lib/uniswap-v4-periphery"]
-	path = lib/uniswap-v4-periphery
-	url = https://github.com/uniswap/v4-periphery
