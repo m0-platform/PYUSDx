@@ -273,7 +273,7 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     /// @dev Using block.chainid directly to prevent a replay attack if a chain undergoes a contentious hard fork.
     function currentChainId() public view returns (uint32) {
         // NOTE: For most EVM chains, ID fits into uint32
-        return uint32(block.chainid);
+        return block.chainid.toUint32();
     }
 
     function getNonce() external view returns (uint256) {

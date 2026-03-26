@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.34;
 
+import { BytesParser } from "../../../lib/evm-m-extensions/lib/common/src/libs/BytesParser.sol";
 import { TypeConverter } from "../../../lib/evm-m-extensions/lib/common/src/libs/TypeConverter.sol";
-import { BytesParser } from "./BytesParser.sol";
 
 /// @notice Payload types for cross-chain messages.
 /// @dev    Initially only the `TokenTransfer` payload type is supported,

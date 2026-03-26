@@ -150,6 +150,6 @@ contract LayerZeroBridgeAdapter is BridgeAdapter, ILayerZeroBridgeAdapter {
     /// @notice Returns LayerZero Endpoint Id by chain Id
     /// @dev    https://docs.layerzero.network/v2/deployments/deployed-contracts?stages=mainnet
     function _getLayerZeroEndpointIdOrRevert(uint32 chainId) private view returns (uint32) {
-        return uint32(_getBridgeChainIdOrRevert(chainId));
+        return _getBridgeChainIdOrRevert(chainId).toUint32();
     }
 }
