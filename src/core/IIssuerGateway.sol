@@ -177,6 +177,7 @@ interface IIssuerGateway {
     /// @notice Updates the mint TTL
     /// @dev    Only callable by addresses with DEFAULT_ADMIN_ROLE. Changes apply retroactively to all
     ///         existing proposals since `expiresAt` is computed from the current TTL at execution time.
+    ///         A value of 0 is not permitted and will revert.
     /// @param  mintTTL The mint TTL in seconds
     function setMintTTL(uint32 mintTTL) external;
 }

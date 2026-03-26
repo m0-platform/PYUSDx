@@ -94,7 +94,8 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
 
         IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
 
-        // NOTE: safe to use unchecked, it would overflow after 281 trillion proposals.
+        // NOTE: safe to use unchecked, overflow would occur after 281 trillion proposals,
+        //       at which point nonce wrapping could theoretically reuse a deleted mintId.
         unchecked {
             mintId = ++$.mintNonce;
         }
@@ -103,7 +104,8 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         uint40 activeAt;
         uint40 expiresAt;
 
-        // NOTE: safe to use unchecked, uint40 timestamp + uint32 delay cannot overflow uint40 for millennia.
+        // NOTE: safe to use unchecked, uint40 timestamps overflow past year 36812,
+        //       and max uint32 delay (~136 years) cannot push them past that until then.
         unchecked {
             activeAt = createdAt + $.mintDelay;
             expiresAt = activeAt + $.mintTTL;
@@ -129,7 +131,8 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
 
         uint40 activeAt;
 
-        // NOTE: safe to use unchecked, uint40 timestamp + uint32 delay cannot overflow uint40 for millennia.
+        // NOTE: safe to use unchecked, uint40 timestamps overflow past year 36812,
+        //       and max uint32 delay (~136 years) cannot push them past that until then.
         unchecked {
             activeAt = proposal.createdAt + $.mintDelay;
         }
@@ -151,14 +154,15 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         uint40 activeAt;
         uint40 expiresAt;
 
-        // NOTE: safe to use unchecked, uint40 timestamp + uint32 delay cannot overflow uint40 for millennia.
+        // NOTE: compute activeAt first; expiresAt only needed if proposal is active.
+        //       Safe to use unchecked, uint40 timestamps overflow past year 36812,
+        //       and max uint32 delay (~136 years) cannot push them past that until then.
         unchecked {
             activeAt = proposal.createdAt + $.mintDelay;
         }
 
         if (block.timestamp < activeAt) revert PendingMintProposal(activeAt);
 
-        // NOTE: safe to use unchecked, uint40 timestamp + uint32 TTL cannot overflow uint40 for millennia.
         unchecked {
             expiresAt = activeAt + $.mintTTL;
         }
