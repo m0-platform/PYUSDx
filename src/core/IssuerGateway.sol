@@ -71,7 +71,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         uint32 mintDelay_,
         uint32 mintTTL_
     ) external initializer {
-        if (admin == address(0)) revert ZeroAdminAddress();
+        if (admin == address(0)) revert ZeroAdmin();
         if (operator == address(0)) revert ZeroOperator();
         if (executor == address(0)) revert ZeroExecutor();
 

@@ -25,7 +25,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
     function test_initialize_revertIfZeroAdmin() public {
         IssuerGateway newImpl = new IssuerGateway(address(pyusdx));
 
-        vm.expectRevert(IIssuerGateway.ZeroAdminAddress.selector);
+        vm.expectRevert(IIssuerGateway.ZeroAdmin.selector);
         UnsafeUpgrades.deployTransparentProxy(
             address(newImpl),
             admin,

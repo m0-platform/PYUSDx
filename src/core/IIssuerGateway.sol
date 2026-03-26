@@ -54,7 +54,7 @@ interface IIssuerGateway {
     error ZeroPYUSDX();
 
     /// @notice Thrown when the admin address is zero
-    error ZeroAdminAddress();
+    error ZeroAdmin();
 
     /// @notice Thrown when the operator address is zero
     error ZeroOperator();
