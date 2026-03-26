@@ -60,8 +60,8 @@ abstract contract IntegrationForkTest is BaseForkTest {
             }),
             Config.IssuerGatewayConfig({
                 admin: admin,
-                issuer: issuer,
-                minter: minter,
+                issuer: operator,
+                minter: executor,
                 mintDelay: MINT_DELAY,
                 mintTTL: MINT_TTL
             }),
@@ -78,12 +78,12 @@ abstract contract IntegrationForkTest is BaseForkTest {
 
     /// @dev Helper to mint PYUSDX through the time-delay mechanism
     function _mintPYUSDX(address recipient_, uint256 amount_) internal {
-        vm.prank(issuer);
+        vm.prank(operator);
         uint48 mintId = issuerGateway.proposeMint(amount_, recipient_);
 
         vm.warp(block.timestamp + MINT_DELAY);
 
-        vm.prank(minter);
+        vm.prank(executor);
         issuerGateway.mint(mintId);
     }
 }

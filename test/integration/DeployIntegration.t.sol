@@ -38,8 +38,8 @@ contract DeployIntegrationTests is IntegrationForkTest {
 
     function test_coreDeployment_issuerGatewayRoles() public view {
         assertTrue(issuerGateway.hasRole(issuerGateway.DEFAULT_ADMIN_ROLE(), admin));
-        assertTrue(issuerGateway.hasRole(issuerGateway.ISSUER_ROLE(), issuer));
-        assertTrue(issuerGateway.hasRole(issuerGateway.MINTER_ROLE(), minter));
+        assertTrue(issuerGateway.hasRole(issuerGateway.OPERATOR_ROLE(), operator));
+        assertTrue(issuerGateway.hasRole(issuerGateway.EXECUTOR_ROLE(), executor));
     }
 
     function test_coreDeployment_swapFacilityRoles() public view {
@@ -61,14 +61,14 @@ contract DeployIntegrationTests is IntegrationForkTest {
         _mintPYUSDX(alice, amount);
         assertEq(pyusdx.balanceOf(alice), amount);
 
-        // Transfer to issuer so issuer can burn (burn burns from msg.sender)
+        // Transfer to operator so operator can burn (burn burns from msg.sender)
         vm.prank(alice);
-        pyusdx.transfer(issuer, amount);
+        pyusdx.transfer(operator, amount);
 
-        vm.prank(issuer);
+        vm.prank(operator);
         issuerGateway.burn(amount);
 
-        assertEq(pyusdx.balanceOf(issuer), 0);
+        assertEq(pyusdx.balanceOf(operator), 0);
     }
 
     function test_coreDeployment_factoryDeployExtension() public {

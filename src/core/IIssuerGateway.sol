@@ -56,11 +56,11 @@ interface IIssuerGateway {
     /// @notice Thrown when the admin address is zero
     error ZeroAdminAddress();
 
-    /// @notice Thrown when the issuer address is zero
-    error ZeroIssuer();
+    /// @notice Thrown when the operator address is zero
+    error ZeroOperator();
 
-    /// @notice Thrown when the minter address is zero
-    error ZeroMinter();
+    /// @notice Thrown when the executor address is zero
+    error ZeroExecutor();
 
     /// @notice Thrown when attempting to propose a mint with zero amount
     error ZeroMintAmount();
@@ -94,41 +94,41 @@ interface IIssuerGateway {
 
     /* ============ Constants ============ */
 
-    /// @notice Returns the role identifier for issuer role
+    /// @notice Returns the role identifier for operator role
     /// @return The bytes32 role identifier
-    function ISSUER_ROLE() external view returns (bytes32);
+    function OPERATOR_ROLE() external view returns (bytes32);
 
-    /// @notice Returns the role identifier for minter role
+    /// @notice Returns the role identifier for executor role
     /// @return The bytes32 role identifier
-    function MINTER_ROLE() external view returns (bytes32);
+    function EXECUTOR_ROLE() external view returns (bytes32);
 
     /* ============ Initializer ============ */
 
     /// @notice Initializes the IssuerGateway contract
     /// @dev    Can only be called once due to initializer modifier
     /// @param  admin     The address that will have the default admin role
-    /// @param  issuer    The address that will have the issuer role
-    /// @param  minter    The address that will have the minter role
+    /// @param  operator  The address that will have the operator role
+    /// @param  executor  The address that will have the executor role
     /// @param  mintDelay The delay in seconds before a mint can be executed after proposal
     /// @param  mintTTL   The time to live in seconds for a mint proposal before it expires
-    function initialize(address admin, address issuer, address minter, uint32 mintDelay, uint32 mintTTL) external;
+    function initialize(address admin, address operator, address executor, uint32 mintDelay, uint32 mintTTL) external;
 
     /* ============ Interactive Functions ============ */
 
     /// @notice Proposes a new mint operation
-    /// @dev    Only callable by addresses with ISSUER_ROLE
+    /// @dev    Only callable by addresses with OPERATOR_ROLE
     /// @param  amount    The amount of PYUSDX to mint
     /// @param  recipient The address that will receive the minted tokens
     /// @return mintId    The unique identifier for the mint proposal
     function proposeMint(uint256 amount, address recipient) external returns (uint48 mintId);
 
     /// @notice Executes a proposed mint after the delay has elapsed
-    /// @dev    Only callable by addresses with MINTER_ROLE
+    /// @dev    Only callable by addresses with EXECUTOR_ROLE
     /// @param  mintId The unique identifier for the mint proposal
     function mint(uint48 mintId) external;
 
     /// @notice Burns PYUSDX tokens from the caller's balance
-    /// @dev    Only callable by addresses with ISSUER_ROLE
+    /// @dev    Only callable by addresses with OPERATOR_ROLE
     /// @param  amount The amount of PYUSDX to burn
     function burn(uint256 amount) external;
 

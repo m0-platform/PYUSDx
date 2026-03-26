@@ -41,10 +41,10 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /* ============ Constants ============ */
 
     /// @inheritdoc IIssuerGateway
-    bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @inheritdoc IIssuerGateway
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
     /* ============ Immutable Variables ============ */
 
@@ -66,20 +66,20 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /// @inheritdoc IIssuerGateway
     function initialize(
         address admin,
-        address issuer,
-        address minter,
+        address operator,
+        address executor,
         uint32 mintDelay_,
         uint32 mintTTL_
     ) external initializer {
         if (admin == address(0)) revert ZeroAdminAddress();
-        if (issuer == address(0)) revert ZeroIssuer();
-        if (minter == address(0)) revert ZeroMinter();
+        if (operator == address(0)) revert ZeroOperator();
+        if (executor == address(0)) revert ZeroExecutor();
 
         __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(ISSUER_ROLE, issuer);
-        _grantRole(MINTER_ROLE, minter);
+        _grantRole(OPERATOR_ROLE, operator);
+        _grantRole(EXECUTOR_ROLE, executor);
 
         _setMintDelay(mintDelay_);
         _setMintTTL(mintTTL_);
@@ -88,7 +88,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /* ============ Interactive Functions ============ */
 
     /// @inheritdoc IIssuerGateway
-    function proposeMint(uint256 amount, address recipient) external onlyRole(ISSUER_ROLE) returns (uint48 mintId) {
+    function proposeMint(uint256 amount, address recipient) external onlyRole(OPERATOR_ROLE) returns (uint48 mintId) {
         if (amount == 0) revert ZeroMintAmount();
         if (recipient == address(0)) revert ZeroMintRecipient();
 
@@ -142,7 +142,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     }
 
     /// @inheritdoc IIssuerGateway
-    function mint(uint48 mintId) external onlyRole(MINTER_ROLE) {
+    function mint(uint48 mintId) external onlyRole(EXECUTOR_ROLE) {
         IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
         MintProposal storage proposal = $.mintProposals[mintId];
 
@@ -176,7 +176,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     }
 
     /// @inheritdoc IIssuerGateway
-    function burn(uint256 amount) external onlyRole(ISSUER_ROLE) {
+    function burn(uint256 amount) external onlyRole(OPERATOR_ROLE) {
         if (amount == 0) revert ZeroBurnAmount();
 
         emit BurnExecuted(msg.sender, amount);

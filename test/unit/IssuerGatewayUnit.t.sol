@@ -32,44 +32,44 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
             abi.encodeWithSelector(
                 IssuerGateway.initialize.selector,
                 address(0), // zero admin
-                issuer,
-                minter,
+                operator,
+                executor,
                 DEFAULT_MINT_DELAY,
                 DEFAULT_MINT_TTL
             )
         );
     }
 
-    function test_initialize_revertIfZeroIssuer() public {
+    function test_initialize_revertIfZeroOperator() public {
         IssuerGateway newImpl = new IssuerGateway(address(pyusdx));
 
-        vm.expectRevert(IIssuerGateway.ZeroIssuer.selector);
+        vm.expectRevert(IIssuerGateway.ZeroOperator.selector);
         UnsafeUpgrades.deployTransparentProxy(
             address(newImpl),
             admin,
             abi.encodeWithSelector(
                 IssuerGateway.initialize.selector,
                 admin,
-                address(0), // zero issuer
-                minter,
+                address(0), // zero operator
+                executor,
                 DEFAULT_MINT_DELAY,
                 DEFAULT_MINT_TTL
             )
         );
     }
 
-    function test_initialize_revertIfZeroMinter() public {
+    function test_initialize_revertIfZeroExecutor() public {
         IssuerGateway newImpl = new IssuerGateway(address(pyusdx));
 
-        vm.expectRevert(IIssuerGateway.ZeroMinter.selector);
+        vm.expectRevert(IIssuerGateway.ZeroExecutor.selector);
         UnsafeUpgrades.deployTransparentProxy(
             address(newImpl),
             admin,
             abi.encodeWithSelector(
                 IssuerGateway.initialize.selector,
                 admin,
-                issuer,
-                address(0), // zero minter
+                operator,
+                address(0), // zero executor
                 DEFAULT_MINT_DELAY,
                 DEFAULT_MINT_TTL
             )
@@ -78,7 +78,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
 
     function test_initialize_revertIfCalledTwice() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        issuerGateway.initialize(admin, issuer, minter, DEFAULT_MINT_DELAY, DEFAULT_MINT_TTL);
+        issuerGateway.initialize(admin, operator, executor, DEFAULT_MINT_DELAY, DEFAULT_MINT_TTL);
     }
 
     function test_initialize_revertIfZeroMintTTL() public {
@@ -91,8 +91,8 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
             abi.encodeWithSelector(
                 IssuerGateway.initialize.selector,
                 admin,
-                issuer,
-                minter,
+                operator,
+                executor,
                 DEFAULT_MINT_DELAY,
                 0 // zero TTL
             )
@@ -101,8 +101,8 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
 
     function test_initialize() public view {
         assertTrue(issuerGateway.hasRole(issuerGateway.DEFAULT_ADMIN_ROLE(), admin));
-        assertTrue(issuerGateway.hasRole(issuerGateway.ISSUER_ROLE(), issuer));
-        assertTrue(issuerGateway.hasRole(issuerGateway.MINTER_ROLE(), minter));
+        assertTrue(issuerGateway.hasRole(issuerGateway.OPERATOR_ROLE(), operator));
+        assertTrue(issuerGateway.hasRole(issuerGateway.EXECUTOR_ROLE(), executor));
         assertEq(issuerGateway.mintDelay(), DEFAULT_MINT_DELAY);
         assertEq(issuerGateway.mintTTL(), DEFAULT_MINT_TTL);
     }
@@ -114,7 +114,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
                 other,
-                issuerGateway.ISSUER_ROLE()
+                issuerGateway.OPERATOR_ROLE()
             )
         );
 
@@ -125,14 +125,14 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
     function test_proposeMint_revertIfZeroAmount() public {
         vm.expectRevert(IIssuerGateway.ZeroMintAmount.selector);
 
-        vm.prank(issuer);
+        vm.prank(operator);
         issuerGateway.proposeMint(0, recipient);
     }
 
     function test_proposeMint_revertIfZeroRecipient() public {
         vm.expectRevert(IIssuerGateway.ZeroMintRecipient.selector);
 
-        vm.prank(issuer);
+        vm.prank(operator);
         issuerGateway.proposeMint(100, address(0));
     }
 
@@ -141,25 +141,25 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         uint40 expiresAt = activeAt + DEFAULT_MINT_TTL;
 
         vm.expectEmit();
-        emit IIssuerGateway.MintProposed(1, issuer, 100, recipient, activeAt, expiresAt);
+        emit IIssuerGateway.MintProposed(1, operator, 100, recipient, activeAt, expiresAt);
 
-        vm.prank(issuer);
+        vm.prank(operator);
         uint48 mintId = issuerGateway.proposeMint(100, recipient);
 
         assertEq(mintId, 1);
         assertEq(issuerGateway.mintNonce(), 1);
 
-        (uint40 createdAt, address storedIssuer, address storedRecipient, uint256 storedAmount) = issuerGateway
+        (uint40 createdAt, address storedOperator, address storedRecipient, uint256 storedAmount) = issuerGateway
             .getMintProposal(mintId);
 
         assertEq(createdAt, block.timestamp);
-        assertEq(storedIssuer, issuer);
+        assertEq(storedOperator, operator);
         assertEq(storedRecipient, recipient);
         assertEq(storedAmount, 100);
     }
 
     function test_proposeMint_multipleProposalsUniqueIds() public {
-        vm.startPrank(issuer);
+        vm.startPrank(operator);
 
         uint48 mintId1 = issuerGateway.proposeMint(100, recipient);
         uint48 mintId2 = issuerGateway.proposeMint(200, recipient);
@@ -192,7 +192,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
                 other,
-                issuerGateway.MINTER_ROLE()
+                issuerGateway.EXECUTOR_ROLE()
             )
         );
 
@@ -203,7 +203,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
     function test_mint_revertIfInvalidProposal() public {
         vm.expectRevert(IIssuerGateway.InvalidMintProposal.selector);
 
-        vm.prank(minter);
+        vm.prank(executor);
         issuerGateway.mint(999);
     }
 
@@ -213,7 +213,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
 
         vm.expectRevert(abi.encodeWithSelector(IIssuerGateway.PendingMintProposal.selector, activeAt));
 
-        vm.prank(minter);
+        vm.prank(executor);
         issuerGateway.mint(mintId);
     }
 
@@ -223,7 +223,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
 
         vm.expectRevert(abi.encodeWithSelector(IIssuerGateway.ExpiredMintProposal.selector, expiresAt));
 
-        vm.prank(minter);
+        vm.prank(executor);
         issuerGateway.mint(mintId);
     }
 
@@ -234,7 +234,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
         vm.warp(createdAt + DEFAULT_MINT_DELAY + DEFAULT_MINT_TTL);
 
-        vm.prank(minter);
+        vm.prank(executor);
         issuerGateway.mint(mintId);
 
         assertEq(pyusdx.balanceOf(recipient), 100);
@@ -245,9 +245,9 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         _warpToMintable(mintId);
 
         vm.expectEmit();
-        emit IIssuerGateway.MintExecuted(mintId, minter, 100, recipient);
+        emit IIssuerGateway.MintExecuted(mintId, executor, 100, recipient);
 
-        vm.prank(minter);
+        vm.prank(executor);
         issuerGateway.mint(mintId);
 
         // Check proposal deleted
@@ -264,7 +264,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
                 other,
-                issuerGateway.ISSUER_ROLE()
+                issuerGateway.OPERATOR_ROLE()
             )
         );
 
@@ -273,31 +273,31 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
     }
 
     function test_burn_revertIfZeroAmount() public {
-        vm.prank(issuer);
+        vm.prank(operator);
 
         vm.expectRevert(IIssuerGateway.ZeroBurnAmount.selector);
         issuerGateway.burn(0);
     }
 
     function test_burn() public {
-        // First mint some tokens to the issuer
-        uint48 mintId = _proposeMint(100, issuer);
+        // First mint some tokens to the operator
+        uint48 mintId = _proposeMint(100, operator);
 
         _warpToMintable(mintId);
 
-        vm.prank(minter);
+        vm.prank(executor);
         issuerGateway.mint(mintId);
 
-        uint256 balanceBefore = pyusdx.balanceOf(issuer);
+        uint256 balanceBefore = pyusdx.balanceOf(operator);
         assertEq(balanceBefore, 100);
 
         vm.expectEmit();
-        emit IIssuerGateway.BurnExecuted(issuer, 50);
+        emit IIssuerGateway.BurnExecuted(operator, 50);
 
-        vm.prank(issuer);
+        vm.prank(operator);
         issuerGateway.burn(50);
 
-        assertEq(pyusdx.balanceOf(issuer), 50);
+        assertEq(pyusdx.balanceOf(operator), 50);
     }
 
     /* ============ cancelMint ============ */
@@ -327,7 +327,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
 
         vm.expectRevert(abi.encodeWithSelector(IIssuerGateway.ActiveMintProposal.selector, activeAt));
 
-        vm.prank(issuer);
+        vm.prank(operator);
         issuerGateway.cancelMint(mintId);
     }
 
@@ -342,7 +342,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
 
         vm.expectRevert(abi.encodeWithSelector(IIssuerGateway.ActiveMintProposal.selector, activeAt));
 
-        vm.prank(issuer);
+        vm.prank(operator);
         issuerGateway.cancelMint(mintId);
     }
 
@@ -350,9 +350,9 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         uint48 mintId = _proposeMint(100, recipient);
 
         vm.expectEmit();
-        emit IIssuerGateway.MintCanceled(mintId, issuer);
+        emit IIssuerGateway.MintCanceled(mintId, operator);
 
-        vm.prank(issuer);
+        vm.prank(operator);
         issuerGateway.cancelMint(mintId);
 
         // Check proposal deleted
@@ -365,17 +365,17 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
 
         vm.startPrank(admin);
 
-        // Revoke issuer role using admin's DEFAULT_ADMIN_ROLE
-        issuerGateway.revokeRole(issuerGateway.ISSUER_ROLE(), issuer);
+        // Revoke operator role using admin's DEFAULT_ADMIN_ROLE
+        issuerGateway.revokeRole(issuerGateway.OPERATOR_ROLE(), operator);
 
         vm.stopPrank();
 
-        // Verify issuer no longer has the role
-        assertFalse(issuerGateway.hasRole(issuerGateway.ISSUER_ROLE(), issuer));
+        // Verify operator no longer has the role
+        assertFalse(issuerGateway.hasRole(issuerGateway.OPERATOR_ROLE(), operator));
 
-        // Issuer can still cancel their own proposal (cancel doesn't require ISSUER_ROLE)
+        // Issuer can still cancel their own proposal (cancel doesn't require OPERATOR_ROLE)
         // This must happen while proposal is still pending (before activeAt)
-        vm.prank(issuer);
+        vm.prank(operator);
         issuerGateway.cancelMint(mintId);
 
         // Check proposal deleted
@@ -397,12 +397,12 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
     function test_getMintProposal() public {
         uint48 mintId = _proposeMint(100, recipient);
 
-        (uint40 createdAt, address storedIssuer, address recipient_, uint256 amount) = issuerGateway.getMintProposal(
+        (uint40 createdAt, address storedOperator, address recipient_, uint256 amount) = issuerGateway.getMintProposal(
             mintId
         );
 
         assertEq(createdAt, block.timestamp);
-        assertEq(storedIssuer, issuer);
+        assertEq(storedOperator, operator);
         assertEq(recipient_, recipient);
         assertEq(amount, 100);
     }

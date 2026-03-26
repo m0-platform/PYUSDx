@@ -6,25 +6,18 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 
 import { IssuerGateway } from "../../src/core/IssuerGateway.sol";
 import { MockPYUSDX } from "../mock/MockPYUSDX.sol";
+import { BaseTest } from "./BaseTest.sol";
 
 /// @title IssuerGateway Base Unit Test
 /// @notice Base test contract with common setup for IssuerGateway tests
-abstract contract IssuerGatewayBaseUnitTest is Test {
+abstract contract IssuerGatewayBaseUnitTest is BaseTest {
     IssuerGateway public issuerGateway;
     MockPYUSDX public pyusdx;
-
-    // Test addresses
-    address public admin = makeAddr("admin");
-    address public issuer = makeAddr("issuer");
-    address public minter = makeAddr("minter");
-    address public recipient = makeAddr("recipient");
-    address public caller = makeAddr("caller");
-    address public other = makeAddr("other");
 
     uint32 public constant DEFAULT_MINT_DELAY = 1 days;
     uint32 public constant DEFAULT_MINT_TTL = 7 days;
 
-    function setUp() public virtual {
+    function setUp() public virtual override {
         // Predict MockPYUSDX address:
         // After this point: nonce N -> IssuerGateway impl, N+1 -> proxy, N+2 -> MockPYUSDX
         uint256 nonceBefore = vm.getNonce(address(this));
@@ -39,8 +32,8 @@ abstract contract IssuerGatewayBaseUnitTest is Test {
                 abi.encodeWithSelector(
                     IssuerGateway.initialize.selector,
                     admin,
-                    issuer,
-                    minter,
+                    operator,
+                    executor,
                     DEFAULT_MINT_DELAY,
                     DEFAULT_MINT_TTL
                 )
@@ -54,12 +47,12 @@ abstract contract IssuerGatewayBaseUnitTest is Test {
 
     /* ============ Helper Functions ============ */
 
-    /// @notice Proposes a mint from the issuer account
+    /// @notice Proposes a mint from the operator account
     /// @param amount The amount to mint
     /// @param recipient_ The recipient address
     /// @return mintId The ID of the created mint proposal
     function _proposeMint(uint256 amount, address recipient_) internal returns (uint48 mintId) {
-        vm.prank(issuer);
+        vm.prank(operator);
         mintId = issuerGateway.proposeMint(amount, recipient_);
     }
 
