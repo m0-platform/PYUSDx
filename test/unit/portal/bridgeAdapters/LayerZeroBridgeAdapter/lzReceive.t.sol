@@ -5,7 +5,7 @@ import { IBridgeAdapter } from "../../../../../src/portal/interfaces/IBridgeAdap
 import { ILayerZeroBridgeAdapter } from "../../../../../src/portal/bridgeAdapters/layerZero/interfaces/ILayerZeroBridgeAdapter.sol";
 import { IPortal } from "../../../../../src/portal/interfaces/IPortal.sol";
 import { Origin } from "../../../../../src/portal/bridgeAdapters/layerZero/interfaces/ILayerZeroEndpointV2.sol";
-import { TypeConverter } from "common/src/libs/TypeConverter.sol";
+import { TypeConverter } from "../../../../../lib/evm-m-extensions/lib/common/src/libs/TypeConverter.sol";
 
 import { LayerZeroBridgeAdapterUnitTestBase } from "./LayerZeroBridgeAdapterUnitTestBase.sol";
 

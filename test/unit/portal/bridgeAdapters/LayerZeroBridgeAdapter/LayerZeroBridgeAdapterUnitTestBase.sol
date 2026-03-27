@@ -4,8 +4,8 @@ pragma solidity 0.8.34;
 
 import { Test } from "forge-std/Test.sol";
 
-import { ERC1967Proxy } from "openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { TypeConverter } from "common/src/libs/TypeConverter.sol";
+import { TransparentUpgradeableProxy } from "../../../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { TypeConverter } from "../../../../../lib/evm-m-extensions/lib/common/src/libs/TypeConverter.sol";
 import { LayerZeroBridgeAdapter } from "../../../../../src/portal/bridgeAdapters/layerZero/LayerZeroBridgeAdapter.sol";
 
 import { MockLayerZeroEndpoint } from "../../../../mock/MockLayerZeroEndpoint.sol";
@@ -39,9 +39,13 @@ abstract contract LayerZeroBridgeAdapterUnitTestBase is Test {
         // Deploy implementation
         implementation = new LayerZeroBridgeAdapter(address(lzEndpoint), address(portal));
 
-        // Deploy UUPS proxy
+        // Deploy Transparent proxy
         bytes memory initializeData = abi.encodeCall(LayerZeroBridgeAdapter.initialize, (admin, operator));
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(implementation),
+            admin,
+            initializeData
+        );
         adapter = LayerZeroBridgeAdapter(address(proxy));
 
         vm.startPrank(operator);

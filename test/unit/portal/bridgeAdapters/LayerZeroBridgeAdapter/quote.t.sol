@@ -6,7 +6,7 @@ import {
     ILayerZeroEndpointV2,
     MessagingFee
 } from "../../../../../src/portal/bridgeAdapters/layerZero/interfaces/ILayerZeroEndpointV2.sol";
-import { TypeConverter } from "common/src/libs/TypeConverter.sol";
+import { TypeConverter } from "../../../../../lib/evm-m-extensions/lib/common/src/libs/TypeConverter.sol";
 
 import { LayerZeroBridgeAdapterUnitTestBase } from "./LayerZeroBridgeAdapterUnitTestBase.sol";
 

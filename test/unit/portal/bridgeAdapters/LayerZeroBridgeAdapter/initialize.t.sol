@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.34;
 
-import { ERC1967Proxy } from "openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { TransparentUpgradeableProxy } from "../../../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { LayerZeroBridgeAdapter } from "../../../../../src/portal/bridgeAdapters/layerZero/LayerZeroBridgeAdapter.sol";
 import { IBridgeAdapter } from "../../../../../src/portal/interfaces/IBridgeAdapter.sol";
@@ -25,7 +25,7 @@ contract InitializeUnitTest is LayerZeroBridgeAdapterUnitTestBase {
         bytes memory initializeData = abi.encodeCall(LayerZeroBridgeAdapter.initialize, (address(0), operator));
 
         vm.expectRevert(IBridgeAdapter.ZeroAdmin.selector);
-        new ERC1967Proxy(address(newImplementation), initializeData);
+        new TransparentUpgradeableProxy(address(newImplementation), admin, initializeData);
     }
 
     function test_initialize_zeroOperator() external {
@@ -34,6 +34,6 @@ contract InitializeUnitTest is LayerZeroBridgeAdapterUnitTestBase {
         bytes memory initializeData = abi.encodeCall(LayerZeroBridgeAdapter.initialize, (admin, address(0)));
 
         vm.expectRevert(IBridgeAdapter.ZeroOperator.selector);
-        new ERC1967Proxy(address(newImplementation), initializeData);
+        new TransparentUpgradeableProxy(address(newImplementation), admin, initializeData);
     }
 }

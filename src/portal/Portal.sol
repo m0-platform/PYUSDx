@@ -91,7 +91,7 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     /// @param  admin    The address of the admin.
     /// @param  pauser   The address of the pauser.
     /// @param  operator The address of the operator.
-    function _initialize(address admin, address pauser, address operator) internal onlyInitializing {
+    function initialize(address admin, address pauser, address operator) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
         if (pauser == address(0)) revert ZeroPauser();
         if (operator == address(0)) revert ZeroOperator();

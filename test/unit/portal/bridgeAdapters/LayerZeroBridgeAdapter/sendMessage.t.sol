@@ -3,7 +3,7 @@ pragma solidity 0.8.34;
 
 import { IBridgeAdapter } from "../../../../../src/portal/interfaces/IBridgeAdapter.sol";
 import { ILayerZeroEndpointV2 } from "../../../../../src/portal/bridgeAdapters/layerZero/interfaces/ILayerZeroEndpointV2.sol";
-import { TypeConverter } from "common/src/libs/TypeConverter.sol";
+import { TypeConverter } from "../../../../../lib/evm-m-extensions/lib/common/src/libs/TypeConverter.sol";
 
 import { LayerZeroBridgeAdapterUnitTestBase } from "./LayerZeroBridgeAdapterUnitTestBase.sol";
 
