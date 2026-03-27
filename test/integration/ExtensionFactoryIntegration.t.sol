@@ -29,16 +29,16 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
 
     function test_constructor_zeroPyusdx() public {
         vm.expectRevert(IExtensionFactory.ZeroPYUSDX.selector);
-        new ExtensionFactory(address(0), address(swapFacility));
+        new ExtensionFactory(address(0), address(swapFacility), address(0));
     }
 
     function test_constructor_zeroSwapFacility() public {
         vm.expectRevert(IExtensionFactory.ZeroSwapFacility.selector);
-        new ExtensionFactory(address(pyusdx), address(0));
+        new ExtensionFactory(address(pyusdx), address(0), address(0));
     }
 
     function test_initialize_zeroAdmin() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility), address(0)));
         address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
         address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
 
@@ -57,7 +57,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     }
 
     function test_initialize_zeroFactoryManager() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility), address(0)));
         address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
         address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
 
@@ -76,7 +76,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     }
 
     function test_initialize_zeroYieldToOneImplementation() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility), address(0)));
         address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
 
         vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
@@ -94,7 +94,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     }
 
     function test_initialize_zeroMultiMintImplementation() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility), address(0)));
         address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
 
         vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
@@ -112,7 +112,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     }
 
     function test_initialize_invalidYieldToOneImplementation() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility), address(0)));
         address wrongPyusdx = makeAddr("wrongPyusdx");
         address yieldToOneImpl = address(new YieldToOne(wrongPyusdx, address(swapFacility)));
         address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
@@ -132,7 +132,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     }
 
     function test_initialize_invalidMultiMintImplementation() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility), address(0)));
         address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
         address wrongSwap = makeAddr("wrongSwap");
         address multiMintImpl = address(new MultiMint(address(pyusdx), wrongSwap));

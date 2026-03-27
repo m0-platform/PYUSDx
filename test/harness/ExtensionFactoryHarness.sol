@@ -8,7 +8,11 @@ import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 /// @notice Test harness that exposes internal functions for testing
 contract ExtensionFactoryHarness is ExtensionFactory {
     /// @notice Constructs the harness with the same parameters as ExtensionFactory
-    constructor(address pyusdx_, address swapFacility_) ExtensionFactory(pyusdx_, swapFacility_) {}
+    constructor(
+        address pyusdx_,
+        address swapFacility_,
+        address versionedBeacon_
+    ) ExtensionFactory(pyusdx_, swapFacility_, versionedBeacon_) {}
 
     /// @notice Exposes internal _registerExtension for testing
     /// @param proxy The address of the extension proxy

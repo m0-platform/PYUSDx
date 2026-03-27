@@ -118,7 +118,9 @@ contract DeployBase is DeployHelpers, ScriptBase {
         FactoryConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
         // NOTE: SwapFacility must already be deployed since constructor calls ISwapFacility(swapFacility).pyusdx()
-        implementation = address(new ExtensionFactory(pyusdxProxy, swapFacilityProxy));
+        // NOTE: versionedBeacon is address(0) for initial deployment. Beacon deploy functions
+        //       will revert until the factory is upgraded with a valid beacon address.
+        implementation = address(new ExtensionFactory(pyusdxProxy, swapFacilityProxy, address(0)));
 
         proxy = _deployCreate3TransparentProxy(
             implementation,

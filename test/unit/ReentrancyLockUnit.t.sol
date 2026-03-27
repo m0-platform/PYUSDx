@@ -62,7 +62,7 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
 
         factory = ExtensionFactoryHarness(
             UnsafeUpgrades.deployTransparentProxy(
-                address(new ExtensionFactoryHarness(address(pyusdx), address(swapFacility))),
+                address(new ExtensionFactoryHarness(address(pyusdx), address(swapFacility), address(0))),
                 admin,
                 abi.encodeWithSelector(
                     ExtensionFactory.initialize.selector,

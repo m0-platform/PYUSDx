@@ -64,6 +64,20 @@ interface IExtensionFactory {
     /// @param  implementation The new implementation address.
     event ImplementationSet(ExtensionType indexed extensionType, address indexed implementation);
 
+    /// @notice Emitted when a beacon-proxied extension is deployed.
+    /// @param  extensionType  The type of extension deployed.
+    /// @param  proxy          The address of the BeaconProxy contract.
+    /// @param  versionId      The version the proxy is pinned to at deployment.
+    /// @param  implementation The resolved implementation address at deployment.
+    /// @param  deployer       The address that deployed the extension.
+    event BeaconExtensionDeployed(
+        ExtensionType indexed extensionType,
+        address proxy,
+        uint256 versionId,
+        address indexed implementation,
+        address indexed deployer
+    );
+
     /* ============ Errors ============ */
 
     /// @notice Thrown if the admin is 0x0.
@@ -89,6 +103,12 @@ interface IExtensionFactory {
 
     /// @notice Thrown if the extension type is invalid for setting implementation.
     error InvalidExtensionType();
+
+    /// @notice Thrown if the versioned beacon is 0x0.
+    error ZeroVersionedBeacon();
+
+    /// @notice Thrown if the deployed proxy address does not match the pre-computed address.
+    error DeployedAddressMismatch();
 
     /* ============ View/Pure Functions ============ */
 
@@ -122,6 +142,9 @@ interface IExtensionFactory {
     /// @notice The address of the SwapFacility contract.
     function swapFacility() external view returns (address);
 
+    /// @notice The address of the VersionedBeacon contract.
+    function versionedBeacon() external view returns (address);
+
     /* ============ Deployment Functions ============ */
 
     /// @notice Deploys a new YieldToOne extension.
@@ -145,6 +168,28 @@ interface IExtensionFactory {
         string calldata extensionName,
         MultiMintParams calldata params
     ) external returns (address proxy, address proxyAdmin, address implementation);
+
+    /// @notice Deploys a new BeaconProxy YieldToOne extension pinned to a registered version.
+    /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
+    /// @param  versionId     The version ID to pin the extension to.
+    /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
+    /// @return proxy         The address of the deployed BeaconProxy.
+    function deployBeaconYieldToOne(
+        string calldata extensionName,
+        uint256 versionId,
+        YieldToOneParams calldata params
+    ) external returns (address proxy);
+
+    /// @notice Deploys a new BeaconProxy MultiMint extension pinned to a registered version.
+    /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
+    /// @param  versionId     The version ID to pin the extension to.
+    /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
+    /// @return proxy         The address of the deployed BeaconProxy.
+    function deployBeaconMultiMint(
+        string calldata extensionName,
+        uint256 versionId,
+        MultiMintParams calldata params
+    ) external returns (address proxy);
 
     /* ============ Admin Functions ============ */
 
