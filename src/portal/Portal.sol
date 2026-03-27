@@ -124,6 +124,7 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
             );
     }
 
+    /// @inheritdoc IPortal
     function sendToken(
         uint256 amount,
         address sourceToken,
