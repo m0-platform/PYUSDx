@@ -96,20 +96,20 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
 
         // Deactivate
         vm.expectEmit();
-        emit IExtensionFactory.ExtensionStatusSet(address(yieldToOne), false);
+        emit IExtensionFactory.ExtensionTypeSet(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionStatus(address(yieldToOne), false);
+        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
 
         assertFalse(factory.isApprovedExtension(address(yieldToOne)));
         assertFalse(swapFacility.isApprovedExtension(address(yieldToOne)));
 
         // Reactivate
         vm.expectEmit();
-        emit IExtensionFactory.ExtensionStatusSet(address(yieldToOne), true);
+        emit IExtensionFactory.ExtensionTypeSet(address(yieldToOne), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionStatus(address(yieldToOne), true);
+        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         assertTrue(factory.isApprovedExtension(address(yieldToOne)));
     }
@@ -117,7 +117,7 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
     function testIntegration_factory_setExtensionStatus_idempotent() public {
         // Should not emit event when setting to same value
         vm.prank(factoryManager);
-        factory.setExtensionStatus(address(yieldToOne), true); // Already true
+        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.YIELD_TO_ONE); // Already true
 
         assertTrue(factory.isApprovedExtension(address(yieldToOne)));
     }
@@ -132,14 +132,19 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
         );
 
         vm.prank(alice);
-        factory.setExtensionStatus(address(yieldToOne), false);
+        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
     }
 
     function testIntegration_factory_setExtensionStatus_notRegistered() public {
-        vm.expectRevert(abi.encodeWithSelector(IExtensionFactory.ExtensionNotRegistered.selector, alice));
+        // Setting NONE on unregistered address is idempotent (no-op, no revert)
+        vm.prank(factoryManager);
+        factory.setExtensionType(alice, IExtensionFactory.ExtensionType.NONE);
+
+        // Setting non-NONE on an invalid address reverts (EOA has no code, call to IExtension interface fails)
+        vm.expectRevert();
 
         vm.prank(factoryManager);
-        factory.setExtensionStatus(alice, false);
+        factory.setExtensionType(alice, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
     }
 
     /* ============ Swap Tests ============ */
@@ -248,7 +253,7 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
 
         // Revoke extension
         vm.prank(factoryManager);
-        factory.setExtensionStatus(address(yieldToOne), false);
+        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
 
         // Verify swapFacility rejects the extension
         assertFalse(swapFacility.isApprovedExtension(address(yieldToOne)));
