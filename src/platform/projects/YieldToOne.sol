@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
-import { Freezable } from "../../../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
-import { Pausable } from "../../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
-
 import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { IPYUSDX } from "../../IPYUSDX.sol";
@@ -39,7 +36,7 @@ abstract contract YieldToOneStorageLayout {
 ///         system. When the extension's pending yield is claimed, it is first realized from
 ///         PYUSDX (net of PYUSDX's fee), then minted as extension tokens to the yield recipient.
 /// @author M0 Labs
-contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezable, Pausable {
+contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
     /* ============ Variables ============ */
 
     /// @inheritdoc IYieldToOne
@@ -95,9 +92,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         if (admin == address(0)) revert ZeroAdmin();
         if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
 
-        __Extension_init(name, symbol);
-        __Freezable_init(freezeManager);
-        __Pausable_init(pauser);
+        __Extension_init(name, symbol, freezeManager, pauser);
 
         _setYieldRecipient(yieldRecipient_);
 
@@ -159,46 +154,6 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
     }
 
     /* ============ Hooks ============ */
-
-    /// @dev   Hook called before approval. Reverts if frozen.
-    /// @param account The account granting approval.
-    /// @param spender The account being approved.
-    function _beforeApprove(address account, address spender, uint256) internal view virtual override {
-        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
-        _revertIfFrozen($, account);
-        _revertIfFrozen($, spender);
-    }
-
-    /// @dev   Hook called before wrapping PYUSDX into extension tokens.
-    /// @param account   The account depositing PYUSDX.
-    /// @param recipient The account receiving extension tokens.
-    function _beforeWrap(address account, address recipient, uint256) internal view virtual override {
-        _requireNotPaused();
-
-        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
-        _revertIfFrozen($, account);
-        _revertIfFrozen($, recipient);
-    }
-
-    /// @dev   Hook called before unwrapping extension tokens for PYUSDX.
-    /// @param account The account from which extension tokens are burned.
-    function _beforeUnwrap(address account, uint256) internal view virtual override {
-        _requireNotPaused();
-
-        _revertIfFrozen(_getFreezableStorageLocation(), account);
-    }
-
-    /// @dev   Hook called before transferring extension tokens.
-    /// @param sender    The address sending tokens.
-    /// @param recipient The address receiving tokens.
-    function _beforeTransfer(address sender, address recipient, uint256) internal view virtual override {
-        _requireNotPaused();
-
-        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
-        _revertIfFrozen($, msg.sender);
-        _revertIfFrozen($, sender);
-        _revertIfFrozen($, recipient);
-    }
 
     /// @dev Hook called before claiming yield.
     function _beforeClaimYield() internal view virtual {}

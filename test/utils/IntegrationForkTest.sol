@@ -58,7 +58,13 @@ abstract contract IntegrationForkTest is BaseForkTest {
                 earnerManager: earnerManager,
                 rateManager: rateManager
             }),
-            Config.IssuerGatewayConfig({ admin: admin, minter: minter, mintDelay: MINT_DELAY, mintTTL: MINT_TTL }),
+            Config.IssuerGatewayConfig({
+                admin: admin,
+                issuer: operator,
+                minter: executor,
+                mintDelay: MINT_DELAY,
+                mintTTL: MINT_TTL
+            }),
             Config.SwapFacilityConfig({ admin: admin, pauser: pauser }),
             Config.FactoryConfig({ admin: admin, factoryManager: factoryManager })
         );
@@ -72,11 +78,12 @@ abstract contract IntegrationForkTest is BaseForkTest {
 
     /// @dev Helper to mint PYUSDX through the time-delay mechanism
     function _mintPYUSDX(address recipient_, uint256 amount_) internal {
-        vm.prank(minter);
-        uint48 mintId_ = issuerGateway.proposeMint(amount_, recipient_);
+        vm.prank(operator);
+        uint48 mintId = issuerGateway.proposeMint(amount_, recipient_);
 
         vm.warp(block.timestamp + MINT_DELAY);
 
-        issuerGateway.mint(mintId_);
+        vm.prank(executor);
+        issuerGateway.mint(mintId);
     }
 }

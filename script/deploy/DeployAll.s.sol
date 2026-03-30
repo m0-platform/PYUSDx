@@ -60,6 +60,7 @@ contract DeployAll is DeployBase {
 
     function _loadIssuerGatewayConfig() private view returns (IssuerGatewayConfig memory config) {
         config.admin = vm.envAddress("ISSUER_GATEWAY_ADMIN");
+        config.issuer = vm.envAddress("ISSUER_GATEWAY_ISSUER");
         config.minter = vm.envAddress("ISSUER_GATEWAY_MINTER");
         config.mintDelay = uint32(vm.envUint("ISSUER_GATEWAY_MINT_DELAY"));
         config.mintTTL = uint32(vm.envUint("ISSUER_GATEWAY_MINT_TTL"));

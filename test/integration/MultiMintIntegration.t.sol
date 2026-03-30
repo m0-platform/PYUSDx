@@ -8,7 +8,6 @@ import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFacto
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
-import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.sol";
 
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
@@ -460,7 +459,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         // Revoke extension
         vm.prank(factoryManager);
-        factory.setExtensionStatus(address(multiMint), false);
+        factory.setExtensionType(address(multiMint), IExtensionFactory.ExtensionType.NONE);
 
         assertFalse(swapFacility.isApprovedExtension(address(multiMint)));
 
