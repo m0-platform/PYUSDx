@@ -31,6 +31,7 @@ contract Config {
     struct FactoryConfig {
         address admin;
         address factoryManager;
+        address versionManager;
     }
 
     struct YieldToOneConfig {

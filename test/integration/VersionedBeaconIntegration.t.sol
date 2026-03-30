@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.34;
 
-import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
-
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { IVersionedBeacon } from "../../src/platform/interfaces/IVersionedBeacon.sol";
-import { VersionedBeacon } from "../../src/platform/VersionedBeacon.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
@@ -22,9 +18,6 @@ contract YieldToOneV2 is YieldToOne {
 }
 
 contract VersionedBeaconIntegrationTests is IntegrationForkTest {
-    VersionedBeacon public beacon;
-
-    address public versionManager;
     address public builder;
 
     address public yieldToOneImplV1;
@@ -33,16 +26,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
     function setUp() public override {
         super.setUp();
 
-        versionManager = makeAddr("versionManager");
         builder = makeAddr("builder");
-
-        // Deploy VersionedBeacon
-        beacon = new VersionedBeacon(address(factory), address(pyusdx), address(swapFacility), admin, versionManager);
-
-        // Upgrade factory to new implementation with beacon address
-        address newFactoryImpl = address(new ExtensionFactory(address(pyusdx), address(swapFacility), address(beacon)));
-
-        UnsafeUpgrades.upgradeProxy(address(factory), newFactoryImpl, "", admin);
 
         // Deploy v1 (base YieldToOne) and v2 (YieldToOneV2 with ping())
         yieldToOneImplV1 = address(new YieldToOne(address(pyusdx), address(swapFacility)));
@@ -52,10 +36,10 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
     function test_fullBeaconLifecycle() public {
         /* ============ M0 registers version 1 ============ */
 
-        vm.prank(versionManager);
+        vm.prank(admin);
         uint256 v1 = beacon.registerVersion(IExtensionFactory.ExtensionType.YIELD_TO_ONE, yieldToOneImplV1);
 
-        vm.prank(versionManager);
+        vm.prank(admin);
         beacon.setLatestVersion(IExtensionFactory.ExtensionType.YIELD_TO_ONE, v1);
 
         assertEq(v1, 1);
@@ -120,10 +104,10 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
 
         /* ============ M0 publishes v2, builder upgrades ============ */
 
-        vm.prank(versionManager);
+        vm.prank(admin);
         uint256 v2 = beacon.registerVersion(IExtensionFactory.ExtensionType.YIELD_TO_ONE, yieldToOneImplV2);
 
-        vm.prank(versionManager);
+        vm.prank(admin);
         beacon.setLatestVersion(IExtensionFactory.ExtensionType.YIELD_TO_ONE, v2);
 
         assertEq(v2, 2);

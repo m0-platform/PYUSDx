@@ -11,6 +11,7 @@ import { IssuerGateway } from "../../src/core/IssuerGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
+import { VersionedBeacon } from "../../src/platform/VersionedBeacon.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
@@ -31,6 +32,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address factoryProxy;
         address factoryProxyAdmin;
         address factoryImplementation;
+        address versionedBeacon;
     }
 
     /* ============ Individual Deploy Functions ============ */
@@ -109,18 +111,27 @@ contract DeployBase is DeployHelpers, ScriptBase {
         proxyAdmin = Upgrades.getAdminAddress(proxy);
     }
 
+    function _deployVersionedBeacon(
+        address factoryProxy,
+        address pyusdxProxy,
+        address swapFacilityProxy,
+        address admin,
+        address versionManager
+    ) internal returns (address) {
+        return address(new VersionedBeacon(factoryProxy, pyusdxProxy, swapFacilityProxy, admin, versionManager));
+    }
+
     function _deployFactory(
         address deployer,
         address pyusdxProxy,
         address swapFacilityProxy,
+        address versionedBeacon,
         address yieldToOneImpl,
         address multiMintImpl,
         FactoryConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
         // NOTE: SwapFacility must already be deployed since constructor calls ISwapFacility(swapFacility).pyusdx()
-        // NOTE: versionedBeacon is address(0) for initial deployment. Beacon deploy functions
-        //       will revert until the factory is upgraded with a valid beacon address.
-        implementation = address(new ExtensionFactory(pyusdxProxy, swapFacilityProxy, address(0)));
+        implementation = address(new ExtensionFactory(pyusdxProxy, swapFacilityProxy, versionedBeacon));
 
         proxy = _deployCreate3TransparentProxy(
             implementation,
@@ -189,12 +200,24 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address yieldToOneImpl = address(new YieldToOne(deployment.pyusdxProxy, deployment.swapFacilityProxy));
         address multiMintImpl = address(new MultiMint(deployment.pyusdxProxy, deployment.swapFacilityProxy));
 
-        // 6. Deploy Factory (implementation needs actual PYUSDX + SwapFacility proxies)
+        // 6. Deploy VersionedBeacon (uses pre-computed factory address, not a proxy itself)
+        deployment.versionedBeacon = _deployVersionedBeacon(
+            predictedFactory,
+            deployment.pyusdxProxy,
+            deployment.swapFacilityProxy,
+            factoryConfig.admin,
+            factoryConfig.versionManager
+        );
+
+        console.log("VersionedBeacon:                  ", deployment.versionedBeacon);
+
+        // 7. Deploy Factory (implementation needs actual PYUSDX + SwapFacility proxies + beacon)
         //    Constructor validates swapFacility.pyusdx(), so SwapFacility must be deployed first
         (deployment.factoryProxy, deployment.factoryProxyAdmin, deployment.factoryImplementation) = _deployFactory(
             deployer,
             deployment.pyusdxProxy,
             deployment.swapFacilityProxy,
+            deployment.versionedBeacon,
             yieldToOneImpl,
             multiMintImpl,
             factoryConfig

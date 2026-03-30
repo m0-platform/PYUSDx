@@ -7,6 +7,7 @@ import { DeployBase } from "../../script/deploy/DeployBase.s.sol";
 import { IssuerGateway } from "../../src/core/IssuerGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
+import { VersionedBeacon } from "../../src/platform/VersionedBeacon.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 
 import { BaseForkTest } from "./BaseForkTest.sol";
@@ -33,6 +34,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
     IssuerGateway public issuerGateway;
     SwapFacility public swapFacility;
     ExtensionFactory public factory;
+    VersionedBeacon public beacon;
 
     DeployBase.CoreDeployments internal _coreDeployments;
 
@@ -66,13 +68,14 @@ abstract contract IntegrationForkTest is BaseForkTest {
                 mintTTL: MINT_TTL
             }),
             Config.SwapFacilityConfig({ admin: admin, pauser: pauser }),
-            Config.FactoryConfig({ admin: admin, factoryManager: factoryManager })
+            Config.FactoryConfig({ admin: admin, factoryManager: factoryManager, versionManager: admin })
         );
 
         pyusdx = PYUSDX(deployments_.pyusdxProxy);
         issuerGateway = IssuerGateway(deployments_.issuerGatewayProxy);
         swapFacility = SwapFacility(deployments_.swapFacilityProxy);
         factory = ExtensionFactory(deployments_.factoryProxy);
+        beacon = VersionedBeacon(deployments_.versionedBeacon);
         _coreDeployments = deployments_;
     }
 

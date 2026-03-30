@@ -39,12 +39,14 @@ contract DeployAll is DeployBase {
         console.log("Factory Proxy:                    ", deployment.factoryProxy);
         console.log("Factory ProxyAdmin:               ", deployment.factoryProxyAdmin);
         console.log("Factory Implementation:           ", deployment.factoryImplementation);
+        console.log("VersionedBeacon:                  ", deployment.versionedBeacon);
         console.log("================================================================================");
 
         _writeDeployment(block.chainid, "pyusdx", deployment.pyusdxProxy);
         _writeDeployment(block.chainid, "issuerGateway", deployment.issuerGatewayProxy);
         _writeDeployment(block.chainid, "swapFacility", deployment.swapFacilityProxy);
         _writeDeployment(block.chainid, "extensionFactory", deployment.factoryProxy);
+        _writeDeployment(block.chainid, "versionedBeacon", deployment.versionedBeacon);
     }
 
     function _loadPYUSDXConfig() private view returns (PYUSDXConfig memory config) {
@@ -74,5 +76,6 @@ contract DeployAll is DeployBase {
     function _loadFactoryConfig() private view returns (FactoryConfig memory config) {
         config.admin = vm.envAddress("FACTORY_ADMIN");
         config.factoryManager = vm.envAddress("FACTORY_MANAGER");
+        config.versionManager = vm.envAddress("FACTORY_VERSION_MANAGER");
     }
 }
