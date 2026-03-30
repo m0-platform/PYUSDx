@@ -22,9 +22,9 @@ contract RateLimiterHarness is RateLimiter {
     /// @dev Sets bucket state directly for edge-case testing.
     function setBucketState(
         address issuer,
-        uint256 capacity,
-        uint256 refillPerSecond,
-        uint256 remainingAmount,
+        uint128 capacity,
+        uint128 refillPerSecond,
+        uint128 remainingAmount,
         uint40 lastRefillTime
     ) external {
         RateLimiterStorage storage $ = _getRateLimiterStorage();
@@ -42,7 +42,7 @@ contract RateLimiterHarness is RateLimiter {
     )
         external
         view
-        returns (uint256 capacity, uint256 refillPerSecond, uint256 remainingAmount, uint40 lastRefillTime)
+        returns (uint128 capacity, uint128 refillPerSecond, uint128 remainingAmount, uint40 lastRefillTime)
     {
         RateLimiterStorage storage $ = _getRateLimiterStorage();
         Bucket storage bucket = $.issuerBuckets[issuer];

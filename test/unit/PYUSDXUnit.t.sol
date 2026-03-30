@@ -373,7 +373,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.prank(rateLimitManager);
         pyusdx.setRateLimit(address(issuerGateway), 100e6, 10e6, true);
 
-        (uint256 capacity, uint256 refillPerSecond) = pyusdx.getRateLimitConfig(address(issuerGateway));
+        (uint128 capacity, uint128 refillPerSecond) = pyusdx.getRateLimitConfig(address(issuerGateway));
 
         assertEq(capacity, 100e6);
         assertEq(refillPerSecond, 10e6);
