@@ -35,6 +35,12 @@ interface IVersionedBeacon is IBeacon {
     /// @param  versionId The new pinned version (0 means follow latest).
     event ProxyVersionSet(address indexed proxy, uint256 indexed versionId);
 
+    /// @notice Emitted when a proxy's ownership is transferred.
+    /// @param  proxy        The proxy address.
+    /// @param  previousOwner The previous owner address.
+    /// @param  newOwner     The new owner address.
+    event ProxyOwnershipTransferred(address indexed proxy, address indexed previousOwner, address indexed newOwner);
+
     /* ============ Errors ============ */
 
     /// @notice Thrown if the implementation address is 0x0.
@@ -116,6 +122,12 @@ interface IVersionedBeacon is IBeacon {
     /// @param  proxy     The proxy address.
     /// @param  versionId The version to pin to (0 = follow latest).
     function pinVersion(address proxy, uint256 versionId) external;
+
+    /// @notice Transfers ownership of a proxy to a new address.
+    /// @dev    MUST only be callable by the proxy's current registered owner.
+    /// @param  proxy    The proxy address.
+    /// @param  newOwner The new owner address.
+    function transferProxyOwnership(address proxy, address newOwner) external;
 
     /* ============ View/Pure Functions ============ */
 

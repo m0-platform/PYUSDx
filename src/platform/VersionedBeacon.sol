@@ -138,6 +138,19 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         emit ProxyVersionSet(proxy, versionId);
     }
 
+    /// @inheritdoc IVersionedBeacon
+    function transferProxyOwnership(address proxy, address newOwner) external {
+        ProxyInfo storage info = _proxies[proxy];
+        if (info.typeKey == bytes32(0)) revert ProxyNotRegistered();
+        if (msg.sender != info.owner) revert NotProxyOwner();
+        if (newOwner == address(0)) revert ZeroOwner();
+
+        address previousOwner = info.owner;
+        info.owner = newOwner;
+
+        emit ProxyOwnershipTransferred(proxy, previousOwner, newOwner);
+    }
+
     /* ============ View/Pure Functions ============ */
 
     /// @dev Returns the implementation for the calling proxy. Reverts if the caller is not registered.
