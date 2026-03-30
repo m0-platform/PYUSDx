@@ -3,14 +3,9 @@ pragma solidity 0.8.34;
 
 import { AccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 
+import { IExtension } from "./interfaces/IExtension.sol";
 import { IExtensionFactory } from "./interfaces/IExtensionFactory.sol";
 import { IVersionedBeacon } from "./interfaces/IVersionedBeacon.sol";
-
-/// @dev Minimal interface for reading extension immutables during implementation validation.
-interface IExtensionLike {
-    function pyusdx() external view returns (address);
-    function swapFacility() external view returns (address);
-}
 
 /// @title  VersionedBeacon
 /// @notice A non-upgradeable singleton beacon that resolves per-proxy implementation addresses
@@ -224,7 +219,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     function _revertIfInvalidImplementation(address impl) internal view {
         if (impl == address(0)) revert ZeroImplementation();
 
-        if (IExtensionLike(impl).pyusdx() != pyusdx || IExtensionLike(impl).swapFacility() != swapFacility)
+        if (IExtension(impl).pyusdx() != pyusdx || IExtension(impl).swapFacility() != swapFacility)
             revert InvalidImplementation();
     }
 }
