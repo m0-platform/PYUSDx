@@ -61,6 +61,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         if (pyusdx_ == address(0)) revert ZeroPYUSDX();
         if (swapFacility_ == address(0)) revert ZeroSwapFacility();
         if (admin_ == address(0)) revert ZeroAdmin();
+        if (versionManager_ == address(0)) revert ZeroVersionManager();
 
         factory = factory_;
         pyusdx = pyusdx_;

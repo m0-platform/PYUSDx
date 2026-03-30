@@ -94,6 +94,9 @@ interface IVersionedBeacon is IBeacon {
     /// @notice Thrown if the admin address is 0x0.
     error ZeroAdmin();
 
+    /// @notice Thrown if the version manager address is 0x0.
+    error ZeroVersionManager();
+
     /// @notice Thrown if the proxy address is 0x0.
     error ZeroProxy();
 
