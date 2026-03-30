@@ -137,17 +137,13 @@ interface IVersionedBeacon is IBeacon {
         address owner
     ) external;
 
-    /// @notice Pins the proxy to a specific registered version.
+    /// @notice Pins the proxy to a specific registered version, or unpins it to follow latest.
     /// @dev    MUST only be callable by the proxy's registered owner.
-    ///         The version must exist and match the proxy's extension type.
+    ///         If `versionId` is 0, the proxy follows the latest version for its extension type.
+    ///         If `versionId` is nonzero, it must exist and match the proxy's extension type.
     /// @param  proxy     The proxy address.
-    /// @param  versionId The version to pin to.
+    /// @param  versionId The version to pin to (0 = follow latest).
     function pinVersion(address proxy, uint256 versionId) external;
-
-    /// @notice Unpins the proxy so it follows the latest version for its extension type.
-    /// @dev    MUST only be callable by the proxy's registered owner.
-    /// @param  proxy The proxy address.
-    function unpinVersion(address proxy) external;
 
     /* ============ View/Pure Functions ============ */
 

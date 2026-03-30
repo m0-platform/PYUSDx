@@ -132,23 +132,14 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         if (info.extensionType == IExtensionFactory.ExtensionType.NONE) revert ProxyNotRegistered();
         if (msg.sender != info.owner) revert NotProxyOwner();
 
-        _revertIfInvalidVersionId(versionId);
-        if (_versions[versionId].extensionType != info.extensionType) revert VersionTypeMismatch();
+        if (versionId != 0) {
+            _revertIfInvalidVersionId(versionId);
+            if (_versions[versionId].extensionType != info.extensionType) revert VersionTypeMismatch();
+        }
 
         info.pinnedVersion = versionId;
 
         emit ProxyVersionSet(proxy, versionId);
-    }
-
-    /// @inheritdoc IVersionedBeacon
-    function unpinVersion(address proxy) external {
-        ProxyInfo storage info = _proxies[proxy];
-        if (info.extensionType == IExtensionFactory.ExtensionType.NONE) revert ProxyNotRegistered();
-        if (msg.sender != info.owner) revert NotProxyOwner();
-
-        info.pinnedVersion = 0;
-
-        emit ProxyVersionSet(proxy, 0);
     }
 
     /* ============ View/Pure Functions ============ */
