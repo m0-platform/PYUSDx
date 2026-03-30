@@ -39,11 +39,11 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     mapping(IExtensionFactory.ExtensionType extensionType => uint256 versionId) internal _latestVersion;
 
     /// @dev Per-proxy registration and version state.
+    ///      A proxy is considered registered if extensionType != NONE.
     struct ProxyInfo {
         IExtensionFactory.ExtensionType extensionType;
         address owner;
         uint256 pinnedVersion; // 0 = follow latest
-        bool registered;
     }
 
     mapping(address proxy => ProxyInfo info) internal _proxies;
@@ -121,17 +121,12 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         if (msg.sender != factory) revert NotFactory();
         if (proxy == address(0)) revert ZeroProxy();
         if (owner == address(0)) revert ZeroOwner();
-        if (_proxies[proxy].registered) revert ProxyAlreadyRegistered();
+        if (_proxies[proxy].extensionType != IExtensionFactory.ExtensionType.NONE) revert ProxyAlreadyRegistered();
 
         _revertIfInvalidVersionId(versionId);
         if (_versions[versionId].extensionType != extensionType) revert VersionTypeMismatch();
 
-        _proxies[proxy] = ProxyInfo({
-            extensionType: extensionType,
-            owner: owner,
-            pinnedVersion: versionId,
-            registered: true
-        });
+        _proxies[proxy] = ProxyInfo({ extensionType: extensionType, owner: owner, pinnedVersion: versionId });
 
         emit ProxyRegistered(proxy, extensionType, versionId, owner);
     }
@@ -139,7 +134,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     function pinVersion(address proxy, uint256 versionId) external {
         ProxyInfo storage info = _proxies[proxy];
-        if (!info.registered) revert ProxyNotRegistered();
+        if (info.extensionType == IExtensionFactory.ExtensionType.NONE) revert ProxyNotRegistered();
         if (msg.sender != info.owner) revert NotProxyOwner();
 
         _revertIfInvalidVersionId(versionId);
@@ -153,7 +148,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     function unpinVersion(address proxy) external {
         ProxyInfo storage info = _proxies[proxy];
-        if (!info.registered) revert ProxyNotRegistered();
+        if (info.extensionType == IExtensionFactory.ExtensionType.NONE) revert ProxyNotRegistered();
         if (msg.sender != info.owner) revert NotProxyOwner();
 
         info.pinnedVersion = 0;
@@ -208,7 +203,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @param proxy The proxy address.
     function _resolveImplementation(address proxy) internal view returns (address) {
         ProxyInfo storage info = _proxies[proxy];
-        if (!info.registered) revert ProxyNotRegistered();
+        if (info.extensionType == IExtensionFactory.ExtensionType.NONE) revert ProxyNotRegistered();
 
         uint256 versionId = info.pinnedVersion;
         if (versionId == 0) {
