@@ -91,6 +91,12 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
             versionId = impls.length - 1;
         }
 
+        // Auto-set latest on first version for this type so unpinned proxies always resolve.
+        if (versionId == 1) {
+            _latestVersion[typeKey] = 1;
+            emit LatestVersionSet(typeKey, 1);
+        }
+
         emit VersionRegistered(typeKey, versionId, impl);
     }
 
@@ -194,7 +200,10 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
             versionId = _latestVersion[info.typeKey];
         }
 
-        return _implementations[info.typeKey][versionId];
+        address impl = _implementations[info.typeKey][versionId];
+        if (impl == address(0)) revert InvalidVersion();
+
+        return impl;
     }
 
     /// @dev   Reverts if the version ID is 0 or out of range for the given type key.
