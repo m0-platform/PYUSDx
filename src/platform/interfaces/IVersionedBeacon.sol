@@ -3,50 +3,32 @@ pragma solidity ^0.8.34;
 
 import { IBeacon } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/proxy/beacon/IBeacon.sol";
 
-import { IExtensionFactory } from "./IExtensionFactory.sol";
-
 /// @title  IVersionedBeacon
 /// @notice Interface for a non-upgradeable singleton beacon that resolves per-proxy implementation
 ///         addresses from a version registry. M0 registers approved versions; extension owners
-///         choose which version their proxy runs.
+///         choose which version their proxy runs. Extension types are identified by `bytes32` type
+///         keys (e.g., `keccak256("YIELD_TO_ONE")`), making the beacon agnostic to which types exist.
 /// @author M0 Labs
 interface IVersionedBeacon is IBeacon {
-    /* ============ Structs ============ */
-
-    /// @notice A registered implementation version.
-    struct Version {
-        address implementation;
-        IExtensionFactory.ExtensionType extensionType;
-    }
-
     /* ============ Events ============ */
 
     /// @notice Emitted when a new implementation version is registered.
-    /// @param  extensionType  The extension type this version applies to.
-    /// @param  versionId      The assigned version ID (1-indexed).
+    /// @param  typeKey        The extension type key.
+    /// @param  versionId      The assigned version ID (1-indexed, per type key).
     /// @param  implementation The implementation address.
-    event VersionRegistered(
-        IExtensionFactory.ExtensionType indexed extensionType,
-        uint256 indexed versionId,
-        address indexed implementation
-    );
+    event VersionRegistered(bytes32 indexed typeKey, uint256 indexed versionId, address indexed implementation);
 
     /// @notice Emitted when the latest version is updated for an extension type.
-    /// @param  extensionType The extension type.
-    /// @param  versionId     The version ID now marked as latest.
-    event LatestVersionSet(IExtensionFactory.ExtensionType indexed extensionType, uint256 indexed versionId);
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version ID now marked as latest.
+    event LatestVersionSet(bytes32 indexed typeKey, uint256 indexed versionId);
 
     /// @notice Emitted when a new proxy is registered in the beacon.
-    /// @param  proxy         The proxy address.
-    /// @param  extensionType The extension type of the proxy.
-    /// @param  versionId     The version the proxy is pinned to.
-    /// @param  owner         The extension owner who controls version pinning.
-    event ProxyRegistered(
-        address indexed proxy,
-        IExtensionFactory.ExtensionType indexed extensionType,
-        uint256 indexed versionId,
-        address owner
-    );
+    /// @param  proxy     The proxy address.
+    /// @param  typeKey   The extension type key of the proxy.
+    /// @param  versionId The version the proxy is pinned to.
+    /// @param  owner     The extension owner who controls version pinning.
+    event ProxyRegistered(address indexed proxy, bytes32 indexed typeKey, uint256 indexed versionId, address owner);
 
     /// @notice Emitted when a proxy's pinned version changes.
     /// @param  proxy     The proxy address.
@@ -61,14 +43,11 @@ interface IVersionedBeacon is IBeacon {
     /// @notice Thrown if the implementation has mismatched pyusdx or swapFacility.
     error InvalidImplementation();
 
-    /// @notice Thrown if the extension type is not YIELD_TO_ONE or MULTI_MINT.
-    error InvalidExtensionType();
+    /// @notice Thrown if the type key is bytes32(0).
+    error InvalidTypeKey();
 
-    /// @notice Thrown if the version ID is 0 or out of range.
+    /// @notice Thrown if the version ID is 0 or out of range for the given type key.
     error InvalidVersion();
-
-    /// @notice Thrown if a version's extension type does not match the proxy's extension type.
-    error VersionTypeMismatch();
 
     /// @notice Thrown if the proxy is not registered in the beacon.
     error ProxyNotRegistered();
@@ -108,39 +87,32 @@ interface IVersionedBeacon is IBeacon {
     /// @notice Registers a new implementation version. Append-only — cannot overwrite existing versions.
     /// @dev    MUST only be callable by an address with the `VERSION_MANAGER_ROLE` role.
     ///         Validates that the implementation's `pyusdx()` and `swapFacility()` match this beacon's.
-    /// @param  extensionType The extension type this version applies to.
-    /// @param  impl          The implementation address.
-    /// @return versionId     The assigned version ID (1-indexed).
-    function registerVersion(
-        IExtensionFactory.ExtensionType extensionType,
-        address impl
-    ) external returns (uint256 versionId);
+    ///         Version IDs are scoped per type key and 1-indexed. The first call for a new type key
+    ///         implicitly initializes that type.
+    /// @param  typeKey   The extension type key (e.g., `keccak256("YIELD_TO_ONE")`).
+    /// @param  impl      The implementation address.
+    /// @return versionId The assigned version ID (1-indexed, per type key).
+    function registerVersion(bytes32 typeKey, address impl) external returns (uint256 versionId);
 
     /// @notice Sets which version is "latest" for an extension type.
     /// @dev    MUST only be callable by an address with the `VERSION_MANAGER_ROLE` role.
-    ///         The version must exist and match the given extension type.
-    /// @param  extensionType The extension type.
-    /// @param  versionId     The version to mark as latest.
-    function setLatestVersion(IExtensionFactory.ExtensionType extensionType, uint256 versionId) external;
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version to mark as latest.
+    function setLatestVersion(bytes32 typeKey, uint256 versionId) external;
 
     /// @notice Registers a new proxy in the beacon, pinned to a specific version.
     /// @dev    MUST only be callable by the factory. Called BEFORE the BeaconProxy is deployed
     ///         so that `implementation()` resolves correctly during proxy construction.
-    /// @param  proxy         The pre-computed proxy address.
-    /// @param  extensionType The extension type.
-    /// @param  versionId     The version to pin to.
-    /// @param  owner         The extension owner (who controls version pinning).
-    function registerProxy(
-        address proxy,
-        IExtensionFactory.ExtensionType extensionType,
-        uint256 versionId,
-        address owner
-    ) external;
+    /// @param  proxy     The pre-computed proxy address.
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version to pin to.
+    /// @param  owner     The extension owner (who controls version pinning).
+    function registerProxy(address proxy, bytes32 typeKey, uint256 versionId, address owner) external;
 
     /// @notice Pins the proxy to a specific registered version, or unpins it to follow latest.
     /// @dev    MUST only be callable by the proxy's registered owner.
-    ///         If `versionId` is 0, the proxy follows the latest version for its extension type.
-    ///         If `versionId` is nonzero, it must exist and match the proxy's extension type.
+    ///         If `versionId` is 0, the proxy follows the latest version for its type.
+    ///         If `versionId` is nonzero, it must exist for the proxy's type.
     /// @param  proxy     The proxy address.
     /// @param  versionId The version to pin to (0 = follow latest).
     function pinVersion(address proxy, uint256 versionId) external;
@@ -174,17 +146,24 @@ interface IVersionedBeacon is IBeacon {
     /// @return The owner address.
     function proxyOwner(address proxy) external view returns (address);
 
-    /// @notice Returns the latest version ID for an extension type.
-    /// @param  extensionType The extension type.
+    /// @notice Returns the type key of a registered proxy.
+    /// @param  proxy The proxy address.
+    /// @return The type key (bytes32(0) if not registered).
+    function proxyTypeKey(address proxy) external view returns (bytes32);
+
+    /// @notice Returns the latest version ID for a type key.
+    /// @param  typeKey The extension type key.
     /// @return The latest version ID.
-    function latestVersion(IExtensionFactory.ExtensionType extensionType) external view returns (uint256);
+    function latestVersion(bytes32 typeKey) external view returns (uint256);
 
-    /// @notice Returns version details.
-    /// @param  versionId The version ID.
-    /// @return The Version struct (implementation address and extension type).
-    function getVersion(uint256 versionId) external view returns (Version memory);
+    /// @notice Returns the implementation address for a given type key and version.
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version ID (1-indexed, per type key).
+    /// @return The implementation address.
+    function getVersion(bytes32 typeKey, uint256 versionId) external view returns (address);
 
-    /// @notice Returns the total number of registered versions.
+    /// @notice Returns the total number of registered versions for a type key.
+    /// @param  typeKey The extension type key.
     /// @return The version count (excluding the dummy at index 0).
-    function versionCount() external view returns (uint256);
+    function versionCount(bytes32 typeKey) external view returns (uint256);
 }

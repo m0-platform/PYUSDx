@@ -4,7 +4,6 @@ pragma solidity 0.8.34;
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
-import { IVersionedBeacon } from "../../src/platform/interfaces/IVersionedBeacon.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
@@ -18,6 +17,8 @@ contract YieldToOneV2 is YieldToOne {
 }
 
 contract VersionedBeaconIntegrationTests is IntegrationForkTest {
+    bytes32 public constant YIELD_TO_ONE_TYPE_KEY = keccak256("YIELD_TO_ONE");
+
     address public builder;
 
     address public yieldToOneImplV1;
@@ -37,17 +38,15 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         /* ============ M0 registers version 1 ============ */
 
         vm.prank(admin);
-        uint256 v1 = beacon.registerVersion(IExtensionFactory.ExtensionType.YIELD_TO_ONE, yieldToOneImplV1);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
 
         vm.prank(admin);
-        beacon.setLatestVersion(IExtensionFactory.ExtensionType.YIELD_TO_ONE, v1);
+        beacon.setLatestVersion(YIELD_TO_ONE_TYPE_KEY, v1);
 
         assertEq(v1, 1);
-        assertEq(beacon.latestVersion(IExtensionFactory.ExtensionType.YIELD_TO_ONE), v1);
-        assertEq(beacon.versionCount(), 1);
-
-        IVersionedBeacon.Version memory version1 = beacon.getVersion(v1);
-        assertEq(version1.implementation, yieldToOneImplV1);
+        assertEq(beacon.latestVersion(YIELD_TO_ONE_TYPE_KEY), v1);
+        assertEq(beacon.versionCount(YIELD_TO_ONE_TYPE_KEY), 1);
+        assertEq(beacon.getVersion(YIELD_TO_ONE_TYPE_KEY, v1), yieldToOneImplV1);
 
         /* ============ Builder deploys a beacon extension ============ */
 
@@ -105,13 +104,13 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         /* ============ M0 publishes v2, builder upgrades ============ */
 
         vm.prank(admin);
-        uint256 v2 = beacon.registerVersion(IExtensionFactory.ExtensionType.YIELD_TO_ONE, yieldToOneImplV2);
+        uint256 v2 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV2);
 
         vm.prank(admin);
-        beacon.setLatestVersion(IExtensionFactory.ExtensionType.YIELD_TO_ONE, v2);
+        beacon.setLatestVersion(YIELD_TO_ONE_TYPE_KEY, v2);
 
         assertEq(v2, 2);
-        assertEq(beacon.latestVersion(IExtensionFactory.ExtensionType.YIELD_TO_ONE), v2);
+        assertEq(beacon.latestVersion(YIELD_TO_ONE_TYPE_KEY), v2);
 
         // Builder is still on v1 (pinned), not affected by setLatestVersion
         assertEq(beacon.implementationFor(proxy), yieldToOneImplV1);

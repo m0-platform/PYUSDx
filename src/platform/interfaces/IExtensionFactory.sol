@@ -115,6 +115,12 @@ interface IExtensionFactory {
     /// @notice The role identifier for the factory manager role.
     function FACTORY_MANAGER_ROLE() external view returns (bytes32);
 
+    /// @notice The type key for YieldToOne extensions in the VersionedBeacon.
+    function YIELD_TO_ONE_TYPE_KEY() external pure returns (bytes32);
+
+    /// @notice The type key for MultiMint extensions in the VersionedBeacon.
+    function MULTI_MINT_TYPE_KEY() external pure returns (bytes32);
+
     /// @notice Returns the predicted deployment address for an extension with the given extension name and deployer.
     /// @param  deployer      The address of the deployer (embedded in salt for deployer-specific addresses).
     /// @param  extensionName The name of the extension (determines the deployment address).

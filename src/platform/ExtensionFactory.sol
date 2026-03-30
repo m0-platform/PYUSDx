@@ -50,6 +50,12 @@ contract ExtensionFactory is
     /// @inheritdoc IExtensionFactory
     bytes32 public constant FACTORY_MANAGER_ROLE = keccak256("FACTORY_MANAGER_ROLE");
 
+    /// @inheritdoc IExtensionFactory
+    bytes32 public constant YIELD_TO_ONE_TYPE_KEY = keccak256("YIELD_TO_ONE");
+
+    /// @inheritdoc IExtensionFactory
+    bytes32 public constant MULTI_MINT_TYPE_KEY = keccak256("MULTI_MINT");
+
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     /// @inheritdoc IExtensionFactory
     address public immutable override pyusdx;
@@ -192,8 +198,7 @@ contract ExtensionFactory is
     ) external returns (address proxy) {
         _revertIfZeroAdmin(params.admin);
 
-        IVersionedBeacon.Version memory version = IVersionedBeacon(versionedBeacon).getVersion(versionId);
-        if (version.extensionType != ExtensionType.YIELD_TO_ONE) revert InvalidExtensionType();
+        address impl = IVersionedBeacon(versionedBeacon).getVersion(YIELD_TO_ONE_TYPE_KEY, versionId);
 
         bytes memory initData = abi.encodeWithSelector(
             YieldToOne.initialize.selector,
@@ -206,9 +211,11 @@ contract ExtensionFactory is
             params.yieldRecipientManager
         );
 
-        proxy = _deployBeaconProxy(extensionName, versionId, ExtensionType.YIELD_TO_ONE, params.admin, initData);
+        proxy = _deployBeaconProxy(extensionName, versionId, YIELD_TO_ONE_TYPE_KEY, params.admin, initData);
 
-        emit BeaconExtensionDeployed(ExtensionType.YIELD_TO_ONE, proxy, versionId, version.implementation, msg.sender);
+        _registerExtension(proxy, ExtensionType.YIELD_TO_ONE);
+
+        emit BeaconExtensionDeployed(ExtensionType.YIELD_TO_ONE, proxy, versionId, impl, msg.sender);
     }
 
     /// @inheritdoc IExtensionFactory
@@ -219,8 +226,7 @@ contract ExtensionFactory is
     ) external returns (address proxy) {
         _revertIfZeroAdmin(params.admin);
 
-        IVersionedBeacon.Version memory version = IVersionedBeacon(versionedBeacon).getVersion(versionId);
-        if (version.extensionType != ExtensionType.MULTI_MINT) revert InvalidExtensionType();
+        address impl = IVersionedBeacon(versionedBeacon).getVersion(MULTI_MINT_TYPE_KEY, versionId);
 
         bytes memory initData = abi.encodeWithSelector(
             MultiMint.initialize.selector,
@@ -234,9 +240,11 @@ contract ExtensionFactory is
             params.yieldRecipientManager
         );
 
-        proxy = _deployBeaconProxy(extensionName, versionId, ExtensionType.MULTI_MINT, params.admin, initData);
+        proxy = _deployBeaconProxy(extensionName, versionId, MULTI_MINT_TYPE_KEY, params.admin, initData);
 
-        emit BeaconExtensionDeployed(ExtensionType.MULTI_MINT, proxy, versionId, version.implementation, msg.sender);
+        _registerExtension(proxy, ExtensionType.MULTI_MINT);
+
+        emit BeaconExtensionDeployed(ExtensionType.MULTI_MINT, proxy, versionId, impl, msg.sender);
     }
 
     /// @inheritdoc IExtensionFactory
@@ -308,16 +316,16 @@ contract ExtensionFactory is
 
     /* ============ Internal Interactive Functions ============ */
 
-    /// @dev   Deploys a BeaconProxy via CREATE3 and registers it in the VersionedBeacon and factory.
+    /// @dev   Deploys a BeaconProxy via CREATE3 and registers it in the VersionedBeacon.
     /// @param extensionName The human-readable extension name (determines deployment address).
     /// @param versionId     The version ID to pin the proxy to.
-    /// @param extensionType The extension type.
+    /// @param typeKey       The extension type key for the VersionedBeacon.
     /// @param admin         The extension owner (registered in beacon for version pinning).
     /// @param initData      The encoded initializer call data.
     function _deployBeaconProxy(
         string calldata extensionName,
         uint256 versionId,
-        ExtensionType extensionType,
+        bytes32 typeKey,
         address admin,
         bytes memory initData
     ) internal returns (address proxy) {
@@ -329,7 +337,7 @@ contract ExtensionFactory is
         proxy = _getCreate3Address(address(this), salt);
 
         // Register in beacon BEFORE deploying so implementation() resolves during construction.
-        IVersionedBeacon(versionedBeacon).registerProxy(proxy, extensionType, versionId, admin);
+        IVersionedBeacon(versionedBeacon).registerProxy(proxy, typeKey, versionId, admin);
 
         // Deploy BeaconProxy via CREATE3.
         address deployed = _deployCreate3(
@@ -338,8 +346,6 @@ contract ExtensionFactory is
         );
 
         if (deployed != proxy) revert DeployedAddressMismatch();
-
-        _registerExtension(proxy, extensionType);
     }
 
     /// @dev   Registers an extension in the factory.

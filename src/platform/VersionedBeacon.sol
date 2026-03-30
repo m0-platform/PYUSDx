@@ -4,13 +4,14 @@ pragma solidity 0.8.34;
 import { AccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 import { IExtension } from "./interfaces/IExtension.sol";
-import { IExtensionFactory } from "./interfaces/IExtensionFactory.sol";
 import { IVersionedBeacon } from "./interfaces/IVersionedBeacon.sol";
 
 /// @title  VersionedBeacon
 /// @notice A non-upgradeable singleton beacon that resolves per-proxy implementation addresses
 ///         from an append-only version registry. M0 registers approved versions; extension owners
 ///         choose which version their proxy runs. M0 cannot force-upgrade any extension.
+///         Extension types are identified by `bytes32` type keys, making the beacon agnostic to
+///         which types exist. New types are implicitly created on first `registerVersion` call.
 /// @author M0 Labs
 contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /* ============ Variables ============ */
@@ -27,16 +28,17 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     address public immutable swapFacility;
 
-    /// @dev 1-indexed version array. Index 0 is a dummy entry so version IDs start at 1.
-    Version[] internal _versions;
+    /// @dev 1-indexed implementation arrays per type key.
+    ///      Index 0 is a dummy entry, pushed lazily on first registerVersion call for each type.
+    mapping(bytes32 typeKey => address[] implementations) internal _implementations;
 
-    /// @dev Latest version ID per extension type.
-    mapping(IExtensionFactory.ExtensionType extensionType => uint256 versionId) internal _latestVersion;
+    /// @dev Latest version ID per type key.
+    mapping(bytes32 typeKey => uint256 versionId) internal _latestVersion;
 
     /// @dev Per-proxy registration and version state.
-    ///      A proxy is considered registered if extensionType != NONE.
+    ///      A proxy is considered registered if typeKey != bytes32(0).
     struct ProxyInfo {
-        IExtensionFactory.ExtensionType extensionType;
+        bytes32 typeKey;
         address owner;
         uint256 pinnedVersion; // 0 = follow latest
     }
@@ -64,77 +66,65 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
         _grantRole(VERSION_MANAGER_ROLE, versionManager_);
-
-        // Push dummy at index 0 so version IDs are 1-indexed.
-        _versions.push(Version(address(0), IExtensionFactory.ExtensionType.NONE));
     }
 
     /* ============ Interactive Functions ============ */
 
     /// @inheritdoc IVersionedBeacon
     function registerVersion(
-        IExtensionFactory.ExtensionType extensionType,
+        bytes32 typeKey,
         address impl
     ) external onlyRole(VERSION_MANAGER_ROLE) returns (uint256 versionId) {
-        if (
-            extensionType != IExtensionFactory.ExtensionType.YIELD_TO_ONE &&
-            extensionType != IExtensionFactory.ExtensionType.MULTI_MINT
-        ) revert InvalidExtensionType();
+        if (typeKey == bytes32(0)) revert InvalidTypeKey();
 
         _revertIfInvalidImplementation(impl);
 
-        _versions.push(Version(impl, extensionType));
+        address[] storage impls = _implementations[typeKey];
 
-        // NOTE: Safe because we always have at least the dummy at index 0, so length >= 2 here.
+        // Lazy-init: push dummy at index 0 on first version registration for this type.
+        if (impls.length == 0) impls.push(address(0));
+
+        impls.push(impl);
+
+        // NOTE: Safe because length >= 2 after the push above.
         unchecked {
-            versionId = _versions.length - 1;
+            versionId = impls.length - 1;
         }
 
-        emit VersionRegistered(extensionType, versionId, impl);
+        emit VersionRegistered(typeKey, versionId, impl);
     }
 
     /// @inheritdoc IVersionedBeacon
-    function setLatestVersion(
-        IExtensionFactory.ExtensionType extensionType,
-        uint256 versionId
-    ) external onlyRole(VERSION_MANAGER_ROLE) {
-        _revertIfInvalidVersionId(versionId);
-        if (_versions[versionId].extensionType != extensionType) revert VersionTypeMismatch();
+    function setLatestVersion(bytes32 typeKey, uint256 versionId) external onlyRole(VERSION_MANAGER_ROLE) {
+        _revertIfInvalidVersionId(typeKey, versionId);
 
-        _latestVersion[extensionType] = versionId;
+        _latestVersion[typeKey] = versionId;
 
-        emit LatestVersionSet(extensionType, versionId);
+        emit LatestVersionSet(typeKey, versionId);
     }
 
     /// @inheritdoc IVersionedBeacon
-    function registerProxy(
-        address proxy,
-        IExtensionFactory.ExtensionType extensionType,
-        uint256 versionId,
-        address owner
-    ) external {
+    function registerProxy(address proxy, bytes32 typeKey, uint256 versionId, address owner) external {
         if (msg.sender != factory) revert NotFactory();
         if (proxy == address(0)) revert ZeroProxy();
         if (owner == address(0)) revert ZeroOwner();
-        if (_proxies[proxy].extensionType != IExtensionFactory.ExtensionType.NONE) revert ProxyAlreadyRegistered();
+        if (_proxies[proxy].typeKey != bytes32(0)) revert ProxyAlreadyRegistered();
 
-        _revertIfInvalidVersionId(versionId);
-        if (_versions[versionId].extensionType != extensionType) revert VersionTypeMismatch();
+        _revertIfInvalidVersionId(typeKey, versionId);
 
-        _proxies[proxy] = ProxyInfo({ extensionType: extensionType, owner: owner, pinnedVersion: versionId });
+        _proxies[proxy] = ProxyInfo({ typeKey: typeKey, owner: owner, pinnedVersion: versionId });
 
-        emit ProxyRegistered(proxy, extensionType, versionId, owner);
+        emit ProxyRegistered(proxy, typeKey, versionId, owner);
     }
 
     /// @inheritdoc IVersionedBeacon
     function pinVersion(address proxy, uint256 versionId) external {
         ProxyInfo storage info = _proxies[proxy];
-        if (info.extensionType == IExtensionFactory.ExtensionType.NONE) revert ProxyNotRegistered();
+        if (info.typeKey == bytes32(0)) revert ProxyNotRegistered();
         if (msg.sender != info.owner) revert NotProxyOwner();
 
         if (versionId != 0) {
-            _revertIfInvalidVersionId(versionId);
-            if (_versions[versionId].extensionType != info.extensionType) revert VersionTypeMismatch();
+            _revertIfInvalidVersionId(info.typeKey, versionId);
         }
 
         info.pinnedVersion = versionId;
@@ -165,21 +155,29 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     }
 
     /// @inheritdoc IVersionedBeacon
-    function latestVersion(IExtensionFactory.ExtensionType extensionType) external view returns (uint256) {
-        return _latestVersion[extensionType];
+    function proxyTypeKey(address proxy) external view returns (bytes32) {
+        return _proxies[proxy].typeKey;
     }
 
     /// @inheritdoc IVersionedBeacon
-    function getVersion(uint256 versionId) external view returns (Version memory) {
-        _revertIfInvalidVersionId(versionId);
-        return _versions[versionId];
+    function latestVersion(bytes32 typeKey) external view returns (uint256) {
+        return _latestVersion[typeKey];
     }
 
     /// @inheritdoc IVersionedBeacon
-    function versionCount() external view returns (uint256) {
+    function getVersion(bytes32 typeKey, uint256 versionId) external view returns (address) {
+        _revertIfInvalidVersionId(typeKey, versionId);
+        return _implementations[typeKey][versionId];
+    }
+
+    /// @inheritdoc IVersionedBeacon
+    function versionCount(bytes32 typeKey) external view returns (uint256) {
+        uint256 length = _implementations[typeKey].length;
+        if (length == 0) return 0;
+
         // NOTE: Subtract 1 for the dummy at index 0.
         unchecked {
-            return _versions.length - 1;
+            return length - 1;
         }
     }
 
@@ -189,20 +187,21 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @param proxy The proxy address.
     function _resolveImplementation(address proxy) internal view returns (address) {
         ProxyInfo storage info = _proxies[proxy];
-        if (info.extensionType == IExtensionFactory.ExtensionType.NONE) revert ProxyNotRegistered();
+        if (info.typeKey == bytes32(0)) revert ProxyNotRegistered();
 
         uint256 versionId = info.pinnedVersion;
         if (versionId == 0) {
-            versionId = _latestVersion[info.extensionType];
+            versionId = _latestVersion[info.typeKey];
         }
 
-        return _versions[versionId].implementation;
+        return _implementations[info.typeKey][versionId];
     }
 
-    /// @dev   Reverts if the version ID is 0 or out of range.
+    /// @dev   Reverts if the version ID is 0 or out of range for the given type key.
+    /// @param typeKey   The extension type key.
     /// @param versionId The version ID to validate.
-    function _revertIfInvalidVersionId(uint256 versionId) internal view {
-        if (versionId == 0 || versionId >= _versions.length) revert InvalidVersion();
+    function _revertIfInvalidVersionId(bytes32 typeKey, uint256 versionId) internal view {
+        if (versionId == 0 || versionId >= _implementations[typeKey].length) revert InvalidVersion();
     }
 
     /// @dev   Reverts if the implementation address is zero or wired to wrong pyusdx/swapFacility.
