@@ -55,9 +55,6 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @dev Whether an entire extension type is paused.
     mapping(bytes32 typeKey => bool) internal _typePaused;
 
-    /// @dev Pause implementation per type key and version ID.
-    mapping(bytes32 typeKey => mapping(uint256 versionId => address)) internal _pauseImplementations;
-
     /// @dev Whether a specific version of an extension type is paused.
     mapping(bytes32 typeKey => mapping(uint256 versionId => bool)) internal _versionPaused;
 
@@ -110,13 +107,11 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     function registerVersion(
         bytes32 typeKey,
-        address impl,
-        address pauseImpl
+        address impl
     ) external onlyRole(VERSION_MANAGER_ROLE) returns (uint256 versionId) {
         if (!_registeredTypeKeys[typeKey]) revert TypeKeyNotRegistered();
 
         _revertIfInvalidImplementation(impl);
-        _revertIfInvalidImplementation(pauseImpl);
 
         address[] storage impls = _implementations[typeKey];
         impls.push(impl);
@@ -126,8 +121,6 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
             versionId = impls.length - 1;
         }
 
-        _pauseImplementations[typeKey][versionId] = pauseImpl;
-
         // Auto-set latest on first version for this type so unpinned proxies always resolve.
         if (versionId == 1) {
             _latestVersion[typeKey] = 1;
@@ -135,7 +128,6 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         }
 
         emit VersionRegistered(typeKey, versionId, impl);
-        emit PauseImplementationRegistered(typeKey, versionId, pauseImpl);
     }
 
     /// @inheritdoc IVersionedBeacon
@@ -192,8 +184,6 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     function pauseVersion(bytes32 typeKey, uint256 versionId) external onlyRole(PAUSE_MANAGER_ROLE) {
         _revertIfInvalidVersionId(typeKey, versionId);
-
-        if (_pauseImplementations[typeKey][versionId] == address(0)) revert NoPauseImplementation();
 
         _versionPaused[typeKey][versionId] = true;
 
@@ -292,14 +282,21 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     }
 
     /// @inheritdoc IVersionedBeacon
-    function getPauseImplementation(bytes32 typeKey, uint256 versionId) external view returns (address) {
-        return _pauseImplementations[typeKey][versionId];
+    function isProxyPaused(address proxy) external view returns (bool) {
+        ProxyInfo storage info = _proxies[proxy];
+        if (info.typeKey == bytes32(0)) return false;
+
+        if (_typePaused[info.typeKey]) return true;
+
+        uint256 versionId = info.pinnedVersion;
+        if (versionId == 0) versionId = _latestVersion[info.typeKey];
+
+        return _versionPaused[info.typeKey][versionId];
     }
 
     /* ============ Internal View Functions ============ */
 
     /// @dev   Resolves the implementation address for a given proxy.
-    ///        If the proxy's type or version is paused, returns the pause implementation instead.
     /// @param proxy The proxy address.
     function _resolveImplementation(address proxy) internal view returns (address) {
         ProxyInfo storage info = _proxies[proxy];
@@ -308,13 +305,6 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         uint256 versionId = info.pinnedVersion;
         if (versionId == 0) {
             versionId = _latestVersion[info.typeKey];
-        }
-
-        // Check pause: type-level first, then version-level.
-        if (_typePaused[info.typeKey] || _versionPaused[info.typeKey][versionId]) {
-            address pauseImpl = _pauseImplementations[info.typeKey][versionId];
-            if (pauseImpl == address(0)) revert NoPauseImplementation();
-            return pauseImpl;
         }
 
         address impl = _implementations[info.typeKey][versionId];

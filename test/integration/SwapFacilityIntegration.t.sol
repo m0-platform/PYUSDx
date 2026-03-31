@@ -29,8 +29,7 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: admin
         });
 
         vm.prank(admin);
@@ -49,7 +48,6 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -223,7 +221,6 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
                 yieldRecipient,
                 admin,
                 freezeManager,
-                pauser,
                 admin
             )
         );

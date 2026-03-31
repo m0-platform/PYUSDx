@@ -14,12 +14,17 @@ import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+import { MockVersionedBeacon } from "../mock/MockVersionedBeacon.sol";
 
 contract YieldToOneUnitTests is Test {
     MockIssuerGateway public issuerGateway;
     PYUSDXHarness public pyusdx;
     MockSwapFacility public swapFacility;
     YieldToOne public extension;
+    MockVersionedBeacon public mockBeacon;
+
+    /// @dev ERC-1967 beacon storage slot (same as YieldToOne._BEACON_SLOT).
+    bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
 
     address public admin = makeAddr("admin");
     address public pauser = makeAddr("pauser");
@@ -76,7 +81,6 @@ contract YieldToOneUnitTests is Test {
                     yieldRecipient,
                     admin,
                     freezeManager,
-                    pauser,
                     yieldRecipientManager
                 )
             )
@@ -86,6 +90,10 @@ contract YieldToOneUnitTests is Test {
         pyusdx.setAccountInfo(address(extension), 500, 0, address(0));
 
         pyusdx.setAccountRateBps(address(extension), uint24(500));
+
+        // Deploy a mock beacon and wire it into the extension's ERC-1967 beacon slot.
+        mockBeacon = new MockVersionedBeacon();
+        vm.store(address(extension), _BEACON_SLOT, bytes32(uint256(uint160(address(mockBeacon)))));
     }
 
     /* ============ Helpers ============ */
@@ -125,7 +133,6 @@ contract YieldToOneUnitTests is Test {
                 yieldRecipient,
                 address(0),
                 freezeManager,
-                pauser,
                 yieldRecipientManager
             )
         );
@@ -144,7 +151,6 @@ contract YieldToOneUnitTests is Test {
                 yieldRecipient,
                 admin,
                 freezeManager,
-                pauser,
                 address(0)
             )
         );
@@ -211,7 +217,6 @@ contract YieldToOneUnitTests is Test {
                     yieldRecipient,
                     admin,
                     freezeManager,
-                    pauser,
                     yieldRecipientManager
                 )
             )
@@ -437,5 +442,61 @@ contract YieldToOneUnitTests is Test {
             abi.encodeWithSelector(IExtension.InsufficientBalance.selector, alice, MINT_AMOUNT, MINT_AMOUNT + 1)
         );
         extension.transfer(bob, MINT_AMOUNT + 1);
+    }
+
+    /* ============ Pausable (beacon-based) ============ */
+
+    function test_wrap_revert_paused() public {
+        issuerGateway.mint(alice, MINT_AMOUNT);
+
+        mockBeacon.setPaused(true);
+
+        vm.startPrank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), MINT_AMOUNT);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+    }
+
+    function test_transfer_revert_paused() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        mockBeacon.setPaused(true);
+
+        vm.prank(alice);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        extension.transfer(bob, 400e6);
+    }
+
+    function test_unwrap_revert_paused() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        mockBeacon.setPaused(true);
+
+        vm.startPrank(alice);
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+    }
+
+    function test_approve_succeedsWhenPaused() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        mockBeacon.setPaused(true);
+
+        vm.prank(alice);
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+    }
+
+    function test_claimYield_succeedsWhenPaused() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        mockBeacon.setPaused(true);
+
+        uint256 claimed = extension.claimYield();
+        assertGt(claimed, 0);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 }

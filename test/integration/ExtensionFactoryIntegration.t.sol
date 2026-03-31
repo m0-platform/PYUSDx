@@ -184,7 +184,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -225,7 +224,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: address(0),
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -240,7 +238,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -263,7 +260,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -282,7 +278,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -292,7 +287,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -310,7 +304,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -340,7 +333,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -382,7 +374,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: address(0),
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -398,7 +389,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -422,7 +412,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -433,7 +422,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -452,7 +440,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -486,8 +473,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: admin
         });
 
         IExtensionFactory.MultiMintParams memory mmParams = IExtensionFactory.MultiMintParams({
@@ -497,7 +483,6 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -517,8 +502,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: admin
         });
 
         (address proxy, , ) = factory.deployYieldToOne(string("yto-status-test"), params);
@@ -543,8 +527,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: admin
         });
 
         (address proxy, , ) = factory.deployYieldToOne(string("yto-reactivate-test"), params);
@@ -571,8 +554,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: admin
         });
 
         (address proxy, , ) = factory.deployYieldToOne(string("yto-idempotent-test"), params);
@@ -610,8 +592,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: admin
         });
 
         (address proxy, , ) = factory.deployYieldToOne(string("yto-not-manager-test"), params);
@@ -661,8 +642,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: admin
         });
 
         // Deploy first proxy with original implementation
@@ -681,8 +661,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: admin
         });
 
         (address proxy2, , ) = factory.deployYieldToOne(string("yto-impl-test-2"), params2);

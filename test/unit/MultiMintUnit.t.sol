@@ -18,12 +18,17 @@ import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openze
 import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { MockERC20 } from "../mock/MockERC20.sol";
 import { MockFeeOnTransfer } from "../mock/MockFeeOnTransfer.sol";
+import { MockVersionedBeacon } from "../mock/MockVersionedBeacon.sol";
 
 contract MultiMintTest is Test {
     MockIssuerGateway public issuerGateway;
     PYUSDXHarness public pyusdx;
     MockSwapFacility public swapFacility;
     MultiMint public extension;
+    MockVersionedBeacon public mockBeacon;
+
+    /// @dev ERC-1967 beacon storage slot (same as YieldToOne._BEACON_SLOT).
+    bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
 
     MockERC20 public usdc; // 6 decimals
     MockERC20 public dai; // 18 decimals
@@ -85,7 +90,6 @@ contract MultiMintTest is Test {
                     admin,
                     assetCapManager,
                     freezeManager,
-                    pauser,
                     yieldRecipientManager
                 )
             )
@@ -105,6 +109,10 @@ contract MultiMintTest is Test {
         extension.setAssetCap(address(dai), 1_000_000e18);
         extension.setAssetCap(address(fourDec), 1_000_000e4);
         vm.stopPrank();
+
+        // Deploy a mock beacon and wire it into the extension's ERC-1967 beacon slot.
+        mockBeacon = new MockVersionedBeacon();
+        vm.store(address(extension), _BEACON_SLOT, bytes32(uint256(uint160(address(mockBeacon)))));
     }
 
     /* ============ Helpers ============ */
@@ -763,6 +771,8 @@ contract MultiMintTest is Test {
         assertFalse(extension.isAllowedToUnwrap(0));
     }
 
+    /* ============ isAllowedToReplaceAsset ============ */
+
     function test_isAllowedToReplaceAsset() public {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
@@ -775,5 +785,89 @@ contract MultiMintTest is Test {
 
         assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 0));
         assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 101e6));
+    }
+
+    /* ============ InsufficientAssetReceived ============ */
+
+    function test_wrap_asset_revert_insufficientAssetReceived() public {
+        MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
+
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(feeToken), 1_000_000e6);
+
+        // Pre-fund swap facility so safeTransferFrom (L238) succeeds despite prior fee loss.
+        feeToken.mint(address(swapFacility), 100e6);
+
+        feeToken.mint(alice, 200e6);
+        vm.startPrank(alice);
+        feeToken.approve(address(swapFacility), 200e6);
+        vm.expectRevert(
+            abi.encodeWithSelector(IMultiMint.InsufficientAssetReceived.selector, address(feeToken), 200e6, 198e6)
+        );
+        swapFacility.swapInAsset(address(extension), address(feeToken), 200e6, alice);
+        vm.stopPrank();
+    }
+
+    /* ============ Pausable (beacon-based) ============ */
+
+    function test_wrap_pyusdx_revert_paused() public {
+        issuerGateway.mint(alice, MINT_AMOUNT);
+
+        mockBeacon.setPaused(true);
+
+        vm.startPrank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), MINT_AMOUNT);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+    }
+
+    function test_wrap_asset_revert_paused() public {
+        mockBeacon.setPaused(true);
+
+        usdc.mint(alice, 100e6);
+        vm.startPrank(alice);
+        usdc.approve(address(swapFacility), 100e6);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.swapInAsset(address(extension), address(usdc), 100e6, alice);
+        vm.stopPrank();
+    }
+
+    function test_unwrap_revert_paused() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        mockBeacon.setPaused(true);
+
+        vm.startPrank(alice);
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+    }
+
+    function test_replaceAsset_revert_paused() public {
+        _wrapAssetFor(alice, address(usdc), 100e6);
+
+        issuerGateway.mint(bob, 50e6);
+        vm.startPrank(bob);
+        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
+        vm.stopPrank();
+
+        mockBeacon.setPaused(true);
+
+        vm.prank(bob);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
+    }
+
+    function test_claimYield_succeedsWhenPaused() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        mockBeacon.setPaused(true);
+
+        uint256 claimed = extension.claimYield();
+        assertGt(claimed, 0);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 }

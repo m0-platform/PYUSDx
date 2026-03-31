@@ -2,12 +2,12 @@
 pragma solidity 0.8.34;
 
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { IVersionedBeacon } from "../../src/platform/interfaces/IVersionedBeacon.sol";
-import { PausedYieldToOne } from "../../src/platform/projects/PausedYieldToOne.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
@@ -28,7 +28,6 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
 
     address public yieldToOneImplV1;
     address public yieldToOneImplV2;
-    address public pausedYieldToOneImpl;
 
     function setUp() public override {
         super.setUp();
@@ -38,14 +37,13 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         // Deploy v1 (base YieldToOne) and v2 (YieldToOneV2 with ping())
         yieldToOneImplV1 = address(new YieldToOne(address(pyusdx), address(swapFacility)));
         yieldToOneImplV2 = address(new YieldToOneV2(address(pyusdx), address(swapFacility)));
-        pausedYieldToOneImpl = address(new PausedYieldToOne(address(pyusdx), address(swapFacility)));
     }
 
     function test_fullBeaconLifecycle() public {
         /* ============ M0 registers version 1 ============ */
 
         vm.prank(admin);
-        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1, pausedYieldToOneImpl);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
 
         vm.prank(admin);
         beacon.setLatestVersion(YIELD_TO_ONE_TYPE_KEY, v1);
@@ -63,7 +61,6 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: builder,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: builder
         });
 
@@ -111,7 +108,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         /* ============ M0 publishes v2, builder upgrades ============ */
 
         vm.prank(admin);
-        uint256 v2 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV2, pausedYieldToOneImpl);
+        uint256 v2 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV2);
 
         vm.prank(admin);
         beacon.setLatestVersion(YIELD_TO_ONE_TYPE_KEY, v2);
@@ -155,7 +152,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
 
         // Deploy a YieldToOne extension BEFORE registering the new type
         vm.prank(admin);
-        uint256 ytoV1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1, pausedYieldToOneImpl);
+        uint256 ytoV1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
 
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: "Existing Extension",
@@ -163,7 +160,6 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: builder,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: builder
         });
 
@@ -191,10 +187,10 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         beacon.registerTypeKey(YIELD_SPLIT_TYPE_KEY);
 
         vm.prank(admin);
-        uint256 v1 = beacon.registerVersion(YIELD_SPLIT_TYPE_KEY, yieldToOneImplV1, pausedYieldToOneImpl);
+        uint256 v1 = beacon.registerVersion(YIELD_SPLIT_TYPE_KEY, yieldToOneImplV1);
 
         vm.prank(admin);
-        uint256 v2 = beacon.registerVersion(YIELD_SPLIT_TYPE_KEY, yieldToOneImplV2, pausedYieldToOneImpl);
+        uint256 v2 = beacon.registerVersion(YIELD_SPLIT_TYPE_KEY, yieldToOneImplV2);
 
         // New type has correct state
         assertEq(v1, 1);
@@ -230,7 +226,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
 
         vm.expectRevert(IVersionedBeacon.TypeKeyNotRegistered.selector);
         vm.prank(admin);
-        beacon.registerVersion(unregisteredKey, yieldToOneImplV1, pausedYieldToOneImpl);
+        beacon.registerVersion(unregisteredKey, yieldToOneImplV1);
     }
 
     function test_registerTypeKey_revert_zeroKey() public {
@@ -242,7 +238,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
     function test_pinVersion_revert_nonOwner() public {
         // Setup: register version and deploy extension owned by builder
         vm.prank(admin);
-        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1, pausedYieldToOneImpl);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
 
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: "Builder YieldToOne",
@@ -250,7 +246,6 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: builder,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: builder
         });
 
@@ -273,7 +268,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
     function test_pinVersion_revert_invalidVersion() public {
         // Setup: register one version and deploy extension
         vm.prank(admin);
-        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1, pausedYieldToOneImpl);
+        beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
 
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: "Builder YieldToOne",
@@ -281,7 +276,6 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: builder,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: builder
         });
 
@@ -300,7 +294,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         /* ============ Register v1, deploy ext on v1, then register v2 ============ */
 
         vm.prank(admin);
-        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1, pausedYieldToOneImpl);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
 
         // Deploy first extension while v1 is latest
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
@@ -309,7 +303,6 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: builder,
             freezeManager: freezeManager,
-            pauser: pauser,
             yieldRecipientManager: builder
         });
 
@@ -318,14 +311,10 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
 
         // Now register v2 and promote it to latest
         vm.prank(admin);
-        uint256 v2 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV2, pausedYieldToOneImpl);
+        uint256 v2 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV2);
 
         vm.prank(admin);
         beacon.setLatestVersion(YIELD_TO_ONE_TYPE_KEY, v2);
-
-        // Verify pause impls were registered
-        assertEq(beacon.getPauseImplementation(YIELD_TO_ONE_TYPE_KEY, v1), pausedYieldToOneImpl);
-        assertEq(beacon.getPauseImplementation(YIELD_TO_ONE_TYPE_KEY, v2), pausedYieldToOneImpl);
 
         // Deploy second extension on v2 (now latest)
         params.name = "Extension V2";
@@ -369,8 +358,12 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         assertTrue(beacon.isVersionPaused(YIELD_TO_ONE_TYPE_KEY, v2));
         assertFalse(beacon.isVersionPaused(YIELD_TO_ONE_TYPE_KEY, v1));
 
-        // v2 proxy: impl now resolves to pause implementation
-        assertEq(beacon.implementationFor(proxyV2), pausedYieldToOneImpl);
+        // v2 proxy: implementation still returns normal impl (no swap)
+        assertEq(beacon.implementationFor(proxyV2), yieldToOneImplV2);
+
+        // v2 proxy: paused() returns true via beacon check
+        assertTrue(extV2.paused());
+        assertTrue(beacon.isProxyPaused(proxyV2));
 
         // v2 proxy: view functions still work
         assertEq(extV2.balanceOf(alice), wrapAmount);
@@ -378,17 +371,18 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         assertEq(extV2.name(), "Extension V2");
         assertEq(extV2.symbol(), "EV2");
 
-        // v2 proxy: state-changing functions revert
+        // v2 proxy: transfer reverts with EnforcedPause
         vm.prank(alice);
-        vm.expectRevert(IVersionedBeacon.ExtensionPaused.selector);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
         IERC20(proxyV2).transfer(bob, 100e6);
 
+        // v2 proxy: approve still works (not guarded by _requireNotPaused)
         vm.prank(alice);
-        vm.expectRevert(IVersionedBeacon.ExtensionPaused.selector);
         IERC20(proxyV2).approve(address(swapFacility), wrapAmount);
 
         // v1 proxy: completely unaffected, transfers work
         assertEq(beacon.implementationFor(proxyV1), yieldToOneImplV1);
+        assertFalse(extV1.paused());
 
         vm.prank(alice);
         IERC20(proxyV1).transfer(bob, 100e6);
@@ -402,6 +396,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         beacon.unpauseVersion(YIELD_TO_ONE_TYPE_KEY, v2);
 
         assertFalse(beacon.isVersionPaused(YIELD_TO_ONE_TYPE_KEY, v2));
+        assertFalse(extV2.paused());
         assertEq(beacon.implementationFor(proxyV2), yieldToOneImplV2);
 
         // v2 proxy can transfer again
@@ -418,21 +413,27 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
 
         assertTrue(beacon.isTypePaused(YIELD_TO_ONE_TYPE_KEY));
 
-        // Both proxies resolve to their pause impls
-        assertEq(beacon.implementationFor(proxyV1), pausedYieldToOneImpl);
-        assertEq(beacon.implementationFor(proxyV2), pausedYieldToOneImpl);
+        // Both proxies are paused
+        assertTrue(extV1.paused());
+        assertTrue(extV2.paused());
+        assertTrue(beacon.isProxyPaused(proxyV1));
+        assertTrue(beacon.isProxyPaused(proxyV2));
+
+        // Implementation still returns normal impls (no swap)
+        assertEq(beacon.implementationFor(proxyV1), yieldToOneImplV1);
+        assertEq(beacon.implementationFor(proxyV2), yieldToOneImplV2);
 
         // Both: views work
         assertEq(extV1.balanceOf(bob), 100e6);
         assertEq(extV2.balanceOf(bob), 100e6);
 
-        // Both: mutations revert
+        // Both: transfers revert with EnforcedPause
         vm.prank(bob);
-        vm.expectRevert(IVersionedBeacon.ExtensionPaused.selector);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
         IERC20(proxyV1).transfer(alice, 50e6);
 
         vm.prank(bob);
-        vm.expectRevert(IVersionedBeacon.ExtensionPaused.selector);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
         IERC20(proxyV2).transfer(alice, 50e6);
 
         /* ============ Type unpause: resume normal operations ============ */
@@ -441,6 +442,8 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         beacon.unpauseType(YIELD_TO_ONE_TYPE_KEY);
 
         assertFalse(beacon.isTypePaused(YIELD_TO_ONE_TYPE_KEY));
+        assertFalse(extV1.paused());
+        assertFalse(extV2.paused());
 
         // Both proxies resolve to their real impls
         assertEq(beacon.implementationFor(proxyV1), yieldToOneImplV1);

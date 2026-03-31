@@ -21,7 +21,6 @@ contract DeployMultiMint is DeployBase {
             admin: vm.envAddress("ADMIN"),
             assetCapManager: vm.envAddress("ASSET_CAP_MANAGER"),
             freezeManager: vm.envAddress("FREEZE_MANAGER"),
-            pauser: vm.envAddress("PAUSER"),
             yieldRecipientManager: vm.envAddress("YIELD_RECIPIENT_MANAGER")
         });
 

@@ -133,7 +133,6 @@ contract ExtensionFactory is
             params.yieldRecipient,
             params.admin,
             params.freezeManager,
-            params.pauser,
             params.yieldRecipientManager
         );
 
@@ -170,7 +169,6 @@ contract ExtensionFactory is
             params.admin,
             params.assetCapManager,
             params.freezeManager,
-            params.pauser,
             params.yieldRecipientManager
         );
 
@@ -207,7 +205,6 @@ contract ExtensionFactory is
             params.yieldRecipient,
             params.admin,
             params.freezeManager,
-            params.pauser,
             params.yieldRecipientManager
         );
 
@@ -236,7 +233,6 @@ contract ExtensionFactory is
             params.admin,
             params.assetCapManager,
             params.freezeManager,
-            params.pauser,
             params.yieldRecipientManager
         );
 

@@ -41,12 +41,6 @@ interface IVersionedBeacon is IBeacon {
     /// @param  newOwner     The new owner address.
     event ProxyOwnershipTransferred(address indexed proxy, address indexed previousOwner, address indexed newOwner);
 
-    /// @notice Emitted when a pause implementation is registered for a version.
-    /// @param  typeKey   The extension type key.
-    /// @param  versionId The version ID.
-    /// @param  pauseImpl The pause implementation address.
-    event PauseImplementationRegistered(bytes32 indexed typeKey, uint256 indexed versionId, address indexed pauseImpl);
-
     /// @notice Emitted when a specific version is paused.
     /// @param  typeKey   The extension type key.
     /// @param  versionId The version ID.
@@ -122,14 +116,8 @@ interface IVersionedBeacon is IBeacon {
     /// @notice Thrown if the owner address is 0x0.
     error ZeroOwner();
 
-    /// @notice Thrown if no pause implementation is registered for a paused version.
-    error NoPauseImplementation();
-
     /// @notice Thrown if the pause manager address is 0x0.
     error ZeroPauseManager();
-
-    /// @notice Thrown when any state-changing function is called on a paused extension.
-    error ExtensionPaused();
 
     /* ============ Interactive Functions ============ */
 
@@ -138,18 +126,14 @@ interface IVersionedBeacon is IBeacon {
     /// @param  typeKey The extension type key (e.g., `keccak256("YIELD_TO_ONE")`).
     function registerTypeKey(bytes32 typeKey) external;
 
-    /// @notice Registers a new implementation version with its associated pause implementation.
-    ///         Append-only — cannot overwrite existing versions.
+    /// @notice Registers a new implementation version. Append-only — cannot overwrite existing versions.
     /// @dev    MUST only be callable by an address with the `VERSION_MANAGER_ROLE` role.
-    ///         Validates that both `impl` and `pauseImpl` have matching `pyusdx()` and `swapFacility()`.
-    ///         Version IDs are scoped per type key and 1-indexed. The first call for a new type key
-    ///         implicitly initializes that type. The `pauseImpl` may be reused across versions if the
-    ///         storage layout has not changed.
+    ///         Validates that `impl` has matching `pyusdx()` and `swapFacility()`.
+    ///         Version IDs are scoped per type key and 1-indexed.
     /// @param  typeKey   The extension type key (e.g., `keccak256("YIELD_TO_ONE")`).
     /// @param  impl      The implementation address.
-    /// @param  pauseImpl The read-only pause implementation address.
     /// @return versionId The assigned version ID (1-indexed, per type key).
-    function registerVersion(bytes32 typeKey, address impl, address pauseImpl) external returns (uint256 versionId);
+    function registerVersion(bytes32 typeKey, address impl) external returns (uint256 versionId);
 
     /// @notice Sets which version is "latest" for an extension type.
     /// @dev    MUST only be callable by an address with the `VERSION_MANAGER_ROLE` role.
@@ -180,9 +164,8 @@ interface IVersionedBeacon is IBeacon {
     /// @param  newOwner The new owner address.
     function transferProxyOwnership(address proxy, address newOwner) external;
 
-    /// @notice Pauses a specific version. Proxies on this version resolve to the pause implementation.
+    /// @notice Pauses a specific version.
     /// @dev    MUST only be callable by an address with the `PAUSE_MANAGER_ROLE` role.
-    ///         Reverts if no pause implementation is registered for the version.
     /// @param  typeKey   The extension type key.
     /// @param  versionId The version ID.
     function pauseVersion(bytes32 typeKey, uint256 versionId) external;
@@ -193,8 +176,7 @@ interface IVersionedBeacon is IBeacon {
     /// @param  versionId The version ID.
     function unpauseVersion(bytes32 typeKey, uint256 versionId) external;
 
-    /// @notice Pauses an entire extension type. All proxies of this type resolve to their
-    ///         version's pause implementation.
+    /// @notice Pauses an entire extension type.
     /// @dev    MUST only be callable by an address with the `PAUSE_MANAGER_ROLE` role.
     /// @param  typeKey The extension type key.
     function pauseType(bytes32 typeKey) external;
@@ -210,7 +192,6 @@ interface IVersionedBeacon is IBeacon {
     /// @dev    Called by OZ `BeaconProxy` on every delegatecall. Resolves per-proxy based on
     ///         `msg.sender` (the proxy's address). If the proxy is pinned, returns the pinned
     ///         version's implementation. If unpinned, returns the latest version's implementation.
-    ///         If the proxy's type or version is paused, returns the pause implementation.
     /// @return The resolved implementation address.
     function implementation() external view override returns (address);
 
@@ -281,9 +262,8 @@ interface IVersionedBeacon is IBeacon {
     /// @return True if the type key is registered.
     function isRegisteredTypeKey(bytes32 typeKey) external view returns (bool);
 
-    /// @notice Returns the pause implementation for a specific version.
-    /// @param  typeKey   The extension type key.
-    /// @param  versionId The version ID.
-    /// @return The pause implementation address (address(0) if not registered).
-    function getPauseImplementation(bytes32 typeKey, uint256 versionId) external view returns (address);
+    /// @notice Returns whether a proxy is paused (via type-level or version-level pause).
+    /// @param  proxy The proxy address.
+    /// @return True if the proxy is paused.
+    function isProxyPaused(address proxy) external view returns (bool);
 }

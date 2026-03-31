@@ -3,8 +3,6 @@ pragma solidity 0.8.34;
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
-import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
-
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
@@ -25,8 +23,7 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: admin
         });
 
         vm.prank(admin);
@@ -251,36 +248,6 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         swapFacility.swapIn(address(yieldToOne), AMOUNT, alice);
 
         assertEq(yieldToOne.balanceOf(alice), AMOUNT);
-    }
-
-    /* ============ pause ============ */
-
-    function testIntegration_pause_blocksWrap() public {
-        _mintPYUSDX(alice, AMOUNT);
-
-        vm.prank(pauser);
-        yieldToOne.pause();
-
-        vm.prank(alice);
-        IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
-
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-
-        vm.prank(alice);
-        swapFacility.swapIn(address(yieldToOne), AMOUNT, alice);
-    }
-
-    function testIntegration_pause_claimYieldSucceeds() public {
-        _wrapFor(alice, AMOUNT);
-
-        vm.warp(block.timestamp + 365 days);
-
-        vm.prank(pauser);
-        yieldToOne.pause();
-
-        // claimYield should still succeed — _beforeClaimYield is a no-op
-        uint256 claimed = yieldToOne.claimYield();
-        assertGt(claimed, 0);
     }
 
     /* ============ complex scenarios ============ */
