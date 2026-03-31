@@ -41,6 +41,30 @@ interface IVersionedBeacon is IBeacon {
     /// @param  newOwner     The new owner address.
     event ProxyOwnershipTransferred(address indexed proxy, address indexed previousOwner, address indexed newOwner);
 
+    /// @notice Emitted when a pause implementation is registered for a version.
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version ID.
+    /// @param  pauseImpl The pause implementation address.
+    event PauseImplementationRegistered(bytes32 indexed typeKey, uint256 indexed versionId, address indexed pauseImpl);
+
+    /// @notice Emitted when a specific version is paused.
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version ID.
+    event VersionPaused(bytes32 indexed typeKey, uint256 indexed versionId);
+
+    /// @notice Emitted when a specific version is unpaused.
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version ID.
+    event VersionUnpaused(bytes32 indexed typeKey, uint256 indexed versionId);
+
+    /// @notice Emitted when an entire extension type is paused.
+    /// @param  typeKey The extension type key.
+    event TypePaused(bytes32 indexed typeKey);
+
+    /// @notice Emitted when an entire extension type is unpaused.
+    /// @param  typeKey The extension type key.
+    event TypeUnpaused(bytes32 indexed typeKey);
+
     /* ============ Errors ============ */
 
     /// @notice Thrown if the implementation address is 0x0.
@@ -88,17 +112,29 @@ interface IVersionedBeacon is IBeacon {
     /// @notice Thrown if the owner address is 0x0.
     error ZeroOwner();
 
+    /// @notice Thrown if no pause implementation is registered for a paused version.
+    error NoPauseImplementation();
+
+    /// @notice Thrown if the pause manager address is 0x0.
+    error ZeroPauseManager();
+
+    /// @notice Thrown when any state-changing function is called on a paused extension.
+    error ExtensionPaused();
+
     /* ============ Interactive Functions ============ */
 
-    /// @notice Registers a new implementation version. Append-only — cannot overwrite existing versions.
+    /// @notice Registers a new implementation version with its associated pause implementation.
+    ///         Append-only — cannot overwrite existing versions.
     /// @dev    MUST only be callable by an address with the `VERSION_MANAGER_ROLE` role.
-    ///         Validates that the implementation's `pyusdx()` and `swapFacility()` match this beacon's.
+    ///         Validates that both `impl` and `pauseImpl` have matching `pyusdx()` and `swapFacility()`.
     ///         Version IDs are scoped per type key and 1-indexed. The first call for a new type key
-    ///         implicitly initializes that type.
+    ///         implicitly initializes that type. The `pauseImpl` may be reused across versions if the
+    ///         storage layout has not changed.
     /// @param  typeKey   The extension type key (e.g., `keccak256("YIELD_TO_ONE")`).
     /// @param  impl      The implementation address.
+    /// @param  pauseImpl The read-only pause implementation address.
     /// @return versionId The assigned version ID (1-indexed, per type key).
-    function registerVersion(bytes32 typeKey, address impl) external returns (uint256 versionId);
+    function registerVersion(bytes32 typeKey, address impl, address pauseImpl) external returns (uint256 versionId);
 
     /// @notice Sets which version is "latest" for an extension type.
     /// @dev    MUST only be callable by an address with the `VERSION_MANAGER_ROLE` role.
@@ -129,10 +165,37 @@ interface IVersionedBeacon is IBeacon {
     /// @param  newOwner The new owner address.
     function transferProxyOwnership(address proxy, address newOwner) external;
 
+    /// @notice Pauses a specific version. Proxies on this version resolve to the pause implementation.
+    /// @dev    MUST only be callable by an address with the `PAUSE_MANAGER_ROLE` role.
+    ///         Reverts if no pause implementation is registered for the version.
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version ID.
+    function pauseVersion(bytes32 typeKey, uint256 versionId) external;
+
+    /// @notice Unpauses a specific version. Proxies resume resolving to the normal implementation.
+    /// @dev    MUST only be callable by an address with the `PAUSE_MANAGER_ROLE` role.
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version ID.
+    function unpauseVersion(bytes32 typeKey, uint256 versionId) external;
+
+    /// @notice Pauses an entire extension type. All proxies of this type resolve to their
+    ///         version's pause implementation.
+    /// @dev    MUST only be callable by an address with the `PAUSE_MANAGER_ROLE` role.
+    /// @param  typeKey The extension type key.
+    function pauseType(bytes32 typeKey) external;
+
+    /// @notice Unpauses an entire extension type.
+    /// @dev    MUST only be callable by an address with the `PAUSE_MANAGER_ROLE` role.
+    /// @param  typeKey The extension type key.
+    function unpauseType(bytes32 typeKey) external;
+
     /* ============ View/Pure Functions ============ */
 
     /// @notice The role identifier for the version manager role.
     function VERSION_MANAGER_ROLE() external view returns (bytes32);
+
+    /// @notice The role identifier for the pause manager role.
+    function PAUSE_MANAGER_ROLE() external view returns (bytes32);
 
     /// @notice The factory address (immutable).
     function factory() external view returns (address);
@@ -178,4 +241,21 @@ interface IVersionedBeacon is IBeacon {
     /// @param  typeKey The extension type key.
     /// @return The version count (excluding the dummy at index 0).
     function versionCount(bytes32 typeKey) external view returns (uint256);
+
+    /// @notice Returns whether a specific version is paused.
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version ID.
+    /// @return True if the version is paused.
+    function isVersionPaused(bytes32 typeKey, uint256 versionId) external view returns (bool);
+
+    /// @notice Returns whether an entire extension type is paused.
+    /// @param  typeKey The extension type key.
+    /// @return True if the type is paused.
+    function isTypePaused(bytes32 typeKey) external view returns (bool);
+
+    /// @notice Returns the pause implementation for a specific version.
+    /// @param  typeKey   The extension type key.
+    /// @param  versionId The version ID.
+    /// @return The pause implementation address (address(0) if not registered).
+    function getPauseImplementation(bytes32 typeKey, uint256 versionId) external view returns (address);
 }

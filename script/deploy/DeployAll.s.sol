@@ -77,5 +77,6 @@ contract DeployAll is DeployBase {
         config.admin = vm.envAddress("FACTORY_ADMIN");
         config.factoryManager = vm.envAddress("FACTORY_MANAGER");
         config.versionManager = vm.envAddress("FACTORY_VERSION_MANAGER");
+        config.pauseManager = vm.envAddress("FACTORY_PAUSE_MANAGER");
     }
 }

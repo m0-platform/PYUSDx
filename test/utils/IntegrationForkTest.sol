@@ -68,7 +68,12 @@ abstract contract IntegrationForkTest is BaseForkTest {
                 mintTTL: MINT_TTL
             }),
             Config.SwapFacilityConfig({ admin: admin, pauser: pauser }),
-            Config.FactoryConfig({ admin: admin, factoryManager: factoryManager, versionManager: admin })
+            Config.FactoryConfig({
+                admin: admin,
+                factoryManager: factoryManager,
+                versionManager: admin,
+                pauseManager: admin
+            })
         );
 
         pyusdx = PYUSDX(deployments_.pyusdxProxy);

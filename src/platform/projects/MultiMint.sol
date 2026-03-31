@@ -135,7 +135,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     }
 
     /// @inheritdoc IMultiMint
-    function setAssetCap(address asset, uint256 cap) external onlyRole(ASSET_CAP_MANAGER_ROLE) {
+    function setAssetCap(address asset, uint256 cap) external virtual onlyRole(ASSET_CAP_MANAGER_ROLE) {
         _revertIfInvalidAsset(asset);
 
         MultiMintStorage storage $ = _getMultiMintStorage();

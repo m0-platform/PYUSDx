@@ -2,6 +2,7 @@
 pragma solidity 0.8.34;
 
 import { AccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import { IBeacon } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/proxy/beacon/IBeacon.sol";
 
 import { IExtension } from "./interfaces/IExtension.sol";
 import { IVersionedBeacon } from "./interfaces/IVersionedBeacon.sol";
@@ -18,6 +19,9 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
 
     /// @inheritdoc IVersionedBeacon
     bytes32 public constant VERSION_MANAGER_ROLE = keccak256("VERSION_MANAGER_ROLE");
+
+    /// @inheritdoc IVersionedBeacon
+    bytes32 public constant PAUSE_MANAGER_ROLE = keccak256("PAUSE_MANAGER_ROLE");
 
     /// @inheritdoc IVersionedBeacon
     address public immutable factory;
@@ -45,6 +49,15 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
 
     mapping(address proxy => ProxyInfo info) internal _proxies;
 
+    /// @dev Whether an entire extension type is paused.
+    mapping(bytes32 typeKey => bool) internal _typePaused;
+
+    /// @dev Pause implementation per type key and version ID.
+    mapping(bytes32 typeKey => mapping(uint256 versionId => address)) internal _pauseImplementations;
+
+    /// @dev Whether a specific version of an extension type is paused.
+    mapping(bytes32 typeKey => mapping(uint256 versionId => bool)) internal _versionPaused;
+
     /* ============ Constructor ============ */
 
     /// @notice Constructs the VersionedBeacon. This contract is NOT upgradeable.
@@ -53,12 +66,21 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @param  swapFacility_   The SwapFacility address (for implementation validation).
     /// @param  admin_          The address granted DEFAULT_ADMIN_ROLE.
     /// @param  versionManager_ The address granted VERSION_MANAGER_ROLE.
-    constructor(address factory_, address pyusdx_, address swapFacility_, address admin_, address versionManager_) {
+    /// @param  pauseManager_   The address granted PAUSE_MANAGER_ROLE.
+    constructor(
+        address factory_,
+        address pyusdx_,
+        address swapFacility_,
+        address admin_,
+        address versionManager_,
+        address pauseManager_
+    ) {
         if (factory_ == address(0)) revert ZeroFactory();
         if (pyusdx_ == address(0)) revert ZeroPYUSDX();
         if (swapFacility_ == address(0)) revert ZeroSwapFacility();
         if (admin_ == address(0)) revert ZeroAdmin();
         if (versionManager_ == address(0)) revert ZeroVersionManager();
+        if (pauseManager_ == address(0)) revert ZeroPauseManager();
 
         factory = factory_;
         pyusdx = pyusdx_;
@@ -66,6 +88,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
         _grantRole(VERSION_MANAGER_ROLE, versionManager_);
+        _grantRole(PAUSE_MANAGER_ROLE, pauseManager_);
     }
 
     /* ============ Interactive Functions ============ */
@@ -73,11 +96,13 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     function registerVersion(
         bytes32 typeKey,
-        address impl
+        address impl,
+        address pauseImpl
     ) external onlyRole(VERSION_MANAGER_ROLE) returns (uint256 versionId) {
         if (typeKey == bytes32(0)) revert InvalidTypeKey();
 
         _revertIfInvalidImplementation(impl);
+        _revertIfInvalidImplementation(pauseImpl);
 
         address[] storage impls = _implementations[typeKey];
 
@@ -91,6 +116,8 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
             versionId = impls.length - 1;
         }
 
+        _pauseImplementations[typeKey][versionId] = pauseImpl;
+
         // Auto-set latest on first version for this type so unpinned proxies always resolve.
         if (versionId == 1) {
             _latestVersion[typeKey] = 1;
@@ -98,6 +125,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         }
 
         emit VersionRegistered(typeKey, versionId, impl);
+        emit PauseImplementationRegistered(typeKey, versionId, pauseImpl);
     }
 
     /// @inheritdoc IVersionedBeacon
@@ -151,9 +179,47 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         emit ProxyOwnershipTransferred(proxy, previousOwner, newOwner);
     }
 
+    /// @inheritdoc IVersionedBeacon
+    function pauseVersion(bytes32 typeKey, uint256 versionId) external onlyRole(PAUSE_MANAGER_ROLE) {
+        _revertIfInvalidVersionId(typeKey, versionId);
+
+        if (_pauseImplementations[typeKey][versionId] == address(0)) revert NoPauseImplementation();
+
+        _versionPaused[typeKey][versionId] = true;
+
+        emit VersionPaused(typeKey, versionId);
+    }
+
+    /// @inheritdoc IVersionedBeacon
+    function unpauseVersion(bytes32 typeKey, uint256 versionId) external onlyRole(PAUSE_MANAGER_ROLE) {
+        _revertIfInvalidVersionId(typeKey, versionId);
+
+        _versionPaused[typeKey][versionId] = false;
+
+        emit VersionUnpaused(typeKey, versionId);
+    }
+
+    /// @inheritdoc IVersionedBeacon
+    function pauseType(bytes32 typeKey) external onlyRole(PAUSE_MANAGER_ROLE) {
+        if (typeKey == bytes32(0)) revert InvalidTypeKey();
+
+        _typePaused[typeKey] = true;
+
+        emit TypePaused(typeKey);
+    }
+
+    /// @inheritdoc IVersionedBeacon
+    function unpauseType(bytes32 typeKey) external onlyRole(PAUSE_MANAGER_ROLE) {
+        if (typeKey == bytes32(0)) revert InvalidTypeKey();
+
+        _typePaused[typeKey] = false;
+
+        emit TypeUnpaused(typeKey);
+    }
+
     /* ============ View/Pure Functions ============ */
 
-    /// @dev Returns the implementation for the calling proxy. Reverts if the caller is not registered.
+    /// @inheritdoc IBeacon
     function implementation() external view returns (address) {
         return _resolveImplementation(msg.sender);
     }
@@ -200,9 +266,25 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         }
     }
 
+    /// @inheritdoc IVersionedBeacon
+    function isVersionPaused(bytes32 typeKey, uint256 versionId) external view returns (bool) {
+        return _versionPaused[typeKey][versionId];
+    }
+
+    /// @inheritdoc IVersionedBeacon
+    function isTypePaused(bytes32 typeKey) external view returns (bool) {
+        return _typePaused[typeKey];
+    }
+
+    /// @inheritdoc IVersionedBeacon
+    function getPauseImplementation(bytes32 typeKey, uint256 versionId) external view returns (address) {
+        return _pauseImplementations[typeKey][versionId];
+    }
+
     /* ============ Internal View Functions ============ */
 
     /// @dev   Resolves the implementation address for a given proxy.
+    ///        If the proxy's type or version is paused, returns the pause implementation instead.
     /// @param proxy The proxy address.
     function _resolveImplementation(address proxy) internal view returns (address) {
         ProxyInfo storage info = _proxies[proxy];
@@ -211,6 +293,13 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         uint256 versionId = info.pinnedVersion;
         if (versionId == 0) {
             versionId = _latestVersion[info.typeKey];
+        }
+
+        // Check pause: type-level first, then version-level.
+        if (_typePaused[info.typeKey] || _versionPaused[info.typeKey][versionId]) {
+            address pauseImpl = _pauseImplementations[info.typeKey][versionId];
+            if (pauseImpl == address(0)) revert NoPauseImplementation();
+            return pauseImpl;
         }
 
         address impl = _implementations[info.typeKey][versionId];
