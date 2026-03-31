@@ -2083,6 +2083,13 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.setAccountInfo(alice, 500, 10001, bob);
     }
 
+    function test_setAccountInfo_revert_earnerRateTooHigh() public {
+        vm.expectRevert(abi.encodeWithSelector(IPYUSDX.EarnerRateTooHigh.selector, uint32(10_001)));
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 10_001, 0, bob);
+    }
+
     function test_setAccountInfo_revert_invalidAccountInfo() public {
         vm.expectRevert(IPYUSDX.InvalidAccountInfo.selector);
 

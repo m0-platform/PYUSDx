@@ -88,6 +88,9 @@ interface IPYUSDX {
     /// @notice Thrown when the fee rate exceeds the maximum.
     error FeeRateTooHigh(uint16 feeRate);
 
+    /// @notice Thrown when the earner rate exceeds the maximum.
+    error EarnerRateTooHigh(uint32 earnerRate);
+
     /// @notice Thrown when an input array is empty.
     error ArrayLengthZero();
 
