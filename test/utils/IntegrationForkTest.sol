@@ -82,6 +82,16 @@ abstract contract IntegrationForkTest is BaseForkTest {
         factory = ExtensionFactory(deployments_.factoryProxy);
         beacon = VersionedBeacon(deployments_.versionedBeacon);
         _coreDeployments = deployments_;
+
+        _registerDefaultTypeKeys();
+    }
+
+    /// @dev Registers the default extension type keys in the beacon.
+    function _registerDefaultTypeKeys() internal {
+        vm.startPrank(admin);
+        beacon.registerTypeKey(keccak256("YIELD_TO_ONE"));
+        beacon.registerTypeKey(keccak256("MULTI_MINT"));
+        vm.stopPrank();
     }
 
     /// @dev Helper to mint PYUSDX through the time-delay mechanism

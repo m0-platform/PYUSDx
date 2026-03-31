@@ -193,11 +193,11 @@ contract ExtensionFactory is
     /// @inheritdoc IExtensionFactory
     function deployBeaconYieldToOne(
         string calldata extensionName,
-        uint256 versionId,
         YieldToOneParams calldata params
     ) external returns (address proxy) {
         _revertIfZeroAdmin(params.admin);
 
+        uint256 versionId = IVersionedBeacon(versionedBeacon).latestVersion(YIELD_TO_ONE_TYPE_KEY);
         address impl = IVersionedBeacon(versionedBeacon).getVersion(YIELD_TO_ONE_TYPE_KEY, versionId);
 
         bytes memory initData = abi.encodeWithSelector(
@@ -221,11 +221,11 @@ contract ExtensionFactory is
     /// @inheritdoc IExtensionFactory
     function deployBeaconMultiMint(
         string calldata extensionName,
-        uint256 versionId,
         MultiMintParams calldata params
     ) external returns (address proxy) {
         _revertIfZeroAdmin(params.admin);
 
+        uint256 versionId = IVersionedBeacon(versionedBeacon).latestVersion(MULTI_MINT_TYPE_KEY);
         address impl = IVersionedBeacon(versionedBeacon).getVersion(MULTI_MINT_TYPE_KEY, versionId);
 
         bytes memory initData = abi.encodeWithSelector(

@@ -68,7 +68,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         });
 
         vm.prank(builder);
-        address proxy = factory.deployBeaconYieldToOne("builder-yto", v1, params);
+        address proxy = factory.deployBeaconYieldToOne("builder-yto", params);
 
         // Verify factory registration
         assertTrue(factory.isApprovedExtension(proxy));
@@ -168,7 +168,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         });
 
         vm.prank(builder);
-        address existingProxy = factory.deployBeaconYieldToOne("existing-ext", ytoV1, params);
+        address existingProxy = factory.deployBeaconYieldToOne("existing-ext", params);
 
         // Wrap PYUSDX so we can verify balances are preserved
         uint256 wrapAmount = 500e6;
@@ -186,7 +186,10 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
 
         assertEq(YieldToOne(existingProxy).balanceOf(alice), wrapAmount);
 
-        // Now register versions for the new YIELD_SPLIT type
+        // Register the new YIELD_SPLIT type key, then register versions
+        vm.prank(admin);
+        beacon.registerTypeKey(YIELD_SPLIT_TYPE_KEY);
+
         vm.prank(admin);
         uint256 v1 = beacon.registerVersion(YIELD_SPLIT_TYPE_KEY, yieldToOneImplV1, pausedYieldToOneImpl);
 
@@ -222,10 +225,18 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         assertEq(YieldToOne(existingProxy).balanceOf(alice), 0);
     }
 
-    function test_registerVersion_revert_zeroTypeKey() public {
+    function test_registerVersion_revert_unregisteredTypeKey() public {
+        bytes32 unregisteredKey = keccak256("UNREGISTERED");
+
+        vm.expectRevert(IVersionedBeacon.TypeKeyNotRegistered.selector);
         vm.prank(admin);
+        beacon.registerVersion(unregisteredKey, yieldToOneImplV1, pausedYieldToOneImpl);
+    }
+
+    function test_registerTypeKey_revert_zeroKey() public {
         vm.expectRevert(IVersionedBeacon.InvalidTypeKey.selector);
-        beacon.registerVersion(bytes32(0), yieldToOneImplV1, pausedYieldToOneImpl);
+        vm.prank(admin);
+        beacon.registerTypeKey(bytes32(0));
     }
 
     function test_pinVersion_revert_nonOwner() public {
@@ -244,7 +255,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         });
 
         vm.prank(builder);
-        address proxy = factory.deployBeaconYieldToOne("builder-pin-test", v1, params);
+        address proxy = factory.deployBeaconYieldToOne("builder-pin-test", params);
 
         // Random user cannot pin
         address randomUser = makeAddr("randomUser");
@@ -275,7 +286,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         });
 
         vm.prank(builder);
-        address proxy = factory.deployBeaconYieldToOne("builder-invalid-ver", v1, params);
+        address proxy = factory.deployBeaconYieldToOne("builder-invalid-ver", params);
 
         // Builder tries to pin to a version that doesn't exist
         vm.prank(builder);
@@ -286,23 +297,12 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
     /* ============ Pause Lifecycle ============ */
 
     function test_pauseLifecycle() public {
-        /* ============ Register v1 and v2 with pause impls ============ */
+        /* ============ Register v1, deploy ext on v1, then register v2 ============ */
 
         vm.prank(admin);
         uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1, pausedYieldToOneImpl);
 
-        vm.prank(admin);
-        uint256 v2 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV2, pausedYieldToOneImpl);
-
-        vm.prank(admin);
-        beacon.setLatestVersion(YIELD_TO_ONE_TYPE_KEY, v2);
-
-        // Verify pause impls were registered
-        assertEq(beacon.getPauseImplementation(YIELD_TO_ONE_TYPE_KEY, v1), pausedYieldToOneImpl);
-        assertEq(beacon.getPauseImplementation(YIELD_TO_ONE_TYPE_KEY, v2), pausedYieldToOneImpl);
-
-        /* ============ Deploy two extensions: one on v1, one on v2 ============ */
-
+        // Deploy first extension while v1 is latest
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: "Extension V1",
             symbol: "EV1",
@@ -314,13 +314,25 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
         });
 
         vm.prank(builder);
-        address proxyV1 = factory.deployBeaconYieldToOne("pause-test-v1", v1, params);
+        address proxyV1 = factory.deployBeaconYieldToOne("pause-test-v1", params);
 
+        // Now register v2 and promote it to latest
+        vm.prank(admin);
+        uint256 v2 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV2, pausedYieldToOneImpl);
+
+        vm.prank(admin);
+        beacon.setLatestVersion(YIELD_TO_ONE_TYPE_KEY, v2);
+
+        // Verify pause impls were registered
+        assertEq(beacon.getPauseImplementation(YIELD_TO_ONE_TYPE_KEY, v1), pausedYieldToOneImpl);
+        assertEq(beacon.getPauseImplementation(YIELD_TO_ONE_TYPE_KEY, v2), pausedYieldToOneImpl);
+
+        // Deploy second extension on v2 (now latest)
         params.name = "Extension V2";
         params.symbol = "EV2";
 
         vm.prank(builder);
-        address proxyV2 = factory.deployBeaconYieldToOne("pause-test-v2", v2, params);
+        address proxyV2 = factory.deployBeaconYieldToOne("pause-test-v2", params);
 
         YieldToOne extV1 = YieldToOne(proxyV1);
         YieldToOne extV2 = YieldToOne(proxyV2);

@@ -175,25 +175,21 @@ interface IExtensionFactory {
         MultiMintParams calldata params
     ) external returns (address proxy, address proxyAdmin, address implementation);
 
-    /// @notice Deploys a new BeaconProxy YieldToOne extension pinned to a registered version.
+    /// @notice Deploys a new BeaconProxy YieldToOne extension pinned to the latest registered version.
     /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
-    /// @param  versionId     The version ID to pin the extension to.
     /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
     /// @return proxy         The address of the deployed BeaconProxy.
     function deployBeaconYieldToOne(
         string calldata extensionName,
-        uint256 versionId,
         YieldToOneParams calldata params
     ) external returns (address proxy);
 
-    /// @notice Deploys a new BeaconProxy MultiMint extension pinned to a registered version.
+    /// @notice Deploys a new BeaconProxy MultiMint extension pinned to the latest registered version.
     /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
-    /// @param  versionId     The version ID to pin the extension to.
     /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
     /// @return proxy         The address of the deployed BeaconProxy.
     function deployBeaconMultiMint(
         string calldata extensionName,
-        uint256 versionId,
         MultiMintParams calldata params
     ) external returns (address proxy);
 

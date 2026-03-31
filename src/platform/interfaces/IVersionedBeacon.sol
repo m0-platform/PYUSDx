@@ -65,6 +65,10 @@ interface IVersionedBeacon is IBeacon {
     /// @param  typeKey The extension type key.
     event TypeUnpaused(bytes32 indexed typeKey);
 
+    /// @notice Emitted when a new type key is registered.
+    /// @param  typeKey The extension type key.
+    event TypeKeyRegistered(bytes32 indexed typeKey);
+
     /* ============ Errors ============ */
 
     /// @notice Thrown if the implementation address is 0x0.
@@ -75,6 +79,12 @@ interface IVersionedBeacon is IBeacon {
 
     /// @notice Thrown if the type key is bytes32(0).
     error InvalidTypeKey();
+
+    /// @notice Thrown if the type key has not been registered via registerTypeKey.
+    error TypeKeyNotRegistered();
+
+    /// @notice Thrown if the type key has already been registered.
+    error TypeKeyAlreadyRegistered();
 
     /// @notice Thrown if the version ID is 0 or out of range for the given type key.
     error InvalidVersion();
@@ -122,6 +132,11 @@ interface IVersionedBeacon is IBeacon {
     error ExtensionPaused();
 
     /* ============ Interactive Functions ============ */
+
+    /// @notice Registers a new type key. Must be called before registerVersion for that key.
+    /// @dev    MUST only be callable by an address with the `VERSION_MANAGER_ROLE` role.
+    /// @param  typeKey The extension type key (e.g., `keccak256("YIELD_TO_ONE")`).
+    function registerTypeKey(bytes32 typeKey) external;
 
     /// @notice Registers a new implementation version with its associated pause implementation.
     ///         Append-only — cannot overwrite existing versions.
@@ -191,6 +206,14 @@ interface IVersionedBeacon is IBeacon {
 
     /* ============ View/Pure Functions ============ */
 
+    /// @notice Returns the implementation address for the calling proxy.
+    /// @dev    Called by OZ `BeaconProxy` on every delegatecall. Resolves per-proxy based on
+    ///         `msg.sender` (the proxy's address). If the proxy is pinned, returns the pinned
+    ///         version's implementation. If unpinned, returns the latest version's implementation.
+    ///         If the proxy's type or version is paused, returns the pause implementation.
+    /// @return The resolved implementation address.
+    function implementation() external view override returns (address);
+
     /// @notice The role identifier for the version manager role.
     function VERSION_MANAGER_ROLE() external view returns (bytes32);
 
@@ -252,6 +275,11 @@ interface IVersionedBeacon is IBeacon {
     /// @param  typeKey The extension type key.
     /// @return True if the type is paused.
     function isTypePaused(bytes32 typeKey) external view returns (bool);
+
+    /// @notice Returns whether a type key has been registered.
+    /// @param  typeKey The extension type key.
+    /// @return True if the type key is registered.
+    function isRegisteredTypeKey(bytes32 typeKey) external view returns (bool);
 
     /// @notice Returns the pause implementation for a specific version.
     /// @param  typeKey   The extension type key.

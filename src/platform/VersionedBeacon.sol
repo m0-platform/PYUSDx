@@ -49,6 +49,9 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
 
     mapping(address proxy => ProxyInfo info) internal _proxies;
 
+    /// @dev Whether a type key has been registered via registerTypeKey.
+    mapping(bytes32 typeKey => bool) internal _registeredTypeKeys;
+
     /// @dev Whether an entire extension type is paused.
     mapping(bytes32 typeKey => bool) internal _typePaused;
 
@@ -94,21 +97,28 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /* ============ Interactive Functions ============ */
 
     /// @inheritdoc IVersionedBeacon
+    function registerTypeKey(bytes32 typeKey) external onlyRole(VERSION_MANAGER_ROLE) {
+        if (typeKey == bytes32(0)) revert InvalidTypeKey();
+        if (_registeredTypeKeys[typeKey]) revert TypeKeyAlreadyRegistered();
+
+        _registeredTypeKeys[typeKey] = true;
+        _implementations[typeKey].push(address(0)); // Push dummy at index 0 for 1-indexed versions.
+
+        emit TypeKeyRegistered(typeKey);
+    }
+
+    /// @inheritdoc IVersionedBeacon
     function registerVersion(
         bytes32 typeKey,
         address impl,
         address pauseImpl
     ) external onlyRole(VERSION_MANAGER_ROLE) returns (uint256 versionId) {
-        if (typeKey == bytes32(0)) revert InvalidTypeKey();
+        if (!_registeredTypeKeys[typeKey]) revert TypeKeyNotRegistered();
 
         _revertIfInvalidImplementation(impl);
         _revertIfInvalidImplementation(pauseImpl);
 
         address[] storage impls = _implementations[typeKey];
-
-        // Lazy-init: push dummy at index 0 on first version registration for this type.
-        if (impls.length == 0) impls.push(address(0));
-
         impls.push(impl);
 
         // NOTE: Safe because length >= 2 after the push above.
@@ -219,7 +229,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
 
     /* ============ View/Pure Functions ============ */
 
-    /// @inheritdoc IBeacon
+    /// @inheritdoc IVersionedBeacon
     function implementation() external view returns (address) {
         return _resolveImplementation(msg.sender);
     }
@@ -274,6 +284,11 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     function isTypePaused(bytes32 typeKey) external view returns (bool) {
         return _typePaused[typeKey];
+    }
+
+    /// @inheritdoc IVersionedBeacon
+    function isRegisteredTypeKey(bytes32 typeKey) external view returns (bool) {
+        return _registeredTypeKeys[typeKey];
     }
 
     /// @inheritdoc IVersionedBeacon

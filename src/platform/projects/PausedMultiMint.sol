@@ -80,7 +80,7 @@ contract PausedMultiMint is MultiMint {
     }
 
     /// @dev Reverts on all asset replacement attempts.
-    function _replaceAsset(address, address, address, uint256) internal pure override {
+    function _replaceAsset(address, address, uint256) internal pure override {
         revert IVersionedBeacon.ExtensionPaused();
     }
 }
