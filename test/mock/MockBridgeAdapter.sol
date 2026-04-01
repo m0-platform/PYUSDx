@@ -5,6 +5,8 @@ pragma solidity 0.8.34;
 import { IBridgeAdapter } from "../../src/portal/interfaces/IBridgeAdapter.sol";
 
 contract MockBridgeAdapter is IBridgeAdapter {
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+
     address public portal;
     uint256 public quoteValue;
 

@@ -3,7 +3,7 @@ pragma solidity ^0.8.34;
 
 /// @title  IPortal interface
 /// @author M0 Labs
-/// @notice Subset of functions inherited by both IHubPortal and ISpokePortal.
+/// @notice Interface for bridging PYUSDX and PYUSDX Extension tokens across chains via pluggable bridge adapters.
 interface IPortal {
     /* ============ Events ============ */
 
@@ -11,7 +11,7 @@ interface IPortal {
     /// @param  sourceToken        The address of the token on the source chain.
     /// @param  destinationChainId The ID of the destination chain.
     /// @param  destinationToken   The address of the token on the destination chain.
-    /// @param  sender             The account initiated bridging of the M tokens via the Portal.
+    /// @param  sender             The account sending tokens.
     /// @param  recipient          The account receiving tokens on destination chain.
     /// @param  amount             The amount of tokens.
     /// @param  bridgeAdapter      The address of the bridge adapter used to send the message.
@@ -49,9 +49,9 @@ interface IPortal {
     /// @param  amount               The amount of tokens.
     event WrapFailed(address indexed destinationExtension, address indexed recipient, uint256 amount);
 
-    /// @notice Emitted when the gas limit for a payload type is updated.
+    /// @notice Emitted when the gas limit for processing messages on a destination chain is updated.
     /// @param  destinationChainId The ID of the destination chain.
-    /// @param  gasLimit           The gas limit.
+    /// @param  gasLimit           The maximum gas allocated for message execution on the destination chain.
     event PayloadGasLimitSet(uint32 indexed destinationChainId, uint256 gasLimit);
 
     /// @notice Emitted when the default bridge adapter for a destination chain is set.
@@ -141,6 +141,12 @@ interface IPortal {
 
     /* ============ View/Pure Functions ============ */
 
+    /// @notice The role that can pause and unpause sending and receiving cross-chain messages.
+    function PAUSER_ROLE() external view returns (bytes32);
+
+    /// @notice The role that can configure the Portal.
+    function OPERATOR_ROLE() external view returns (bytes32);
+
     /// @notice The address of PYUSDX token.
     function pyusdx() external view returns (address);
 
@@ -162,8 +168,7 @@ interface IPortal {
     /// @param  bridgingAdapter    The address of the bridge adapter.
     function supportedBridgeAdapter(uint32 destinationChainId, address bridgingAdapter) external view returns (bool);
 
-    /// @notice Returns the gas limit required to process a message
-    ///         with the specified payload type on the destination chain.
+    /// @notice Returns the gas limit required to process a message on the destination chain.
     /// @param  destinationChainId The ID of the destination chain.
     function payloadGasLimit(uint32 destinationChainId) external view returns (uint256);
 

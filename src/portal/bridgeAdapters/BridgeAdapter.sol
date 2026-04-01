@@ -31,6 +31,7 @@ abstract contract BridgeAdapterStorageLayout {
 /// @author M0 Labs
 /// @notice Base contract for bridge adapters implementing cross-chain messaging functionality.
 abstract contract BridgeAdapter is IBridgeAdapter, BridgeAdapterStorageLayout, AccessControlUpgradeable {
+    /// @inheritdoc IBridgeAdapter
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @inheritdoc IBridgeAdapter

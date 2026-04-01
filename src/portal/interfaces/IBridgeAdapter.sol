@@ -77,6 +77,9 @@ interface IBridgeAdapter {
 
     /* ============ View/Pure Functions ============ */
 
+    /// @notice The role that can configure the bridge adapter.
+    function OPERATOR_ROLE() external view returns (bytes32);
+
     /// @notice Returns the address of the portal.
     function portal() external view returns (address);
 

@@ -55,7 +55,10 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     using PayloadEncoder for bytes;
     using SafeERC20 for IERC20;
 
+    /// @inheritdoc IPortal
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
+    /// @inheritdoc IPortal
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @inheritdoc IPortal
@@ -161,10 +164,10 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         emit TokenReceived(sourceChainId, destinationToken, sender, recipient, amount, messageId);
 
         if (destinationToken == pyusdx) {
-            // mints or unlocks PYUSDX Token to the recipient
+            // mints PYUSDX Token to the recipient
             IPYUSDX(pyusdx).mint(recipient, amount);
         } else {
-            // mints or unlocks PYUSDX Token to the Portal
+            // mints PYUSDX Token to the Portal
             IPYUSDX(pyusdx).mint(address(this), amount);
 
             // wraps PYUSDX token to the destination token and transfers it to the recipient
@@ -184,14 +187,13 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
 
         ChainConfig storage remoteChainConfig = _getPortalStorageLocation().remoteChainConfig[destinationChainId];
 
+        if (remoteChainConfig.defaultBridgeAdapter == bridgeAdapter) return;
+
         // If the bridge adapter isn't already supported, add it to the supported adapters list
         if (!remoteChainConfig.supportedBridgeAdapter[bridgeAdapter]) {
             remoteChainConfig.supportedBridgeAdapter[bridgeAdapter] = true;
             emit SupportedBridgeAdapterSet(destinationChainId, bridgeAdapter, true);
         }
-
-        if (remoteChainConfig.defaultBridgeAdapter == bridgeAdapter) return;
-
         remoteChainConfig.defaultBridgeAdapter = bridgeAdapter;
         emit DefaultBridgeAdapterSet(destinationChainId, bridgeAdapter);
     }
@@ -277,6 +279,7 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         return block.chainid.toUint32();
     }
 
+    /// @inheritdoc IPortal
     function getNonce() external view returns (uint256) {
         PortalStorageStruct storage $ = _getPortalStorageLocation();
         return $.nonce;
@@ -452,7 +455,7 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     }
 
     /// @dev   Wraps PYUSDX token to the token specified by `destinationToken`.
-    ///        If wrapping fails transfers PYUSDX token to `recipient_`.
+    ///        If wrapping fails transfers PYUSDX token to `recipient`.
     /// @param destinationToken The address of the Extension token.
     /// @param recipient        The account to receive wrapped token.
     /// @param amount           The amount to wrap.
