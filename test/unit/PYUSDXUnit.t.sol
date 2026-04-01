@@ -2499,6 +2499,30 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.freeze(bob);
     }
 
+    function test_freeze_revert_frozenClaimRecipient() public {
+        // Mint tokens to alice and set up as earner with bob as claimRecipient
+        uint256 balance = 1000e6;
+        issuerGateway.mint(alice, balance);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 5000, bob);
+        pyusdx.setAccountRateBps(alice, uint24(500));
+
+        // Freeze bob (the claimRecipient)
+        vm.prank(freezeManager);
+        pyusdx.freeze(bob);
+
+        // Warp time to accrue yield
+        vm.warp(block.timestamp + 365 days);
+        assertGt(pyusdx.accruedYieldOf(alice), 0, "Should have yield accrued");
+
+        // Freeze alice — fails in `claimFor()` when transferring yield to frozen bob
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+    }
+
     function test_freezeAccounts_revert_notFreezeManager() public {
         address[] memory accountsToFreeze = new address[](1);
         accountsToFreeze[0] = alice;
