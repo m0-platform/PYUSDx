@@ -23,12 +23,7 @@ interface IMultiMint is IYieldToOne {
     /// @param  assetAmount  Amount of asset replaced.
     /// @param  recipient    Address that received the asset.
     /// @param  pyusdxAmount Amount of PYUSDX deposited.
-    event AssetReplacedWithPYUSDX(
-        address indexed asset,
-        uint256 assetAmount,
-        address indexed recipient,
-        uint256 pyusdxAmount
-    );
+    event AssetReplaced(address indexed asset, uint256 assetAmount, address indexed recipient, uint256 pyusdxAmount);
 
     /* ============ Custom Errors ============ */
 

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.34;
 
+import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+
 import { IIssuerGateway } from "./IIssuerGateway.sol";
 import { IPYUSDX } from "../IPYUSDX.sol";
-
-import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 /// @notice ERC-7201 namespaced storage layout for IssuerGateway.
 abstract contract IssuerGatewayStorageLayout {
@@ -18,7 +18,7 @@ abstract contract IssuerGatewayStorageLayout {
 
     struct MintProposal {
         uint40 createdAt; // ──╮ Timestamp when the proposal was created, good for 100+ years.
-        address minter; //       Address that proposed the mint.
+        address minter; // ────╯ Address that proposed the mint.
         address recipient; //    Address that will receive the minted tokens.
         uint256 amount; //       Amount of PYUSDX to mint.
     }
@@ -41,7 +41,10 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /* ============ Constants ============ */
 
     /// @inheritdoc IIssuerGateway
-    bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+
+    /// @inheritdoc IIssuerGateway
+    bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
     /* ============ Immutable Variables ============ */
 
@@ -53,7 +56,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /// @notice Constructs the IssuerGateway implementation contract.
     /// @param  pyusdx_ The PYUSDX token contract address.
     constructor(address pyusdx_) {
-        if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDXToken();
+        if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDX();
 
         _disableInitializers();
     }
@@ -61,14 +64,22 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /* ============ Initializer ============ */
 
     /// @inheritdoc IIssuerGateway
-    function initialize(address admin, address minter, uint32 mintDelay_, uint32 mintTTL_) external initializer {
-        if (admin == address(0)) revert ZeroAdminAddress();
-        if (minter == address(0)) revert ZeroMinterAddress();
+    function initialize(
+        address admin,
+        address operator,
+        address executor,
+        uint32 mintDelay_,
+        uint32 mintTTL_
+    ) external initializer {
+        if (admin == address(0)) revert ZeroAdmin();
+        if (operator == address(0)) revert ZeroOperator();
+        if (executor == address(0)) revert ZeroExecutor();
 
         __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(ISSUER_ROLE, minter);
+        _grantRole(OPERATOR_ROLE, operator);
+        _grantRole(EXECUTOR_ROLE, executor);
 
         _setMintDelay(mintDelay_);
         _setMintTTL(mintTTL_);
@@ -77,16 +88,28 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /* ============ Interactive Functions ============ */
 
     /// @inheritdoc IIssuerGateway
-    function proposeMint(uint256 amount, address recipient) external onlyRole(ISSUER_ROLE) returns (uint48 mintId) {
+    function proposeMint(uint256 amount, address recipient) external onlyRole(OPERATOR_ROLE) returns (uint48 mintId) {
         if (amount == 0) revert ZeroMintAmount();
         if (recipient == address(0)) revert ZeroMintRecipient();
 
         IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
-        mintId = ++$.mintNonce;
+
+        // NOTE: safe to use unchecked, overflow would occur after 281 trillion proposals,
+        //       at which point nonce wrapping could theoretically reuse a deleted mintId.
+        unchecked {
+            mintId = ++$.mintNonce;
+        }
 
         uint40 createdAt = uint40(block.timestamp);
-        uint40 activeAt = createdAt + $.mintDelay;
-        uint40 expiresAt = activeAt + $.mintTTL;
+        uint40 activeAt;
+        uint40 expiresAt;
+
+        // NOTE: safe to use unchecked, uint40 timestamps overflow past year 36812,
+        //       and max uint32 delay (~136 years) cannot push them past that until then.
+        unchecked {
+            activeAt = createdAt + $.mintDelay;
+            expiresAt = activeAt + $.mintTTL;
+        }
 
         $.mintProposals[mintId] = MintProposal({
             createdAt: createdAt,
@@ -99,38 +122,6 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     }
 
     /// @inheritdoc IIssuerGateway
-    function mint(uint48 mintId) external {
-        IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
-        MintProposal storage proposal = $.mintProposals[mintId];
-
-        if (proposal.createdAt == 0) revert InvalidMintProposal();
-
-        uint40 activeAt = proposal.createdAt + $.mintDelay;
-        if (block.timestamp < activeAt) revert PendingMintProposal(activeAt);
-
-        uint40 expiresAt = activeAt + $.mintTTL;
-        if (block.timestamp > expiresAt) revert ExpiredMintProposal(expiresAt);
-
-        address recipient = proposal.recipient;
-        uint256 amount = proposal.amount;
-
-        delete $.mintProposals[mintId];
-
-        IPYUSDX(pyusdx).mint(recipient, amount);
-
-        emit MintExecuted(mintId, msg.sender, amount, recipient);
-    }
-
-    /// @inheritdoc IIssuerGateway
-    function burn(uint256 amount) external onlyRole(ISSUER_ROLE) {
-        if (amount == 0) revert ZeroBurnAmount();
-
-        IPYUSDX(pyusdx).burn(msg.sender, amount);
-
-        emit BurnExecuted(msg.sender, amount);
-    }
-
-    /// @inheritdoc IIssuerGateway
     function cancelMint(uint48 mintId) external {
         IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
         MintProposal storage proposal = $.mintProposals[mintId];
@@ -138,12 +129,75 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         if (proposal.createdAt == 0) revert InvalidMintProposal();
         if (proposal.minter != msg.sender) revert NotMintProposalCreator();
 
-        uint40 activeAt = proposal.createdAt + $.mintDelay;
+        uint40 activeAt;
+
+        // NOTE: safe to use unchecked, uint40 timestamps overflow past year 36812,
+        //       and max uint32 delay (~136 years) cannot push them past that until then.
+        unchecked {
+            activeAt = proposal.createdAt + $.mintDelay;
+        }
+
         if (block.timestamp >= activeAt) revert ActiveMintProposal(activeAt);
 
         delete $.mintProposals[mintId];
 
         emit MintCanceled(mintId, msg.sender);
+    }
+
+    /// @inheritdoc IIssuerGateway
+    function mint(uint48 mintId) external onlyRole(EXECUTOR_ROLE) {
+        IssuerGatewayStorage storage $ = _getIssuerGatewayStorage();
+        MintProposal storage proposal = $.mintProposals[mintId];
+
+        if (proposal.createdAt == 0) revert InvalidMintProposal();
+
+        uint40 activeAt;
+        uint40 expiresAt;
+
+        // NOTE: compute activeAt first; expiresAt only needed if proposal is active.
+        //       Safe to use unchecked, uint40 timestamps overflow past year 36812,
+        //       and max uint32 delay (~136 years) cannot push them past that until then.
+        unchecked {
+            activeAt = proposal.createdAt + $.mintDelay;
+        }
+
+        if (block.timestamp < activeAt) revert PendingMintProposal(activeAt);
+
+        unchecked {
+            expiresAt = activeAt + $.mintTTL;
+        }
+
+        if (block.timestamp > expiresAt) revert ExpiredMintProposal(expiresAt);
+
+        address recipient = proposal.recipient;
+        uint256 amount = proposal.amount;
+
+        delete $.mintProposals[mintId];
+
+        emit MintExecuted(mintId, msg.sender, amount, recipient);
+
+        IPYUSDX(pyusdx).mint(recipient, amount);
+    }
+
+    /// @inheritdoc IIssuerGateway
+    function burn(uint256 amount) external onlyRole(OPERATOR_ROLE) {
+        if (amount == 0) revert ZeroBurnAmount();
+
+        emit BurnExecuted(msg.sender, amount);
+
+        IPYUSDX(pyusdx).burn(msg.sender, amount);
+    }
+
+    /* ============ Admin Functions ============ */
+
+    /// @inheritdoc IIssuerGateway
+    function setMintDelay(uint32 mintDelay_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setMintDelay(mintDelay_);
+    }
+
+    /// @inheritdoc IIssuerGateway
+    function setMintTTL(uint32 mintTTL_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setMintTTL(mintTTL_);
     }
 
     /* ============ View Functions ============ */
@@ -171,18 +225,6 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         return (proposal.createdAt, proposal.minter, proposal.recipient, proposal.amount);
     }
 
-    /* ============ Admin Functions ============ */
-
-    /// @inheritdoc IIssuerGateway
-    function setMintDelay(uint32 mintDelay_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _setMintDelay(mintDelay_);
-    }
-
-    /// @inheritdoc IIssuerGateway
-    function setMintTTL(uint32 mintTTL_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _setMintTTL(mintTTL_);
-    }
-
     /* ============ Internal Functions ============ */
 
     /// @notice Updates the mint delay
@@ -193,6 +235,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         if ($.mintDelay == mintDelay_) return;
 
         $.mintDelay = mintDelay_;
+
         emit MintDelaySet(mintDelay_);
     }
 
@@ -206,6 +249,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         if ($.mintTTL == mintTTL_) return;
 
         $.mintTTL = mintTTL_;
+
         emit MintTTLSet(mintTTL_);
     }
 }

@@ -28,16 +28,18 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable extensionFactory;
 
+    /* ============ Constructor ============ */
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     /// @notice Constructs SwapFacility Implementation contract
     /// @dev    Sets immutable storage.
     /// @param  pyusdx_           The address of PYUSDX token.
     /// @param  extensionFactory_ The address of the PYUSDX Extension Factory.
     constructor(address pyusdx_, address extensionFactory_) {
-        _disableInitializers();
-
         if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDXToken();
         if ((extensionFactory = extensionFactory_) == address(0)) revert ZeroExtensionFactory();
+
+        _disableInitializers();
     }
 
     /* ============ Initializer ============ */
@@ -54,7 +56,12 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     /* ============ Interactive Functions ============ */
 
     /// @inheritdoc ISwapFacility
-    function swap(address tokenIn, address tokenOut, uint256 amount, address recipient) external isNotLocked {
+    function swap(
+        address tokenIn,
+        address tokenOut,
+        uint256 amount,
+        address recipient
+    ) external isNotLocked whenNotPaused {
         _swap(tokenIn, tokenOut, amount, recipient);
     }
 
@@ -68,7 +75,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external isNotLocked {
+    ) external isNotLocked whenNotPaused {
         try IExtension(tokenIn).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
         _swap(tokenIn, tokenOut, amount, recipient);
     }
@@ -81,18 +88,18 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         address recipient,
         uint256 deadline,
         bytes calldata signature
-    ) external isNotLocked {
+    ) external isNotLocked whenNotPaused {
         try IExtension(tokenIn).permit(msg.sender, address(this), amount, deadline, signature) {} catch {}
         _swap(tokenIn, tokenOut, amount, recipient);
     }
 
     /// @inheritdoc ISwapFacility
-    function swapIn(address extensionOut, uint256 amount, address recipient) external isNotLocked {
+    function swapIn(address extensionOut, uint256 amount, address recipient) external isNotLocked whenNotPaused {
         _swap(pyusdx, extensionOut, amount, recipient);
     }
 
     /// @inheritdoc ISwapFacility
-    function swapOut(address extensionIn, uint256 amount, address recipient) external isNotLocked {
+    function swapOut(address extensionIn, uint256 amount, address recipient) external isNotLocked whenNotPaused {
         _swap(extensionIn, pyusdx, amount, recipient);
     }
 
@@ -103,7 +110,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         address extensionOut,
         uint256 amount,
         address recipient
-    ) external isNotLocked {
+    ) external isNotLocked whenNotPaused {
         _replaceAsset(asset, tokenIn, extensionOut, amount, recipient);
     }
 
@@ -118,7 +125,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external isNotLocked {
+    ) external isNotLocked whenNotPaused {
         try IERC20Extended(tokenIn).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
         _replaceAsset(asset, tokenIn, extensionOut, amount, recipient);
     }
@@ -132,7 +139,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         address recipient,
         uint256 deadline,
         bytes calldata signature
-    ) external isNotLocked {
+    ) external isNotLocked whenNotPaused {
         try IERC20Extended(tokenIn).permit(msg.sender, address(this), amount, deadline, signature) {} catch {}
         _replaceAsset(asset, tokenIn, extensionOut, amount, recipient);
     }
@@ -145,66 +152,18 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     }
 
     /// @inheritdoc ISwapFacility
-    function canSwapViaPath(address tokenIn, address tokenOut) external view returns (bool) {
-        // Self-swaps are not valid
-        if (tokenIn == tokenOut) return false;
-
-        bool isTokenInPaused;
-        bool isTokenOutPaused;
-
-        // If `tokenIn` or `tokenOut` are not valid contracts, return false
-        if (tokenIn.code.length == 0 || tokenOut.code.length == 0) return false;
-
-        // If contracts are paused, return false
-        try Pausable(tokenIn).paused() returns (bool tokenInPaused) {
-            isTokenInPaused = tokenInPaused;
-        } catch {}
-        try Pausable(tokenOut).paused() returns (bool tokenOutPaused) {
-            isTokenOutPaused = tokenOutPaused;
-        } catch {}
-
-        if (paused() || isTokenInPaused || isTokenOutPaused) return false;
-
-        bool tokenOutExtension = isApprovedExtension(tokenOut);
-        bool tokenInExtension = isApprovedExtension(tokenIn);
-
-        // If the input token is PYUSDX, we swap it for the output token, which must be an approved extension
-        if (tokenIn == pyusdx && tokenOutExtension) return true;
-
-        // If the output token is PYUSDX, we swap the input token, which must be an approved extension, for PYUSDX
-        if (tokenOut == pyusdx && tokenInExtension) return true;
-
-        // If both tokens are extensions, we swap one extension for another
-        if (tokenInExtension && tokenOutExtension) return true;
-
-        // If token out is an extension, we try to swap in via MultiMint
-        // The tokenOut must be an approved extension and support the tokenIn as a MultiMint asset
-        if (tokenOutExtension) {
-            try IMultiMint(tokenOut).isAllowedAsset(tokenIn) returns (bool allowed) {
-                return allowed;
-            } catch {
-                return false;
-            }
-        }
-
-        return false;
-    }
-
-    /// @inheritdoc ISwapFacility
     function msgSender() public view returns (address) {
         return _getLocker();
     }
 
-    /* ============ Private Interactive Functions ============ */
+    /* ============ Internal Interactive Functions ============ */
 
     /// @notice Swaps between two tokens, which can be PYUSDX token, PYUSDX Extensions, or an external asset used by MultiMint Extensions.
     /// @param  tokenIn   The address of the token to swap from.
     /// @param  tokenOut  The address of the token to swap to.
     /// @param  amount    The amount to swap.
     /// @param  recipient The address to receive the swapped tokens.
-    function _swap(address tokenIn, address tokenOut, uint256 amount, address recipient) private {
-        _requireNotPaused();
-
+    function _swap(address tokenIn, address tokenOut, uint256 amount, address recipient) internal {
         // Prevent self-swaps (e.g., PYUSDX -> PYUSDX or extension -> same extension)
         if (tokenIn == tokenOut) revert InvalidSwapPath(tokenIn, tokenOut);
 
@@ -217,12 +176,12 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         if (tokenOut == pyusdx) return _swapOut(tokenIn, amount, recipient);
 
         // If both tokens are extensions, we swap one extension for another
-        bool tokenOutExtension = isApprovedExtension(tokenOut);
-        if (isApprovedExtension(tokenIn) && tokenOutExtension)
+        bool isTokenOutApproved = isApprovedExtension(tokenOut);
+        if (isApprovedExtension(tokenIn) && isTokenOutApproved)
             return _swapExtensions(tokenIn, tokenOut, amount, recipient);
 
         // If tokenOut is an extension but tokenIn is an external asset, route through MultiMint
-        if (tokenOutExtension) return _swapInMultiMint(tokenIn, tokenOut, amount, recipient);
+        if (isTokenOutApproved) return _swapInMultiMint(tokenIn, tokenOut, amount, recipient);
 
         // If none of the above, we revert
         revert InvalidSwapPath(tokenIn, tokenOut);
@@ -233,7 +192,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     /// @param  extensionOut The address of the PYUSDX Extension to swap to.
     /// @param  amount       The amount to swap.
     /// @param  recipient    The address to receive the swapped PYUSDX Extension tokens.
-    function _swapExtensions(address extensionIn, address extensionOut, uint256 amount, address recipient) private {
+    function _swapExtensions(address extensionIn, address extensionOut, uint256 amount, address recipient) internal {
         uint256 pyusdxBalanceBefore = _pyusdxBalanceOf(address(this));
 
         IERC20(extensionIn).transferFrom(msg.sender, address(this), amount);
@@ -252,7 +211,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     /// @param  extensionOut The address of the PYUSDX Extension to swap to.
     /// @param  amount       The amount of PYUSDX token to swap.
     /// @param  recipient    The address to receive the swapped PYUSDX Extension tokens.
-    function _swapIn(address extensionOut, uint256 amount, address recipient) private {
+    function _swapIn(address extensionOut, uint256 amount, address recipient) internal {
         _revertIfNotApprovedExtension(extensionOut);
 
         IERC20(pyusdx).transferFrom(msg.sender, address(this), amount);
@@ -262,12 +221,34 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         emit SwappedIn(pyusdx, extensionOut, amount, recipient);
     }
 
+    /// @notice Swaps PYUSDX Extension to PYUSDX token.
+    /// @param  extensionIn The address of the PYUSDX Extension to swap from.
+    /// @param  amount      The amount of PYUSDX Extension tokens to swap.
+    /// @param  recipient   The address to receive PYUSDX tokens.
+    function _swapOut(address extensionIn, uint256 amount, address recipient) internal {
+        _revertIfNotApprovedExtension(extensionIn);
+
+        IERC20(extensionIn).transferFrom(msg.sender, address(this), amount);
+
+        uint256 pyusdxBalanceBefore = _pyusdxBalanceOf(address(this));
+
+        // NOTE: Amount and recipient validation is performed in Extensions.
+        IExtension(extensionIn).unwrap(amount);
+
+        // NOTE: Ensures that we transfer to recipient the equivalent amount of PYUSDX received from unwrapping.
+        amount = _pyusdxBalanceOf(address(this)) - pyusdxBalanceBefore;
+
+        IERC20(pyusdx).transfer(recipient, amount);
+
+        emit SwappedOut(extensionIn, pyusdx, amount, recipient);
+    }
+
     /// @notice Swaps `amount` of `asset` to MultiMint Extension tokens.
     /// @param  asset        The address of the asset to swap.
     /// @param  extensionOut The address of the MultiMint Extension to swap to.
     /// @param  amount       The amount of `asset` to swap.
     /// @param  recipient    The address to receive `amount` of MultiMint Extension tokens.
-    function _swapInMultiMint(address asset, address extensionOut, uint256 amount, address recipient) private {
+    function _swapInMultiMint(address asset, address extensionOut, uint256 amount, address recipient) internal {
         _revertIfCannotMultiMint(asset, extensionOut);
 
         // NOTE: Use safeTransferFrom and forceApprove to handle assets that do not return a boolean value.
@@ -291,9 +272,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         address extensionOut,
         uint256 amount,
         address recipient
-    ) private {
-        _requireNotPaused();
-
+    ) internal {
         // NOTE: `tokenIn` can be PYUSDX or an approved extension
         if (tokenIn != pyusdx) {
             _revertIfNotApprovedExtension(tokenIn);
@@ -321,29 +300,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         emit MultiMintAssetReplaced(asset, extensionOut, amount);
     }
 
-    /// @notice Swaps PYUSDX Extension to PYUSDX token.
-    /// @param  extensionIn The address of the PYUSDX Extension to swap from.
-    /// @param  amount      The amount of PYUSDX Extension tokens to swap.
-    /// @param  recipient   The address to receive PYUSDX tokens.
-    function _swapOut(address extensionIn, uint256 amount, address recipient) private {
-        _revertIfNotApprovedExtension(extensionIn);
-
-        IERC20(extensionIn).transferFrom(msg.sender, address(this), amount);
-
-        uint256 pyusdxBalanceBefore = _pyusdxBalanceOf(address(this));
-
-        // NOTE: Amount and recipient validation is performed in Extensions.
-        IExtension(extensionIn).unwrap(amount);
-
-        // NOTE: Ensures that we transfer to recipient the equivalent amount of PYUSDX received from unwrapping.
-        amount = _pyusdxBalanceOf(address(this)) - pyusdxBalanceBefore;
-
-        IERC20(pyusdx).transfer(recipient, amount);
-
-        emit SwappedOut(extensionIn, pyusdx, amount, recipient);
-    }
-
-    /* ============ Private View/Pure Functions ============ */
+    /* ============ Internal View/Pure Functions ============ */
 
     /// @dev    Returns the PYUSDX Token balance of `account`.
     /// @param  account The account being queried.
@@ -354,14 +311,14 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
 
     /// @dev   Reverts if `extension` is not an approved earner or an admin-approved extension.
     /// @param extension Address of an extension.
-    function _revertIfNotApprovedExtension(address extension) private view {
+    function _revertIfNotApprovedExtension(address extension) internal view {
         if (!isApprovedExtension(extension)) revert NotApprovedExtension(extension);
     }
 
     /// @dev   Reverts if `asset` is not an allowed asset in MultiMint Extension.
     /// @param asset        Address of the asset to check.
     /// @param extensionOut Address of the MultiMint Extension.
-    function _revertIfCannotMultiMint(address asset, address extensionOut) private view {
+    function _revertIfCannotMultiMint(address asset, address extensionOut) internal view {
         try IMultiMint(extensionOut).isAllowedAsset(asset) returns (bool allowed) {
             if (!allowed) revert InvalidSwapPath(asset, extensionOut);
         } catch {

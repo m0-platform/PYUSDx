@@ -186,10 +186,4 @@ interface ISwapFacility {
     /// @param  extension The extension address to check.
     /// @return True if approved, false otherwise.
     function isApprovedExtension(address extension) external view returns (bool);
-
-    /// @notice Checks if `tokenIn` can be swapped for `tokenOut`.
-    /// @param  tokenIn  The address of the input token.
-    /// @param  tokenOut The address of the output token.
-    /// @return True if can swap, false otherwise.
-    function canSwapViaPath(address tokenIn, address tokenOut) external view returns (bool);
 }

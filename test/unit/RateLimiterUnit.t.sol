@@ -37,8 +37,8 @@ contract RateLimiterTests is Test {
     }
 
     function test_initialize() public {
-        assertEq(limiter.RATE_LIMITER_ROLE(), keccak256("RATE_LIMITER_ROLE"));
-        assertTrue(limiter.hasRole(limiter.RATE_LIMITER_ROLE(), manager));
+        assertEq(limiter.RATE_LIMIT_MANAGER_ROLE(), keccak256("RATE_LIMIT_MANAGER_ROLE"));
+        assertTrue(limiter.hasRole(limiter.RATE_LIMIT_MANAGER_ROLE(), manager));
     }
 
     /* ============ setRateLimit ============ */

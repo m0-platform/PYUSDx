@@ -5,13 +5,16 @@ import { ERC20ExtendedUpgradeable } from "../../lib/evm-m-extensions/lib/common/
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
+import { Freezable } from "../../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
+import { Pausable } from "../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
+
 import { IExtension } from "./interfaces/IExtension.sol";
 import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
 
 /// @title  Extension
 /// @notice Upgradeable ERC20 base contract for wrapping PYUSDX into a branded extension token.
 /// @author M0 Labs
-abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
+abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, Pausable {
     /* ============ Variables ============ */
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
@@ -37,19 +40,28 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
     /// @param  pyusdx_       The address of the PYUSDX token.
     /// @param  swapFacility_ The address of the swap facility.
     constructor(address pyusdx_, address swapFacility_) {
-        _disableInitializers();
-
         if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDX();
         if ((swapFacility = swapFacility_) == address(0)) revert ZeroSwapFacility();
+
+        _disableInitializers();
     }
 
     /* ============ Initializer ============ */
 
     /// @notice Initializes the generic PYUSDX extension token.
-    /// @param  name   The name of the token.
-    /// @param  symbol The symbol of the token.
-    function __Extension_init(string memory name, string memory symbol) internal onlyInitializing {
+    /// @param  name           The name of the token.
+    /// @param  symbol         The symbol of the token.
+    /// @param  freezeManager  The address of the freeze manager.
+    /// @param  pauser         The address of the pauser.
+    function __Extension_init(
+        string memory name,
+        string memory symbol,
+        address freezeManager,
+        address pauser
+    ) internal onlyInitializing {
         __ERC20ExtendedUpgradeable_init(name, symbol, 6);
+        __Freezable_init(freezeManager);
+        __Pausable_init(pauser);
     }
 
     /* ============ Interactive Functions ============ */
@@ -74,25 +86,42 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
     /// @dev   Hook called before approval of PYUSDX Extension token.
     /// @param account The sender's address.
     /// @param spender The spender address.
-    /// @param amount  The amount to be approved.
-    function _beforeApprove(address account, address spender, uint256 amount) internal virtual {}
+    function _beforeApprove(address account, address spender, uint256 /* amount */) internal view virtual {
+        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
+        _revertIfFrozen($, account);
+        _revertIfFrozen($, spender);
+    }
 
     /// @dev   Hook called before wrapping PYUSDX into PYUSDX Extension token.
     /// @param account   The account from which PYUSDX is deposited.
     /// @param recipient The account receiving the minted PYUSDX Extension token.
-    /// @param amount    The amount of PYUSDX deposited.
-    function _beforeWrap(address account, address recipient, uint256 amount) internal virtual {}
+    function _beforeWrap(address account, address recipient, uint256 /* amount */) internal view virtual {
+        _requireNotPaused();
+
+        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
+        _revertIfFrozen($, account);
+        _revertIfFrozen($, recipient);
+    }
 
     /// @dev   Hook called before unwrapping PYUSDX Extension token.
     /// @param account The original caller (resolved via swap facility).
-    /// @param amount  The amount of PYUSDX Extension token burned.
-    function _beforeUnwrap(address account, uint256 amount) internal virtual {}
+    function _beforeUnwrap(address account, uint256 /* amount */) internal view virtual {
+        _requireNotPaused();
+
+        _revertIfFrozen(_getFreezableStorageLocation(), account);
+    }
 
     /// @dev   Hook called before transferring PYUSDX Extension token.
     /// @param sender    The sender's address.
     /// @param recipient The recipient's address.
-    /// @param amount    The amount to be transferred.
-    function _beforeTransfer(address sender, address recipient, uint256 amount) internal virtual {}
+    function _beforeTransfer(address sender, address recipient, uint256 /* amount */) internal view virtual {
+        _requireNotPaused();
+
+        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
+        _revertIfFrozen($, msg.sender);
+        _revertIfFrozen($, sender);
+        _revertIfFrozen($, recipient);
+    }
 
     /* ============ Internal Interactive Functions ============ */
 
@@ -156,6 +185,7 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable {
     /// @param amount    The amount to be transferred.
     function _transfer(address sender, address recipient, uint256 amount) internal override {
         _revertIfZeroAccount(recipient);
+
         _beforeTransfer(sender, recipient, amount);
 
         emit Transfer(sender, recipient, amount);

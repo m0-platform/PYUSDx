@@ -99,7 +99,7 @@ contract MockMultiMint is ERC20, IMultiMint {
         assetBalances[asset] -= assetAmount;
         IERC20(asset).transfer(recipient, assetAmount);
 
-        emit AssetReplacedWithPYUSDX(asset, assetAmount, recipient, amount);
+        emit AssetReplaced(asset, assetAmount, recipient, amount);
     }
 
     /**

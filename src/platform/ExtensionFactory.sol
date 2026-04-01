@@ -16,7 +16,6 @@ abstract contract ExtensionFactoryStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.PYUSDXExtensionFactory
     struct ExtensionFactoryStorage {
         mapping(address extension => IExtensionFactory.ExtensionType extensionType) extensionTypes;
-        mapping(address extension => bool active) activeExtensions;
         address yieldToOneImplementation;
         address multiMintImplementation;
     }
@@ -87,8 +86,8 @@ contract ExtensionFactory is
     ) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
         if (factoryManager == address(0)) revert ZeroFactoryManager();
-        _revertIfInvalidImplementation(yieldToOneImplementation);
-        _revertIfInvalidImplementation(multiMintImplementation);
+        _revertIfInvalidExtension(yieldToOneImplementation);
+        _revertIfInvalidExtension(multiMintImplementation);
 
         __AccessControl_init();
 
@@ -176,20 +175,21 @@ contract ExtensionFactory is
     }
 
     /// @inheritdoc IExtensionFactory
-    function setExtensionStatus(address extension, bool enabled) external override onlyRole(FACTORY_MANAGER_ROLE) {
-        if (extension == address(0)) revert ZeroExtension();
-
+    function setExtensionType(
+        address extension,
+        ExtensionType extensionType
+    ) external override onlyRole(FACTORY_MANAGER_ROLE) {
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
 
-        if ($.extensionTypes[extension] == ExtensionType.NONE) {
-            revert ExtensionNotRegistered(extension);
+        if ($.extensionTypes[extension] == extensionType) return;
+
+        if (extensionType != ExtensionType.NONE) {
+            _revertIfInvalidExtension(extension);
         }
 
-        if ($.activeExtensions[extension] == enabled) return;
+        $.extensionTypes[extension] = extensionType;
 
-        $.activeExtensions[extension] = enabled;
-
-        emit ExtensionStatusSet(extension, enabled);
+        emit ExtensionTypeSet(extension, extensionType);
     }
 
     /// @inheritdoc IExtensionFactory
@@ -201,7 +201,7 @@ contract ExtensionFactory is
             revert InvalidExtensionType();
         }
 
-        _revertIfInvalidImplementation(implementation);
+        _revertIfInvalidExtension(implementation);
 
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
 
@@ -238,7 +238,7 @@ contract ExtensionFactory is
 
     /// @inheritdoc IExtensionFactory
     function isApprovedExtension(address extension) public view override returns (bool) {
-        return _getExtensionFactoryStorage().activeExtensions[extension];
+        return _getExtensionFactoryStorage().extensionTypes[extension] != ExtensionType.NONE;
     }
 
     /* ============ Internal Interactive Functions ============ */
@@ -247,9 +247,7 @@ contract ExtensionFactory is
     /// @param proxy         The address of the proxy.
     /// @param extensionType The type of the extension.
     function _registerExtension(address proxy, ExtensionType extensionType) internal {
-        ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
-        $.extensionTypes[proxy] = extensionType;
-        $.activeExtensions[proxy] = true;
+        _getExtensionFactoryStorage().extensionTypes[proxy] = extensionType;
     }
 
     /* ============ Internal View Functions ============ */
@@ -291,12 +289,12 @@ contract ExtensionFactory is
         if (admin == address(0)) revert ZeroAdmin();
     }
 
-    /// @dev   Reverts if the implementation address is zero or wired to wrong pyusdx/swapFacility.
-    /// @param implementation The implementation address to validate.
-    function _revertIfInvalidImplementation(address implementation) internal view {
-        if (implementation == address(0)) revert ZeroImplementation();
+    /// @dev   Reverts if the extension address is zero or wired to wrong pyusdx/swapFacility.
+    /// @param extension The extension address to validate.
+    function _revertIfInvalidExtension(address extension) internal view {
+        if (extension == address(0)) revert ZeroExtension();
 
-        if (IExtension(implementation).pyusdx() != pyusdx || IExtension(implementation).swapFacility() != swapFacility)
-            revert InvalidImplementation();
+        if (IExtension(extension).pyusdx() != pyusdx || IExtension(extension).swapFacility() != swapFacility)
+            revert InvalidExtension();
     }
 }

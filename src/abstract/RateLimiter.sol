@@ -37,15 +37,16 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
     /* ============ Constants ============ */
 
     /// @inheritdoc IRateLimiter
-    bytes32 public constant RATE_LIMITER_ROLE = keccak256("RATE_LIMITER_ROLE");
+    bytes32 public constant RATE_LIMIT_MANAGER_ROLE = keccak256("RATE_LIMIT_MANAGER_ROLE");
 
     /* ============ Initializer ============ */
 
     /// @dev   Initializes the rate limiter with a rate limit manager.
-    /// @param rateLimitManager The address that will receive RATE_LIMITER_ROLE.
+    /// @param rateLimitManager The address that will receive RATE_LIMIT_MANAGER_ROLE.
     function __RateLimiter_init(address rateLimitManager) internal onlyInitializing {
         if (rateLimitManager == address(0)) revert ZeroRateLimitManager();
-        _grantRole(RATE_LIMITER_ROLE, rateLimitManager);
+
+        _grantRole(RATE_LIMIT_MANAGER_ROLE, rateLimitManager);
     }
 
     /* ============ Interactive Functions ============ */
@@ -56,7 +57,7 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
         uint256 capacity,
         uint256 refillPerSecond,
         bool enabled
-    ) external onlyRole(RATE_LIMITER_ROLE) {
+    ) external onlyRole(RATE_LIMIT_MANAGER_ROLE) {
         RateLimiterStorage storage $ = _getRateLimiterStorage();
         Bucket storage bucket = $.issuerBuckets[issuer];
 
@@ -136,7 +137,10 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
 
         if (amount > remainingAmount) revert RateLimitExceeded(amount, remainingAmount);
 
-        bucket.remainingAmount = remainingAmount - amount;
+        unchecked {
+            bucket.remainingAmount = remainingAmount - amount;
+        }
+
         bucket.lastRefillTime = uint40(block.timestamp);
     }
 

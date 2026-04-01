@@ -41,7 +41,7 @@ interface IRateLimiter {
     /* ============ View/Pure Functions ============ */
 
     /// @notice The role that can set rate limits.
-    function RATE_LIMITER_ROLE() external view returns (bytes32);
+    function RATE_LIMIT_MANAGER_ROLE() external view returns (bytes32);
 
     /// @notice Returns issuer rate-limit config.
     /// @param  issuer          Address of the issuer.

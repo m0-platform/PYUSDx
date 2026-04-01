@@ -66,13 +66,13 @@ contract PYUSDX is
 {
     /* ============ Constants ============ */
 
-    /// @notice Maximum fee rate in bps (100%).
+    /// @inheritdoc IPYUSDX
     uint16 public constant ONE_HUNDRED_PERCENT = 10_000;
 
-    /// @notice Precision scaling for index calculations (1e12).
+    /// @inheritdoc IPYUSDX
     uint128 public constant EXP_SCALED_ONE = 1e12;
 
-    /// @notice The role that can issue PYUSDX tokens.
+    /// @inheritdoc IPYUSDX
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
 
     /* ============ Constructor ============ */
@@ -118,13 +118,6 @@ contract PYUSDX is
     }
 
     /// @inheritdoc IPYUSDX
-    function distributeReward(address account, uint256 amount) external onlyEarnerManager whenNotPaused {
-        _mint(account, amount);
-
-        emit RewardDistributed(account, amount);
-    }
-
-    /// @inheritdoc IPYUSDX
     function burn(address account, uint256 amount) external onlyRole(ISSUER_ROLE) whenNotPaused {
         _revertIfZeroAccount(account);
         _revertIfFrozen(account);
@@ -132,11 +125,7 @@ contract PYUSDX is
 
         PYUSDXStorage storage $ = _getPYUSDXStorage();
 
-        if (isEarning(account)) {
-            _subtractEarningAmount($, account, amount);
-        } else {
-            _subtractNonEarningAmount($, account, amount);
-        }
+        isEarning(account) ? _subtractEarningAmount($, account, amount) : _subtractNonEarningAmount($, account, amount);
 
         $.totalSupply -= amount;
 
@@ -144,11 +133,16 @@ contract PYUSDX is
     }
 
     /// @inheritdoc IPYUSDX
+    function distributeReward(address account, uint256 amount) external onlyEarnerManager whenNotPaused {
+        _mint(account, amount);
+
+        emit RewardDistributed(account, amount);
+    }
+
+    /// @inheritdoc IPYUSDX
     function claimFor(
         address account
     ) external whenNotPaused returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) {
-        _revertIfFrozen(account);
-
         return _claimFor(account);
     }
 
@@ -233,7 +227,11 @@ contract PYUSDX is
         if (accountInfo.earnerRate == 0) return (0, 0, 0);
 
         uint256 balanceWithYield = _getPresentAmountRoundedDown(accountInfo.earningPrincipal, currentIndexOf(account));
-        yieldWithFee = balanceWithYield > accountInfo.balance ? balanceWithYield - accountInfo.balance : 0;
+
+        unchecked {
+            yieldWithFee = balanceWithYield > accountInfo.balance ? balanceWithYield - accountInfo.balance : 0;
+        }
+
         uint16 feeRate = accountInfo.feeRate;
 
         if (feeRate == 0 || yieldWithFee == 0) return (yieldWithFee, 0, yieldWithFee);
@@ -394,6 +392,7 @@ contract PYUSDX is
 
         // Update index for the account before potentially changing its earner rate.
         _updateIndexOf(account);
+
         accountInfo.earnerRate = earnerRate;
         accountInfo.feeRate = feeRate;
         accountInfo.claimRecipient = claimRecipient;
@@ -422,6 +421,8 @@ contract PYUSDX is
 
     /// @dev Internal claim implementation.
     function _claimFor(address account) internal returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) {
+        _revertIfFrozen(account);
+
         (yieldWithFee, fee, yieldNetOfFee) = accruedYieldAndFeeOf(account);
 
         if (yieldWithFee == 0) return (0, 0, 0);
@@ -434,7 +435,10 @@ contract PYUSDX is
 
         // No change in principal, only the balance is updated to include the newly claimed yield.
         $.totalSupply += yieldWithFee;
-        $.accounts[account].balance += yieldWithFee;
+
+        unchecked {
+            $.accounts[account].balance += yieldWithFee;
+        }
 
         address claimRecipient = claimRecipientFor(account);
 
@@ -502,11 +506,7 @@ contract PYUSDX is
     /// @param account The account to subtract the amount from.
     /// @param amount  The amount to subtract (must be safe240).
     function _subtractNonEarningAmount(PYUSDXStorage storage $, address account, uint256 amount) internal {
-        uint256 accountBalance = $.accounts[account].balance;
-
-        if (accountBalance < amount) {
-            revert InsufficientBalance(account, accountBalance, amount);
-        }
+        _revertIfInsufficientBalance(account, amount);
 
         unchecked {
             $.accounts[account].balance -= amount;
@@ -518,20 +518,14 @@ contract PYUSDX is
     /// @param account The account to subtract the amount from.
     /// @param amount  The present amount to subtract (must be safe240).
     function _subtractEarningAmount(PYUSDXStorage storage $, address account, uint256 amount) internal {
-        uint256 accountBalance = $.accounts[account].balance;
-
-        if (accountBalance < amount) {
-            revert InsufficientBalance(account, accountBalance, amount);
-        }
+        _revertIfInsufficientBalance(account, amount);
 
         uint112 principal = _getPrincipalAmountRoundedUp(amount, _updateIndexOf(account));
         uint112 earningPrincipal = $.accounts[account].earningPrincipal;
 
         unchecked {
             $.accounts[account].balance -= amount;
-
-            // NOTE: `min112` prevents underflow.
-            $.accounts[account].earningPrincipal = earningPrincipal - UIntMath.min112(principal, earningPrincipal);
+            $.accounts[account].earningPrincipal = earningPrincipal > principal ? earningPrincipal - principal : 0;
         }
     }
 
@@ -540,10 +534,10 @@ contract PYUSDX is
     /// @param recipient The recipient's address.
     /// @param amount    The amount to be transferred.
     function _transfer(address sender, address recipient, uint256 amount) internal override whenNotPaused {
+        _revertIfZeroAccount(recipient);
         _revertIfFrozen(msg.sender);
         _revertIfFrozen(sender);
         _revertIfFrozen(recipient);
-        _revertIfZeroAccount(recipient);
 
         emit Transfer(sender, recipient, amount);
 
@@ -551,19 +545,11 @@ contract PYUSDX is
 
         PYUSDXStorage storage $ = _getPYUSDXStorage();
 
-        // Subtract from sender
-        if (isEarning(sender)) {
-            _subtractEarningAmount($, sender, amount);
-        } else {
-            _subtractNonEarningAmount($, sender, amount);
-        }
+        // Subtract from the `sender` account.
+        isEarning(sender) ? _subtractEarningAmount($, sender, amount) : _subtractNonEarningAmount($, sender, amount);
 
-        // Add to recipient
-        if (isEarning(recipient)) {
-            _addEarningAmount($, recipient, amount);
-        } else {
-            _addNonEarningAmount($, recipient, amount);
-        }
+        // Add to the `recipient` account.
+        isEarning(recipient) ? _addEarningAmount($, recipient, amount) : _addNonEarningAmount($, recipient, amount);
     }
 
     /// @dev   Internal force transfer implementation to seize funds from frozen accounts.
@@ -572,6 +558,7 @@ contract PYUSDX is
     /// @param amount        The amount to transfer.
     function _forceTransfer(address frozenAccount, address recipient, uint256 amount) internal override {
         _revertIfZeroAccount(recipient);
+        _revertIfFrozen(recipient);
         _revertIfNotFrozen(frozenAccount);
 
         emit Transfer(frozenAccount, recipient, amount);
@@ -585,11 +572,7 @@ contract PYUSDX is
         _subtractNonEarningAmount($, frozenAccount, amount);
 
         // Add to recipient (can be earning or non-earning)
-        if (isEarning(recipient)) {
-            _addEarningAmount($, recipient, amount);
-        } else {
-            _addNonEarningAmount($, recipient, amount);
-        }
+        isEarning(recipient) ? _addEarningAmount($, recipient, amount) : _addNonEarningAmount($, recipient, amount);
     }
 
     /// @dev   Internal mint implementation to create new tokens.
@@ -599,17 +582,14 @@ contract PYUSDX is
         _revertIfZeroAccount(account);
         _revertIfFrozen(account);
         _revertIfZeroAmount(amount);
+
         _enforceRateLimit(msg.sender, amount);
 
         PYUSDXStorage storage $ = _getPYUSDXStorage();
 
         $.totalSupply += amount;
 
-        if (isEarning(account)) {
-            _addEarningAmount($, account, amount);
-        } else {
-            _addNonEarningAmount($, account, amount);
-        }
+        isEarning(account) ? _addEarningAmount($, account, amount) : _addNonEarningAmount($, account, amount);
 
         emit Transfer(address(0), account, amount);
     }
@@ -639,5 +619,12 @@ contract PYUSDX is
     /// @dev Reverts if account is zero address.
     function _revertIfZeroAccount(address account) internal pure {
         if (account == address(0)) revert ZeroAccount();
+    }
+
+    /// @dev Reverts if account has insufficient balance for an operation.
+    function _revertIfInsufficientBalance(address account, uint256 amount) internal view {
+        uint256 balance = balanceOf(account);
+
+        if (balance < amount) revert InsufficientBalance(account, balance, amount);
     }
 }

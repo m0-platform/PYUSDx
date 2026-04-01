@@ -3,12 +3,11 @@ pragma solidity ^0.8.34;
 
 import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
-import { IYieldToOne } from "./interfaces/IYieldToOne.sol";
 import { IPYUSDX } from "../../IPYUSDX.sol";
 
-import { Freezable } from "../../../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
-import { Pausable } from "../../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
 import { Extension } from "../Extension.sol";
+
+import { IYieldToOne } from "./interfaces/IYieldToOne.sol";
 
 abstract contract YieldToOneStorageLayout {
     /// @custom:storage-location erc7201:PYUSDX.storage.YieldToOne
@@ -37,7 +36,7 @@ abstract contract YieldToOneStorageLayout {
 ///         system. When the extension's pending yield is claimed, it is first realized from
 ///         PYUSDX (net of PYUSDX's fee), then minted as extension tokens to the yield recipient.
 /// @author M0 Labs
-contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezable, Pausable {
+contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
     /* ============ Variables ============ */
 
     /// @inheritdoc IYieldToOne
@@ -90,12 +89,10 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         address pauser,
         address yieldRecipientManager
     ) internal onlyInitializing {
-        if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
         if (admin == address(0)) revert ZeroAdmin();
+        if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
 
-        __Extension_init(name, symbol);
-        __Freezable_init(freezeManager);
-        __Pausable_init(pauser);
+        __Extension_init(name, symbol, freezeManager, pauser);
 
         _setYieldRecipient(yieldRecipient_);
 
@@ -112,7 +109,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         // NOTE: Realize any pending PYUSDX yield
         IPYUSDX(pyusdx).claimFor(address(this));
 
-        // NOTE: Excess accounts for the newly claimed yield and any prior unclaimed yield.
+        // NOTE: Excess accounts for the newly claimed yield and any prior unclaimed yield
+        //       (i.e. PYUSDX donation or `claimFor()` the extension at the PYUSDX level)
         uint256 excess = _excess();
 
         if (excess == 0) return 0;
@@ -157,43 +155,6 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
 
     /* ============ Hooks ============ */
 
-    /// @dev   Hook called before approval. Reverts if frozen.
-    /// @param account The account granting approval.
-    /// @param spender The account being approved.
-    function _beforeApprove(address account, address spender, uint256) internal view virtual override {
-        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
-        _revertIfFrozen($, account);
-        _revertIfFrozen($, spender);
-    }
-
-    /// @dev   Hook called before wrapping PYUSDX into extension tokens.
-    /// @param account   The account depositing PYUSDX.
-    /// @param recipient The account receiving extension tokens.
-    function _beforeWrap(address account, address recipient, uint256) internal view virtual override {
-        _requireNotPaused();
-        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
-        _revertIfFrozen($, account);
-        _revertIfFrozen($, recipient);
-    }
-
-    /// @dev   Hook called before unwrapping extension tokens for PYUSDX.
-    /// @param account The account from which extension tokens are burned.
-    function _beforeUnwrap(address account, uint256) internal view virtual override {
-        _requireNotPaused();
-        _revertIfFrozen(_getFreezableStorageLocation(), account);
-    }
-
-    /// @dev   Hook called before transferring extension tokens.
-    /// @param sender    The address sending tokens.
-    /// @param recipient The address receiving tokens.
-    function _beforeTransfer(address sender, address recipient, uint256) internal view virtual override {
-        _requireNotPaused();
-        FreezableStorageStruct storage $ = _getFreezableStorageLocation();
-        _revertIfFrozen($, msg.sender);
-        _revertIfFrozen($, sender);
-        _revertIfFrozen($, recipient);
-    }
-
     /// @dev Hook called before claiming yield.
     function _beforeClaimYield() internal view virtual {}
 
@@ -206,7 +167,10 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         YieldToOneStorage storage $ = _getYieldToOneStorage();
 
         $.totalSupply += amount;
-        $.balanceOf[recipient] += amount;
+
+        unchecked {
+            $.balanceOf[recipient] += amount;
+        }
 
         emit Transfer(address(0), recipient, amount);
     }
@@ -250,7 +214,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
 
         YieldToOneStorage storage $ = _getYieldToOneStorage();
 
-        if (yieldRecipient_ == $.yieldRecipient) return;
+        if ($.yieldRecipient == yieldRecipient_) return;
 
         $.yieldRecipient = yieldRecipient_;
 
@@ -264,6 +228,8 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension, Freezabl
         uint256 pyusdxBalance = _pyusdxBalanceOf(address(this));
         uint256 totalSupply_ = totalSupply();
 
-        return pyusdxBalance > totalSupply_ ? pyusdxBalance - totalSupply_ : 0;
+        unchecked {
+            return pyusdxBalance > totalSupply_ ? pyusdxBalance - totalSupply_ : 0;
+        }
     }
 }
