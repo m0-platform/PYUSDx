@@ -67,18 +67,18 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     }
 
     function testFuzz_rateLimit_refillStaysWithinCapacity(
-        uint256 capacity,
-        uint256 bucketRemaining,
+        uint128 capacity,
+        uint128 bucketRemaining,
         uint256 mintAmount,
-        uint256 refillPerSecond,
+        uint128 refillPerSecond,
         uint40 currentTime,
         uint40 timeSinceLastRefill,
         uint40 elapsedAfterMint
     ) public {
-        uint256 boundedCapacity = bound(capacity, 1, type(uint256).max);
-        uint256 boundedBucketRemaining = bound(bucketRemaining, 0, boundedCapacity);
-        uint256 boundedMintAmount = bound(mintAmount, 0, type(uint256).max);
-        uint256 boundedRefillPerSecond = bound(refillPerSecond, 1, type(uint256).max);
+        uint128 boundedCapacity = uint128(bound(capacity, 1, type(uint128).max));
+        uint128 boundedBucketRemaining = uint128(bound(bucketRemaining, 0, boundedCapacity));
+        uint256 boundedMintAmount = bound(mintAmount, 0, type(uint128).max);
+        uint128 boundedRefillPerSecond = uint128(bound(refillPerSecond, 1, type(uint128).max));
 
         // Bound currentTime to reasonable range, then constrain other time values
         uint40 boundedCurrentTime = uint40(bound(currentTime, 1, type(uint40).max));
@@ -96,7 +96,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         );
 
         // Calculate available amount after refill (caps at capacity)
-        uint256 available = pyusdx.getRemainingAmount(address(issuerGateway));
+        uint128 available = pyusdx.getRemainingAmount(address(issuerGateway));
 
         bool isZeroAmount = boundedMintAmount == 0;
         bool exceedsRateLimit = boundedMintAmount > available;
@@ -115,15 +115,15 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         if (!exceedsRateLimit && !isZeroAmount) {
             vm.warp(block.timestamp + boundedElapsedAfterMint);
 
-            uint256 availableAfterMint = pyusdx.getRemainingAmount(address(issuerGateway));
+            uint128 availableAfterMint = pyusdx.getRemainingAmount(address(issuerGateway));
 
             assertLe(availableAfterMint, boundedCapacity);
         }
     }
 
-    function testFuzz_rateLimit_zeroRefillConsumesCapacity(uint256 capacity, uint256 amount, uint40 elapsed) public {
-        uint256 boundedCapacity = bound(capacity, 1, type(uint256).max);
-        uint256 boundedAmount = bound(amount, 1, boundedCapacity);
+    function testFuzz_rateLimit_zeroRefillConsumesCapacity(uint128 capacity, uint128 amount, uint40 elapsed) public {
+        uint128 boundedCapacity = uint128(bound(capacity, 1, type(uint128).max));
+        uint128 boundedAmount = uint128(bound(amount, 1, boundedCapacity));
         uint40 boundedElapsed = uint40(bound(elapsed, 1, type(uint40).max));
 
         vm.prank(rateLimitManager);

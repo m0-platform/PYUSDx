@@ -3,16 +3,17 @@ pragma solidity ^0.8.34;
 
 import { Math } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import { UIntMath } from "../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
 
 import { IRateLimiter } from "./interfaces/IRateLimiter.sol";
 
 /// @notice ERC-7201 namespaced storage layout for token-bucket mint rate limiting.
 abstract contract RateLimiterStorageLayout {
     struct Bucket {
-        uint256 capacity; // Slot 0: Config
-        uint256 refillPerSecond; // Slot 1: Config
-        uint256 remainingAmount; // Slot 2: State (frequently updated)
-        uint40 lastRefillTime; // Slot 3 (216 bits unused), good until year 36,812
+        uint128 capacity; // --------┐ Slot 0: Config
+        uint128 refillPerSecond; // -┘
+        uint128 remainingAmount; // -┐ Slot 1: State (frequently updated)
+        uint40 lastRefillTime; // ---┘ good until year 36,812
     }
 
     /// @custom:storage-location erc7201:M0.storage.RateLimiter
@@ -54,8 +55,8 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
     /// @inheritdoc IRateLimiter
     function setRateLimit(
         address issuer,
-        uint256 capacity,
-        uint256 refillPerSecond,
+        uint128 capacity,
+        uint128 refillPerSecond,
         bool enabled
     ) external onlyRole(RATE_LIMIT_MANAGER_ROLE) {
         RateLimiterStorage storage $ = _getRateLimiterStorage();
@@ -74,14 +75,16 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
         // NOTE: Start with full bucket on first setup. Otherwise, calculate refilled amount and cap to new capacity.
         bucket.remainingAmount = bucket.lastRefillTime == 0
             ? capacity
-            : Math.min(
-                _calculateRemainingAmount(
-                    bucket.remainingAmount,
-                    bucket.capacity,
-                    bucket.lastRefillTime,
-                    bucket.refillPerSecond
-                ),
-                capacity
+            : uint128(
+                Math.min(
+                    _calculateRemainingAmount(
+                        bucket.remainingAmount,
+                        bucket.capacity,
+                        bucket.lastRefillTime,
+                        bucket.refillPerSecond
+                    ),
+                    capacity
+                )
             );
 
         bucket.capacity = capacity;
@@ -92,21 +95,21 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
     /* ============ External View Functions ============ */
 
     /// @inheritdoc IRateLimiter
-    function getRateLimitConfig(address issuer) external view returns (uint256 capacity, uint256 refillPerSecond) {
+    function getRateLimitConfig(address issuer) external view returns (uint128 capacity, uint128 refillPerSecond) {
         Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];
 
         // NOTE: Unconfigured issuers have unlimited capacity
-        if (bucket.lastRefillTime == 0) return (type(uint256).max, 0);
+        if (bucket.lastRefillTime == 0) return (type(uint128).max, 0);
 
         return (bucket.capacity, bucket.refillPerSecond);
     }
 
     /// @inheritdoc IRateLimiter
-    function getRemainingAmount(address issuer) external view returns (uint256) {
+    function getRemainingAmount(address issuer) external view returns (uint128) {
         Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];
 
         // NOTE: Unconfigured issuers have unlimited capacity
-        if (bucket.lastRefillTime == 0) return type(uint256).max;
+        if (bucket.lastRefillTime == 0) return type(uint128).max;
 
         return
             _calculateRemainingAmount(
@@ -128,17 +131,18 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
         // NOTE: Unconfigured issuers have unlimited capacity
         if (bucket.lastRefillTime == 0) return;
 
-        uint256 remainingAmount = _calculateRemainingAmount(
+        uint128 amount_ = UIntMath.safe128(amount);
+        uint128 remainingAmount = _calculateRemainingAmount(
             bucket.remainingAmount,
             bucket.capacity,
             bucket.lastRefillTime,
             bucket.refillPerSecond
         );
 
-        if (amount > remainingAmount) revert RateLimitExceeded(amount, remainingAmount);
+        if (amount_ > remainingAmount) revert RateLimitExceeded(amount_, remainingAmount);
 
         unchecked {
-            bucket.remainingAmount = remainingAmount - amount;
+            bucket.remainingAmount = remainingAmount - amount_;
         }
 
         bucket.lastRefillTime = uint40(block.timestamp);
@@ -151,11 +155,11 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
     /// @param  refillPerSecond Refill rate per second.
     /// @return The remaining amount after refill (capped at capacity).
     function _calculateRemainingAmount(
-        uint256 remaining,
-        uint256 capacity,
+        uint128 remaining,
+        uint128 capacity,
         uint40 lastRefillTime,
-        uint256 refillPerSecond
-    ) internal view returns (uint256) {
+        uint128 refillPerSecond
+    ) internal view returns (uint128) {
         // NOTE: No refill if rate is 0
         if (refillPerSecond == 0) return remaining;
 
@@ -171,6 +175,6 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
         (bool mulOk, uint256 refillAmount) = Math.tryMul(elapsed, refillPerSecond);
         (bool addOk, uint256 total) = Math.tryAdd(remaining, refillAmount);
 
-        return (!mulOk || !addOk) ? capacity : Math.min(total, capacity);
+        return (!mulOk || !addOk) ? capacity : uint128(Math.min(total, capacity));
     }
 }

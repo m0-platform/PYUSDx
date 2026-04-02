@@ -55,7 +55,7 @@ contract RateLimiterTests is Test {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10e6, true);
 
-        (uint256 capacity, uint256 refillPerSecond) = limiter.getRateLimitConfig(issuer);
+        (uint128 capacity, uint128 refillPerSecond) = limiter.getRateLimitConfig(issuer);
 
         assertEq(capacity, 100e6);
         assertEq(refillPerSecond, 10e6);
@@ -80,7 +80,7 @@ contract RateLimiterTests is Test {
         // Should have 50e6 + 3*10e6 = 80e6, capped at new capacity 200e6
         assertEq(limiter.getRemainingAmount(issuer), 80e6);
 
-        (uint256 capacity, uint256 refillPerSecond) = limiter.getRateLimitConfig(issuer);
+        (uint128 capacity, uint128 refillPerSecond) = limiter.getRateLimitConfig(issuer);
 
         assertEq(capacity, 200e6);
         assertEq(refillPerSecond, 5e6);
@@ -115,18 +115,20 @@ contract RateLimiterTests is Test {
         limiter.setRateLimit(issuer, 0, 0, false);
 
         // Unconfigured issuer returns unlimited
-        (uint256 capacity, uint256 refillPerSecond) = limiter.getRateLimitConfig(issuer);
+        (uint128 capacity, uint128 refillPerSecond) = limiter.getRateLimitConfig(issuer);
 
-        assertEq(capacity, type(uint256).max);
+        assertEq(capacity, type(uint128).max);
         assertEq(refillPerSecond, 0);
-        assertEq(limiter.getRemainingAmount(issuer), type(uint256).max);
+        assertEq(limiter.getRemainingAmount(issuer), type(uint128).max);
     }
 
     function test_setRateLimit_remove_revertIfNonZeroCapacity() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10, true);
 
-        vm.expectRevert(abi.encodeWithSelector(IRateLimiter.InvalidRateLimitRemoval.selector, 50e6, 0));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRateLimiter.InvalidRateLimitRemoval.selector, uint128(50e6), uint128(0))
+        );
 
         vm.prank(manager);
         limiter.setRateLimit(issuer, 50e6, 0, false);
@@ -136,7 +138,7 @@ contract RateLimiterTests is Test {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10, true);
 
-        vm.expectRevert(abi.encodeWithSelector(IRateLimiter.InvalidRateLimitRemoval.selector, 0, 5));
+        vm.expectRevert(abi.encodeWithSelector(IRateLimiter.InvalidRateLimitRemoval.selector, uint128(0), uint128(5)));
 
         vm.prank(manager);
         limiter.setRateLimit(issuer, 0, 5, false);
@@ -146,7 +148,7 @@ contract RateLimiterTests is Test {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 0, true);
 
-        (uint256 capacity, uint256 refillPerSecond) = limiter.getRateLimitConfig(issuer);
+        (uint128 capacity, uint128 refillPerSecond) = limiter.getRateLimitConfig(issuer);
 
         assertEq(capacity, 100e6);
         assertEq(refillPerSecond, 0);
@@ -156,16 +158,16 @@ contract RateLimiterTests is Test {
     /* ============ getRateLimitConfig ============ */
 
     function test_getRateLimitConfig_unconfiguredIssuer() public {
-        (uint256 capacity, uint256 refillPerSecond) = limiter.getRateLimitConfig(makeAddr("unknown"));
+        (uint128 capacity, uint128 refillPerSecond) = limiter.getRateLimitConfig(makeAddr("unknown"));
 
-        assertEq(capacity, type(uint256).max);
+        assertEq(capacity, type(uint128).max);
         assertEq(refillPerSecond, 0);
     }
 
     /* ============ getRemainingAmount ============ */
 
     function test_getRemainingAmount_unconfiguredIssuer() public {
-        assertEq(limiter.getRemainingAmount(makeAddr("unknown")), type(uint256).max);
+        assertEq(limiter.getRemainingAmount(makeAddr("unknown")), type(uint128).max);
     }
 
     function test_getRemainingAmount_noRefill() public {
@@ -206,7 +208,7 @@ contract RateLimiterTests is Test {
 
     function test_getRemainingAmount_overflowCapsAtCapacity() public {
         // Set up bucket with values that would cause overflow
-        limiter.setBucketState(issuer, 100e6, type(uint256).max, 1, uint40(block.timestamp));
+        limiter.setBucketState(issuer, 100e6, type(uint128).max, 1, uint40(block.timestamp));
 
         vm.warp(block.timestamp + 1);
 
@@ -233,7 +235,9 @@ contract RateLimiterTests is Test {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 0, true);
 
-        vm.expectRevert(abi.encodeWithSelector(IRateLimiter.RateLimitExceeded.selector, 150e6, 100e6));
+        vm.expectRevert(
+            abi.encodeWithSelector(IRateLimiter.RateLimitExceeded.selector, uint128(150e6), uint128(100e6))
+        );
         limiter.enforceRateLimit(issuer, 150e6);
     }
 
@@ -274,7 +278,7 @@ contract RateLimiterTests is Test {
         limiter.enforceRateLimit(issuer, 50e6);
         assertEq(limiter.getRemainingAmount(issuer), 0e6);
 
-        vm.expectRevert(abi.encodeWithSelector(IRateLimiter.RateLimitExceeded.selector, 1, 0));
+        vm.expectRevert(abi.encodeWithSelector(IRateLimiter.RateLimitExceeded.selector, uint128(1), uint128(0)));
         limiter.enforceRateLimit(issuer, 1);
     }
 }

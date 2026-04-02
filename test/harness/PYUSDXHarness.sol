@@ -71,9 +71,9 @@ contract PYUSDXHarness is PYUSDX {
     /// @notice Sets rate-limit storage directly for edge-case testing.
     function setRateLimitState(
         address issuer,
-        uint256 capacity,
-        uint256 refillPerSecond,
-        uint256 remainingAmount,
+        uint128 capacity,
+        uint128 refillPerSecond,
+        uint128 remainingAmount,
         uint40 lastRefillTime
     ) external {
         Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];

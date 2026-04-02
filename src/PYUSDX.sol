@@ -352,10 +352,10 @@ contract PYUSDX is
     }
 
     /// @dev Internal implementation for setting earning details.
-    // TODO: limits on earner rate?
     function _setAccountInfo(address account, uint32 earnerRate, uint16 feeRate, address claimRecipient) internal {
         _revertIfZeroAccount(account);
         if (feeRate > ONE_HUNDRED_PERCENT) revert FeeRateTooHigh(feeRate);
+        if (earnerRate > ONE_HUNDRED_PERCENT) revert EarnerRateTooHigh(earnerRate);
 
         // Disable earning should have all earning-related fields set to 0, address(0).
         if (earnerRate == 0 && (feeRate != 0 || claimRecipient != address(0))) revert InvalidAccountInfo();
