@@ -2058,9 +2058,62 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.claimFor(alice);
     }
 
-    /* ============ setEarningDetails ============ */
+    /* ============ setAccountInfo ============ */
+
+    function test_setAccountInfo_revert_notEarnerManager() public {
+        address randomCaller = makeAddr("randomCaller");
+
+        vm.expectRevert(IPYUSDX.NotEarnerManager.selector);
+
+        vm.prank(randomCaller);
+        pyusdx.setAccountInfo(alice, 500, 500, bob);
+    }
+
+    function test_setAccountInfo_revert_zeroAccount() public {
+        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(address(0), 500, 500, bob);
+    }
+
+    function test_setAccountInfo_revert_feeRateTooHigh() public {
+        vm.expectRevert(abi.encodeWithSelector(IPYUSDX.FeeRateTooHigh.selector, 10001));
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 10001, bob);
+    }
+
+    function test_setAccountInfo_revert_earnerRateTooHigh() public {
+        vm.expectRevert(abi.encodeWithSelector(IPYUSDX.EarnerRateTooHigh.selector, uint32(10_001)));
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 10_001, 0, bob);
+    }
+
+    function test_setAccountInfo_revert_invalidAccountInfo() public {
+        vm.expectRevert(IPYUSDX.InvalidAccountInfo.selector);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 0, 500, bob);
+    }
+
+    function test_setAccountInfo_revert_frozenAccount() public {
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        vm.prank(earnerManager);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        pyusdx.setAccountInfo(alice, 500, 0, address(0));
+    }
 
     function test_setAccountInfo_enableEarning() public {
+        vm.expectEmit();
+        emit IPYUSDX.AccountInfoUpdated(alice, 500, 500, bob);
+
+        vm.expectEmit();
+        emit IPYUSDX.StartedEarning(alice);
+
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 500, bob);
 
@@ -2074,28 +2127,123 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 500, bob);
 
+        vm.expectEmit();
+        emit IPYUSDX.AccountInfoUpdated(alice, 0, 0, address(0));
+
+        vm.expectEmit();
+        emit IPYUSDX.StoppedEarning(alice);
+
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 0, 0, address(0));
 
         assertFalse(pyusdx.isEarning(alice));
     }
 
-    function test_setAccountInfo_revert_zeroAccount() public {
-        vm.expectRevert(IPYUSDX.ZeroAccount.selector);
+    function test_setAccountInfo_noop_alreadyDisabled() public {
+        // Alice is not earning (default state)
+        assertFalse(pyusdx.isEarning(alice));
+
+        // Calling setAccountInfo to disable for non-earner should be a no-op (no event)
+        vm.recordLogs();
+
         vm.prank(earnerManager);
-        pyusdx.setAccountInfo(address(0), 500, 500, bob);
+        pyusdx.setAccountInfo(alice, 0, 0, address(0));
+
+        // Verify no AccountInfoUpdated event was emitted
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertNotEq(logs[i].topics[0], IPYUSDX.AccountInfoUpdated.selector);
+        }
+
+        // State should remain unchanged
+        assertFalse(pyusdx.isEarning(alice));
     }
 
-    function test_setAccountInfo_revert_feeRateTooHigh() public {
-        vm.expectRevert(abi.encodeWithSelector(IPYUSDX.FeeRateTooHigh.selector, 10001));
+    function test_setAccountInfo_noop_sameSettings() public {
+        // First enable earning for alice
         vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 500, 10001, bob);
+        pyusdx.setAccountInfo(alice, 500, 500, bob);
+
+        (uint32 earnerRate, uint16 feeRate, address recipient) = pyusdx.getAccountEarningInfo(alice);
+
+        assertEq(earnerRate, 500);
+        assertEq(feeRate, 500);
+        assertEq(recipient, bob);
+
+        // Call again with same settings - should be a no-op (no event, no claim)
+        vm.recordLogs();
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 500, bob);
+
+        // Verify no AccountInfoUpdated event was emitted
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertNotEq(logs[i].topics[0], IPYUSDX.AccountInfoUpdated.selector);
+        }
+
+        // State should remain unchanged
+        (earnerRate, feeRate, recipient) = pyusdx.getAccountEarningInfo(alice);
+
+        assertEq(earnerRate, 500);
+        assertEq(feeRate, 500);
+        assertEq(recipient, bob);
     }
 
-    function test_setAccountInfo_revert_invalidAccountInfo() public {
-        vm.expectRevert(IPYUSDX.InvalidAccountInfo.selector);
+    function test_setAccountInfo_changeEarnerRate() public {
         vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 0, 500, bob);
+        pyusdx.setAccountInfo(alice, 500, 500, bob);
+
+        vm.expectEmit();
+        emit IPYUSDX.AccountInfoUpdated(alice, 1000, 500, bob);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 1000, 500, bob);
+
+        (uint32 earnerRate, , ) = pyusdx.getAccountEarningInfo(alice);
+        assertEq(earnerRate, 1000);
+    }
+
+    function test_setAccountInfo_changeFeeRate() public {
+        // First enable earning for alice
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 500, bob);
+
+        // Change fee rate - should emit event
+        vm.expectEmit();
+        emit IPYUSDX.AccountInfoUpdated(alice, 500, 1000, bob);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 1000, bob);
+
+        // Verify state updated
+        (, uint16 feeRate, ) = pyusdx.getAccountEarningInfo(alice);
+        assertEq(feeRate, 1000);
+    }
+
+    function test_setAccountInfo_changeClaimRecipient() public {
+        // First enable earning for alice
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 500, bob);
+
+        address charlie = makeAddr("charlie");
+
+        // Change claim recipient - should emit event
+        vm.expectEmit();
+        emit IPYUSDX.AccountInfoUpdated(alice, 500, 500, charlie);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 500, charlie);
+
+        // Verify state updated
+        (, , address recipient) = pyusdx.getAccountEarningInfo(alice);
+        assertEq(recipient, charlie);
+    }
+
+    function test_setAccountInfo_batch_revert_arrayLengthZero() public {
+        vm.expectRevert(IPYUSDX.ArrayLengthZero.selector);
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(new address[](0), new uint32[](0), new uint16[](0), new address[](0));
     }
 
     function test_setAccountInfo_batch() public {
@@ -2120,114 +2268,6 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         assertTrue(pyusdx.isEarning(alice));
         assertTrue(pyusdx.isEarning(bob));
-    }
-
-    function test_setAccountInfo_batch_revert_arrayLengthZero() public {
-        vm.expectRevert(IPYUSDX.ArrayLengthZero.selector);
-        vm.prank(earnerManager);
-        pyusdx.setAccountInfo(new address[](0), new uint32[](0), new uint16[](0), new address[](0));
-    }
-
-    function test_setAccountInfo_noop_alreadyDisabled() public {
-        // Alice is not earning (default state)
-        assertFalse(pyusdx.isEarning(alice));
-
-        // Calling setAccountInfo to disable for non-earner should be a no-op (no event)
-        vm.recordLogs();
-        vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 0, 0, address(0));
-
-        // Verify no AccountInfoUpdated event was emitted
-        VmSafe.Log[] memory logs = vm.getRecordedLogs();
-        for (uint256 i = 0; i < logs.length; i++) {
-            assertNotEq(logs[i].topics[0], IPYUSDX.AccountInfoUpdated.selector);
-        }
-
-        // State should remain unchanged
-        assertFalse(pyusdx.isEarning(alice));
-    }
-
-    function test_setAccountInfo_noop_sameSettings() public {
-        // First enable earning for alice
-        vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 500, 500, bob);
-
-        (uint32 earnerRate, uint16 feeRate, address recipient) = pyusdx.getAccountEarningInfo(alice);
-        assertEq(earnerRate, 500);
-        assertEq(feeRate, 500);
-        assertEq(recipient, bob);
-
-        // Call again with same settings - should be a no-op (no event, no claim)
-        vm.recordLogs();
-        vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 500, 500, bob);
-
-        // Verify no AccountInfoUpdated event was emitted
-        VmSafe.Log[] memory logs = vm.getRecordedLogs();
-        for (uint256 i = 0; i < logs.length; i++) {
-            assertNotEq(logs[i].topics[0], IPYUSDX.AccountInfoUpdated.selector);
-        }
-
-        // State should remain unchanged
-        (earnerRate, feeRate, recipient) = pyusdx.getAccountEarningInfo(alice);
-        assertEq(earnerRate, 500);
-        assertEq(feeRate, 500);
-        assertEq(recipient, bob);
-    }
-
-    function test_setAccountInfo_changedFeeRate_emitsEvent() public {
-        // First enable earning for alice
-        vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 500, 500, bob);
-
-        // Change fee rate - should emit event
-        vm.expectEmit();
-        emit IPYUSDX.AccountInfoUpdated(alice, 500, 1000, bob);
-        vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 500, 1000, bob);
-
-        // Verify state updated
-        (, uint16 feeRate, ) = pyusdx.getAccountEarningInfo(alice);
-        assertEq(feeRate, 1000);
-    }
-
-    function test_setAccountInfo_changedClaimRecipient_emitsEvent() public {
-        // First enable earning for alice
-        vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 500, 500, bob);
-
-        address charlie = makeAddr("charlie");
-
-        // Change claim recipient - should emit event
-        vm.expectEmit();
-        emit IPYUSDX.AccountInfoUpdated(alice, 500, 500, charlie);
-        vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 500, 500, charlie);
-
-        // Verify state updated
-        (, , address recipient) = pyusdx.getAccountEarningInfo(alice);
-        assertEq(recipient, charlie);
-    }
-
-    function test_setAccountInfo_earnerManagerCanUpdate() public {
-        // First earner manager sets earning details for alice
-        vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 500, 500, bob);
-
-        // Earner manager can update alice's details
-        vm.prank(earnerManager);
-        pyusdx.setAccountInfo(alice, 500, 1000, bob);
-
-        (, uint16 feeRate, ) = pyusdx.getAccountEarningInfo(alice);
-        assertEq(feeRate, 1000);
-    }
-
-    function test_setAccountInfo_revert_notEarnerManager() public {
-        address randomCaller = makeAddr("randomCaller");
-
-        vm.expectRevert(IPYUSDX.NotEarnerManager.selector);
-        vm.prank(randomCaller);
-        pyusdx.setAccountInfo(alice, 500, 500, bob);
     }
 
     /* ============ freeze / freezeAccounts (earning stop) ============ */
@@ -2457,6 +2497,30 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         vm.expectRevert();
         vm.prank(alice);
         pyusdx.freeze(bob);
+    }
+
+    function test_freeze_revert_frozenClaimRecipient() public {
+        // Mint tokens to alice and set up as earner with bob as claimRecipient
+        uint256 balance = 1000e6;
+        issuerGateway.mint(alice, balance);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 5000, bob);
+        pyusdx.setAccountRateBps(alice, uint24(500));
+
+        // Freeze bob (the claimRecipient)
+        vm.prank(freezeManager);
+        pyusdx.freeze(bob);
+
+        // Warp time to accrue yield
+        vm.warp(block.timestamp + 365 days);
+        assertGt(pyusdx.accruedYieldOf(alice), 0, "Should have yield accrued");
+
+        // Freeze alice — fails in `claimFor()` when transferring yield to frozen bob
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
     }
 
     function test_freezeAccounts_revert_notFreezeManager() public {
