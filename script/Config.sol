@@ -33,6 +33,7 @@ contract Config {
         address factoryManager;
         address versionManager;
         address pauseManager;
+        address freezeManager;
     }
 
     struct YieldToOneConfig {

@@ -247,4 +247,21 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
             return pyusdxBalance > totalSupply_ ? pyusdxBalance - totalSupply_ : 0;
         }
     }
+
+    /// @dev   Overrides Freezable to also check beacon-level freeze state.
+    /// @param $       The storage location of the freezable contract.
+    /// @param account The account to check.
+    function _revertIfFrozen(FreezableStorageStruct storage $, address account) internal view override {
+        _revertIfBeaconFrozen(account);
+        super._revertIfFrozen($, account);
+    }
+
+    /// @dev   Reverts if the account is frozen at the beacon level.
+    /// @param account The account to check.
+    function _revertIfBeaconFrozen(address account) internal view {
+        address beacon = StorageSlot.getAddressSlot(_BEACON_SLOT).value;
+        if (beacon != address(0) && IFreezable(beacon).isFrozen(account)) {
+            revert AccountFrozen(account);
+        }
+    }
 }

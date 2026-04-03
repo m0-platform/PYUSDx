@@ -3,6 +3,7 @@ pragma solidity 0.8.34;
 
 import { AccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 import { IBeacon } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/proxy/beacon/IBeacon.sol";
+import { FreezableNonUpgradeable } from "../../lib/evm-m-extensions/src/components/freezable/FreezableNonUpgradeable.sol";
 
 import { IExtension } from "./interfaces/IExtension.sol";
 import { IVersionedBeacon } from "./interfaces/IVersionedBeacon.sol";
@@ -14,7 +15,7 @@ import { IVersionedBeacon } from "./interfaces/IVersionedBeacon.sol";
 ///         Extension types are identified by `bytes32` type keys, making the beacon agnostic to
 ///         which types exist. New types are implicitly created on first `registerVersion` call.
 /// @author M0 Labs
-contract VersionedBeacon is IVersionedBeacon, AccessControl {
+contract VersionedBeacon is IVersionedBeacon, AccessControl, FreezableNonUpgradeable {
     /* ============ Variables ============ */
 
     /// @inheritdoc IVersionedBeacon
@@ -67,13 +68,15 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @param  admin_          The address granted DEFAULT_ADMIN_ROLE.
     /// @param  versionManager_ The address granted VERSION_MANAGER_ROLE.
     /// @param  pauseManager_   The address granted PAUSE_MANAGER_ROLE.
+    /// @param  freezeManager_  The address granted FREEZE_MANAGER_ROLE.
     constructor(
         address factory_,
         address pyusdx_,
         address swapFacility_,
         address admin_,
         address versionManager_,
-        address pauseManager_
+        address pauseManager_,
+        address freezeManager_
     ) {
         if (factory_ == address(0)) revert ZeroFactory();
         if (pyusdx_ == address(0)) revert ZeroPYUSDX();
@@ -81,6 +84,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         if (admin_ == address(0)) revert ZeroAdmin();
         if (versionManager_ == address(0)) revert ZeroVersionManager();
         if (pauseManager_ == address(0)) revert ZeroPauseManager();
+        if (freezeManager_ == address(0)) revert ZeroFreezeManager();
 
         factory = factory_;
         pyusdx = pyusdx_;
@@ -89,6 +93,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
         _grantRole(VERSION_MANAGER_ROLE, versionManager_);
         _grantRole(PAUSE_MANAGER_ROLE, pauseManager_);
+        _grantRole(FREEZE_MANAGER_ROLE, freezeManager_);
     }
 
     /* ============ Interactive Functions ============ */

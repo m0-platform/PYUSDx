@@ -1,14 +1,14 @@
 {
   "lib/evm-m-extensions": {
     "branch": {
-      "name": "proto-890-use-solidity-0834",
-      "rev": "7573cf94c4363b6ab6ca2eb35aa5d7e0d4dd86a1"
+      "name": "proto-921-add-freezable-to-proxy-beacon",
+      "rev": "8e8aea5f322011f4bf1d1a571a18f8195d0fea4b"
     }
   },
   "lib/forge-std": {
     "branch": {
       "name": "v1",
-      "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
+      "rev": "0844d7e1fc5e60d77b68e469bff60265f236c398"
     }
   },
   "lib/uniswap-v4-periphery": {

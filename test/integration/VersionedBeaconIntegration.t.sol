@@ -4,6 +4,7 @@ pragma solidity 0.8.34;
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 
+import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
@@ -1034,5 +1035,240 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
 
         assertTrue(YieldToOne(proxyV1).paused());
         assertFalse(YieldToOne(proxyV2).paused());
+    }
+
+    /* ============ Freeze Lifecycle ============ */
+
+    function test_freezeLifecycle() public {
+        vm.prank(admin);
+        beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: "Freeze Test Ext",
+            symbol: "FTE",
+            yieldRecipient: yieldRecipient,
+            admin: builder,
+            freezeManager: freezeManager,
+            yieldRecipientManager: builder
+        });
+
+        vm.prank(builder);
+        address proxy = factory.deployBeaconYieldToOne("freeze-test", params);
+
+        YieldToOne ext = YieldToOne(proxy);
+
+        uint256 wrapAmount = 1000e6;
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(proxy, 500, 0, address(0));
+
+        _mintPYUSDX(alice, wrapAmount * 2);
+        _mintPYUSDX(bob, wrapAmount);
+
+        vm.prank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), wrapAmount);
+
+        vm.prank(alice);
+        swapFacility.swapIn(proxy, wrapAmount, alice);
+
+        vm.prank(bob);
+        IERC20(address(pyusdx)).approve(address(swapFacility), wrapAmount);
+
+        vm.prank(bob);
+        swapFacility.swapIn(proxy, wrapAmount, bob);
+
+        assertEq(ext.balanceOf(alice), wrapAmount);
+        assertEq(ext.balanceOf(bob), wrapAmount);
+
+        /* ============ Extension-level freeze: freeze alice ============ */
+
+        vm.prank(freezeManager);
+        ext.freeze(alice);
+
+        assertTrue(ext.isFrozen(alice));
+        assertFalse(ext.isFrozen(bob));
+
+        // Frozen alice cannot transfer
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+
+        vm.prank(alice);
+        IERC20(proxy).transfer(bob, 100e6);
+
+        // Frozen alice cannot approve
+        vm.prank(alice);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        IERC20(proxy).approve(address(swapFacility), wrapAmount);
+
+        // Frozen alice cannot receive (sender check on msg.sender)
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+
+        vm.prank(bob);
+        IERC20(proxy).transfer(alice, 100e6);
+
+        // Non-frozen bob can still transfer
+        vm.prank(bob);
+        IERC20(proxy).transfer(carol, 100e6);
+
+        assertEq(ext.balanceOf(bob), wrapAmount - 100e6);
+        assertEq(ext.balanceOf(carol), 100e6);
+
+        // Views still work on frozen accounts
+        assertEq(ext.balanceOf(alice), wrapAmount);
+
+        /* ============ Extension-level unfreeze: unfreeze alice ============ */
+
+        vm.prank(freezeManager);
+        ext.unfreeze(alice);
+
+        assertFalse(ext.isFrozen(alice));
+
+        // Alice can transfer again
+        vm.prank(alice);
+        IERC20(proxy).transfer(bob, 100e6);
+
+        assertEq(ext.balanceOf(alice), wrapAmount - 100e6);
+        assertEq(ext.balanceOf(bob), wrapAmount);
+
+        /* ============ Beacon-level freeze: freeze bob via the beacon ============ */
+
+        vm.prank(freezeManager);
+        beacon.freeze(bob);
+
+        assertTrue(beacon.isFrozen(bob));
+        assertTrue(ext.isFrozen(bob));
+
+        // Beacon-level freeze blocks bob from transferring on any extension proxy
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+
+        vm.prank(bob);
+        IERC20(proxy).transfer(alice, 50e6);
+
+        // Beacon-level freeze blocks bob from approving
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+
+        vm.prank(bob);
+        IERC20(proxy).approve(address(swapFacility), 100e6);
+
+        // Bob cannot receive either
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+
+        vm.prank(alice);
+        IERC20(proxy).transfer(bob, 50e6);
+
+        // Alice (not beacon-frozen) can still operate
+        vm.prank(alice);
+        IERC20(proxy).transfer(carol, 50e6);
+
+        assertEq(ext.balanceOf(alice), wrapAmount - 100e6 - 50e6);
+
+        /* ============ Beacon-level unfreeze: unfreeze bob ============ */
+
+        vm.prank(freezeManager);
+        beacon.unfreeze(bob);
+
+        assertFalse(beacon.isFrozen(bob));
+        assertFalse(ext.isFrozen(bob));
+
+        // Bob can transfer again
+        vm.prank(bob);
+        IERC20(proxy).transfer(alice, 100e6);
+
+        assertEq(ext.balanceOf(bob), wrapAmount - 100e6);
+
+        /* ============ Double freeze: extension-level AND beacon-level ============ */
+
+        vm.prank(freezeManager);
+        ext.freeze(alice);
+
+        vm.prank(freezeManager);
+        beacon.freeze(alice);
+
+        assertTrue(ext.isFrozen(alice));
+        assertTrue(beacon.isFrozen(alice));
+
+        // Unfreezing at extension level is not enough — beacon-level freeze still blocks
+        vm.prank(freezeManager);
+        ext.unfreeze(alice);
+
+        assertTrue(ext.isFrozen(alice));
+        assertTrue(beacon.isFrozen(alice));
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+
+        vm.prank(alice);
+        IERC20(proxy).transfer(carol, 50e6);
+
+        // Now fully unfreeze
+        vm.prank(freezeManager);
+        beacon.unfreeze(alice);
+
+        assertFalse(ext.isFrozen(alice));
+        assertFalse(beacon.isFrozen(alice));
+
+        vm.prank(alice);
+        IERC20(proxy).transfer(carol, 50e6);
+
+        /* ============ Wrap/unwrap blocked for frozen accounts ============ */
+
+        // Give carol PYUSDX so the freeze check is actually reached (not InsufficientBalance)
+        _mintPYUSDX(carol, wrapAmount);
+
+        // Pre-approve PYUSDX and extension tokens before freezing (approve reverts when frozen)
+        vm.prank(carol);
+        IERC20(address(pyusdx)).approve(address(swapFacility), wrapAmount);
+
+        uint256 carolBalance = ext.balanceOf(carol);
+
+        vm.prank(carol);
+        IERC20(proxy).approve(address(swapFacility), carolBalance + wrapAmount);
+
+        vm.prank(freezeManager);
+        ext.freeze(carol);
+
+        // Carol cannot wrap (swapIn calls wrap, which checks _beforeWrap -> _revertIfFrozen)
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, carol));
+
+        vm.prank(carol);
+        swapFacility.swapIn(proxy, wrapAmount, carol);
+
+        // Carol cannot unwrap (swapOut calls unwrap, which checks _beforeUnwrap -> _revertIfFrozen)
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, carol));
+
+        vm.prank(carol);
+        swapFacility.swapOut(proxy, carolBalance, carol);
+
+        // Unfreeze carol and verify unwrap works
+        vm.prank(freezeManager);
+        ext.unfreeze(carol);
+
+        carolBalance = ext.balanceOf(carol);
+
+        vm.prank(carol);
+        swapFacility.swapOut(proxy, carolBalance, carol);
+
+        assertEq(ext.balanceOf(carol), 0);
+
+        /* ============ Batch freeze/unfreeze via beacon ============ */
+
+        address[] memory accounts_ = new address[](2);
+        accounts_[0] = alice;
+        accounts_[1] = bob;
+
+        vm.prank(freezeManager);
+        beacon.freezeAccounts(accounts_);
+
+        assertTrue(beacon.isFrozen(alice));
+        assertTrue(beacon.isFrozen(bob));
+        assertTrue(ext.isFrozen(alice));
+        assertTrue(ext.isFrozen(bob));
+
+        vm.prank(freezeManager);
+        beacon.unfreezeAccounts(accounts_);
+
+        assertFalse(beacon.isFrozen(alice));
+        assertFalse(beacon.isFrozen(bob));
+        assertFalse(ext.isFrozen(alice));
+        assertFalse(ext.isFrozen(bob));
     }
 }

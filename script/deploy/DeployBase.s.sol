@@ -117,11 +117,20 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address swapFacilityProxy,
         address admin,
         address versionManager,
-        address pauseManager
+        address pauseManager,
+        address freezeManager
     ) internal returns (address) {
         return
             address(
-                new VersionedBeacon(factoryProxy, pyusdxProxy, swapFacilityProxy, admin, versionManager, pauseManager)
+                new VersionedBeacon(
+                    factoryProxy,
+                    pyusdxProxy,
+                    swapFacilityProxy,
+                    admin,
+                    versionManager,
+                    pauseManager,
+                    freezeManager
+                )
             );
     }
 
@@ -211,7 +220,8 @@ contract DeployBase is DeployHelpers, ScriptBase {
             deployment.swapFacilityProxy,
             factoryConfig.admin,
             factoryConfig.versionManager,
-            factoryConfig.pauseManager
+            factoryConfig.pauseManager,
+            factoryConfig.freezeManager
         );
 
         console.log("VersionedBeacon:                  ", deployment.versionedBeacon);

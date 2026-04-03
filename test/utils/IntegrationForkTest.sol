@@ -72,7 +72,8 @@ abstract contract IntegrationForkTest is BaseForkTest {
                 admin: admin,
                 factoryManager: factoryManager,
                 versionManager: admin,
-                pauseManager: admin
+                pauseManager: admin,
+                freezeManager: freezeManager
             })
         );
 

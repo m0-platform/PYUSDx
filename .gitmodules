@@ -5,3 +5,4 @@
 [submodule "lib/evm-m-extensions"]
 	path = lib/evm-m-extensions
 	url = https://github.com/m0-foundation/evm-m-extensions
+	branch = proto-921-add-freezable-to-proxy-beacon
