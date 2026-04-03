@@ -490,7 +490,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         bytes32 multiMintTypeKey = factory.MULTI_MINT_TYPE_KEY();
         address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
 
-        vm.prank(admin);
+        vm.prank(versionManager);
         uint256 multiMintV1 = beacon.registerVersion(multiMintTypeKey, multiMintImpl);
 
         IExtensionFactory.MultiMintParams memory beaconParams = IExtensionFactory.MultiMintParams({
@@ -528,7 +528,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         assertEq(MultiMint(beaconMultiMint).balanceOf(alice), AMOUNT);
 
         // Pause version at beacon level
-        vm.prank(admin);
+        vm.prank(pauseManager);
         beacon.pauseVersion(multiMintTypeKey, multiMintV1);
 
         assertTrue(beacon.isProxyPaused(beaconMultiMint));
@@ -573,7 +573,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         assertEq(MultiMint(beaconMultiMint).balanceOf(alice), AMOUNT);
 
         // Unpause
-        vm.prank(admin);
+        vm.prank(pauseManager);
         beacon.unpauseVersion(multiMintTypeKey, multiMintV1);
 
         assertFalse(MultiMint(beaconMultiMint).paused());
@@ -593,7 +593,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         bytes32 multiMintTypeKey = factory.MULTI_MINT_TYPE_KEY();
         address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
 
-        vm.prank(admin);
+        vm.prank(versionManager);
         beacon.registerVersion(multiMintTypeKey, multiMintImpl);
 
         IExtensionFactory.MultiMintParams memory beaconParams = IExtensionFactory.MultiMintParams({
@@ -622,7 +622,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         swapFacility.swapIn(beaconMultiMint, AMOUNT, alice);
 
         // Type pause
-        vm.prank(admin);
+        vm.prank(pauseManager);
         beacon.pauseType(multiMintTypeKey);
 
         assertTrue(beacon.isTypePaused(multiMintTypeKey));
@@ -635,7 +635,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         IERC20(beaconMultiMint).transfer(bob, 100e6);
 
         // Unpause type
-        vm.prank(admin);
+        vm.prank(pauseManager);
         beacon.unpauseType(multiMintTypeKey);
 
         assertFalse(MultiMint(beaconMultiMint).paused());

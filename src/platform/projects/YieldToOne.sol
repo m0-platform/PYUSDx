@@ -3,6 +3,7 @@ pragma solidity ^0.8.34;
 
 import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { StorageSlot } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/utils/StorageSlot.sol";
+import { IFreezable } from "../../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 
 import { IPYUSDX } from "../../IPYUSDX.sol";
 import { IVersionedBeacon } from "../interfaces/IVersionedBeacon.sol";
@@ -146,6 +147,15 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
         if (beacon == address(0)) return false;
 
         return IVersionedBeacon(beacon).isProxyPaused(address(this));
+    }
+
+    /// @inheritdoc IFreezable
+    /// @dev        Returns true if the account is frozen at the beacon level.
+    function isFrozen(address account) public view virtual override returns (bool) {
+        address beacon = StorageSlot.getAddressSlot(_BEACON_SLOT).value;
+        if (beacon != address(0) && IFreezable(beacon).isFrozen(account)) return true;
+
+        return super.isFrozen(account);
     }
 
     /// @inheritdoc IERC20

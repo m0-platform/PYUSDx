@@ -20,6 +20,8 @@ abstract contract BaseTest is Test {
     address public executor = makeAddr("executor");
     address public assetCapManager = makeAddr("assetCapManager");
     address public factoryManager = makeAddr("factoryManager");
+    address public versionManager = makeAddr("versionManager");
+    address public pauseManager = makeAddr("pauseManager");
 
     // Generic test addresses
     address public recipient = makeAddr("recipient");

@@ -12,6 +12,7 @@ import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
@@ -388,6 +389,77 @@ contract YieldToOneUnitTests is Test {
         assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 
+    /* ============ Freeze via SwapFacility ============ */
+
+    function test_unwrap_revert_frozen() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(alice);
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+    }
+
+    function test_wrap_revert_frozen() public {
+        issuerGateway.mint(alice, MINT_AMOUNT);
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        vm.startPrank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), MINT_AMOUNT);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+    }
+
+    /* ============ Freezable – Unfreeze ============ */
+
+    function test_unfreeze_resumesOperations() public {
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        assertTrue(extension.isFrozen(alice));
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+
+        vm.startPrank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), MINT_AMOUNT);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+
+        vm.prank(freezeManager);
+        extension.unfreeze(alice);
+
+        assertFalse(extension.isFrozen(alice));
+
+        vm.startPrank(alice);
+        swapFacility.swapIn(address(extension), MINT_AMOUNT, alice);
+        vm.stopPrank();
+
+        assertEq(extension.balanceOf(alice), MINT_AMOUNT);
+    }
+
+    function test_transferFrom_revert_frozenCaller() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(alice);
+        extension.approve(bob, MINT_AMOUNT);
+
+        vm.prank(freezeManager);
+        extension.freeze(bob);
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+        extension.transferFrom(alice, bob, 400e6);
+    }
+
     /* ============ Pausable (extension-level) ============ */
 
     function test_claimYield_extensionPaused() public {
@@ -655,5 +727,82 @@ contract YieldToOneUnitTests is Test {
         noBeaconExt.unpause();
 
         assertFalse(noBeaconExt.paused());
+    }
+
+    /* ============ isFrozen ============ */
+
+    function test_isFrozen_extensionFrozen() public {
+        assertFalse(extension.isFrozen(alice));
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        assertTrue(extension.isFrozen(alice));
+    }
+
+    function test_isFrozen_beaconFrozen() public {
+        assertFalse(extension.isFrozen(alice));
+
+        mockBeacon.setFrozen(alice, true);
+
+        assertTrue(extension.isFrozen(alice));
+    }
+
+    function test_isFrozen_bothFrozen() public {
+        assertFalse(extension.isFrozen(alice));
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        mockBeacon.setFrozen(alice, true);
+
+        assertTrue(extension.isFrozen(alice));
+    }
+
+    function test_isFrozen_extensionUnfreeze() public {
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        vm.prank(freezeManager);
+        extension.unfreeze(alice);
+
+        assertFalse(extension.isFrozen(alice));
+    }
+
+    function test_isFrozen_beaconFrozen_extensionUnfreeze() public {
+        assertFalse(extension.isFrozen(alice));
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        mockBeacon.setFrozen(alice, true);
+
+        assertTrue(extension.isFrozen(alice));
+
+        vm.prank(freezeManager);
+        extension.unfreeze(alice);
+
+        assertTrue(extension.isFrozen(alice));
+    }
+
+    function test_isFrozen_extensionFrozen_beaconUnfreeze() public {
+        assertFalse(extension.isFrozen(alice));
+
+        vm.prank(freezeManager);
+        extension.freeze(alice);
+
+        mockBeacon.setFrozen(alice, true);
+
+        assertTrue(extension.isFrozen(alice));
+
+        mockBeacon.setFrozen(alice, false);
+
+        assertTrue(extension.isFrozen(alice));
+    }
+
+    function test_isFrozen_noBeacon() public {
+        vm.store(address(extension), _BEACON_SLOT, bytes32(0));
+
+        assertFalse(extension.isFrozen(alice));
     }
 }

@@ -71,8 +71,8 @@ abstract contract IntegrationForkTest is BaseForkTest {
             Config.FactoryConfig({
                 admin: admin,
                 factoryManager: factoryManager,
-                versionManager: admin,
-                pauseManager: admin,
+                versionManager: versionManager,
+                pauseManager: pauseManager,
                 freezeManager: freezeManager
             })
         );
@@ -89,7 +89,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
 
     /// @dev Registers the default extension type keys in the beacon.
     function _registerDefaultTypeKeys() internal {
-        vm.startPrank(admin);
+        vm.startPrank(versionManager);
         beacon.registerTypeKey(keccak256("YIELD_TO_ONE"));
         beacon.registerTypeKey(keccak256("MULTI_MINT"));
         vm.stopPrank();
