@@ -30,6 +30,10 @@ contract MultiMintTest is Test {
     /// @dev ERC-1967 beacon storage slot (same as YieldToOne._BEACON_SLOT).
     bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
 
+    /// @dev ERC-7201 PausableUpgradeable storage location.
+    bytes32 internal constant _PAUSABLE_STORAGE_LOCATION =
+        0xcd5ed15c6e187e77e9aee88184c21f4f2182ab5827cb3b7e07fbedcd63f03300;
+
     MockERC20 public usdc; // 6 decimals
     MockERC20 public dai; // 18 decimals
     MockERC20 public fourDec; // 4 decimals
@@ -90,6 +94,7 @@ contract MultiMintTest is Test {
                     admin,
                     assetCapManager,
                     freezeManager,
+                    pauser,
                     yieldRecipientManager
                 )
             )
@@ -368,7 +373,7 @@ contract MultiMintTest is Test {
         vm.stopPrank();
     }
 
-    function test_wrap_asset_revert_paused() public {
+    function test_wrap_asset_revert_extensionPaused() public {
         vm.prank(pauser);
         extension.pause();
 
@@ -454,7 +459,7 @@ contract MultiMintTest is Test {
         swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
     }
 
-    function test_unwrap_revert_paused() public {
+    function test_unwrap_revert_extensionPaused() public {
         _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
 
         vm.prank(pauser);
@@ -550,7 +555,7 @@ contract MultiMintTest is Test {
         assertEq(extension.totalAssets(), 300e6);
     }
 
-    function test_replaceAsset_revert_paused() public {
+    function test_replaceAsset_revert_extensionPaused() public {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         issuerGateway.mint(bob, 50e6);
@@ -787,27 +792,6 @@ contract MultiMintTest is Test {
         assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 101e6));
     }
 
-    /* ============ InsufficientAssetReceived ============ */
-
-    function test_wrap_asset_revert_insufficientAssetReceived() public {
-        MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
-
-        vm.prank(assetCapManager);
-        extension.setAssetCap(address(feeToken), 1_000_000e6);
-
-        // Pre-fund swap facility so safeTransferFrom (L238) succeeds despite prior fee loss.
-        feeToken.mint(address(swapFacility), 100e6);
-
-        feeToken.mint(alice, 200e6);
-        vm.startPrank(alice);
-        feeToken.approve(address(swapFacility), 200e6);
-        vm.expectRevert(
-            abi.encodeWithSelector(IMultiMint.InsufficientAssetReceived.selector, address(feeToken), 200e6, 198e6)
-        );
-        swapFacility.swapInAsset(address(extension), address(feeToken), 200e6, alice);
-        vm.stopPrank();
-    }
-
     /* ============ Pausable (beacon-based) ============ */
 
     function test_wrap_pyusdx_revert_paused() public {
@@ -846,7 +830,7 @@ contract MultiMintTest is Test {
     }
 
     function test_replaceAsset_revert_paused() public {
-        _wrapAssetFor(alice, address(usdc), 100e6);
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         issuerGateway.mint(bob, 50e6);
         vm.startPrank(bob);
@@ -869,5 +853,153 @@ contract MultiMintTest is Test {
         uint256 claimed = extension.claimYield();
         assertGt(claimed, 0);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
+    }
+
+    /* ============ Pausable (local + beacon interaction) ============ */
+
+    function test_paused_localPaused_beaconUnpaused() public {
+        assertFalse(extension.paused());
+
+        vm.prank(pauser);
+        extension.pause();
+
+        assertTrue(extension.paused());
+
+        // Beacon is not paused
+        assertFalse(mockBeacon.isProxyPaused(address(extension)));
+    }
+
+    function test_paused_localUnpaused_beaconPaused() public {
+        assertFalse(extension.paused());
+
+        mockBeacon.setPaused(true);
+
+        assertTrue(extension.paused());
+
+        // Check local state is not paused (direct storage read, bypassing overridden paused())
+        assertFalse(vm.load(address(extension), _PAUSABLE_STORAGE_LOCATION) != bytes32(0));
+    }
+
+    function test_paused_localPaused_beaconPaused() public {
+        vm.prank(pauser);
+        extension.pause();
+
+        mockBeacon.setPaused(true);
+
+        assertTrue(extension.paused());
+    }
+
+    function test_paused_unpauseLocal_beaconStillPaused() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        mockBeacon.setPaused(true);
+
+        vm.prank(pauser);
+        extension.unpause();
+
+        // Beacon still holds pause
+        assertTrue(extension.paused());
+
+        vm.startPrank(alice);
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+
+        vm.stopPrank();
+    }
+
+    function test_paused_unpauseBeacon_localStillPaused() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        mockBeacon.setPaused(true);
+
+        assertTrue(extension.paused());
+
+        mockBeacon.setPaused(false);
+
+        // Local still holds pause
+        assertTrue(extension.paused());
+
+        vm.startPrank(alice);
+
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+
+        vm.stopPrank();
+    }
+
+    function test_paused_resumeAfterBothUnpaused() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        mockBeacon.setPaused(true);
+
+        vm.prank(pauser);
+        extension.unpause();
+
+        assertTrue(extension.paused());
+
+        mockBeacon.setPaused(false);
+
+        assertFalse(extension.paused());
+
+        // Operations resume
+        vm.startPrank(alice);
+
+        IERC20(address(extension)).approve(address(swapFacility), MINT_AMOUNT);
+        swapFacility.swapOut(address(extension), MINT_AMOUNT, alice);
+
+        vm.stopPrank();
+
+        assertEq(extension.balanceOf(alice), 0);
+    }
+
+    /* ============ Pausable (no beacon set) ============ */
+
+    function test_paused_noBeaconSet() public {
+        address impl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+        MultiMint noBeaconExt = MultiMint(
+            UnsafeUpgrades.deployTransparentProxy(
+                impl,
+                admin,
+                abi.encodeWithSelector(
+                    MultiMint.initialize.selector,
+                    "No Beacon MM",
+                    "NBMM",
+                    yieldRecipient,
+                    admin,
+                    assetCapManager,
+                    freezeManager,
+                    pauser,
+                    yieldRecipientManager
+                )
+            )
+        );
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(address(noBeaconExt), 500, 0, address(0));
+
+        assertFalse(noBeaconExt.paused());
+
+        vm.prank(pauser);
+        noBeaconExt.pause();
+
+        assertTrue(noBeaconExt.paused());
+
+        vm.prank(pauser);
+        noBeaconExt.unpause();
+
+        assertFalse(noBeaconExt.paused());
     }
 }

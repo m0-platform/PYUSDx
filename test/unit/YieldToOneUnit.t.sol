@@ -14,6 +14,7 @@ import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { MockVersionedBeacon } from "../mock/MockVersionedBeacon.sol";
 
 contract YieldToOneUnitTests is Test {
@@ -25,6 +26,10 @@ contract YieldToOneUnitTests is Test {
 
     /// @dev ERC-1967 beacon storage slot (same as YieldToOne._BEACON_SLOT).
     bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+
+    /// @dev ERC-7201 PausableUpgradeable storage location.
+    bytes32 internal constant _PAUSABLE_STORAGE_LOCATION =
+        0xcd5ed15c6e187e77e9aee88184c21f4f2182ab5827cb3b7e07fbedcd63f03300;
 
     address public admin = makeAddr("admin");
     address public pauser = makeAddr("pauser");
@@ -81,6 +86,7 @@ contract YieldToOneUnitTests is Test {
                     yieldRecipient,
                     admin,
                     freezeManager,
+                    pauser,
                     yieldRecipientManager
                 )
             )
@@ -151,6 +157,7 @@ contract YieldToOneUnitTests is Test {
                 yieldRecipient,
                 admin,
                 freezeManager,
+                pauser,
                 address(0)
             )
         );
@@ -381,9 +388,9 @@ contract YieldToOneUnitTests is Test {
         assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 
-    /* ============ Pausable ============ */
+    /* ============ Pausable (extension-level) ============ */
 
-    function test_claimYield_succeedsWhenPaused() public {
+    function test_claimYield_extensionPaused() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
@@ -498,5 +505,155 @@ contract YieldToOneUnitTests is Test {
         uint256 claimed = extension.claimYield();
         assertGt(claimed, 0);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
+    }
+
+    /* ============ Pausable (local + beacon interaction) ============ */
+
+    function test_paused_localPaused_beaconUnpaused() public {
+        // Local pause alone makes paused() return true
+        assertFalse(extension.paused());
+
+        vm.prank(pauser);
+        extension.pause();
+
+        assertTrue(extension.paused());
+
+        // Beacon is not paused
+        assertFalse(mockBeacon.isProxyPaused(address(extension)));
+    }
+
+    function test_paused_localUnpaused_beaconPaused() public {
+        // Beacon pause alone makes paused() return true
+        assertFalse(extension.paused());
+
+        mockBeacon.setPaused(true);
+
+        assertTrue(extension.paused());
+
+        // Local state is not paused (direct storage read, bypassing overridden paused())
+        assertFalse(vm.load(address(extension), _PAUSABLE_STORAGE_LOCATION) != bytes32(0));
+    }
+
+    function test_paused_localPaused_beaconPaused() public {
+        // Both paused — paused() returns true
+        vm.prank(pauser);
+        extension.pause();
+
+        mockBeacon.setPaused(true);
+
+        assertTrue(extension.paused());
+    }
+
+    function test_paused_unpauseLocal_beaconStillPaused() public {
+        // Pause both
+        vm.prank(pauser);
+        extension.pause();
+
+        mockBeacon.setPaused(true);
+
+        // Unpause local — beacon still holds
+        vm.prank(pauser);
+        extension.unpause();
+
+        // Still paused because of beacon
+        assertTrue(extension.paused());
+
+        // Operations still revert
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(alice);
+        extension.transfer(bob, 100e6);
+    }
+
+    function test_paused_unpauseBeacon_localStillPaused() public {
+        // Pause both
+        vm.prank(pauser);
+        extension.pause();
+
+        mockBeacon.setPaused(true);
+
+        assertTrue(extension.paused());
+
+        // Unpause beacon — local still holds
+        mockBeacon.setPaused(false);
+
+        assertTrue(extension.paused());
+
+        // Operations still revert
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(alice);
+        extension.transfer(bob, 100e6);
+    }
+
+    function test_paused_resumeAfterBothUnpaused() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+
+        // Pause both
+        vm.prank(pauser);
+        extension.pause();
+
+        mockBeacon.setPaused(true);
+
+        assertTrue(extension.paused());
+
+        // Unpause local
+        vm.prank(pauser);
+        extension.unpause();
+
+        assertTrue(extension.paused());
+
+        // Unpause beacon
+        mockBeacon.setPaused(false);
+
+        assertFalse(extension.paused());
+
+        // Operations resume
+        vm.prank(alice);
+        extension.transfer(bob, 400e6);
+
+        assertEq(extension.balanceOf(alice), MINT_AMOUNT - 400e6);
+        assertEq(extension.balanceOf(bob), 400e6);
+    }
+
+    /* ============ Pausable (no beacon set) ============ */
+
+    function test_paused_noBeaconSet() public {
+        // Deploy extension WITHOUT wiring a beacon
+        address impl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        YieldToOne noBeaconExt = YieldToOne(
+            UnsafeUpgrades.deployTransparentProxy(
+                impl,
+                admin,
+                abi.encodeWithSelector(
+                    YieldToOne.initialize.selector,
+                    "No Beacon",
+                    "NB",
+                    yieldRecipient,
+                    admin,
+                    freezeManager,
+                    pauser,
+                    yieldRecipientManager
+                )
+            )
+        );
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(address(noBeaconExt), 500, 0, address(0));
+
+        // paused() returns false (no beacon, no local pause)
+        assertFalse(noBeaconExt.paused());
+
+        // Local pause works
+        vm.prank(pauser);
+        noBeaconExt.pause();
+
+        assertTrue(noBeaconExt.paused());
+
+        // Unpause works
+        vm.prank(pauser);
+        noBeaconExt.unpause();
+
+        assertFalse(noBeaconExt.paused());
     }
 }

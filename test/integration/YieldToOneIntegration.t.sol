@@ -23,6 +23,7 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 

@@ -20,6 +20,7 @@ contract DeployYieldToOne is DeployBase {
             yieldRecipient: vm.envAddress("YIELD_RECIPIENT"),
             admin: vm.envAddress("ADMIN"),
             freezeManager: vm.envAddress("FREEZE_MANAGER"),
+            pauser: vm.envAddress("PAUSER"),
             yieldRecipientManager: vm.envAddress("YIELD_RECIPIENT_MANAGER")
         });
 

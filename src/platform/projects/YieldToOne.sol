@@ -2,7 +2,6 @@
 pragma solidity ^0.8.34;
 
 import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
-import { PausableUpgradeable } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { StorageSlot } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/utils/StorageSlot.sol";
 
 import { IPYUSDX } from "../../IPYUSDX.sol";
@@ -63,6 +62,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
     /// @param  yieldRecipient_       The address of the yield recipient.
     /// @param  admin                 The address of the admin.
     /// @param  freezeManager         The address of the freeze manager.
+    /// @param  pauser                The address of the pauser.
     /// @param  yieldRecipientManager The address of the yield recipient manager.
     function initialize(
         string memory name,
@@ -70,9 +70,10 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
         address yieldRecipient_,
         address admin,
         address freezeManager,
+        address pauser,
         address yieldRecipientManager
     ) public virtual initializer {
-        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, yieldRecipientManager);
+        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, pauser, yieldRecipientManager);
     }
 
     /// @dev   Internal initializer. Sets up ERC20 metadata, roles, and the
@@ -82,6 +83,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
     /// @param yieldRecipient_       The address of the yield recipient.
     /// @param admin                 The address of the admin.
     /// @param freezeManager         The address of the freeze manager.
+    /// @param pauser                The address of the pauser.
     /// @param yieldRecipientManager The address of the yield recipient manager.
     function __YieldToOne_init(
         string memory name,
@@ -89,6 +91,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
         address yieldRecipient_,
         address admin,
         address freezeManager,
+        address pauser,
         address yieldRecipientManager
     ) internal onlyInitializing {
         if (admin == address(0)) revert ZeroAdmin();
@@ -135,8 +138,10 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
 
     /* ============ View/Pure Functions ============ */
 
-    /// @dev Returns true if the extension is paused via the beacon's type-level or version-level pause.
+    /// @notice Returns true if the extension is paused locally or via the beacon's type-level or version-level pause.
     function paused() public view virtual override returns (bool) {
+        if (super.paused()) return true;
+
         address beacon = StorageSlot.getAddressSlot(_BEACON_SLOT).value;
         if (beacon == address(0)) return false;
 

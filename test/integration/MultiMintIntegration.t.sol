@@ -3,9 +3,11 @@ pragma solidity 0.8.34;
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
+import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
+import { IVersionedBeacon } from "../../src/platform/interfaces/IVersionedBeacon.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
 
@@ -27,6 +29,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -479,5 +482,169 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         vm.prank(bob);
         swapFacility.swap(address(USDC), address(multiMint), AMOUNT, bob);
+    }
+
+    /* ============ Beacon Pause ============ */
+
+    function testIntegration_versionPause() public {
+        bytes32 multiMintTypeKey = factory.MULTI_MINT_TYPE_KEY();
+        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+
+        vm.prank(admin);
+        uint256 multiMintV1 = beacon.registerVersion(multiMintTypeKey, multiMintImpl);
+
+        IExtensionFactory.MultiMintParams memory beaconParams = IExtensionFactory.MultiMintParams({
+            name: "Beacon MM Pause Test",
+            symbol: "BMMPT",
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            assetCapManager: assetCapManager,
+            freezeManager: freezeManager,
+            pauser: pauser,
+            yieldRecipientManager: admin
+        });
+
+        vm.prank(admin);
+        address beaconMultiMint = factory.deployBeaconMultiMint("mm-pause-test", beaconParams);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(beaconMultiMint, 500, 0, address(0));
+
+        vm.prank(assetCapManager);
+        MultiMint(beaconMultiMint).setAssetCap(address(USDC), type(uint256).max);
+
+        vm.prank(assetCapManager);
+        MultiMint(beaconMultiMint).setAssetCap(address(PYUSD), type(uint256).max);
+
+        // Wrap before pause
+        _mintPYUSDX(alice, AMOUNT);
+
+        vm.prank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
+
+        vm.prank(alice);
+        swapFacility.swapIn(beaconMultiMint, AMOUNT, alice);
+
+        assertEq(MultiMint(beaconMultiMint).balanceOf(alice), AMOUNT);
+
+        // Pause version at beacon level
+        vm.prank(admin);
+        beacon.pauseVersion(multiMintTypeKey, multiMintV1);
+
+        assertTrue(beacon.isProxyPaused(beaconMultiMint));
+        assertTrue(MultiMint(beaconMultiMint).paused());
+
+        // swapIn reverts
+        _mintPYUSDX(bob, AMOUNT);
+
+        vm.prank(bob);
+        IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(bob);
+        swapFacility.swapIn(beaconMultiMint, AMOUNT, bob);
+
+        // swapOut reverts
+        vm.prank(alice);
+        IERC20(beaconMultiMint).approve(address(swapFacility), AMOUNT);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(alice);
+        swapFacility.swapOut(beaconMultiMint, AMOUNT, alice);
+
+        // transfer reverts
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(alice);
+        IERC20(beaconMultiMint).transfer(bob, 100e6);
+
+        // claimYield succeeds
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 expectedYield = MultiMint(beaconMultiMint).yield();
+        assertGt(expectedYield, 0);
+
+        uint256 claimed = MultiMint(beaconMultiMint).claimYield();
+        assertEq(claimed, expectedYield);
+
+        // View functions still work
+        assertEq(MultiMint(beaconMultiMint).balanceOf(alice), AMOUNT);
+
+        // Unpause
+        vm.prank(admin);
+        beacon.unpauseVersion(multiMintTypeKey, multiMintV1);
+
+        assertFalse(MultiMint(beaconMultiMint).paused());
+
+        // Operations resume
+        vm.prank(alice);
+        IERC20(beaconMultiMint).approve(address(swapFacility), AMOUNT);
+
+        vm.prank(alice);
+        swapFacility.swapOut(beaconMultiMint, AMOUNT, alice);
+
+        assertEq(MultiMint(beaconMultiMint).balanceOf(alice), 0);
+        assertEq(pyusdx.balanceOf(alice), AMOUNT);
+    }
+
+    function testIntegration_typePause() public {
+        bytes32 multiMintTypeKey = factory.MULTI_MINT_TYPE_KEY();
+        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+
+        vm.prank(admin);
+        beacon.registerVersion(multiMintTypeKey, multiMintImpl);
+
+        IExtensionFactory.MultiMintParams memory beaconParams = IExtensionFactory.MultiMintParams({
+            name: "Beacon MM Type Pause Test",
+            symbol: "BMMTPT",
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            assetCapManager: assetCapManager,
+            freezeManager: freezeManager,
+            pauser: pauser,
+            yieldRecipientManager: admin
+        });
+
+        vm.prank(admin);
+        address beaconMultiMint = factory.deployBeaconMultiMint("mm-type-pause-test", beaconParams);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(beaconMultiMint, 500, 0, address(0));
+
+        _mintPYUSDX(alice, AMOUNT);
+
+        vm.prank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
+
+        vm.prank(alice);
+        swapFacility.swapIn(beaconMultiMint, AMOUNT, alice);
+
+        // Type pause
+        vm.prank(admin);
+        beacon.pauseType(multiMintTypeKey);
+
+        assertTrue(beacon.isTypePaused(multiMintTypeKey));
+        assertTrue(MultiMint(beaconMultiMint).paused());
+
+        // transfer reverts
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(alice);
+        IERC20(beaconMultiMint).transfer(bob, 100e6);
+
+        // Unpause type
+        vm.prank(admin);
+        beacon.unpauseType(multiMintTypeKey);
+
+        assertFalse(MultiMint(beaconMultiMint).paused());
+
+        // Operations resume
+        vm.prank(alice);
+        IERC20(beaconMultiMint).transfer(bob, 100e6);
+
+        assertEq(MultiMint(beaconMultiMint).balanceOf(alice), AMOUNT - 100e6);
+        assertEq(MultiMint(beaconMultiMint).balanceOf(bob), 100e6);
     }
 }

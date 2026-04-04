@@ -71,6 +71,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     /// @param  admin                 The address of the admin.
     /// @param  assetCapManager       The address of the asset cap manager.
     /// @param  freezeManager         The address of the freeze manager.
+    /// @param  pauser                The address of the pauser.
     /// @param  yieldRecipientManager The address of the yield recipient manager.
     function initialize(
         string memory name,
@@ -79,9 +80,19 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         address admin,
         address assetCapManager,
         address freezeManager,
+        address pauser,
         address yieldRecipientManager
     ) public virtual initializer {
-        __MultiMint_init(name, symbol, yieldRecipient_, admin, assetCapManager, freezeManager, yieldRecipientManager);
+        __MultiMint_init(
+            name,
+            symbol,
+            yieldRecipient_,
+            admin,
+            assetCapManager,
+            freezeManager,
+            pauser,
+            yieldRecipientManager
+        );
     }
 
     /// @dev   Internal initializer for MultiMint. Grants ASSET_CAP_MANAGER_ROLE
@@ -92,6 +103,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     /// @param admin                 The address of the admin.
     /// @param assetCapManager       The address of the asset cap manager.
     /// @param freezeManager         The address of the freeze manager.
+    /// @param pauser                The address of the pauser.
     /// @param yieldRecipientManager The address of the yield recipient manager.
     function __MultiMint_init(
         string memory name,
@@ -100,11 +112,12 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         address admin,
         address assetCapManager,
         address freezeManager,
+        address pauser,
         address yieldRecipientManager
     ) internal onlyInitializing {
         if (assetCapManager == address(0)) revert ZeroAssetCapManager();
 
-        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, yieldRecipientManager);
+        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, pauser, yieldRecipientManager);
 
         _grantRole(ASSET_CAP_MANAGER_ROLE, assetCapManager);
     }

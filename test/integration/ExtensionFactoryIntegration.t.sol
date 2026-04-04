@@ -184,6 +184,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -224,6 +225,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: address(0),
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -238,6 +240,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -260,6 +263,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -278,6 +282,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -287,6 +292,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -304,6 +310,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -333,6 +340,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -374,6 +382,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: address(0),
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -389,6 +398,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -412,6 +422,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -422,6 +433,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -440,6 +452,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: yieldRecipientManager
         });
 
@@ -473,6 +486,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -483,6 +497,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -502,6 +517,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -527,6 +543,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -554,6 +571,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -592,6 +610,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -642,6 +661,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 
@@ -661,6 +681,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: admin
         });
 

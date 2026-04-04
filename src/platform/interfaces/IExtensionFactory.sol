@@ -13,6 +13,7 @@ interface IExtensionFactory {
         address yieldRecipient;
         address admin;
         address freezeManager;
+        address pauser;
         address yieldRecipientManager;
     }
 
@@ -24,6 +25,7 @@ interface IExtensionFactory {
         address admin;
         address assetCapManager;
         address freezeManager;
+        address pauser;
         address yieldRecipientManager;
     }
 

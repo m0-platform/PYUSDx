@@ -184,6 +184,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     function pauseVersion(bytes32 typeKey, uint256 versionId) external onlyRole(PAUSE_MANAGER_ROLE) {
         _revertIfInvalidVersionId(typeKey, versionId);
+        if (_versionPaused[typeKey][versionId]) return;
 
         _versionPaused[typeKey][versionId] = true;
 
@@ -193,6 +194,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     function unpauseVersion(bytes32 typeKey, uint256 versionId) external onlyRole(PAUSE_MANAGER_ROLE) {
         _revertIfInvalidVersionId(typeKey, versionId);
+        if (!_versionPaused[typeKey][versionId]) return;
 
         _versionPaused[typeKey][versionId] = false;
 
@@ -202,6 +204,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     function pauseType(bytes32 typeKey) external onlyRole(PAUSE_MANAGER_ROLE) {
         if (typeKey == bytes32(0)) revert InvalidTypeKey();
+        if (_typePaused[typeKey]) return;
 
         _typePaused[typeKey] = true;
 
@@ -211,6 +214,7 @@ contract VersionedBeacon is IVersionedBeacon, AccessControl {
     /// @inheritdoc IVersionedBeacon
     function unpauseType(bytes32 typeKey) external onlyRole(PAUSE_MANAGER_ROLE) {
         if (typeKey == bytes32(0)) revert InvalidTypeKey();
+        if (!_typePaused[typeKey]) return;
 
         _typePaused[typeKey] = false;
 

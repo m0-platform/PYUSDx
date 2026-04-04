@@ -8,6 +8,7 @@ import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IER
 
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { IVersionedBeacon } from "../../src/platform/interfaces/IVersionedBeacon.sol";
+import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
@@ -20,8 +21,18 @@ contract YieldToOneV2 is YieldToOne {
     }
 }
 
+/// @dev V2 MultiMint with a ping function for version testing.
+contract MultiMintV2 is MultiMint {
+    constructor(address pyusdx_, address swapFacility_) MultiMint(pyusdx_, swapFacility_) {}
+
+    function ping() external pure returns (string memory) {
+        return "pong";
+    }
+}
+
 contract VersionedBeaconIntegrationTests is IntegrationForkTest {
     bytes32 public constant YIELD_TO_ONE_TYPE_KEY = keccak256("YIELD_TO_ONE");
+    bytes32 public constant MULTI_MINT_TYPE_KEY = keccak256("MULTI_MINT");
     bytes32 public constant YIELD_SPLIT_TYPE_KEY = keccak256("YIELD_SPLIT");
 
     address public builder;
@@ -61,6 +72,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: builder,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: builder
         });
 
@@ -160,6 +172,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: builder,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: builder
         });
 
@@ -246,6 +259,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: builder,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: builder
         });
 
@@ -276,6 +290,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: builder,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: builder
         });
 
@@ -303,6 +318,7 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: builder,
             freezeManager: freezeManager,
+            pauser: pauser,
             yieldRecipientManager: builder
         });
 
@@ -467,5 +483,556 @@ contract VersionedBeaconIntegrationTests is IntegrationForkTest {
 
         assertEq(extV1.balanceOf(alice), 0);
         assertEq(extV2.balanceOf(alice), 0);
+    }
+
+    /* ============ Pause Access Control ============ */
+
+    function test_pauseVersion_revert_notPauseManager() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                builder,
+                beacon.PAUSE_MANAGER_ROLE()
+            )
+        );
+
+        vm.prank(builder);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+    }
+
+    function test_unpauseVersion_revert_notPauseManager() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                builder,
+                beacon.PAUSE_MANAGER_ROLE()
+            )
+        );
+
+        vm.prank(builder);
+        beacon.unpauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+    }
+
+    function test_pauseType_revert_notPauseManager() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                builder,
+                beacon.PAUSE_MANAGER_ROLE()
+            )
+        );
+
+        vm.prank(builder);
+        beacon.pauseType(YIELD_TO_ONE_TYPE_KEY);
+    }
+
+    function test_unpauseType_revert_notPauseManager() public {
+        vm.prank(admin);
+        beacon.pauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                builder,
+                beacon.PAUSE_MANAGER_ROLE()
+            )
+        );
+
+        vm.prank(builder);
+        beacon.unpauseType(YIELD_TO_ONE_TYPE_KEY);
+    }
+
+    /* ============ Pause Validation ============ */
+
+    function test_pauseVersion_revert_invalidVersion() public {
+        vm.prank(admin);
+        beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        // Version 0 is invalid
+        vm.expectRevert(IVersionedBeacon.InvalidVersion.selector);
+
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, 0);
+
+        // Version 99 does not exist
+        vm.expectRevert(IVersionedBeacon.InvalidVersion.selector);
+
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, 99);
+    }
+
+    function test_unpauseVersion_revert_invalidVersion() public {
+        vm.expectRevert(IVersionedBeacon.InvalidVersion.selector);
+
+        vm.prank(admin);
+        beacon.unpauseVersion(YIELD_TO_ONE_TYPE_KEY, 0);
+
+        vm.expectRevert(IVersionedBeacon.InvalidVersion.selector);
+
+        vm.prank(admin);
+        beacon.unpauseVersion(YIELD_TO_ONE_TYPE_KEY, 99);
+    }
+
+    function test_pauseType_revert_zeroTypeKey() public {
+        vm.expectRevert(IVersionedBeacon.InvalidTypeKey.selector);
+
+        vm.prank(admin);
+        beacon.pauseType(bytes32(0));
+    }
+
+    function test_unpauseType_revert_zeroTypeKey() public {
+        vm.expectRevert(IVersionedBeacon.InvalidTypeKey.selector);
+
+        vm.prank(admin);
+        beacon.unpauseType(bytes32(0));
+    }
+
+    /* ============ Pause Idempotency ============ */
+
+    function test_pauseVersion_idempotent() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertTrue(beacon.isVersionPaused(YIELD_TO_ONE_TYPE_KEY, v1));
+
+        // Pausing again does not revert and does not emit (early return)
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertTrue(beacon.isVersionPaused(YIELD_TO_ONE_TYPE_KEY, v1));
+    }
+
+    function test_unpauseVersion_idempotent() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        // Unpausing a non-paused version does not revert and does not emit (early return)
+        vm.prank(admin);
+        beacon.unpauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertFalse(beacon.isVersionPaused(YIELD_TO_ONE_TYPE_KEY, v1));
+    }
+
+    function test_pauseType_idempotent() public {
+        vm.prank(admin);
+        beacon.pauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        assertTrue(beacon.isTypePaused(YIELD_TO_ONE_TYPE_KEY));
+
+        // Pausing again does not revert and does not emit (early return)
+        vm.prank(admin);
+        beacon.pauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        assertTrue(beacon.isTypePaused(YIELD_TO_ONE_TYPE_KEY));
+    }
+
+    function test_unpauseType_idempotent() public {
+        // Unpausing a non-paused type does not revert and does not emit (early return)
+        vm.prank(admin);
+        beacon.unpauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        assertFalse(beacon.isTypePaused(YIELD_TO_ONE_TYPE_KEY));
+    }
+
+    /* ============ Pause Events ============ */
+
+    function test_pauseVersion() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        vm.expectEmit();
+        emit IVersionedBeacon.VersionPaused(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertTrue(beacon.isVersionPaused(YIELD_TO_ONE_TYPE_KEY, v1));
+    }
+
+    function test_unpauseVersion() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        vm.expectEmit();
+        emit IVersionedBeacon.VersionUnpaused(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        vm.prank(admin);
+        beacon.unpauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertFalse(beacon.isVersionPaused(YIELD_TO_ONE_TYPE_KEY, v1));
+    }
+
+    function test_pauseType() public {
+        vm.expectEmit();
+        emit IVersionedBeacon.TypePaused(YIELD_TO_ONE_TYPE_KEY);
+
+        vm.prank(admin);
+        beacon.pauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        assertTrue(beacon.isTypePaused(YIELD_TO_ONE_TYPE_KEY));
+    }
+
+    function test_unpauseType() public {
+        vm.prank(admin);
+        beacon.pauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        vm.expectEmit();
+        emit IVersionedBeacon.TypeUnpaused(YIELD_TO_ONE_TYPE_KEY);
+
+        vm.prank(admin);
+        beacon.unpauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        assertFalse(beacon.isTypePaused(YIELD_TO_ONE_TYPE_KEY));
+    }
+
+    function test_pauseVersion_noEmitWhenAlreadyPaused() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        vm.recordLogs();
+
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertEq(vm.getRecordedLogs().length, 0);
+    }
+
+    function test_unpauseVersion_noEmitWhenNotPaused() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        vm.recordLogs();
+
+        vm.prank(admin);
+        beacon.unpauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertEq(vm.getRecordedLogs().length, 0);
+    }
+
+    function test_pauseType_noEmitWhenAlreadyPaused() public {
+        vm.prank(admin);
+        beacon.pauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        vm.recordLogs();
+
+        vm.prank(admin);
+        beacon.pauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        assertEq(vm.getRecordedLogs().length, 0);
+    }
+
+    function test_unpauseType_noEmitWhenNotPaused() public {
+        vm.recordLogs();
+
+        vm.prank(admin);
+        beacon.unpauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        assertEq(vm.getRecordedLogs().length, 0);
+    }
+
+    /* ============ isProxyPaused Edge Cases ============ */
+
+    function test_isProxyPaused_unregisteredProxy() public {
+        assertFalse(beacon.isProxyPaused(makeAddr("unknown")));
+        assertFalse(beacon.isProxyPaused(address(0)));
+    }
+
+    /* ============ Version Pause with Unpinned Proxies ============ */
+
+    function test_versionPause_affectsUnpinnedProxies() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        // Deploy proxy pinned to v1
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: "Unpinned Test",
+            symbol: "UT",
+            yieldRecipient: yieldRecipient,
+            admin: builder,
+            freezeManager: freezeManager,
+            pauser: pauser,
+            yieldRecipientManager: builder
+        });
+
+        vm.prank(builder);
+        address proxy = factory.deployBeaconYieldToOne("unpinned-test", params);
+
+        // Initially pinned to v1
+        assertEq(beacon.proxyVersion(proxy), v1);
+
+        // Register v2 and unpin the proxy to follow latest
+        vm.prank(admin);
+        uint256 v2 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV2);
+
+        vm.prank(admin);
+        beacon.setLatestVersion(YIELD_TO_ONE_TYPE_KEY, v2);
+
+        vm.prank(builder);
+        beacon.pinVersion(proxy, 0);
+
+        // Unpinned: resolves to latest (v2)
+        assertEq(beacon.implementationFor(proxy), yieldToOneImplV2);
+        assertFalse(beacon.isProxyPaused(proxy));
+
+        // Pause v2 — unpinned proxy should be paused because it resolves to v2
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v2);
+
+        assertTrue(beacon.isProxyPaused(proxy));
+        assertTrue(YieldToOne(proxy).paused());
+
+        // v1 is NOT paused — pinning to v1 would resolve as unpaused
+        assertFalse(beacon.isVersionPaused(YIELD_TO_ONE_TYPE_KEY, v1));
+
+        // Pin to v1 — proxy should no longer be paused
+        vm.prank(builder);
+        beacon.pinVersion(proxy, v1);
+
+        assertFalse(beacon.isProxyPaused(proxy));
+        assertFalse(YieldToOne(proxy).paused());
+    }
+
+    /* ============ Deploy to Paused Version ============ */
+
+    function test_deployBeaconExtension_toPausedVersion_isImmediatelyPaused() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        vm.prank(admin);
+        beacon.setLatestVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        // Pause v1 before deploying
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertTrue(beacon.isVersionPaused(YIELD_TO_ONE_TYPE_KEY, v1));
+
+        // Deploy — proxy should be immediately paused
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: "Paused From Birth",
+            symbol: "PFB",
+            yieldRecipient: yieldRecipient,
+            admin: builder,
+            freezeManager: freezeManager,
+            pauser: pauser,
+            yieldRecipientManager: builder
+        });
+
+        vm.prank(builder);
+        address proxy = factory.deployBeaconYieldToOne("paused-from-birth", params);
+
+        assertTrue(beacon.isProxyPaused(proxy));
+        assertTrue(YieldToOne(proxy).paused());
+
+        // View functions still work
+        assertEq(YieldToOne(proxy).name(), "Paused From Birth");
+        assertEq(YieldToOne(proxy).symbol(), "PFB");
+
+        // Transfers revert
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(alice);
+        IERC20(proxy).transfer(bob, 100e6);
+
+        // Unpause v1 — proxy resumes
+        vm.prank(admin);
+        beacon.unpauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertFalse(beacon.isProxyPaused(proxy));
+        assertFalse(YieldToOne(proxy).paused());
+    }
+
+    /* ============ SwapFacility Operations When Beacon-Paused ============ */
+
+    function test_swapFacility_blockedWhenBeaconPaused() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: "Swap Pause Test",
+            symbol: "SPT",
+            yieldRecipient: yieldRecipient,
+            admin: builder,
+            freezeManager: freezeManager,
+            pauser: pauser,
+            yieldRecipientManager: builder
+        });
+
+        vm.prank(builder);
+        address proxy = factory.deployBeaconYieldToOne("swap-pause-test", params);
+
+        YieldToOne ext = YieldToOne(proxy);
+
+        // Enable earning
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(proxy, 500, 0, address(0));
+
+        // Wrap before pause
+        uint256 wrapAmount = 1000e6;
+
+        _mintPYUSDX(alice, wrapAmount);
+
+        vm.prank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), wrapAmount);
+
+        vm.prank(alice);
+        swapFacility.swapIn(proxy, wrapAmount, alice);
+
+        assertEq(ext.balanceOf(alice), wrapAmount);
+
+        // Pause v1 at beacon level
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertTrue(ext.paused());
+
+        // swapIn reverts
+        _mintPYUSDX(bob, wrapAmount);
+
+        vm.prank(bob);
+        IERC20(address(pyusdx)).approve(address(swapFacility), wrapAmount);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(bob);
+        swapFacility.swapIn(proxy, wrapAmount, bob);
+
+        // swapOut reverts
+        vm.prank(alice);
+        IERC20(proxy).approve(address(swapFacility), wrapAmount);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(alice);
+        swapFacility.swapOut(proxy, wrapAmount, alice);
+
+        // swapExtensions reverts (transfer triggers _requireNotPaused)
+        vm.prank(alice);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        IERC20(proxy).transfer(bob, 100e6);
+
+        // Unpause — all operations resume
+        vm.prank(admin);
+        beacon.unpauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertFalse(ext.paused());
+
+        vm.prank(alice);
+        swapFacility.swapOut(proxy, wrapAmount, alice);
+
+        assertEq(ext.balanceOf(alice), 0);
+        assertEq(IERC20(address(pyusdx)).balanceOf(alice), wrapAmount);
+    }
+
+    /* ============ Type Pause Does Not Affect Other Types ============ */
+
+    function test_typePause_isolationAcrossTypes() public {
+        vm.prank(admin);
+        beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        // Deploy a YieldToOne extension
+        IExtensionFactory.YieldToOneParams memory ytoParams = IExtensionFactory.YieldToOneParams({
+            name: "YTO Isolation",
+            symbol: "YTOI",
+            yieldRecipient: yieldRecipient,
+            admin: builder,
+            freezeManager: freezeManager,
+            pauser: pauser,
+            yieldRecipientManager: builder
+        });
+
+        vm.prank(builder);
+        address yieldToOneProxy = factory.deployBeaconYieldToOne("yto-isolation", ytoParams);
+
+        // Register MULTI_MINT type key and deploy a MultiMint extension
+        address multiMintImplV1 = address(new MultiMint(address(pyusdx), address(swapFacility)));
+
+        vm.prank(admin);
+        beacon.registerVersion(MULTI_MINT_TYPE_KEY, multiMintImplV1);
+
+        IExtensionFactory.MultiMintParams memory multiMintParams = IExtensionFactory.MultiMintParams({
+            name: "MM Isolation",
+            symbol: "MMI",
+            yieldRecipient: yieldRecipient,
+            admin: builder,
+            assetCapManager: assetCapManager,
+            freezeManager: freezeManager,
+            pauser: pauser,
+            yieldRecipientManager: builder
+        });
+
+        vm.prank(builder);
+        address multiMintProxy = factory.deployBeaconMultiMint("mm-isolation", multiMintParams);
+
+        // Pause YIELD_TO_ONE type
+        vm.prank(admin);
+        beacon.pauseType(YIELD_TO_ONE_TYPE_KEY);
+
+        assertTrue(beacon.isTypePaused(YIELD_TO_ONE_TYPE_KEY));
+        assertFalse(beacon.isTypePaused(MULTI_MINT_TYPE_KEY));
+
+        assertTrue(YieldToOne(yieldToOneProxy).paused());
+        assertFalse(MultiMint(multiMintProxy).paused());
+    }
+
+    /* ============ Version Pause Cross-Version Isolation ============ */
+
+    function test_versionPause_onlyAffectsPinnedVersion() public {
+        vm.prank(admin);
+        uint256 v1 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV1);
+
+        vm.prank(admin);
+        uint256 v2 = beacon.registerVersion(YIELD_TO_ONE_TYPE_KEY, yieldToOneImplV2);
+
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: "V1 Ext",
+            symbol: "V1E",
+            yieldRecipient: yieldRecipient,
+            admin: builder,
+            freezeManager: freezeManager,
+            pauser: pauser,
+            yieldRecipientManager: builder
+        });
+
+        vm.prank(builder);
+        address proxyV1 = factory.deployBeaconYieldToOne("v1-cross-ver", params);
+
+        params.name = "V2 Ext";
+        params.symbol = "V2E";
+
+        vm.prank(admin);
+        beacon.setLatestVersion(YIELD_TO_ONE_TYPE_KEY, v2);
+
+        vm.prank(builder);
+        address proxyV2 = factory.deployBeaconYieldToOne("v2-cross-ver", params);
+
+        // Pause only v1
+        vm.prank(admin);
+        beacon.pauseVersion(YIELD_TO_ONE_TYPE_KEY, v1);
+
+        assertTrue(beacon.isProxyPaused(proxyV1));
+        assertFalse(beacon.isProxyPaused(proxyV2));
+
+        assertTrue(YieldToOne(proxyV1).paused());
+        assertFalse(YieldToOne(proxyV2).paused());
     }
 }
