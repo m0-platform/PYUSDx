@@ -4,12 +4,10 @@ pragma solidity 0.8.34;
 import { BytesParser } from "../../../lib/evm-m-extensions/lib/common/src/libs/BytesParser.sol";
 import { TypeConverter } from "../../../lib/evm-m-extensions/lib/common/src/libs/TypeConverter.sol";
 
-/// @notice Payload types for cross-chain messages.
-/// @dev    Initially only the `TokenTransfer` payload type is supported,
-///         but the list can be extended in the future to support additional message types
-///         (e.g., order book fill and cancel reports).
+/// @notice Payload types for cross-chain messages
 enum PayloadType {
-    TokenTransfer
+    TokenTransfer,
+    ComposedTokenTransfer
 }
 
 /// @title  PayloadEncoder
@@ -19,12 +17,13 @@ library PayloadEncoder {
     using BytesParser for bytes;
     using TypeConverter for *;
 
-    /// @dev Token Transfer payloads have the following structure:
-    /// ┌──────────────────────┬──────────────────┬────────────┬───────────┬───────────────────┬────────────┬─────────────┐
-    /// │ Destination Chain ID │ Destination Peer │ Message ID │  Amount   │ Destination Token │   Sender   |  Recipient  │
-    /// │       (uint32)       │    (bytes32)     │  (bytes32) │ (uint128) │     (bytes32)     │  (bytes32) │  (bytes32)  │
-    /// │       4 bytes        │    32 bytes      │  32 bytes  │ 16 bytes  │      32 bytes     │   32 bytes │   32 bytes  │
-    /// └──────────────────────┴──────────────────┴────────────┴───────────┴───────────────────┴────────────┴─────────────┘
+    /// @dev Both TokenTransfer and ComposedTokenTransfer payloads have the following structure:
+    /// ┌──────────────┬──────────────────────┬──────────────────┬────────────┬───────────┬───────────────────┬────────────┬─────────────┬───────────────────────┐
+    /// │ Payload Type │ Destination Chain ID │ Destination Peer │ Message ID │  Amount   │ Destination Token │   Sender   |  Recipient  │ Payload Specific Data │
+    /// │   (uint8)    │       (uint32)       │    (bytes32)     │  (bytes32) │ (uint128) │     (bytes32)     │  (bytes32) │  (bytes32)  │  (variable length)    │
+    /// │   1 byte     │        32 bytes      │    32 bytes      │  32 bytes  │  16 bytes │      32 bytes     │   32 bytes │   32 bytes  │                       │
+    /// └──────────────┴──────────────────────┴──────────────────┴────────────┴───────────┴───────────────────┴────────────┴─────────────┴───────────────────────┘
+    uint256 internal constant PAYLOAD_TYPE_LENGTH = 1;
     uint256 internal constant DESTINATION_CHAIN_ID_LENGTH = 4;
     uint256 internal constant DESTINATION_PEER_LENGTH = 32;
     uint256 internal constant MESSAGE_ID_LENGTH = 32;
@@ -32,9 +31,11 @@ library PayloadEncoder {
     uint256 internal constant DESTINATION_TOKEN_LENGTH = 32;
     uint256 internal constant SENDER_LENGTH = 32;
     uint256 internal constant RECIPIENT_LENGTH = 32;
+    uint256 internal constant OFFSET = PAYLOAD_TYPE_LENGTH + DESTINATION_CHAIN_ID_LENGTH + DESTINATION_PEER_LENGTH;
 
-    uint256 internal constant PAYLOAD_LENGTH =
-        DESTINATION_CHAIN_ID_LENGTH +
+    uint256 internal constant MIN_PAYLOAD_LENGTH =
+        PAYLOAD_TYPE_LENGTH +
+            DESTINATION_CHAIN_ID_LENGTH +
             DESTINATION_PEER_LENGTH +
             MESSAGE_ID_LENGTH +
             AMOUNT_LENGTH +
@@ -43,6 +44,28 @@ library PayloadEncoder {
             RECIPIENT_LENGTH;
 
     error InvalidPayloadLength(uint256 length);
+    error InvalidPayloadType(uint8 value);
+
+    /// @notice Decodes the payload type from the payload.
+    /// @param  payload The payload to decode.
+    function decodePayloadType(bytes calldata payload) internal pure returns (PayloadType) {
+        if (payload.length < MIN_PAYLOAD_LENGTH) revert InvalidPayloadLength(payload.length);
+
+        uint8 payloadType;
+        (payloadType, ) = payload.asUint8Unchecked(0);
+
+        if (payloadType > uint8(type(PayloadType).max)) revert InvalidPayloadType(payloadType);
+        return PayloadType(payloadType);
+    }
+
+    /// @notice Decodes the message ID from the payload.
+    /// @param  payload   The payload to decode.
+    /// @return messageId The message ID.
+    function decodeMessageId(bytes memory payload) internal pure returns (bytes32 messageId) {
+        if (payload.length < MIN_PAYLOAD_LENGTH) revert InvalidPayloadLength(payload.length);
+
+        (messageId, ) = payload.asBytes32Unchecked(OFFSET);
+    }
 
     /// @notice Encodes a token transfer payload.
     /// @dev    Encoded values are packed using `abi.encodePacked`.
@@ -65,6 +88,7 @@ library PayloadEncoder {
         // Converting addresses to `bytes32` and amount to `uint128` to support non-EVM chains.
         return
             abi.encodePacked(
+                PayloadType.TokenTransfer,
                 destinationChainId,
                 destinationPeer,
                 messageId,
@@ -89,9 +113,7 @@ library PayloadEncoder {
         pure
         returns (bytes32 messageId, uint256 amount, address destinationToken, bytes32 sender, address recipient)
     {
-        if (payload.length != PAYLOAD_LENGTH) revert InvalidPayloadLength(payload.length);
-
-        uint256 offset = DESTINATION_CHAIN_ID_LENGTH + DESTINATION_PEER_LENGTH;
+        uint256 offset = OFFSET;
         bytes32 destinationTokenBytes32;
         bytes32 recipientBytes32;
 
@@ -103,6 +125,81 @@ library PayloadEncoder {
 
         destinationToken = destinationTokenBytes32.toAddress();
         recipient = recipientBytes32.toAddress();
+
+        payload.checkLength(offset);
+    }
+
+    /// @notice Encodes a token transfer payload and composed message.
+    /// @dev    Encoded values are packed using `abi.encodePacked`.
+    /// @param destinationChainId The destination chain ID.
+    /// @param destinationPeer    The address of the peer bridge adapter on the destination chain.
+    /// @param messageId          The message ID.
+    /// @param amount             The amount of tokens to transfer.
+    /// @param destinationToken   The address of the destination token.
+    /// @param sender             The address of the sender.
+    /// @param recipient          The address of the recipient.
+    function encodeComposedTokenTransfer(
+        uint32 destinationChainId,
+        bytes32 destinationPeer,
+        bytes32 messageId,
+        uint256 amount,
+        bytes32 destinationToken,
+        address sender,
+        bytes32 recipient,
+        bytes32 composer,
+        bytes memory composedMessage
+    ) internal pure returns (bytes memory) {
+        // Converting addresses to `bytes32` and amount to `uint128` to support non-EVM chains.
+        return
+            abi.encodePacked(
+                PayloadType.ComposedTokenTransfer,
+                destinationChainId,
+                destinationPeer,
+                messageId,
+                amount.toUint128(),
+                destinationToken,
+                sender.toBytes32(),
+                recipient,
+                composer,
+                composedMessage
+            );
+    }
+
+    function decodeComposedTokenTransfer(
+        bytes memory payload
+    )
+        internal
+        pure
+        returns (
+            bytes32 messageId,
+            uint256 amount,
+            address destinationToken,
+            bytes32 sender,
+            address recipient,
+            address composer,
+            bytes memory composedMessage
+        )
+    {
+        uint256 offset = OFFSET;
+        bytes32 destinationTokenBytes32;
+        bytes32 recipientBytes32;
+        bytes32 composerBytes32;
+
+        (messageId, offset) = payload.asBytes32Unchecked(offset);
+        (amount, offset) = payload.asUint128Unchecked(offset);
+        (destinationTokenBytes32, offset) = payload.asBytes32Unchecked(offset);
+        (sender, offset) = payload.asBytes32Unchecked(offset);
+        (recipientBytes32, offset) = payload.asBytes32Unchecked(offset);
+        (composerBytes32, offset) = payload.asBytes32Unchecked(offset);
+        composedMessage = new bytes(payload.length - offset);
+        assembly {
+            mcopy(add(composedMessage, 0x20), add(add(payload, 0x20), offset), mload(composedMessage))
+        }
+        offset += composedMessage.length;
+
+        destinationToken = destinationTokenBytes32.toAddress();
+        recipient = recipientBytes32.toAddress();
+        composer = composerBytes32.toAddress();
 
         payload.checkLength(offset);
     }

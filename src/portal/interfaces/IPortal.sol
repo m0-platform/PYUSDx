@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
+struct ComposeMessageParams {
+    bytes32 composer;
+    bytes message;
+    uint256 gasLimit;
+}
+
 /// @title  IPortal interface
 /// @author M0 Labs
 /// @notice Interface for bridging PYUSDX and PYUSDX Extension tokens across chains via pluggable bridge adapters.
@@ -243,6 +249,48 @@ interface IPortal {
         bytes32 recipient,
         bytes32 refundAddress,
         address bridgeAdapter
+    ) external payable returns (bytes32 messageId);
+
+    /// @notice Transfers PYUSDX or PYUSDX Extension to the destination chain using the default bridge adapter.
+    /// @dev    If wrapping on the destination fails, the recipient will receive PYUSDX token.
+    /// @param  amount             The amount of tokens to transfer.
+    /// @param  sourceToken        The address of the token (PYUSDX or PYUSDX Extension) on the source chain.
+    /// @param  destinationChainId The ID of the destination chain.
+    /// @param  destinationToken   The address of the token (PYUSDX or PYUSDX Extension) on the destination chain.
+    /// @param  recipient          The account to receive tokens.
+    /// @param  refundAddress      The address to receive excess native gas on the source chain.
+    /// @param  composeParams      The parameters for composing a message with the token transfer.
+    /// @return messageId          The unique identifier of the message sent.
+    function sendTokenAndCompose(
+        uint256 amount,
+        address sourceToken,
+        uint32 destinationChainId,
+        bytes32 destinationToken,
+        bytes32 recipient,
+        bytes32 refundAddress,
+        ComposeMessageParams calldata composeParams
+    ) external payable returns (bytes32 messageId);
+
+    /// @notice Transfers PYUSDX or PYUSDX Extension to the destination chain using the default bridge adapter.
+    /// @dev    If wrapping on the destination fails, the recipient will receive PYUSDX token.
+    /// @param  amount             The amount of tokens to transfer.
+    /// @param  sourceToken        The address of the token (PYUSDX or PYUSDX Extension) on the source chain.
+    /// @param  destinationChainId The ID of the destination chain.
+    /// @param  destinationToken   The address of the token (PYUSDX or PYUSDX Extension) on the destination chain.
+    /// @param  recipient          The account to receive tokens.
+    /// @param  bridgeAdapter      The address of the bridge adapter to use.
+    /// @param  refundAddress      The address to receive excess native gas on the source chain.
+    /// @param  composeParams      The parameters for composing a message with the token transfer.
+    /// @return messageId          The unique identifier of the message sent.
+    function sendTokenAndCompose(
+        uint256 amount,
+        address sourceToken,
+        uint32 destinationChainId,
+        bytes32 destinationToken,
+        bytes32 recipient,
+        bytes32 refundAddress,
+        address bridgeAdapter,
+        ComposeMessageParams calldata composeParams
     ) external payable returns (bytes32 messageId);
 
     /// @notice Receives a message from the bridge.
