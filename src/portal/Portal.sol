@@ -187,12 +187,12 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         address recipient;
 
         if (payloadType == PayloadType.TokenTransfer) {
-            (, amount, destinationToken, sender, recipient) = payload.decodeTokenTransfer();
+            (amount, destinationToken, sender, recipient) = payload.decodeTokenTransfer();
         }
         if (payloadType == PayloadType.ComposedTokenTransfer) {
             address composer;
-            bytes memory composedMessage;
-            (, amount, destinationToken, sender, recipient, composer, composedMessage) = payload
+            bytes calldata composedMessage;
+            (amount, destinationToken, sender, recipient, composer, composedMessage) = payload
                 .decodeComposedTokenTransfer();
         }
 

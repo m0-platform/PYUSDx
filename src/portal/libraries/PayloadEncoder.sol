@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.34;
 
-import { BytesParser } from "../../../lib/evm-m-extensions/lib/common/src/libs/BytesParser.sol";
 import { TypeConverter } from "../../../lib/evm-m-extensions/lib/common/src/libs/TypeConverter.sol";
 
 /// @notice Payload types for cross-chain messages
@@ -14,7 +13,6 @@ enum PayloadType {
 /// @author M0 Labs
 /// @notice Encodes and decodes cross-chain message payloads.
 library PayloadEncoder {
-    using BytesParser for bytes;
     using TypeConverter for *;
 
     /// @dev Both TokenTransfer and ComposedTokenTransfer payloads have the following structure:
@@ -31,17 +29,26 @@ library PayloadEncoder {
     uint256 internal constant DESTINATION_TOKEN_LENGTH = 32;
     uint256 internal constant SENDER_LENGTH = 32;
     uint256 internal constant RECIPIENT_LENGTH = 32;
-    uint256 internal constant OFFSET = PAYLOAD_TYPE_LENGTH + DESTINATION_CHAIN_ID_LENGTH + DESTINATION_PEER_LENGTH;
+    uint256 internal constant COMPOSER_LENGTH = 32;
 
-    uint256 internal constant MIN_PAYLOAD_LENGTH =
-        PAYLOAD_TYPE_LENGTH +
-            DESTINATION_CHAIN_ID_LENGTH +
-            DESTINATION_PEER_LENGTH +
-            MESSAGE_ID_LENGTH +
-            AMOUNT_LENGTH +
-            DESTINATION_TOKEN_LENGTH +
-            SENDER_LENGTH +
-            RECIPIENT_LENGTH;
+    // Field offsets within the payload (literal values required for inline assembly).
+    uint256 internal constant MESSAGE_ID_OFFSET = 37; // PAYLOAD_TYPE_LENGTH + DESTINATION_CHAIN_ID_LENGTH + DESTINATION_PEER_LENGTH: 1 + 4 + 32
+    uint256 internal constant AMOUNT_OFFSET = 69; // MESSAGE_ID_OFFSET + MESSAGE_ID_LENGTH: 37 + 32
+    uint256 internal constant DESTINATION_TOKEN_OFFSET = 85; // AMOUNT_OFFSET + AMOUNT_LENGTH: 69 + 16
+    uint256 internal constant SENDER_OFFSET = 117; // DESTINATION_TOKEN_OFFSET + DESTINATION_TOKEN_LENGTH: 85 + 32
+    uint256 internal constant RECIPIENT_OFFSET = 149; // SENDER_OFFSET + SENDER_LENGTH: 117 + 32
+    uint256 internal constant COMPOSER_OFFSET = 181; // RECIPIENT_OFFSET + RECIPIENT_LENGTH: 149 + 32
+    uint256 internal constant COMPOSED_MSG_OFFSET = 213; // COMPOSER_OFFSET + COMPOSER_LENGTH: 181 + 32
+
+    uint256 internal constant MIN_PAYLOAD_LENGTH = 181; // RECIPIENT_OFFSET + RECIPIENT_LENGTH: 149 + 32
+
+    uint256 internal constant ADDRESS_MASK = 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
+
+    /// @dev Right-shift to extract uint8 from a 32-byte word: 256 - 8
+    uint256 internal constant UINT8_SHIFT = 248;
+
+    /// @dev Right-shift to extract uint128 from a 32-byte word: 256 - 128
+    uint256 internal constant UINT128_SHIFT = 128;
 
     error InvalidPayloadLength(uint256 length);
     error InvalidPayloadType(uint8 value);
@@ -52,7 +59,9 @@ library PayloadEncoder {
         if (payload.length < MIN_PAYLOAD_LENGTH) revert InvalidPayloadLength(payload.length);
 
         uint8 payloadType;
-        (payloadType, ) = payload.asUint8Unchecked(0);
+        assembly {
+            payloadType := shr(UINT8_SHIFT, calldataload(payload.offset))
+        }
 
         if (payloadType > uint8(type(PayloadType).max)) revert InvalidPayloadType(payloadType);
         return PayloadType(payloadType);
@@ -61,10 +70,12 @@ library PayloadEncoder {
     /// @notice Decodes the message ID from the payload.
     /// @param  payload   The payload to decode.
     /// @return messageId The message ID.
-    function decodeMessageId(bytes memory payload) internal pure returns (bytes32 messageId) {
+    function decodeMessageId(bytes calldata payload) internal pure returns (bytes32 messageId) {
         if (payload.length < MIN_PAYLOAD_LENGTH) revert InvalidPayloadLength(payload.length);
 
-        (messageId, ) = payload.asBytes32Unchecked(OFFSET);
+        assembly {
+            messageId := calldataload(add(payload.offset, MESSAGE_ID_OFFSET))
+        }
     }
 
     /// @notice Encodes a token transfer payload.
@@ -101,32 +112,16 @@ library PayloadEncoder {
 
     /// @notice Decodes a token transfer payload.
     /// @param  payload          The payload to decode.
-    /// @return messageId        The message ID.
     /// @return amount           The amount of tokens to transfer.
     /// @return destinationToken The address of the destination token.
     /// @return sender           The address of the sender.
     /// @return recipient        The address of the recipient.
     function decodeTokenTransfer(
-        bytes memory payload
-    )
-        internal
-        pure
-        returns (bytes32 messageId, uint256 amount, address destinationToken, bytes32 sender, address recipient)
-    {
-        uint256 offset = OFFSET;
-        bytes32 destinationTokenBytes32;
-        bytes32 recipientBytes32;
+        bytes calldata payload
+    ) internal pure returns (uint256 amount, address destinationToken, bytes32 sender, address recipient) {
+        if (payload.length != MIN_PAYLOAD_LENGTH) revert InvalidPayloadLength(payload.length);
 
-        (messageId, offset) = payload.asBytes32Unchecked(offset);
-        (amount, offset) = payload.asUint128Unchecked(offset);
-        (destinationTokenBytes32, offset) = payload.asBytes32Unchecked(offset);
-        (sender, offset) = payload.asBytes32Unchecked(offset);
-        (recipientBytes32, offset) = payload.asBytes32Unchecked(offset);
-
-        destinationToken = destinationTokenBytes32.toAddress();
-        recipient = recipientBytes32.toAddress();
-
-        payload.checkLength(offset);
+        (amount, destinationToken, sender, recipient) = _decodeTokenTransfer(payload);
     }
 
     /// @notice Encodes a token transfer payload and composed message.
@@ -138,6 +133,8 @@ library PayloadEncoder {
     /// @param destinationToken   The address of the destination token.
     /// @param sender             The address of the sender.
     /// @param recipient          The address of the recipient.
+    /// @param composer           The address of the contract on the destination chain that will receive the composed message via `lzCompose`.
+    /// @param composedMessage    The arbitrary calldata forwarded to the composer contract via `lzCompose`.
     function encodeComposedTokenTransfer(
         uint32 destinationChainId,
         bytes32 destinationPeer,
@@ -166,42 +163,42 @@ library PayloadEncoder {
     }
 
     function decodeComposedTokenTransfer(
-        bytes memory payload
+        bytes calldata payload
     )
         internal
         pure
         returns (
-            bytes32 messageId,
             uint256 amount,
             address destinationToken,
             bytes32 sender,
             address recipient,
             address composer,
-            bytes memory composedMessage
+            bytes calldata composedMessage
         )
     {
-        uint256 offset = OFFSET;
-        bytes32 destinationTokenBytes32;
-        bytes32 recipientBytes32;
-        bytes32 composerBytes32;
+        if (payload.length < MIN_PAYLOAD_LENGTH + COMPOSER_LENGTH) revert InvalidPayloadLength(payload.length);
 
-        (messageId, offset) = payload.asBytes32Unchecked(offset);
-        (amount, offset) = payload.asUint128Unchecked(offset);
-        (destinationTokenBytes32, offset) = payload.asBytes32Unchecked(offset);
-        (sender, offset) = payload.asBytes32Unchecked(offset);
-        (recipientBytes32, offset) = payload.asBytes32Unchecked(offset);
-        (composerBytes32, offset) = payload.asBytes32Unchecked(offset);
-        composedMessage = new bytes(payload.length - offset);
+        (amount, destinationToken, sender, recipient) = _decodeTokenTransfer(payload);
+
         assembly {
-            mcopy(add(composedMessage, 0x20), add(add(payload, 0x20), offset), mload(composedMessage))
+            let offset := payload.offset
+            composer := and(calldataload(add(offset, COMPOSER_OFFSET)), ADDRESS_MASK)
+            composedMessage.offset := add(offset, COMPOSED_MSG_OFFSET)
+            composedMessage.length := sub(payload.length, COMPOSED_MSG_OFFSET)
         }
-        offset += composedMessage.length;
+    }
 
-        destinationToken = destinationTokenBytes32.toAddress();
-        recipient = recipientBytes32.toAddress();
-        composer = composerBytes32.toAddress();
-
-        payload.checkLength(offset);
+    /// @dev Decodes the common fields shared by TokenTransfer and ComposedTokenTransfer payloads.
+    function _decodeTokenTransfer(
+        bytes calldata payload
+    ) private pure returns (uint256 amount, address destinationToken, bytes32 sender, address recipient) {
+        assembly {
+            let offset := payload.offset
+            amount := shr(UINT128_SHIFT, calldataload(add(offset, AMOUNT_OFFSET)))
+            destinationToken := and(calldataload(add(offset, DESTINATION_TOKEN_OFFSET)), ADDRESS_MASK)
+            sender := calldataload(add(offset, SENDER_OFFSET))
+            recipient := and(calldataload(add(offset, RECIPIENT_OFFSET)), ADDRESS_MASK)
+        }
     }
 
     /// @notice Generates a payload with empty data
