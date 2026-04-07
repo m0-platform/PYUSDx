@@ -49,13 +49,16 @@ interface IBridgeAdapter {
     /* ============ Interactive Functions ============ */
 
     /// @notice Sends a message to the remote chain.
-    /// @param  destinationChainId The chain Id of the destination chain.
-    /// @param  gasLimit           The gas limit to execute the message on the destination chain.
-    /// @param  refundAddress      The address to refund the fee to.
-    /// @param  payload            The message payload to send.
+    /// @param  destinationChainId      The chain Id of the destination chain.
+    /// @param  gasLimit                The gas limit to execute the message on the destination chain.
+    /// @param  composedMessageGasLimit The gas limit for processing the composed message on the destination chain.
+    ///                                 Zero if the message doesn't include a composed message.
+    /// @param  refundAddress           The address to refund the fee to.
+    /// @param  payload                 The message payload to send.
     function sendMessage(
         uint32 destinationChainId,
         uint256 gasLimit,
+        uint256 composedMessageGasLimit,
         bytes32 refundAddress,
         bytes memory payload
     ) external payable;
@@ -83,14 +86,17 @@ interface IBridgeAdapter {
     /// @notice Returns the address of the portal.
     function portal() external view returns (address);
 
-    /// @notice Returns the fee for sending a message to the remote chain
-    /// @param  destinationChainId The chain Id of the destination chain.
-    /// @param  gasLimit           The gas limit to execute the message on the destination chain.
-    /// @param  payload            The message payload to send.
-    /// @return fee                The fee for sending a message.
+    /// @notice Returns the fee for sending a message to the remote chain.
+    /// @param  destinationChainId      The chain Id of the destination chain.
+    /// @param  gasLimit                The gas limit to execute the message on the destination chain.
+    /// @param  composedMessageGasLimit The gas limit for processing the composed message on the destination chain.
+    ///                                 Zero if the message doesn't include a composed message.
+    /// @param  payload                 The message payload to send.
+    /// @return fee                     The fee for sending a message.
     function quote(
         uint32 destinationChainId,
         uint256 gasLimit,
+        uint256 composedMessageGasLimit,
         bytes memory payload
     ) external view returns (uint256 fee);
 

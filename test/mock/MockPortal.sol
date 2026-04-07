@@ -17,5 +17,8 @@ contract MockPortal {
         return 0;
     }
 
-    function receiveMessage(uint32 sourceChainId, bytes memory payload) external {}
+    function receiveMessage(
+        uint32 sourceChainId,
+        bytes memory payload
+    ) external returns (address composer, bytes memory composedMessage) {}
 }

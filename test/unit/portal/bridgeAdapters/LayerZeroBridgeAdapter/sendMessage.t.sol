@@ -20,7 +20,7 @@ contract SendMessageUnitTest is LayerZeroBridgeAdapterUnitTestBase {
         vm.expectCall(address(lzEndpoint), fee, abi.encodeWithSelector(ILayerZeroEndpointV2.send.selector));
 
         vm.prank(address(portal));
-        adapter.sendMessage{ value: fee }(SPOKE_CHAIN_ID, gasLimit, refundAddress, payload);
+        adapter.sendMessage{ value: fee }(SPOKE_CHAIN_ID, gasLimit, 0, refundAddress, payload);
     }
 
     function test_sendMessage_revertsIfNotCalledByPortal() external {
@@ -31,7 +31,7 @@ contract SendMessageUnitTest is LayerZeroBridgeAdapterUnitTestBase {
         vm.expectRevert(IBridgeAdapter.NotPortal.selector);
 
         vm.prank(user);
-        adapter.sendMessage{ value: 0.001 ether }(SPOKE_CHAIN_ID, gasLimit, refundAddress, payload);
+        adapter.sendMessage{ value: 0.001 ether }(SPOKE_CHAIN_ID, gasLimit, 0, refundAddress, payload);
     }
 
     function test_sendMessage_revertsIfChainNotConfigured() external {
@@ -43,7 +43,7 @@ contract SendMessageUnitTest is LayerZeroBridgeAdapterUnitTestBase {
         vm.expectRevert(abi.encodeWithSelector(IBridgeAdapter.UnsupportedChain.selector, unconfiguredChain));
 
         vm.prank(address(portal));
-        adapter.sendMessage{ value: 0.001 ether }(unconfiguredChain, gasLimit, refundAddress, payload);
+        adapter.sendMessage{ value: 0.001 ether }(unconfiguredChain, gasLimit, 0, refundAddress, payload);
     }
 
     function test_sendMessage_revertsIfBridgeChainIdNotSet() external {
@@ -57,7 +57,7 @@ contract SendMessageUnitTest is LayerZeroBridgeAdapterUnitTestBase {
         vm.expectRevert(abi.encodeWithSelector(IBridgeAdapter.UnsupportedChain.selector, newChainId));
 
         vm.prank(address(portal));
-        adapter.sendMessage{ value: 0.001 ether }(newChainId, 250_000, makeAddr("refund").toBytes32(), "test");
+        adapter.sendMessage{ value: 0.001 ether }(newChainId, 250_000, 0, makeAddr("refund").toBytes32(), "test");
     }
 
     function test_sendMessage_revertsIfPeerNotSet() external {
@@ -70,6 +70,6 @@ contract SendMessageUnitTest is LayerZeroBridgeAdapterUnitTestBase {
         vm.expectRevert(abi.encodeWithSelector(IBridgeAdapter.UnsupportedChain.selector, newChainId));
 
         vm.prank(address(portal));
-        adapter.sendMessage{ value: 0.001 ether }(newChainId, 250_000, makeAddr("refund").toBytes32(), "test");
+        adapter.sendMessage{ value: 0.001 ether }(newChainId, 250_000, 0, makeAddr("refund").toBytes32(), "test");
     }
 }

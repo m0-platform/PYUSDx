@@ -62,4 +62,12 @@ interface ILayerZeroEndpointV2 {
     /// @param  oapp     The OApp address to query.
     /// @return delegate The current delegate address.
     function delegates(address oapp) external view returns (address delegate);
+
+    /// @notice Sends the lzCompose message to the Endpoint
+    /// @dev    The composer MUST assert the sender.
+    /// @param to      The address which will receive the composed message
+    /// @param guid    The message guid.
+    /// @param index   The index of the composed message.
+    /// @param message The composed message.
+    function sendCompose(address to, bytes32 guid, uint16 index, bytes calldata message) external;
 }

@@ -201,9 +201,29 @@ library PayloadEncoder {
         }
     }
 
-    /// @notice Generates a payload with empty data
+    /// @notice Generates a TokenTransfer payload with empty data
     /// @dev    Used for estimating gas costs when the actual payload doesn't matter.
-    function generateEmptyPayload() internal pure returns (bytes memory) {
+    function generateEmptyTokenTransferPayload() internal pure returns (bytes memory) {
         return encodeTokenTransfer(0, bytes32(0), bytes32(0), 0, bytes32(0), address(0), bytes32(0));
+    }
+
+    /// @notice Generates a ComposedTokenTransfer payload with empty transfer data.
+    /// @dev    Used for estimating gas costs when the actual payload doesn't matter.
+    function generateEmptyComposedTokenTransferPayload(
+        bytes32 composer,
+        bytes memory message
+    ) internal pure returns (bytes memory) {
+        return
+            encodeComposedTokenTransfer(
+                0,
+                bytes32(0),
+                bytes32(0),
+                0,
+                bytes32(0),
+                address(0),
+                bytes32(0),
+                composer,
+                message
+            );
     }
 }

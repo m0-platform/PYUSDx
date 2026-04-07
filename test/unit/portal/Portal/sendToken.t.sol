@@ -4,7 +4,7 @@ pragma solidity 0.8.34;
 import { TypeConverter } from "../../../../lib/evm-m-extensions/lib/common/src/libs/TypeConverter.sol";
 
 import { IBridgeAdapter } from "../../../../src/portal/interfaces/IBridgeAdapter.sol";
-import { IPortal } from "../../../../src/portal/interfaces/IPortal.sol";
+import { TokenTransferParams, IPortal } from "../../../../src/portal/interfaces/IPortal.sol";
 import { PayloadEncoder } from "../../../../src/portal/libraries/PayloadEncoder.sol";
 
 import { MockBridgeAdapter } from "../../../mock/MockBridgeAdapter.sol";
@@ -47,15 +47,18 @@ contract SendTokenUnitTest is PortalUnitTestBase {
             user,
             recipient
         );
-        address defaultBridgeAdapter = portal.defaultBridgeAdapter(CHAIN_ID_2);
+        address defaultAdapter = portal.defaultBridgeAdapter(CHAIN_ID_2);
 
         uint256 initialBalance = extension.balanceOf(user);
         vm.startPrank(user);
         pyusdx.approve(address(portal), amount);
 
         vm.expectCall(
-            defaultBridgeAdapter,
-            abi.encodeCall(IBridgeAdapter.sendMessage, (CHAIN_ID_2, TOKEN_TRANSFER_GAS_LIMIT, refundAddress, payload))
+            defaultAdapter,
+            abi.encodeCall(
+                IBridgeAdapter.sendMessage,
+                (CHAIN_ID_2, TOKEN_TRANSFER_GAS_LIMIT, 0, refundAddress, payload)
+            )
         );
         vm.expectEmit();
         emit IPortal.TokenSent(
@@ -65,11 +68,13 @@ contract SendTokenUnitTest is PortalUnitTestBase {
             user,
             recipient,
             amount,
-            defaultBridgeAdapter,
+            defaultAdapter,
             messageId
         );
 
-        portal.sendToken{ value: fee }(amount, address(pyusdx), CHAIN_ID_2, peerPYUSDX, recipient, refundAddress);
+        portal.sendToken{ value: fee }(
+            TokenTransferParams(amount, address(pyusdx), CHAIN_ID_2, peerPYUSDX, recipient, refundAddress, address(0))
+        );
         vm.stopPrank();
 
         assertEq(pyusdx.balanceOf(user), initialBalance - amount);
@@ -88,15 +93,18 @@ contract SendTokenUnitTest is PortalUnitTestBase {
             user,
             recipient
         );
-        address defaultBridgeAdapter = portal.defaultBridgeAdapter(CHAIN_ID_2);
+        address defaultAdapter = portal.defaultBridgeAdapter(CHAIN_ID_2);
 
         uint256 initialBalance = extension.balanceOf(user);
         vm.startPrank(user);
         extension.approve(address(portal), amount);
 
         vm.expectCall(
-            defaultBridgeAdapter,
-            abi.encodeCall(IBridgeAdapter.sendMessage, (CHAIN_ID_2, TOKEN_TRANSFER_GAS_LIMIT, refundAddress, payload))
+            defaultAdapter,
+            abi.encodeCall(
+                IBridgeAdapter.sendMessage,
+                (CHAIN_ID_2, TOKEN_TRANSFER_GAS_LIMIT, 0, refundAddress, payload)
+            )
         );
         vm.expectEmit();
         emit IPortal.TokenSent(
@@ -106,11 +114,21 @@ contract SendTokenUnitTest is PortalUnitTestBase {
             user,
             recipient,
             amount,
-            defaultBridgeAdapter,
+            defaultAdapter,
             messageId
         );
 
-        portal.sendToken{ value: fee }(amount, address(extension), CHAIN_ID_2, peerExtension, recipient, refundAddress);
+        portal.sendToken{ value: fee }(
+            TokenTransferParams(
+                amount,
+                address(extension),
+                CHAIN_ID_2,
+                peerExtension,
+                recipient,
+                refundAddress,
+                address(0)
+            )
+        );
         vm.stopPrank();
 
         assertEq(extension.balanceOf(user), initialBalance - amount);
@@ -149,7 +167,10 @@ contract SendTokenUnitTest is PortalUnitTestBase {
 
         vm.expectCall(
             address(customAdapter),
-            abi.encodeCall(IBridgeAdapter.sendMessage, (CHAIN_ID_2, TOKEN_TRANSFER_GAS_LIMIT, refundAddress, payload))
+            abi.encodeCall(
+                IBridgeAdapter.sendMessage,
+                (CHAIN_ID_2, TOKEN_TRANSFER_GAS_LIMIT, 0, refundAddress, payload)
+            )
         );
         vm.expectEmit();
         emit IPortal.TokenSent(
@@ -164,13 +185,15 @@ contract SendTokenUnitTest is PortalUnitTestBase {
         );
 
         portal.sendToken{ value: fee }(
-            amount,
-            address(pyusdx),
-            CHAIN_ID_2,
-            peerPYUSDX,
-            recipient,
-            refundAddress,
-            address(customAdapter)
+            TokenTransferParams(
+                amount,
+                address(pyusdx),
+                CHAIN_ID_2,
+                peerPYUSDX,
+                recipient,
+                refundAddress,
+                address(customAdapter)
+            )
         );
         vm.stopPrank();
     }
@@ -181,37 +204,49 @@ contract SendTokenUnitTest is PortalUnitTestBase {
 
         vm.expectRevert(IPortal.SendingPaused.selector);
         vm.prank(user);
-        portal.sendToken(amount, address(pyusdx), CHAIN_ID_2, peerPYUSDX, recipient, refundAddress);
+        portal.sendToken(
+            TokenTransferParams(amount, address(pyusdx), CHAIN_ID_2, peerPYUSDX, recipient, refundAddress, address(0))
+        );
     }
 
     function test_sendToken_revertsIfZeroAmount() external {
         vm.expectRevert(IPortal.ZeroAmount.selector);
         vm.prank(user);
-        portal.sendToken(0, address(pyusdx), CHAIN_ID_2, peerPYUSDX, recipient, refundAddress);
+        portal.sendToken(
+            TokenTransferParams(0, address(pyusdx), CHAIN_ID_2, peerPYUSDX, recipient, refundAddress, address(0))
+        );
     }
 
     function test_sendToken_revertsIfZeroRefundAddress() external {
         vm.expectRevert(IPortal.ZeroRefundAddress.selector);
         vm.prank(user);
-        portal.sendToken(amount, address(pyusdx), CHAIN_ID_2, peerPYUSDX, recipient, bytes32(0));
+        portal.sendToken(
+            TokenTransferParams(amount, address(pyusdx), CHAIN_ID_2, peerPYUSDX, recipient, bytes32(0), address(0))
+        );
     }
 
     function test_sendToken_revertsIfZeroSourceToken() external {
         vm.expectRevert(IPortal.ZeroSourceToken.selector);
         vm.prank(user);
-        portal.sendToken(amount, address(0), CHAIN_ID_2, peerPYUSDX, recipient, refundAddress);
+        portal.sendToken(
+            TokenTransferParams(amount, address(0), CHAIN_ID_2, peerPYUSDX, recipient, refundAddress, address(0))
+        );
     }
 
     function test_sendToken_revertsIfZeroDestinationToken() external {
         vm.expectRevert(IPortal.ZeroDestinationToken.selector);
         vm.prank(user);
-        portal.sendToken(amount, address(pyusdx), CHAIN_ID_2, bytes32(0), recipient, refundAddress);
+        portal.sendToken(
+            TokenTransferParams(amount, address(pyusdx), CHAIN_ID_2, bytes32(0), recipient, refundAddress, address(0))
+        );
     }
 
     function test_sendToken_revertsIfZeroRecipient() external {
         vm.expectRevert(IPortal.ZeroRecipient.selector);
         vm.prank(user);
-        portal.sendToken(amount, address(pyusdx), CHAIN_ID_2, peerPYUSDX, bytes32(0), refundAddress);
+        portal.sendToken(
+            TokenTransferParams(amount, address(pyusdx), CHAIN_ID_2, peerPYUSDX, bytes32(0), refundAddress, address(0))
+        );
     }
 
     function test_sendToken_revertsIfNoBridgeAdapterSet() external {
@@ -221,7 +256,17 @@ contract SendTokenUnitTest is PortalUnitTestBase {
             abi.encodeWithSelector(IPortal.UnsupportedBridgeAdapter.selector, unconfiguredChain, address(0))
         );
         vm.prank(user);
-        portal.sendToken(amount, address(pyusdx), unconfiguredChain, peerPYUSDX, recipient, refundAddress);
+        portal.sendToken(
+            TokenTransferParams(
+                amount,
+                address(pyusdx),
+                unconfiguredChain,
+                peerPYUSDX,
+                recipient,
+                refundAddress,
+                address(0)
+            )
+        );
     }
 
     function test_sendToken_revertsIfUnsupportedBridgeAdapter() external {
@@ -232,14 +277,26 @@ contract SendTokenUnitTest is PortalUnitTestBase {
         );
 
         vm.prank(user);
-        portal.sendToken(amount, address(pyusdx), CHAIN_ID_2, peerPYUSDX, recipient, refundAddress, unsupportedAdapter);
+        portal.sendToken(
+            TokenTransferParams(
+                amount,
+                address(pyusdx),
+                CHAIN_ID_2,
+                peerPYUSDX,
+                recipient,
+                refundAddress,
+                unsupportedAdapter
+            )
+        );
     }
 
     function test_sendToken_revertsIfSendToSelf() external {
         vm.startPrank(user);
 
         vm.expectRevert(abi.encodeWithSelector(IPortal.UnsupportedBridgeAdapter.selector, CHAIN_ID_1, address(0)));
-        portal.sendToken(amount, address(pyusdx), CHAIN_ID_1, peerPYUSDX, recipient, refundAddress);
+        portal.sendToken(
+            TokenTransferParams(amount, address(pyusdx), CHAIN_ID_1, peerPYUSDX, recipient, refundAddress, address(0))
+        );
         vm.stopPrank();
     }
 }

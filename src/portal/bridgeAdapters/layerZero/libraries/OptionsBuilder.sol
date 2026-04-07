@@ -40,6 +40,26 @@ library OptionsBuilder {
         return addExecutorOption(options, ExecutorOptions.OPTION_TYPE_LZRECEIVE, option);
     }
 
+    /// @dev Adds an executor LZ compose option to the existing options.
+    /// @param options The existing options container.
+    /// @param index The index for the lzCompose() function call.
+    /// @param gas The gasLimit for the lzCompose() function call.
+    /// @param value The msg.value for the lzCompose() function call.
+    /// @return options The updated options container.
+    ///
+    /// @dev When multiples of this option are added, they are summed PER index by the executor on the remote chain.
+    /// @dev If the OApp sends N lzCompose calls on the remote, you must provide N incremented indexes starting with 0.
+    /// i.e. When your remote OApp composes (N = 3) messages, you must set this option for index 0,1,2
+    function addExecutorLzComposeOption(
+        bytes memory options,
+        uint16 index,
+        uint128 gas,
+        uint128 value
+    ) internal pure returns (bytes memory) {
+        bytes memory option = ExecutorOptions.encodeLzComposeOption(index, gas, value);
+        return addExecutorOption(options, ExecutorOptions.OPTION_TYPE_LZCOMPOSE, option);
+    }
+
     /// @dev Adds an executor option to the existing options.
     /// @param options    The existing options container.
     /// @param optionType The type of the executor option.

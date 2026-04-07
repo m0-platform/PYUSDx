@@ -17,6 +17,7 @@ contract MockBridgeAdapter is IBridgeAdapter {
     function sendMessage(
         uint32 destinationChainId,
         uint256 gasLimit,
+        uint256 composedMessageGasLimit,
         bytes32 refundAddress,
         bytes memory payload
     ) external payable {}
@@ -25,7 +26,12 @@ contract MockBridgeAdapter is IBridgeAdapter {
         quoteValue = quote_;
     }
 
-    function quote(uint32 destinationChainId, uint256 gasLimit, bytes memory payload) external view returns (uint256) {
+    function quote(
+        uint32 destinationChainId,
+        uint256 gasLimit,
+        uint256 composedMessageGasLimit,
+        bytes memory payload
+    ) external view returns (uint256) {
         return quoteValue;
     }
 
