@@ -2499,7 +2499,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.freeze(bob);
     }
 
-    function test_freeze_revert_frozenClaimRecipient() public {
+    function test_freeze_succeeds_frozenClaimRecipient() public {
         // Mint tokens to alice and set up as earner with bob as claimRecipient
         uint256 balance = 1000e6;
         issuerGateway.mint(alice, balance);
@@ -2514,13 +2514,68 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         // Warp time to accrue yield
         vm.warp(block.timestamp + 365 days);
-        assertGt(pyusdx.accruedYieldOf(alice), 0, "Should have yield accrued");
 
-        // Freeze alice — fails in `claimFor()` when transferring yield to frozen bob
-        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+        (uint256 yieldWithFee, uint256 fee, ) = pyusdx.accruedYieldAndFeeOf(alice);
+        assertGt(yieldWithFee, 0, "Should have yield accrued");
+        assertGt(fee, 0, "Should have fee");
 
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+        uint256 expectedTotal = aliceBalanceBefore + yieldWithFee;
+
+        // Freeze alice — succeeds, all yield (including fee) stays on alice's balance
         vm.prank(freezeManager);
         pyusdx.freeze(alice);
+
+        // Verify frozen
+        assertTrue(pyusdx.isFrozen(alice));
+
+        // Verify ALL yield stays on alice's balance (not routed to claimRecipient or earnerManager)
+        // Balance increases by yieldWithFee (the full yield including the fee portion)
+        assertEq(pyusdx.balanceOf(alice), expectedTotal, "All yield should stay on alice");
+    }
+
+    function test_freeze_succeeds_whilePaused_noYield() public {
+        // Mint tokens to alice (non-earner by default)
+        issuerGateway.mint(alice, 1000e6);
+
+        // Pause the contract
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        // Freeze should still work while paused (no yield to claim, no _transfer needed)
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        assertTrue(pyusdx.isFrozen(alice));
+    }
+
+    function test_freeze_succeeds_whilePaused_withYield() public {
+        // Mint tokens to alice and set up as earner with fee and claimRecipient
+        uint256 balance = 1000e6;
+        issuerGateway.mint(alice, balance);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 5000, bob);
+        pyusdx.setAccountRateBps(alice, uint24(500));
+
+        // Warp time to accrue yield
+        vm.warp(block.timestamp + 365 days);
+
+        (uint256 expectedYield, , ) = pyusdx.accruedYieldAndFeeOf(alice);
+        assertGt(expectedYield, 0, "Should have yield accrued");
+
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+
+        // Pause the contract
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        // Freeze should succeed while paused — yield materialized on alice, skip _transfer
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        assertTrue(pyusdx.isFrozen(alice));
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore + expectedYield, "Yield should be materialized on alice");
     }
 
     function test_freezeAccounts_revert_notFreezeManager() public {

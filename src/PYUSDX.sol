@@ -327,7 +327,7 @@ contract PYUSDX is
     /// @dev   Hook called before freezing an account.
     /// @param account   The account to be frozen.
     function _beforeFreeze(address account) internal override {
-        _claimFor(account);
+        _claimFor(account, true);
 
         _stopEarningFor(account);
 
@@ -421,6 +421,16 @@ contract PYUSDX is
 
     /// @dev Internal claim implementation.
     function _claimFor(address account) internal returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) {
+        return _claimFor(account, false);
+    }
+
+    /// @dev   Internal claim implementation.
+    /// @param account   The account to claim yield for.
+    /// @param forFreeze Whether the claim is happening during a freeze operation.
+    function _claimFor(
+        address account,
+        bool forFreeze
+    ) internal returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) {
         _revertIfFrozen(account);
 
         (yieldWithFee, fee, yieldNetOfFee) = accruedYieldAndFeeOf(account);
@@ -439,6 +449,12 @@ contract PYUSDX is
         unchecked {
             $.accounts[account].balance += yieldWithFee;
         }
+
+        // NOTE: When claiming during freeze, skip the `claimRecipient` routing and fee transfer.
+        //       This avoids calling `_transfer` which has `whenNotPaused` and `_revertIfFrozen` checks
+        //       that would cause freeze to revert while paused or when `claimRecipient` is frozen.
+        //       `forceTransfer` can then be used to transfer all funds from the frozen account.
+        if (forFreeze) return (yieldWithFee, fee, yieldNetOfFee);
 
         address claimRecipient = claimRecipientFor(account);
 
