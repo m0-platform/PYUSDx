@@ -5,16 +5,15 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
-import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
+import { IExtensionBeacon } from "../../src/platform/interfaces/IExtensionBeacon.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
-import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
-import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 import { IReentrancyLock } from "../../src/swap/interfaces/IReentrancyLock.sol";
 
 import { ExtensionFactoryHarness } from "../harness/ExtensionFactoryHarness.sol";
 
+import { MockExtensionBeacon } from "../mock/MockExtensionBeacon.sol";
 import { MockPYUSDXExtension } from "../mock/MockPYUSDXExtension.sol";
 import { MockTrustedRouter } from "../mock/MockTrustedRouter.sol";
 import { MockRouterAwareExtension } from "../mock/MockRouterAwareExtension.sol";
@@ -37,14 +36,13 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
         // After super.setUp(), nonce is 4
         // new SwapFacility impl: 4 -> 5
         // deployTransparentProxy: 5 -> 6
-        // new YieldToOne impl: 6 -> 7
-        // new MultiMint impl: 7 -> 8
-        // new Factory impl: 8 -> 9
-        // deployTransparentProxy: 9 -> 10
-        // Factory proxy is at nonce 9 = 4 + 5
+        // new MockExtensionBeacon: 6 -> 7
+        // new ExtensionFactoryHarness: 7 -> 8
+        // deployTransparentProxy: 8 -> 9
+        // Factory proxy is at nonce 8 = 4 + 4
 
         uint64 nonceBeforeDeployments = vm.getNonce(address(this));
-        address predictedFactory = vm.computeCreateAddress(address(this), nonceBeforeDeployments + 5);
+        address predictedFactory = vm.computeCreateAddress(address(this), nonceBeforeDeployments + 4);
 
         address swapFacilityImplementation = address(new SwapFacility(address(pyusdx), predictedFactory));
         swapFacility = SwapFacility(
@@ -55,22 +53,15 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
             )
         );
 
-        // Deploy factory with actual SwapFacility address
-        // Deploy dummy implementations (unit tests use mocks, not real extensions)
-        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
-        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+        // Deploy mock beacon (unit tests use mocks, not real extensions)
+        MockExtensionBeacon mockBeacon = new MockExtensionBeacon();
 
+        // Deploy factory with actual SwapFacility address
         factory = ExtensionFactoryHarness(
             UnsafeUpgrades.deployTransparentProxy(
-                address(new ExtensionFactoryHarness(address(pyusdx), address(swapFacility))),
+                address(new ExtensionFactoryHarness(address(pyusdx), address(swapFacility), address(mockBeacon))),
                 admin,
-                abi.encodeWithSelector(
-                    ExtensionFactory.initialize.selector,
-                    admin,
-                    factoryManager,
-                    yieldToOneImpl,
-                    multiMintImpl
-                )
+                abi.encodeWithSelector(ExtensionFactory.initialize.selector, admin, factoryManager)
             )
         );
 
@@ -78,8 +69,8 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
         routerAwareExtension = new MockRouterAwareExtension(address(pyusdx), address(swapFacility));
 
         // Register mock extensions by default
-        factory.registerExtension(address(extensionA), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
-        factory.registerExtension(address(routerAwareExtension), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(extensionA), IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(routerAwareExtension), IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
     }
 
     function _setupSwapIn(address user, uint256 amount) internal {
@@ -184,7 +175,7 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
     function test_reentrancy_blocked() public {
         MockReentrantExtension reentrantExtension = new MockReentrantExtension(address(pyusdx), address(swapFacility));
 
-        factory.registerExtension(address(reentrantExtension), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(reentrantExtension), IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
 
         _setupSwapIn(alice, AMOUNT);
 

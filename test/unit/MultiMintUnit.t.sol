@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.34;
 
-import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { PYUSDX } from "../../src/PYUSDX.sol";
@@ -19,7 +18,9 @@ import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/o
 import { MockERC20 } from "../mock/MockERC20.sol";
 import { MockFeeOnTransfer } from "../mock/MockFeeOnTransfer.sol";
 
-contract MultiMintTest is Test {
+import { BaseTest } from "../utils/BaseTest.sol";
+
+contract MultiMintTest is BaseTest {
     MockIssuerGateway public issuerGateway;
     PYUSDXHarness public pyusdx;
     MockSwapFacility public swapFacility;
@@ -29,21 +30,11 @@ contract MultiMintTest is Test {
     MockERC20 public dai; // 18 decimals
     MockERC20 public fourDec; // 4 decimals
 
-    address public admin = makeAddr("admin");
-    address public pauser = makeAddr("pauser");
-    address public freezeManager = makeAddr("freezeManager");
-    address public earnerManager = makeAddr("earnerManager");
-    address public rateManager = makeAddr("rateManager");
-    address public assetCapManager = makeAddr("assetCapManager");
-    address public yieldRecipientManager = makeAddr("yieldRecipientManager");
-
-    address public yieldRecipient = makeAddr("yieldRecipient");
-    address public alice = makeAddr("alice");
-    address public bob = makeAddr("bob");
-
     uint256 public constant MINT_AMOUNT = 1000e6;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
+
         issuerGateway = new MockIssuerGateway(address(0));
         address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(

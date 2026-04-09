@@ -4,6 +4,7 @@ pragma solidity 0.8.34;
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 
+import { IExtensionBeacon } from "../../src/platform/interfaces/IExtensionBeacon.sol";
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
@@ -32,7 +33,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         });
 
         vm.prank(admin);
-        (address multiMintProxy, , ) = factory.deployMultiMint(string("mm-integration"), mmParams);
+        (address multiMintProxy, ) = factory.deployMultiMint(string("mm-integration"), mmParams);
         multiMint = MultiMint(multiMintProxy);
 
         // Enable PYUSDX earning for MultiMint (claimRecipient = address(0) means yield stays on contract)
@@ -459,7 +460,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         // Revoke extension
         vm.prank(factoryManager);
-        factory.setExtensionType(address(multiMint), IExtensionFactory.ExtensionType.NONE);
+        factory.setExtensionType(address(multiMint), IExtensionBeacon.ExtensionType.NONE);
 
         assertFalse(swapFacility.isApprovedExtension(address(multiMint)));
 

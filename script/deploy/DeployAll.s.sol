@@ -36,6 +36,9 @@ contract DeployAll is DeployBase {
         console.log("SwapFacility Proxy:               ", deployment.swapFacilityProxy);
         console.log("SwapFacility ProxyAdmin:          ", deployment.swapFacilityProxyAdmin);
         console.log("SwapFacility Implementation:      ", deployment.swapFacilityImplementation);
+        console.log("Beacon Proxy:                     ", deployment.beaconProxy);
+        console.log("Beacon ProxyAdmin:                ", deployment.beaconProxyAdmin);
+        console.log("Beacon Implementation:            ", deployment.beaconImplementation);
         console.log("Factory Proxy:                    ", deployment.factoryProxy);
         console.log("Factory ProxyAdmin:               ", deployment.factoryProxyAdmin);
         console.log("Factory Implementation:           ", deployment.factoryImplementation);

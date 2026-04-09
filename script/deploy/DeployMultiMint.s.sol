@@ -27,16 +27,12 @@ contract DeployMultiMint is DeployBase {
 
         vm.startBroadcast(deployer);
 
-        (address proxy, address proxyAdmin, address implementation) = ExtensionFactory(factory).deployMultiMint(
-            extensionName,
-            params
-        );
+        (address proxy, address implementation) = ExtensionFactory(factory).deployMultiMint(extensionName, params);
 
         vm.stopBroadcast();
 
         console.log("MultiMint Implementation:", implementation);
         console.log("MultiMint Proxy:         ", proxy);
-        console.log("MultiMint ProxyAdmin:    ", proxyAdmin);
 
         _writeDeployment(block.chainid, _getExtensionName(), proxy);
     }

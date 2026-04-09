@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
+import { IExtensionBeacon } from "./IExtensionBeacon.sol";
+
 /// @title  PYUSDX Extension Factory interface.
 /// @author M0 Labs
 interface IExtensionFactory {
@@ -29,27 +31,16 @@ interface IExtensionFactory {
         address yieldRecipientManager;
     }
 
-    /* ============ Enums ============ */
-
-    /// @notice The type of PYUSDX extension.
-    enum ExtensionType {
-        NONE,
-        YIELD_TO_ONE,
-        MULTI_MINT
-    }
-
     /* ============ Events ============ */
 
     /// @notice Emitted when an extension is deployed.
     /// @param  extensionType  The type of extension deployed.
     /// @param  proxy          The address of the proxy contract.
-    /// @param  proxyAdmin     The address of the ProxyAdmin contract managing the proxy.
     /// @param  implementation The address of the implementation contract.
     /// @param  deployer       The address that deployed the extension.
     event ExtensionDeployed(
-        ExtensionType indexed extensionType,
+        IExtensionBeacon.ExtensionType indexed extensionType,
         address proxy,
-        address proxyAdmin,
         address indexed implementation,
         address indexed deployer
     );
@@ -57,12 +48,7 @@ interface IExtensionFactory {
     /// @notice Emitted when an extension's type is set (or cleared to NONE).
     /// @param  extension     The address of the extension.
     /// @param  extensionType The new extension type.
-    event ExtensionTypeSet(address indexed extension, ExtensionType indexed extensionType);
-
-    /// @notice Emitted when an implementation address is set for an extension type.
-    /// @param  extensionType  The type of extension.
-    /// @param  implementation The new implementation address.
-    event ImplementationSet(ExtensionType indexed extensionType, address indexed implementation);
+    event ExtensionTypeSet(address indexed extension, IExtensionBeacon.ExtensionType indexed extensionType);
 
     /* ============ Errors ============ */
 
@@ -90,6 +76,9 @@ interface IExtensionFactory {
     /// @notice Thrown if the extension type is invalid for setting implementation.
     error InvalidExtensionType();
 
+    /// @notice Thrown if the extension beacon address is 0x0.
+    error ZeroExtensionBeacon();
+
     /* ============ View/Pure Functions ============ */
 
     /// @notice The role identifier for the factory manager role.
@@ -104,12 +93,12 @@ interface IExtensionFactory {
     /// @notice Returns the extension type for a given extension address.
     /// @param  extension The address of the extension.
     /// @return The extension type (NONE if not registered).
-    function getExtensionType(address extension) external view returns (ExtensionType);
+    function getExtensionType(address extension) external view returns (IExtensionBeacon.ExtensionType);
 
     /// @notice Returns the cached implementation address for a given extension type.
     /// @param  extensionType The type of extension.
     /// @return The implementation address.
-    function getImplementation(ExtensionType extensionType) external view returns (address);
+    function getImplementation(IExtensionBeacon.ExtensionType extensionType) external view returns (address);
 
     /// @notice Returns true if the extension is approved (active).
     /// @param  extension The address of the extension to check.
@@ -122,29 +111,30 @@ interface IExtensionFactory {
     /// @notice The address of the SwapFacility contract.
     function swapFacility() external view returns (address);
 
+    /// @notice The address of the ExtensionBeacon contract.
+    function extensionBeacon() external view returns (address);
+
     /* ============ Deployment Functions ============ */
 
     /// @notice Deploys a new YieldToOne extension.
     /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
     /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
     /// @return proxy         The address of the deployed proxy.
-    /// @return proxyAdmin    The address of the deployed ProxyAdmin.
     /// @return implementation The address of the deployed implementation.
     function deployYieldToOne(
         string calldata extensionName,
         YieldToOneParams calldata params
-    ) external returns (address proxy, address proxyAdmin, address implementation);
+    ) external returns (address proxy, address implementation);
 
     /// @notice Deploys a new MultiMint extension.
     /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
     /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
     /// @return proxy         The address of the deployed proxy.
-    /// @return proxyAdmin    The address of the deployed ProxyAdmin.
     /// @return implementation The address of the deployed implementation.
     function deployMultiMint(
         string calldata extensionName,
         MultiMintParams calldata params
-    ) external returns (address proxy, address proxyAdmin, address implementation);
+    ) external returns (address proxy, address implementation);
 
     /* ============ Admin Functions ============ */
 
@@ -153,12 +143,5 @@ interface IExtensionFactory {
     ///         Validates the extension via `_revertIfInvalidExtension` when setting to a non-NONE type.
     /// @param  extension     The address of the extension.
     /// @param  extensionType The extension type to assign (NONE to revoke).
-    function setExtensionType(address extension, ExtensionType extensionType) external;
-
-    /// @notice Sets the cached implementation address for a given extension type.
-    /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.
-    ///         Only affects future deployments — existing proxies are unaffected.
-    /// @param  extensionType  The type of extension.
-    /// @param  implementation The new implementation address.
-    function setImplementation(ExtensionType extensionType, address implementation) external;
+    function setExtensionType(address extension, IExtensionBeacon.ExtensionType extensionType) external;
 }

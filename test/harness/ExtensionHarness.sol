@@ -10,7 +10,13 @@ contract ExtensionHarness is Extension {
     uint256 private _totalSupply;
     mapping(address account => uint256) private _balances;
 
-    constructor(address pyusdx_, address swapFacility_) Extension(pyusdx_, swapFacility_) {}
+    /// @notice Identifiable version for upgrade propagation testing.
+    uint256 public immutable harnessVersion;
+
+    /// @param  version_ Identifiable version for upgrade propagation testing.
+    constructor(address pyusdx_, address swapFacility_, uint256 version_) Extension(pyusdx_, swapFacility_) {
+        harnessVersion = version_;
+    }
 
     function initialize(
         string memory name,
