@@ -23,10 +23,12 @@ contract ExtensionHarness is Extension {
         string memory symbol,
         address admin,
         address freezeManager,
-        address pauser
+        address pauser,
+        address versionManager
     ) public initializer {
         __Extension_init(name, symbol, freezeManager, pauser);
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(VERSION_MANAGER_ROLE, versionManager);
     }
 
     /// @dev   Mints `amount` tokens to `recipient`.

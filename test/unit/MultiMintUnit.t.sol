@@ -77,7 +77,8 @@ contract MultiMintTest is BaseTest {
                     assetCapManager,
                     freezeManager,
                     pauser,
-                    yieldRecipientManager
+                    yieldRecipientManager,
+                    versionManager
                 )
             )
         );
@@ -155,7 +156,8 @@ contract MultiMintTest is BaseTest {
                 address(0),
                 freezeManager,
                 pauser,
-                yieldRecipientManager
+                yieldRecipientManager,
+                versionManager
             )
         );
     }

@@ -69,7 +69,8 @@ contract YieldToOneUnitTests is BaseTest {
                     admin,
                     freezeManager,
                     pauser,
-                    yieldRecipientManager
+                    yieldRecipientManager,
+                    versionManager
                 )
             )
         );
@@ -118,7 +119,8 @@ contract YieldToOneUnitTests is BaseTest {
                 address(0),
                 freezeManager,
                 pauser,
-                yieldRecipientManager
+                yieldRecipientManager,
+                versionManager
             )
         );
     }
@@ -137,7 +139,8 @@ contract YieldToOneUnitTests is BaseTest {
                 admin,
                 freezeManager,
                 pauser,
-                address(0)
+                address(0),
+                admin
             )
         );
     }
@@ -204,7 +207,8 @@ contract YieldToOneUnitTests is BaseTest {
                     admin,
                     freezeManager,
                     pauser,
-                    yieldRecipientManager
+                    yieldRecipientManager,
+                    versionManager
                 )
             )
         );

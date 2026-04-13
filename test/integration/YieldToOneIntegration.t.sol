@@ -26,8 +26,9 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
         vm.prank(admin);
@@ -149,7 +150,7 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         // Change recipient — this auto-claims yield for old recipient
         address newRecipient = makeAddr("newRecipient");
 
-        vm.prank(admin);
+        vm.prank(yieldRecipientManager);
         yieldToOne.setYieldRecipient(newRecipient);
 
         // Old recipient should have received auto-claimed yield

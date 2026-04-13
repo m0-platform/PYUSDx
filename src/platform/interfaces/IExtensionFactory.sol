@@ -17,6 +17,7 @@ interface IExtensionFactory {
         address freezeManager;
         address pauser;
         address yieldRecipientManager;
+        address versionManager;
     }
 
     /// @notice Parameters for deploying a MultiMint extension.
@@ -29,6 +30,7 @@ interface IExtensionFactory {
         address freezeManager;
         address pauser;
         address yieldRecipientManager;
+        address versionManager;
     }
 
     /* ============ Events ============ */

@@ -29,7 +29,8 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: admin
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         vm.prank(admin);

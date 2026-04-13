@@ -5,9 +5,12 @@ import { ERC1967Utils } from "../../lib/evm-m-extensions/lib/common/lib/openzepp
 import { IERC1967 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/interfaces/IERC1967.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
+import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+
 import { ExtensionBeacon } from "../../src/platform/ExtensionBeacon.sol";
 import { ExtensionBeaconProxy } from "../../src/platform/ExtensionBeaconProxy.sol";
 import { IExtensionBeacon } from "../../src/platform/interfaces/IExtensionBeacon.sol";
+import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 
 import { ExtensionHarness } from "../harness/ExtensionHarness.sol";
 
@@ -26,6 +29,10 @@ contract ExtensionBeaconProxyTest is BaseTest {
     ExtensionHarness public mmImpl;
 
     bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+    bytes32 internal constant _EXTENSION_TYPE_STORAGE_LOCATION =
+        0x50809f8892663c0bc92e8283fda4cb9143fb961da9c4bc5652b13b5c450bbc00;
+    bytes32 internal constant _PINNED_VERSION_STORAGE_LOCATION =
+        0xfec66d3fc30888a287564007fecbbfaf6a964b972d5e0e57e4d8faceddbe2b00;
 
     function setUp() public override {
         super.setUp();
@@ -62,7 +69,8 @@ contract ExtensionBeaconProxyTest is BaseTest {
             symbol_,
             admin,
             freezeManager,
-            pauser
+            pauser,
+            versionManager
         );
 
         return new ExtensionBeaconProxy(address(beacon), IExtensionBeacon.ExtensionType.YIELD_TO_ONE, initData);
@@ -75,7 +83,8 @@ contract ExtensionBeaconProxyTest is BaseTest {
             symbol_,
             admin,
             freezeManager,
-            pauser
+            pauser,
+            versionManager
         );
 
         return new ExtensionBeaconProxy(address(beacon), IExtensionBeacon.ExtensionType.MULTI_MINT, initData);
@@ -114,6 +123,12 @@ contract ExtensionBeaconProxyTest is BaseTest {
 
         bytes32 slotValue = vm.load(address(proxy), _BEACON_SLOT);
         assertEq(address(uint160(uint256(slotValue))), address(beacon));
+
+        slotValue = vm.load(address(proxy), _EXTENSION_TYPE_STORAGE_LOCATION);
+        assertEq(uint256(slotValue), uint256(IExtensionBeacon.ExtensionType.YIELD_TO_ONE));
+
+        slotValue = vm.load(address(proxy), _PINNED_VERSION_STORAGE_LOCATION);
+        assertEq(uint256(slotValue), 0);
 
         assertEq(proxy.beacon(), address(beacon));
         assertEq(uint8(proxy.extensionType()), uint8(IExtensionBeacon.ExtensionType.YIELD_TO_ONE));
@@ -200,5 +215,153 @@ contract ExtensionBeaconProxyTest is BaseTest {
 
         // Verify extension types differ
         assertTrue(ytoProxy.extensionType() != mmProxy.extensionType());
+    }
+
+    /* ============ pinnedVersion ============ */
+
+    function test_pinnedVersion_defaultZero() public {
+        ExtensionBeaconProxy proxy = _deployYTOProxy("Test YTO", "tYTO");
+
+        assertEq(ExtensionHarness(address(proxy)).pinnedVersion(), 0);
+    }
+
+    /* ============ pinVersion ============ */
+
+    function test_pinVersion_notAdmin() public {
+        ExtensionBeaconProxy proxy = _deployYTOProxy("Test YTO", "tYTO");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                ExtensionHarness(address(proxy)).VERSION_MANAGER_ROLE()
+            )
+        );
+
+        vm.prank(alice);
+        ExtensionHarness(address(proxy)).pinVersion(1);
+    }
+
+    function test_pinVersion_nonExistentVersion() public {
+        ExtensionBeaconProxy proxy = _deployYTOProxy("Test YTO", "tYTO");
+
+        vm.expectRevert(abi.encodeWithSelector(IExtensionBeacon.NoImplementationRegistered.selector));
+
+        vm.prank(versionManager);
+        ExtensionHarness(address(proxy)).pinVersion(99);
+    }
+
+    function test_pinVersion() public {
+        ExtensionBeaconProxy proxy = _deployYTOProxy("Test YTO", "tYTO");
+
+        // Register v2 implementation
+        ExtensionHarness v2Impl = new ExtensionHarness(address(pyusdx), address(swapFacility), 2);
+
+        vm.prank(beaconManager);
+        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(v2Impl));
+
+        // Proxy follows latest (v2)
+        assertEq(ExtensionHarness(address(proxy)).pinnedVersion(), 0);
+        assertEq(ExtensionHarness(address(proxy)).harnessVersion(), 2);
+
+        // Pin to v1
+        vm.expectEmit();
+        emit IExtension.VersionPinned(1);
+
+        vm.prank(versionManager);
+        ExtensionHarness(address(proxy)).pinVersion(1);
+
+        bytes32 slotValue = vm.load(address(proxy), _PINNED_VERSION_STORAGE_LOCATION);
+        assertEq(uint256(slotValue), 1);
+
+        assertEq(ExtensionHarness(address(proxy)).pinnedVersion(), 1);
+        assertEq(ExtensionHarness(address(proxy)).harnessVersion(), 1);
+    }
+
+    function test_pinVersion_pinnedIgnoresUpgrade() public {
+        ExtensionBeaconProxy proxy1 = _deployYTOProxy("Pinned", "PIN");
+        ExtensionBeaconProxy proxy2 = _deployYTOProxy("Unpinned", "UNP");
+
+        // Pin proxy1 to v1
+        vm.prank(versionManager);
+        ExtensionHarness(address(proxy1)).pinVersion(1);
+
+        // Register v2
+        ExtensionHarness v2Impl = new ExtensionHarness(address(pyusdx), address(swapFacility), 2);
+
+        vm.prank(beaconManager);
+        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(v2Impl));
+
+        // Pinned stays on v1, unpinned moves to v2
+        assertEq(ExtensionHarness(address(proxy1)).harnessVersion(), 1);
+        assertEq(ExtensionHarness(address(proxy2)).harnessVersion(), 2);
+    }
+
+    function test_pinVersion_repin() public {
+        ExtensionBeaconProxy proxy = _deployYTOProxy("Test YTO", "tYTO");
+
+        // Register v2
+        ExtensionHarness v2Impl = new ExtensionHarness(address(pyusdx), address(swapFacility), 2);
+
+        vm.prank(beaconManager);
+        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(v2Impl));
+
+        // Pin to v1
+        vm.prank(versionManager);
+        ExtensionHarness(address(proxy)).pinVersion(1);
+
+        assertEq(ExtensionHarness(address(proxy)).harnessVersion(), 1);
+
+        // Re-pin directly to v2
+        vm.prank(versionManager);
+        ExtensionHarness(address(proxy)).pinVersion(2);
+
+        assertEq(ExtensionHarness(address(proxy)).harnessVersion(), 2);
+        assertEq(ExtensionHarness(address(proxy)).pinnedVersion(), 2);
+    }
+
+    function test_pinVersion_unpin() public {
+        ExtensionBeaconProxy proxy = _deployYTOProxy("Test YTO", "tYTO");
+
+        // Register v2
+        ExtensionHarness v2Impl = new ExtensionHarness(address(pyusdx), address(swapFacility), 2);
+
+        vm.prank(beaconManager);
+        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(v2Impl));
+
+        // Pin to v1
+        vm.prank(versionManager);
+        ExtensionHarness(address(proxy)).pinVersion(1);
+
+        assertEq(ExtensionHarness(address(proxy)).harnessVersion(), 1);
+
+        // Unpin (version 0)
+        vm.expectEmit();
+        emit IExtension.VersionPinned(0);
+
+        vm.prank(versionManager);
+        ExtensionHarness(address(proxy)).pinVersion(0);
+
+        assertEq(ExtensionHarness(address(proxy)).pinnedVersion(), 0);
+
+        // Now follows latest (v2)
+        assertEq(ExtensionHarness(address(proxy)).harnessVersion(), 2);
+    }
+
+    function test_pinVersion_pinToLatestThenUpgrade() public {
+        ExtensionBeaconProxy proxy = _deployYTOProxy("Test YTO", "tYTO");
+
+        // Pin to v1 (currently the latest)
+        vm.prank(versionManager);
+        ExtensionHarness(address(proxy)).pinVersion(1);
+
+        // Register v2
+        ExtensionHarness v2Impl = new ExtensionHarness(address(pyusdx), address(swapFacility), 2);
+
+        vm.prank(beaconManager);
+        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(v2Impl));
+
+        // Still on v1 despite v2 being registered
+        assertEq(ExtensionHarness(address(proxy)).harnessVersion(), 1);
     }
 }

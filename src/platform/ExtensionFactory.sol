@@ -112,7 +112,8 @@ contract ExtensionFactory is
             params.admin,
             params.freezeManager,
             params.pauser,
-            params.yieldRecipientManager
+            params.yieldRecipientManager,
+            params.versionManager
         );
 
         // NOTE: Deploy at a predicted address using CREATE3, reverts when same deployer + extensionName.
@@ -145,7 +146,8 @@ contract ExtensionFactory is
             params.assetCapManager,
             params.freezeManager,
             params.pauser,
-            params.yieldRecipientManager
+            params.yieldRecipientManager,
+            params.versionManager
         );
 
         // NOTE: Deploy at a predicted address using CREATE3, reverts when same deployer + extensionName.

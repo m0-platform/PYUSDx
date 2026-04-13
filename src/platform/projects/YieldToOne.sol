@@ -59,6 +59,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
     /// @param  freezeManager         The address of the freeze manager.
     /// @param  pauser                The address of the pauser.
     /// @param  yieldRecipientManager The address of the yield recipient manager.
+    /// @param  versionManager        The address of the version manager.
     function initialize(
         string memory name,
         string memory symbol,
@@ -66,9 +67,19 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
         address admin,
         address freezeManager,
         address pauser,
-        address yieldRecipientManager
+        address yieldRecipientManager,
+        address versionManager
     ) public virtual initializer {
-        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, pauser, yieldRecipientManager);
+        __YieldToOne_init(
+            name,
+            symbol,
+            yieldRecipient_,
+            admin,
+            freezeManager,
+            pauser,
+            yieldRecipientManager,
+            versionManager
+        );
     }
 
     /// @dev   Internal initializer. Sets up ERC20 metadata, roles, and the
@@ -80,6 +91,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
     /// @param freezeManager         The address of the freeze manager.
     /// @param pauser                The address of the pauser.
     /// @param yieldRecipientManager The address of the yield recipient manager.
+    /// @param versionManager        The address of the version manager.
     function __YieldToOne_init(
         string memory name,
         string memory symbol,
@@ -87,16 +99,19 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
         address admin,
         address freezeManager,
         address pauser,
-        address yieldRecipientManager
+        address yieldRecipientManager,
+        address versionManager
     ) internal onlyInitializing {
         if (admin == address(0)) revert ZeroAdmin();
         if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
+        if (versionManager == address(0)) revert ZeroVersionManager();
 
         __Extension_init(name, symbol, freezeManager, pauser);
 
         _setYieldRecipient(yieldRecipient_);
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(VERSION_MANAGER_ROLE, versionManager);
         _grantRole(YIELD_RECIPIENT_MANAGER_ROLE, yieldRecipientManager);
     }
 

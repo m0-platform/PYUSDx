@@ -78,8 +78,9 @@ contract DeployIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
         vm.prank(admin);
@@ -99,8 +100,9 @@ contract DeployIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
         vm.prank(admin);

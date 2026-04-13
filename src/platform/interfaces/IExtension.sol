@@ -6,6 +6,12 @@ import { IERC20Extended } from "../../../lib/evm-m-extensions/lib/common/src/int
 /// @title  PYUSDX Extension interface extending Extended ERC20.
 /// @author M0 Labs
 interface IExtension is IERC20Extended {
+    /* ============ Events ============ */
+
+    /// @notice Emitted when the proxy's pinned implementation version changes.
+    /// @param  version The version number pinned to (0 = unpinned, follows latest).
+    event VersionPinned(uint256 indexed version);
+
     /* ============ Custom Errors ============ */
 
     /// @notice Emitted when there is insufficient balance to decrement from `account`.
@@ -43,6 +49,14 @@ interface IExtension is IERC20Extended {
     /// @param  amount The amount of extension token burned.
     function unwrap(uint256 amount) external;
 
+    /// @notice Pins this proxy to a specific implementation version, or unpins if 0.
+    /// @dev    Only callable by an address with VERSION_MANAGER_ROLE. When pinned, the proxy
+    ///         resolves its implementation from that specific version in the ExtensionBeacon
+    ///         instead of following the latest. Passing 0 unpins and reverts to latest.
+    ///         WARNING: Pinning to a version that predates this function makes unpinning impossible.
+    /// @param  version The version number to pin to (0 = unpin, follows latest).
+    function pinVersion(uint256 version) external;
+
     /* ============ View/Pure Functions ============ */
 
     /// @notice The address of the PYUSDX token contract.
@@ -50,4 +64,8 @@ interface IExtension is IERC20Extended {
 
     /// @notice The address of the swap facility contract.
     function swapFacility() external view returns (address);
+
+    /// @notice Returns the currently pinned implementation version, or 0 if following latest.
+    /// @return The pinned version number (0 = unpinned/latest).
+    function pinnedVersion() external view returns (uint256);
 }
