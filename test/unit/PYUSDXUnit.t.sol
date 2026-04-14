@@ -2270,6 +2270,43 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(pyusdx.isEarning(bob));
     }
 
+    function test_setAccountInfo_whilePaused() public {
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 500, bob);
+
+        assertTrue(pyusdx.isEarning(alice));
+    }
+
+    function test_setAccountInfo_batch_whilePaused() public {
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        address[] memory batchAccounts = new address[](2);
+        batchAccounts[0] = alice;
+        batchAccounts[1] = bob;
+
+        uint32[] memory earnerRates = new uint32[](2);
+        earnerRates[0] = 500;
+        earnerRates[1] = 500;
+
+        uint16[] memory feeRates = new uint16[](2);
+        feeRates[0] = 500;
+        feeRates[1] = 1000;
+
+        address[] memory recipients = new address[](2);
+        recipients[0] = bob;
+        recipients[1] = alice;
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(batchAccounts, earnerRates, feeRates, recipients);
+
+        assertTrue(pyusdx.isEarning(alice));
+        assertTrue(pyusdx.isEarning(bob));
+    }
+
     /* ============ freeze / freezeAccounts (earning stop) ============ */
 
     function test_freeze_earningAccount_claimsYieldAndStopsEarning() public {
