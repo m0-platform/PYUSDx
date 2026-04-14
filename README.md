@@ -1,172 +1,173 @@
-# Foundry template
+# PYUSDX
 
-Template to kickstart a Foundry project.
+PYUSDX is an upgradeable ERC20 stablecoin protocol built by [M0 Labs](https://www.m0.xyz). It implements non-rebasing yield mechanics with claimable yield via continuous indexing, compliance features (freezing, forced transfers, pausing), token-bucket rate limiting on mints, a multi-extension platform for branded wrapper tokens, and cross-chain bridging through a Portal with pluggable bridge adapters.
 
-## Getting started
+## Architecture
 
-The easiest way to get started is by clicking the [Use this template](https://github.com/MZero-Labs/foundry-template/generate) button at the top right of this page.
-
-If you prefer to go the CLI way:
-
-```bash
-forge init my-project --template https://github.com/MZero-Labs/foundry-template
 ```
+src/
+├── PYUSDX.sol                    Core ERC20 token (6 decimals, claimable yield, compliance)
+├── IPYUSDX.sol                   Token interface
+├── abstract/
+│   └── RateLimiter.sol           Token-bucket rate limiting mixin
+├── core/
+│   └── IssuerGateway.sol         Time-delayed mint/burn gateway with proposal lifecycle
+├── platform/
+│   ├── Extension.sol             Base wrapper token (wrap PYUSDX -> extension, unwrap back)
+│   ├── ExtensionBeacon.sol       Beacon for upgradeable extensions
+│   ├── ExtensionBeaconProxy.sol  Beacon proxy for extension instances
+│   ├── ExtensionFactory.sol      Factory for deploying extension tokens
+│   └── projects/
+│       ├── YieldToOne.sol        Extension routing all yield to a single recipient
+│       └── MultiMint.sol         Extension accepting multiple stablecoin collaterals
+├── swap/
+│   └── SwapFacility.sol          Swap between PYUSDX and extension tokens
+└── portal/
+    ├── Portal.sol                Cross-chain bridging with pluggable adapters
+    └── bridgeAdapters/
+        └── layerZero/            LayerZero V2 bridge adapter
+```
+
+### Key Contracts
+
+| Contract                   | Description                                                                                                                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PYUSDX**                 | Core token. Non-rebasing ERC20 with per-account earning rates, claimable yield via continuous indexing, fee collection, compliance controls, and rate-limited minting. Uses ERC-7201 namespaced storage. |
+| **IssuerGateway**          | Operators propose mints with a configurable delay; executors finalize them after the delay window. Direct burn for operators. Proposals expire after a TTL.                                              |
+| **Extension**              | Base class for branded PYUSDX wrappers. Beacon proxy pattern for upgradeability with version pinning.                                                                                                    |
+| **YieldToOne**             | Extension where all accrued yield is minted to a designated recipient.                                                                                                                                   |
+| **MultiMint**              | Extension accepting multiple ERC20 assets (e.g. USDC, USDT, PYUSDX) with per-asset caps. Always unwraps to PYUSDX.                                                                                       |
+| **ExtensionFactory**       | Deploys YieldToOne and MultiMint extensions via beacon proxies. Manages implementations per extension type.                                                                                              |
+| **SwapFacility**           | Atomic swaps between any two extensions, or PYUSDX into an extension. Supports ERC-2612 permit.                                                                                                          |
+| **Portal**                 | Cross-chain token transfers via configurable bridge adapters. Separate send/receive pause controls.                                                                                                      |
+| **LayerZeroBridgeAdapter** | Bridge adapter implementation for LayerZero Endpoint V2.                                                                                                                                                 |
+| **RateLimiter**            | Token-bucket rate limiting mixin with a packed 2-slot Bucket struct.                                                                                                                                     |
 
 ## Development
 
+### Prerequisites
+
+- [Foundry](https://github.com/foundry-rs/foundry) (Solc 0.8.34, Cancun EVM)
+- [Node.js](https://nodejs.org/) >= 18
+- [lcov](https://github.com/linux-test-project/lcov) (for coverage reports)
+- [Slither](https://github.com/crytic/slither) (for static analysis)
+
 ### Installation
 
-You may have to install the following tools to use this repository:
-
-- [Foundry](https://github.com/foundry-rs/foundry) to compile and test contracts
-- [lcov](https://github.com/linux-test-project/lcov) to generate the code coverage report
-- [slither](https://github.com/crytic/slither) to static analyze contracts
-
-Install dependencies:
-
 ```bash
-npm i
+git clone --recurse-submodules https://github.com/m0-foundation/PYUSDX.git
+cd PYUSDX
+npm install
 ```
 
-### Env
-
-Copy `.env` and write down the env variables needed to run this project.
+### Environment
 
 ```bash
 cp .env.example .env
 ```
 
-### Compile
+Fill in the required values. See `.env.example` for the full list of configuration variables including RPC URLs, deployer key, and role addresses.
 
-Run the following command to compile the contracts:
+### Compile
 
 ```bash
 npm run compile
 ```
 
-### Coverage
+### Test
 
-Forge is used for coverage, run it with:
+```bash
+npm test                  # all tests
+npm run test-fuzz         # fuzz tests
+npm run test-integration  # integration tests
+npm run test-invariant    # invariant tests
+```
+
+Run a specific test contract or test case:
+
+```bash
+forge test --mc <TestContractName>
+forge test --mt <testCaseName>
+```
+
+### Coverage
 
 ```bash
 npm run coverage
-```
-
-You can then consult the report by opening `coverage/index.html`:
-
-```bash
 open coverage/index.html
 ```
 
-### Test
-
-To run all tests:
+### Gas Report
 
 ```bash
-npm test
+npm run test-gas
 ```
 
-Run test that matches a test contract:
-
-```bash
-forge test --mc <test-contract-name>
-```
-
-Test a specific test case:
-
-```bash
-forge test --mt <test-case-name>
-```
-
-To run slither:
+### Static Analysis
 
 ```bash
 npm run slither
 ```
 
-### Code quality
+### Code Quality
 
-[Husky](https://typicode.github.io/husky/#/) is used to run [lint-staged](https://github.com/okonet/lint-staged) and tests when committing.
-
-[Prettier](https://prettier.io) is used to format code. Use it by running:
+[Prettier](https://prettier.io) and [Solhint](https://protofire.github.io/solhint/) are enforced via [Husky](https://typicode.github.io/husky/) pre-commit hooks.
 
 ```bash
-npm run prettier
+npm run prettier      # format
+npm run solhint       # lint
+npm run solhint-fix   # auto-fix
 ```
-
-[Solhint](https://protofire.github.io/solhint/) is used to lint Solidity files. Run it with:
-
-```bash
-npm run solhint
-```
-
-To fix solhint errors, run:
-
-```bash
-npm run solhint-fix
-```
-
-### CI
-
-The following Github Actions workflow are setup to run on push and pull requests:
-
-- [.github/workflows/coverage.yml](.github/workflows/coverage.yml)
-- [.github/workflows/test-gas.yml](.github/workflows/test-gas.yml)
-
-It will build the contracts and run the test coverage, as well as a gas report.
-
-The coverage report will be displayed in the PR by [github-actions-report-lcov](https://github.com/zgosalvez/github-actions-report-lcov) and the gas report by [foundry-gas-diff](https://github.com/Rubilmax/foundry-gas-diff).
-
-For the workflows to work, you will need to setup the `MNEMONIC_FOR_TESTS` and `MAINNET_RPC_URL` repository secrets in the settings of your Github repository.
-
-Some additional workflows are available if you wish to add fuzz, integration and invariant tests:
-
-- [.github/workflows/test-fuzz.yml](.github/workflows/test-fuzz.yml)
-- [.github/workflows/test-integration.yml](.github/workflows/test-integration.yml)
-- [.github/workflows/test-invariant.yml](.github/workflows/test-invariant.yml)
-
-You will need to uncomment them to activate them.
 
 ### Documentation
 
-The documentation can be generated by running:
+Forge-generated docs served locally:
 
 ```bash
-npm run doc
+npm run doc           # http://localhost:4000
 ```
 
-It will run a server on port 4000, you can then access the documentation by opening [http://localhost:4000](http://localhost:4000).
+Protocol specification PDFs are available in the `docs/` directory.
 
 ## Deployment
 
-### Build
-
-To compile the contracts for production, run:
+### Build (production)
 
 ```bash
 npm run build
 ```
 
-### Deploy
+### Deploy locally
 
-#### Local
-
-Open a new terminal window and run [anvil](https://book.getfoundry.sh/reference/anvil/) to start a local chain:
+Start a local Anvil node, then deploy:
 
 ```bash
 anvil
-```
-
-Deploy the contracts by running:
-
-```bash
 npm run deploy-local
 ```
 
-#### Sepolia
-
-To deploy to the Sepolia testnet, run:
+### Deploy to Sepolia
 
 ```bash
 npm run deploy-sepolia
 ```
+
+Deployment scripts are in `script/deploy/`. `DeployAll.s.sol` orchestrates the full deployment of PYUSDX, IssuerGateway, SwapFacility, ExtensionBeacon, and ExtensionFactory with their proxy infrastructure. Separate scripts exist for deploying individual extensions (`DeployYieldToOne.s.sol`, `DeployMultiMint.s.sol`).
+
+## CI
+
+GitHub Actions workflows run on push and pull requests:
+
+| Workflow               | Description                                      |
+| ---------------------- | ------------------------------------------------ |
+| `coverage.yml`         | Build + test coverage (reported on PRs via lcov) |
+| `test-gas.yml`         | Gas report (diff reported on PRs)                |
+| `test-fuzz.yml`        | Fuzz tests (10,000 runs)                         |
+| `test-integration.yml` | Integration tests                                |
+| `test-invariant.yml`   | Invariant tests (depth 250)                      |
+
+Repository secrets required: `MNEMONIC_FOR_TESTS`, `MAINNET_RPC_URL`.
+
+## License
+
+BUSL-1.1
