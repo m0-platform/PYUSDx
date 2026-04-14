@@ -62,7 +62,7 @@ interface IBridgeAdapter {
 
     /// @notice Sets an address of Bridge Adapter contract on the remote chain.
     /// @param  destinationChainId The ID of the destination chain.
-    /// @param  destinationPeer    The address of of the Bridge Adapter contract on the destination chain.
+    /// @param  destinationPeer    The address of the Bridge Adapter contract on the destination chain.
     function setPeer(uint32 destinationChainId, bytes32 destinationPeer) external;
 
     /// @notice Sets the provider-specific chain ID.

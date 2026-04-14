@@ -25,7 +25,7 @@ abstract contract IssuerGatewayStorageLayout {
 
     // keccak256(abi.encode(uint256(keccak256("M0.storage.IssuerGateway")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant _ISSUER_GATEWAY_STORAGE_LOCATION =
-        0xda46dec3db1918d8d4832c5443057c953d7a27444565c41e9c2acac962bf4c00;
+        0x99f50564a150c0ec2577802956bad90791735d240fd25271a11f449021fae700;
 
     function _getIssuerGatewayStorage() internal pure returns (IssuerGatewayStorage storage $) {
         assembly {
