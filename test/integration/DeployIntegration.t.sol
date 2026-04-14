@@ -78,12 +78,13 @@ contract DeployIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
         vm.prank(admin);
-        (address ytoProxy, , ) = factory.deployYieldToOne(string("test-yto-deploy"), params);
+        (address ytoProxy, ) = factory.deployYieldToOne(string("test-yto-deploy"), params);
 
         assertTrue(factory.isApprovedExtension(ytoProxy));
         assertTrue(swapFacility.isApprovedExtension(ytoProxy));
@@ -99,12 +100,13 @@ contract DeployIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
         vm.prank(admin);
-        (address ytoProxy, , ) = factory.deployYieldToOne(string("test-yto-swap"), params);
+        (address ytoProxy, ) = factory.deployYieldToOne(string("test-yto-swap"), params);
         YieldToOne yto = YieldToOne(ytoProxy);
 
         // Enable earning for the extension

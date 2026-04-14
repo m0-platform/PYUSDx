@@ -20,6 +20,8 @@ abstract contract BaseTest is Test {
     address public executor = makeAddr("executor");
     address public assetCapManager = makeAddr("assetCapManager");
     address public factoryManager = makeAddr("factoryManager");
+    address public beaconManager = makeAddr("beaconManager");
+    address public versionManager = makeAddr("versionManager");
 
     // Generic test addresses
     address public recipient = makeAddr("recipient");
@@ -40,6 +42,9 @@ abstract contract BaseTest is Test {
     // Constants
     uint128 public constant PRECISION = 1e12;
     uint16 public constant MAX_FEE_RATE = 10_000;
+
+    bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
+    bytes32 public constant BEACON_MANAGER_ROLE = keccak256("BEACON_MANAGER_ROLE");
 
     function setUp() public virtual {
         (alice, aliceKey) = makeAddrAndKey("alice");

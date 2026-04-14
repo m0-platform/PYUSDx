@@ -21,21 +21,18 @@ contract DeployYieldToOne is DeployBase {
             admin: vm.envAddress("ADMIN"),
             freezeManager: vm.envAddress("FREEZE_MANAGER"),
             yieldRecipientManager: vm.envAddress("YIELD_RECIPIENT_MANAGER"),
-            pauser: vm.envAddress("PAUSER")
+            pauser: vm.envAddress("PAUSER"),
+            versionManager: vm.envAddress("VERSION_MANAGER")
         });
 
         vm.startBroadcast(deployer);
 
-        (address proxy, address proxyAdmin, address implementation) = ExtensionFactory(factory).deployYieldToOne(
-            extensionName,
-            params
-        );
+        (address proxy, address implementation) = ExtensionFactory(factory).deployYieldToOne(extensionName, params);
 
         vm.stopBroadcast();
 
         console.log("YieldToOne Implementation:", implementation);
         console.log("YieldToOne Proxy:         ", proxy);
-        console.log("YieldToOne ProxyAdmin:    ", proxyAdmin);
 
         _writeDeployment(block.chainid, _getExtensionName(), proxy);
     }

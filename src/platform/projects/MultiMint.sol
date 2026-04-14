@@ -73,6 +73,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     /// @param  freezeManager         The address of the freeze manager.
     /// @param  pauser                The address of the pauser.
     /// @param  yieldRecipientManager The address of the yield recipient manager.
+    /// @param  versionManager        The address of the version manager.
     function initialize(
         string memory name,
         string memory symbol,
@@ -81,7 +82,8 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         address assetCapManager,
         address freezeManager,
         address pauser,
-        address yieldRecipientManager
+        address yieldRecipientManager,
+        address versionManager
     ) public virtual initializer {
         __MultiMint_init(
             name,
@@ -91,7 +93,8 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
             assetCapManager,
             freezeManager,
             pauser,
-            yieldRecipientManager
+            yieldRecipientManager,
+            versionManager
         );
     }
 
@@ -105,6 +108,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     /// @param freezeManager         The address of the freeze manager.
     /// @param pauser                The address of the pauser.
     /// @param yieldRecipientManager The address of the yield recipient manager.
+    /// @param versionManager        The address of the version manager.
     function __MultiMint_init(
         string memory name,
         string memory symbol,
@@ -113,11 +117,21 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         address assetCapManager,
         address freezeManager,
         address pauser,
-        address yieldRecipientManager
+        address yieldRecipientManager,
+        address versionManager
     ) internal onlyInitializing {
         if (assetCapManager == address(0)) revert ZeroAssetCapManager();
 
-        __YieldToOne_init(name, symbol, yieldRecipient_, admin, freezeManager, pauser, yieldRecipientManager);
+        __YieldToOne_init(
+            name,
+            symbol,
+            yieldRecipient_,
+            admin,
+            freezeManager,
+            pauser,
+            yieldRecipientManager,
+            versionManager
+        );
 
         _grantRole(ASSET_CAP_MANAGER_ROLE, assetCapManager);
     }

@@ -22,21 +22,18 @@ contract DeployMultiMint is DeployBase {
             assetCapManager: vm.envAddress("ASSET_CAP_MANAGER"),
             freezeManager: vm.envAddress("FREEZE_MANAGER"),
             pauser: vm.envAddress("PAUSER"),
-            yieldRecipientManager: vm.envAddress("YIELD_RECIPIENT_MANAGER")
+            yieldRecipientManager: vm.envAddress("YIELD_RECIPIENT_MANAGER"),
+            versionManager: vm.envAddress("VERSION_MANAGER")
         });
 
         vm.startBroadcast(deployer);
 
-        (address proxy, address proxyAdmin, address implementation) = ExtensionFactory(factory).deployMultiMint(
-            extensionName,
-            params
-        );
+        (address proxy, address implementation) = ExtensionFactory(factory).deployMultiMint(extensionName, params);
 
         vm.stopBroadcast();
 
         console.log("MultiMint Implementation:", implementation);
         console.log("MultiMint Proxy:         ", proxy);
-        console.log("MultiMint ProxyAdmin:    ", proxyAdmin);
 
         _writeDeployment(block.chainid, _getExtensionName(), proxy);
     }

@@ -4,6 +4,7 @@ pragma solidity ^0.8.34;
 import { Config } from "../../script/Config.sol";
 import { DeployBase } from "../../script/deploy/DeployBase.s.sol";
 
+import { ExtensionBeacon } from "../../src/platform/ExtensionBeacon.sol";
 import { IssuerGateway } from "../../src/core/IssuerGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
@@ -33,6 +34,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
     IssuerGateway public issuerGateway;
     SwapFacility public swapFacility;
     ExtensionFactory public factory;
+    ExtensionBeacon public extensionBeacon;
 
     DeployBase.CoreDeployments internal _coreDeployments;
 
@@ -73,6 +75,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
         issuerGateway = IssuerGateway(deployments_.issuerGatewayProxy);
         swapFacility = SwapFacility(deployments_.swapFacilityProxy);
         factory = ExtensionFactory(deployments_.factoryProxy);
+        extensionBeacon = ExtensionBeacon(deployments_.beaconProxy);
         _coreDeployments = deployments_;
     }
 

@@ -22,6 +22,9 @@ interface IYieldToOne {
     /// @notice Emitted in initializer if Yield Recipient Manager is 0x0.
     error ZeroYieldRecipientManager();
 
+    /// @notice Emitted in initializer if Version Manager is 0x0.
+    error ZeroVersionManager();
+
     /// @notice Emitted in initializer if Admin is 0x0.
     error ZeroAdmin();
 

@@ -4,18 +4,38 @@ pragma solidity ^0.8.34;
 import { ERC20ExtendedUpgradeable } from "../../lib/evm-m-extensions/lib/common/src/ERC20ExtendedUpgradeable.sol";
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
+import { StorageSlot } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/utils/StorageSlot.sol";
 
 import { Freezable } from "../../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
 import { Pausable } from "../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
 
 import { IExtension } from "./interfaces/IExtension.sol";
+import { IExtensionBeacon } from "./interfaces/IExtensionBeacon.sol";
 import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
 
 /// @title  Extension
 /// @notice Upgradeable ERC20 base contract for wrapping PYUSDX into a branded extension token.
 /// @author M0 Labs
 abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, Pausable {
+    /* ============ Constants ============ */
+
+    /// @dev ERC-1967 beacon storage slot (shared with ExtensionBeaconProxy).
+    bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+
+    /// @dev Storage location for the extension type (shared with ExtensionBeaconProxy).
+    ///      keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXExtensionType")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 internal constant _EXTENSION_TYPE_STORAGE_LOCATION =
+        0x50809f8892663c0bc92e8283fda4cb9143fb961da9c4bc5652b13b5c450bbc00;
+
+    /// @dev Storage location for the pinned implementation version (shared with ExtensionBeaconProxy).
+    ///      keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXPinnedVersion")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 internal constant _PINNED_VERSION_STORAGE_LOCATION =
+        0xfec66d3fc30888a287564007fecbbfaf6a964b972d5e0e57e4d8faceddbe2b00;
+
     /* ============ Variables ============ */
+
+    /// @notice Role required to call `pinVersion`.
+    bytes32 public constant VERSION_MANAGER_ROLE = keccak256("VERSION_MANAGER_ROLE");
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     /// @inheritdoc IExtension
@@ -76,10 +96,33 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, 
         _unwrap(ISwapFacility(msg.sender).msgSender(), amount);
     }
 
+    /// @inheritdoc IExtension
+    function pinVersion(uint256 version) external onlyRole(VERSION_MANAGER_ROLE) {
+        if (version != 0) {
+            address beacon = StorageSlot.getAddressSlot(_BEACON_SLOT).value;
+            IExtensionBeacon.ExtensionType extensionType = IExtensionBeacon.ExtensionType(
+                StorageSlot.getUint256Slot(_EXTENSION_TYPE_STORAGE_LOCATION).value
+            );
+
+            // NOTE: This call is purely for validation — it reverts with `NoImplementationRegistered`
+            //       if the version does not exist in the beacon.
+            IExtensionBeacon(beacon).implementation(extensionType, version);
+        }
+
+        StorageSlot.getUint256Slot(_PINNED_VERSION_STORAGE_LOCATION).value = version;
+
+        emit VersionPinned(version);
+    }
+
     /* ============ View/Pure Functions ============ */
 
     /// @inheritdoc IERC20
     function balanceOf(address account) public view virtual returns (uint256);
+
+    /// @inheritdoc IExtension
+    function pinnedVersion() external view returns (uint256) {
+        return StorageSlot.getUint256Slot(_PINNED_VERSION_STORAGE_LOCATION).value;
+    }
 
     /* ============ Hooks For Internal Interactive Functions ============ */
 

@@ -3,11 +3,9 @@ pragma solidity 0.8.34;
 
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import {
-    UnsafeUpgrades,
-    Upgrades
-} from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
+import { IExtensionBeacon } from "../../src/platform/interfaces/IExtensionBeacon.sol";
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
@@ -29,150 +27,60 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
 
     function test_constructor_zeroPyusdx() public {
         vm.expectRevert(IExtensionFactory.ZeroPYUSDX.selector);
-        new ExtensionFactory(address(0), address(swapFacility));
+        new ExtensionFactory(address(0), address(swapFacility), address(extensionBeacon));
     }
 
     function test_constructor_zeroSwapFacility() public {
         vm.expectRevert(IExtensionFactory.ZeroSwapFacility.selector);
-        new ExtensionFactory(address(pyusdx), address(0));
+        new ExtensionFactory(address(pyusdx), address(0), address(extensionBeacon));
+    }
+
+    function test_constructor_zeroBeacon() public {
+        vm.expectRevert(IExtensionFactory.ZeroExtensionBeacon.selector);
+        new ExtensionFactory(address(pyusdx), address(swapFacility), address(0));
     }
 
     function test_initialize_zeroAdmin() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
-        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
-        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility), address(extensionBeacon)));
 
         vm.expectRevert(IExtensionFactory.ZeroAdmin.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
             admin,
-            abi.encodeWithSelector(
-                ExtensionFactory.initialize.selector,
-                address(0),
-                factoryManager,
-                yieldToOneImpl,
-                multiMintImpl
-            )
+            abi.encodeWithSelector(ExtensionFactory.initialize.selector, address(0), factoryManager)
         );
     }
 
     function test_initialize_zeroFactoryManager() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
-        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
-        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility), address(extensionBeacon)));
 
         vm.expectRevert(IExtensionFactory.ZeroFactoryManager.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
             admin,
-            abi.encodeWithSelector(
-                ExtensionFactory.initialize.selector,
-                admin,
-                address(0),
-                yieldToOneImpl,
-                multiMintImpl
-            )
-        );
-    }
-
-    function test_initialize_zeroYieldToOneImplementation() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
-        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
-
-        vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
-        UnsafeUpgrades.deployTransparentProxy(
-            impl,
-            admin,
-            abi.encodeWithSelector(
-                ExtensionFactory.initialize.selector,
-                admin,
-                factoryManager,
-                address(0),
-                multiMintImpl
-            )
-        );
-    }
-
-    function test_initialize_zeroMultiMintImplementation() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
-        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
-
-        vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
-        UnsafeUpgrades.deployTransparentProxy(
-            impl,
-            admin,
-            abi.encodeWithSelector(
-                ExtensionFactory.initialize.selector,
-                admin,
-                factoryManager,
-                yieldToOneImpl,
-                address(0)
-            )
-        );
-    }
-
-    function test_initialize_invalidYieldToOneImplementation() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
-        address wrongPyusdx = makeAddr("wrongPyusdx");
-        address yieldToOneImpl = address(new YieldToOne(wrongPyusdx, address(swapFacility)));
-        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
-
-        vm.expectRevert(IExtensionFactory.InvalidExtension.selector);
-        UnsafeUpgrades.deployTransparentProxy(
-            impl,
-            admin,
-            abi.encodeWithSelector(
-                ExtensionFactory.initialize.selector,
-                admin,
-                factoryManager,
-                yieldToOneImpl,
-                multiMintImpl
-            )
-        );
-    }
-
-    function test_initialize_invalidMultiMintImplementation() public {
-        address impl = address(new ExtensionFactory(address(pyusdx), address(swapFacility)));
-        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
-        address wrongSwap = makeAddr("wrongSwap");
-        address multiMintImpl = address(new MultiMint(address(pyusdx), wrongSwap));
-
-        vm.expectRevert(IExtensionFactory.InvalidExtension.selector);
-        UnsafeUpgrades.deployTransparentProxy(
-            impl,
-            admin,
-            abi.encodeWithSelector(
-                ExtensionFactory.initialize.selector,
-                admin,
-                factoryManager,
-                yieldToOneImpl,
-                multiMintImpl
-            )
+            abi.encodeWithSelector(ExtensionFactory.initialize.selector, admin, address(0))
         );
     }
 
     function test_initialState() public view {
         assertEq(factory.pyusdx(), address(pyusdx));
         assertEq(factory.swapFacility(), address(swapFacility));
+        assertEq(factory.extensionBeacon(), address(extensionBeacon));
 
         assertTrue(factory.hasRole(factory.DEFAULT_ADMIN_ROLE(), admin));
         assertTrue(factory.hasRole(factory.FACTORY_MANAGER_ROLE(), factoryManager));
 
-        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.NONE), address(0));
-        assertTrue(factory.getImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE) != address(0));
-        assertTrue(factory.getImplementation(IExtensionFactory.ExtensionType.MULTI_MINT) != address(0));
+        assertTrue(factory.getImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE) != address(0));
+        assertTrue(factory.getImplementation(IExtensionBeacon.ExtensionType.MULTI_MINT) != address(0));
 
-        assertEq(uint8(IExtensionFactory.ExtensionType.NONE), uint8(0));
-        assertEq(uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE), uint8(1));
-        assertEq(uint8(IExtensionFactory.ExtensionType.MULTI_MINT), uint8(2));
+        assertEq(uint8(IExtensionBeacon.ExtensionType.NONE), uint8(0));
+        assertEq(uint8(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), uint8(1));
+        assertEq(uint8(IExtensionBeacon.ExtensionType.MULTI_MINT), uint8(2));
     }
 
     function test_initialize_alreadyInitialized() public {
-        address yieldToOneImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
-        address multiMintImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
-
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        factory.initialize(admin, factoryManager, yieldToOneImpl, multiMintImpl);
+        factory.initialize(admin, factoryManager);
     }
 
     /* ============ deployYieldToOne Tests ============ */
@@ -185,28 +93,19 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: yieldRecipientManager
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
-        (address proxy, address proxyAdmin, address implementation) = factory.deployYieldToOne(
-            EXTENSION_NAME_YTO,
-            params
-        );
+        (address proxy, address implementation) = factory.deployYieldToOne(EXTENSION_NAME_YTO, params);
 
         assertTrue(proxy != address(0));
-        assertTrue(proxyAdmin != address(0));
         assertTrue(implementation != address(0));
 
         // Verify extension is registered
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionBeacon.ExtensionType.YIELD_TO_ONE));
         assertTrue(factory.isApprovedExtension(proxy));
         assertTrue(swapFacility.isApprovedExtension(proxy));
-
-        // Verify storage
-        assertEq(Upgrades.getImplementationAddress(proxy), implementation);
-
-        // Verify ProxyAdmin matches ERC-1967 admin slot
-        assertEq(proxyAdmin, Upgrades.getAdminAddress(proxy));
 
         // Verify token metadata
         assertEq(YieldToOne(proxy).name(), YTO_NAME);
@@ -226,7 +125,8 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: address(0),
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: yieldRecipientManager
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         vm.expectRevert(IExtensionFactory.ZeroAdmin.selector);
@@ -241,7 +141,8 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: yieldRecipientManager
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         factory.deployYieldToOne(EXTENSION_NAME_YTO, params);
@@ -252,7 +153,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
 
         // Different deployer + same extensionName succeeds
         vm.prank(alice);
-        (address proxy, , ) = factory.deployYieldToOne(EXTENSION_NAME_YTO, params);
+        (address proxy, ) = factory.deployYieldToOne(EXTENSION_NAME_YTO, params);
         assertTrue(factory.isApprovedExtension(proxy));
     }
 
@@ -264,13 +165,14 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: yieldRecipientManager
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         factory.deployYieldToOne(EXTENSION_NAME_YTO, params);
 
         // Different extensionName produces different address
-        (address proxy2, , ) = factory.deployYieldToOne(string("YTO-002"), params);
+        (address proxy2, ) = factory.deployYieldToOne(string("YTO-002"), params);
 
         assertTrue(factory.isApprovedExtension(proxy2));
     }
@@ -283,7 +185,8 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: yieldRecipientManager
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         IExtensionFactory.YieldToOneParams memory params2 = IExtensionFactory.YieldToOneParams({
@@ -293,14 +196,16 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: yieldRecipientManager
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
-        (, , address impl1) = factory.deployYieldToOne(string("YTO-A"), params1);
-        (, , address impl2) = factory.deployYieldToOne(string("YTO-B"), params2);
+        (, address impl1) = factory.deployYieldToOne(string("YTO-A"), params1);
+        (, address impl2) = factory.deployYieldToOne(string("YTO-B"), params2);
 
+        // Both should return the same implementation from the beacon
         assertEq(impl1, impl2);
-        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE), impl1);
+        assertEq(factory.getImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), impl1);
     }
 
     function test_deployYieldToOne_predictedAddress() public {
@@ -311,15 +216,16 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             admin: admin,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: yieldRecipientManager
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         // Deploy from test contract (address(this))
-        (address proxy1, , ) = factory.deployYieldToOne(EXTENSION_NAME_YTO, params);
+        (address proxy1, ) = factory.deployYieldToOne(EXTENSION_NAME_YTO, params);
 
         // Same extension name from different deployer should produce different address
         vm.prank(alice);
-        (address proxy2, , ) = factory.deployYieldToOne(EXTENSION_NAME_YTO, params);
+        (address proxy2, ) = factory.deployYieldToOne(EXTENSION_NAME_YTO, params);
 
         assertTrue(proxy1 != proxy2);
         assertTrue(factory.isApprovedExtension(proxy1));
@@ -341,28 +247,19 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: yieldRecipientManager
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
-        (address proxy, address proxyAdmin, address implementation) = factory.deployMultiMint(
-            EXTENSION_NAME_MM,
-            params
-        );
+        (address proxy, address implementation) = factory.deployMultiMint(EXTENSION_NAME_MM, params);
 
         assertTrue(proxy != address(0));
-        assertTrue(proxyAdmin != address(0));
         assertTrue(implementation != address(0));
 
         // Verify extension is registered
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.MULTI_MINT));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionBeacon.ExtensionType.MULTI_MINT));
         assertTrue(factory.isApprovedExtension(proxy));
         assertTrue(swapFacility.isApprovedExtension(proxy));
-
-        // Verify storage
-        assertEq(Upgrades.getImplementationAddress(proxy), implementation);
-
-        // Verify ProxyAdmin matches ERC-1967 admin slot
-        assertEq(proxyAdmin, Upgrades.getAdminAddress(proxy));
 
         // Verify token metadata
         assertEq(MultiMint(proxy).name(), MM_NAME);
@@ -383,7 +280,8 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: yieldRecipientManager
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         vm.expectRevert(IExtensionFactory.ZeroAdmin.selector);
@@ -399,7 +297,8 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: admin
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         factory.deployMultiMint(EXTENSION_NAME_MM, params);
@@ -410,7 +309,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
 
         // Different deployer + same extensionName succeeds
         vm.prank(alice);
-        (address proxy, , ) = factory.deployMultiMint(EXTENSION_NAME_MM, params);
+        (address proxy, ) = factory.deployMultiMint(EXTENSION_NAME_MM, params);
         assertTrue(factory.isApprovedExtension(proxy));
     }
 
@@ -423,7 +322,8 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: admin
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         IExtensionFactory.MultiMintParams memory params2 = IExtensionFactory.MultiMintParams({
@@ -434,14 +334,15 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: admin
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
-        (, , address impl1) = factory.deployMultiMint(string("MM-A"), params1);
-        (, , address impl2) = factory.deployMultiMint(string("MM-B"), params2);
+        (, address impl1) = factory.deployMultiMint(string("MM-A"), params1);
+        (, address impl2) = factory.deployMultiMint(string("MM-B"), params2);
 
         assertEq(impl1, impl2);
-        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.MULTI_MINT), impl1);
+        assertEq(factory.getImplementation(IExtensionBeacon.ExtensionType.MULTI_MINT), impl1);
     }
 
     function test_deployMultiMint_predictedAddress() public {
@@ -453,15 +354,16 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: yieldRecipientManager
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         // Deploy from test contract (address(this))
-        (address proxy1, , ) = factory.deployMultiMint(EXTENSION_NAME_YTO, params);
+        (address proxy1, ) = factory.deployMultiMint(EXTENSION_NAME_YTO, params);
 
         // Same extension name from different deployer should produce different address
         vm.prank(alice);
-        (address proxy2, , ) = factory.deployMultiMint(EXTENSION_NAME_YTO, params);
+        (address proxy2, ) = factory.deployMultiMint(EXTENSION_NAME_YTO, params);
 
         assertTrue(proxy1 != proxy2);
         assertTrue(factory.isApprovedExtension(proxy1));
@@ -475,8 +377,8 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     /* ============ extensionType Tests ============ */
 
     function test_extensionType_noneForNonExtension() public view {
-        assertEq(uint8(factory.getExtensionType(alice)), uint8(IExtensionFactory.ExtensionType.NONE));
-        assertEq(uint8(factory.getExtensionType(address(0))), uint8(IExtensionFactory.ExtensionType.NONE));
+        assertEq(uint8(factory.getExtensionType(alice)), uint8(IExtensionBeacon.ExtensionType.NONE));
+        assertEq(uint8(factory.getExtensionType(address(0))), uint8(IExtensionBeacon.ExtensionType.NONE));
     }
 
     function test_extensionType_correctPerDeployment() public {
@@ -486,8 +388,9 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
         IExtensionFactory.MultiMintParams memory mmParams = IExtensionFactory.MultiMintParams({
@@ -498,14 +401,15 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: admin
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
-        (address yieldToOneProxy, , ) = factory.deployYieldToOne(string("yto-type-test"), yieldToOneParams);
-        (address multiMintProxy, , ) = factory.deployMultiMint(string("mm-type-test"), mmParams);
+        (address yieldToOneProxy, ) = factory.deployYieldToOne(string("yto-type-test"), yieldToOneParams);
+        (address multiMintProxy, ) = factory.deployMultiMint(string("mm-type-test"), mmParams);
 
-        assertEq(uint8(factory.getExtensionType(yieldToOneProxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
-        assertEq(uint8(factory.getExtensionType(multiMintProxy)), uint8(IExtensionFactory.ExtensionType.MULTI_MINT));
+        assertEq(uint8(factory.getExtensionType(yieldToOneProxy)), uint8(IExtensionBeacon.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(multiMintProxy)), uint8(IExtensionBeacon.ExtensionType.MULTI_MINT));
     }
 
     /* ============ setExtensionType Tests ============ */
@@ -517,23 +421,24 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
-        (address proxy, , ) = factory.deployYieldToOne(string("yto-status-test"), params);
+        (address proxy, ) = factory.deployYieldToOne(string("yto-status-test"), params);
 
         assertTrue(factory.isApprovedExtension(proxy));
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionBeacon.ExtensionType.YIELD_TO_ONE));
 
         vm.expectEmit();
-        emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionFactory.ExtensionType.NONE);
+        emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionBeacon.ExtensionType.NONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.NONE);
+        factory.setExtensionType(proxy, IExtensionBeacon.ExtensionType.NONE);
 
         assertFalse(factory.isApprovedExtension(proxy));
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.NONE));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionBeacon.ExtensionType.NONE));
     }
 
     function test_setExtensionType_reactivate() public {
@@ -543,25 +448,26 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
-        (address proxy, , ) = factory.deployYieldToOne(string("yto-reactivate-test"), params);
+        (address proxy, ) = factory.deployYieldToOne(string("yto-reactivate-test"), params);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.NONE);
+        factory.setExtensionType(proxy, IExtensionBeacon.ExtensionType.NONE);
 
         assertFalse(factory.isApprovedExtension(proxy));
 
         vm.expectEmit();
-        emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(proxy, IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
 
         assertTrue(factory.isApprovedExtension(proxy));
-        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionBeacon.ExtensionType.YIELD_TO_ONE));
     }
 
     function test_setExtensionType_idempotent() public {
@@ -571,15 +477,16 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
-        (address proxy, , ) = factory.deployYieldToOne(string("yto-idempotent-test"), params);
+        (address proxy, ) = factory.deployYieldToOne(string("yto-idempotent-test"), params);
 
         // Already YIELD_TO_ONE, should not emit event
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(proxy, IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
 
         assertTrue(factory.isApprovedExtension(proxy));
     }
@@ -588,19 +495,19 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(address(0), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(address(0), IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
     }
 
     function test_setExtensionType_invalidExtension() public {
         // Setting NONE on unregistered address is idempotent (no-op)
         vm.prank(factoryManager);
-        factory.setExtensionType(alice, IExtensionFactory.ExtensionType.NONE);
+        factory.setExtensionType(alice, IExtensionBeacon.ExtensionType.NONE);
 
         // Setting non-NONE on an invalid address reverts (EOA has no code)
         vm.expectRevert();
 
         vm.prank(factoryManager);
-        factory.setExtensionType(alice, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(alice, IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
     }
 
     function test_setExtensionType_notManager() public {
@@ -610,11 +517,12 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
-        (address proxy, , ) = factory.deployYieldToOne(string("yto-not-manager-test"), params);
+        (address proxy, ) = factory.deployYieldToOne(string("yto-not-manager-test"), params);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -625,129 +533,236 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         );
 
         vm.prank(alice);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.NONE);
+        factory.setExtensionType(proxy, IExtensionBeacon.ExtensionType.NONE);
     }
 
-    /* ============ setImplementation Tests ============ */
+    /* ============ Beacon Integration Tests ============ */
 
-    function test_setImplementation_yieldToOne() public {
-        address newImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
-
-        vm.expectEmit();
-        emit IExtensionFactory.ImplementationSet(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
-
-        vm.prank(factoryManager);
-        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
-
-        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE), newImpl);
+    function test_extensionBeacon_getter() public view {
+        assertEq(factory.extensionBeacon(), address(extensionBeacon));
     }
 
-    function test_setImplementation_multiMint() public {
-        address newImpl = address(new MultiMint(address(pyusdx), address(swapFacility)));
-
-        vm.expectEmit();
-        emit IExtensionFactory.ImplementationSet(IExtensionFactory.ExtensionType.MULTI_MINT, newImpl);
-
-        vm.prank(factoryManager);
-        factory.setImplementation(IExtensionFactory.ExtensionType.MULTI_MINT, newImpl);
-
-        assertEq(factory.getImplementation(IExtensionFactory.ExtensionType.MULTI_MINT), newImpl);
+    function test_getImplementation_delegatesToBeacon() public view {
+        assertEq(
+            factory.getImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE),
+            extensionBeacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE)
+        );
+        assertEq(
+            factory.getImplementation(IExtensionBeacon.ExtensionType.MULTI_MINT),
+            extensionBeacon.implementation(IExtensionBeacon.ExtensionType.MULTI_MINT)
+        );
     }
 
-    function test_setImplementation_proxyUsesNewImpl() public {
+    function test_deployYieldToOne_beaconProxy() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
-        // Deploy first proxy with original implementation
-        (address proxy1, , ) = factory.deployYieldToOne(string("yto-impl-test-1"), params);
+        (address proxy, ) = factory.deployYieldToOne(string("yto-beacon-test"), params);
 
-        // Set a new implementation
-        address newImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+        // Verify beacon slot is set
+        bytes32 beaconSlot = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+        bytes32 beaconValue = vm.load(proxy, beaconSlot);
+        assertEq(address(uint160(uint256(beaconValue))), address(extensionBeacon));
 
-        vm.prank(factoryManager);
-        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
+        // Verify no admin slot (not a TUP)
+        bytes32 adminSlot = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+        bytes32 adminValue = vm.load(proxy, adminSlot);
+        assertEq(adminValue, bytes32(0));
+    }
 
-        // Deploy second proxy - should use new implementation
-        IExtensionFactory.YieldToOneParams memory params2 = IExtensionFactory.YieldToOneParams({
-            name: "Second Token",
-            symbol: "ST2",
+    function test_deployYieldToOne_event() public {
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: YTO_NAME,
+            symbol: YTO_SYMBOL,
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
-        (address proxy2, , ) = factory.deployYieldToOne(string("yto-impl-test-2"), params2);
+        address expectedImpl = extensionBeacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
 
-        assertEq(Upgrades.getImplementationAddress(proxy2), newImpl);
-
-        // First proxy still uses original implementation
-        assertTrue(Upgrades.getImplementationAddress(proxy1) != newImpl);
-    }
-
-    function test_setImplementation_notManager() public {
-        address newImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                alice,
-                factory.FACTORY_MANAGER_ROLE()
-            )
+        vm.expectEmit();
+        emit IExtensionFactory.ExtensionDeployed(
+            IExtensionBeacon.ExtensionType.YIELD_TO_ONE,
+            factory.getExtensionAddress(address(this), string("yto-event-test")),
+            expectedImpl,
+            address(this)
         );
 
+        factory.deployYieldToOne(string("yto-event-test"), params);
+    }
+
+    function test_deployYieldToOne_wiring() public {
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: YTO_NAME,
+            symbol: YTO_SYMBOL,
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            freezeManager: freezeManager,
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
+        });
+
+        (address proxy, ) = factory.deployYieldToOne(string("yto-wiring-test"), params);
+
+        assertEq(IExtension(proxy).pyusdx(), address(pyusdx));
+        assertEq(IExtension(proxy).swapFacility(), address(swapFacility));
+    }
+
+    function test_deployYieldToOne_approvalInSwapFacility() public {
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: YTO_NAME,
+            symbol: YTO_SYMBOL,
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            freezeManager: freezeManager,
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
+        });
+
+        (address proxy, ) = factory.deployYieldToOne(string("yto-approval-test"), params);
+
+        assertTrue(swapFacility.isApprovedExtension(proxy));
+    }
+
+    /* ============ Atomic Upgrade Tests ============ */
+
+    function test_registerImplementation_atomicUpgrade() public {
+        // Deploy 2 YieldToOne proxies
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: YTO_NAME,
+            symbol: YTO_SYMBOL,
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            freezeManager: freezeManager,
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
+        });
+
+        (address proxy1, address v1Impl) = factory.deployYieldToOne(string("yto-atomic-1"), params);
         vm.prank(alice);
-        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
+        (address proxy2, ) = factory.deployYieldToOne(string("yto-atomic-2"), params);
+
+        // Record the V1 implementation
+        address originalImpl = factory.getImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
+        assertEq(originalImpl, v1Impl);
+
+        // Deploy a new V2 YieldToOne implementation
+        address v2Impl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+
+        // Register the V2 implementation in the beacon (factoryManager has BEACON_MANAGER_ROLE)
+        vm.prank(factoryManager);
+        extensionBeacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, v2Impl);
+
+        // Verify the beacon now returns V2 as the latest implementation
+        assertEq(extensionBeacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), v2Impl);
+        assertEq(extensionBeacon.latestVersion(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), 2);
+
+        // Verify factory's getImplementation also reflects the new V2
+        assertEq(factory.getImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), v2Impl);
+
+        // Verify both proxies now resolve to V2 through the beacon
+        // Read implementation via ERC-1967 beacon slot → beacon → implementation(type)
+        bytes32 beaconSlot = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+
+        // Both proxies should have the beacon in their beacon slot
+        bytes32 beaconValue1 = vm.load(proxy1, beaconSlot);
+        bytes32 beaconValue2 = vm.load(proxy2, beaconSlot);
+        assertEq(address(uint160(uint256(beaconValue1))), address(extensionBeacon));
+        assertEq(address(uint160(uint256(beaconValue2))), address(extensionBeacon));
+
+        // Both proxies now use V2 through beacon delegation
+        // Verify by calling a view function that executes through the proxy
+        assertEq(IExtension(proxy1).pyusdx(), address(pyusdx));
+        assertEq(IExtension(proxy2).pyusdx(), address(pyusdx));
     }
 
-    function test_setImplementation_invalidType() public {
-        address newImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
+    /* ============ Removed Function Tests ============ */
 
-        vm.expectRevert(IExtensionFactory.InvalidExtensionType.selector);
+    function test_noSetImplementation() public {
+        // setImplementation(uint8,address) — the function was removed from the modified factory.
+        // A low-level staticcall with its selector must fail (no match).
+        bytes4 selector = bytes4(keccak256("setImplementation(uint8,address)"));
 
-        vm.prank(factoryManager);
-        factory.setImplementation(IExtensionFactory.ExtensionType.NONE, newImpl);
+        (bool success, ) = address(factory).staticcall(
+            abi.encodeWithSelector(selector, uint8(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), makeAddr("impl"))
+        );
+
+        assertFalse(success, "setImplementation should not exist on modified factory");
     }
 
-    function test_setImplementation_invalidPyusdx() public {
-        address wrongPyusdx = makeAddr("wrongPyusdx");
-        address newImpl = address(new YieldToOne(wrongPyusdx, address(swapFacility)));
+    /* ============ Storage Layout Tests ============ */
 
-        vm.expectRevert(IExtensionFactory.InvalidExtension.selector);
+    function test_storageLayout_noImplFields() public view {
+        // Verify that ExtensionFactoryStorage struct only contains extensionTypes mapping
+        // and does not have yieldToOneImplementation or multiMintImplementation fields.
+        // If those fields existed, they would occupy slots at base+1 and base+2.
+        // Since they've been removed, those slots must be zero.
+        bytes32 base = 0xa4153a6682de332cda5838d23ee5e88a3b57ff66d9351fa396c29717c1349400;
 
-        vm.prank(factoryManager);
-        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
+        // Slot at base+1 would be yieldToOneImplementation — must be zero
+        bytes32 slot1 = bytes32(uint256(base) + 1);
+        assertEq(vm.load(address(factory), slot1), bytes32(0), "slot base+1 should be zero (no yieldToOneImpl)");
+
+        // Slot at base+2 would be multiMintImplementation — must be zero
+        bytes32 slot2 = bytes32(uint256(base) + 2);
+        assertEq(vm.load(address(factory), slot2), bytes32(0), "slot base+2 should be zero (no multiMintImpl)");
     }
 
-    function test_setImplementation_invalidSwapFacility() public {
-        address wrongSwap = makeAddr("wrongSwap");
-        address newImpl = address(new YieldToOne(address(pyusdx), wrongSwap));
+    /* ============ Beacon TUP Deployment Tests ============ */
 
-        vm.expectRevert(IExtensionFactory.InvalidExtension.selector);
+    function test_beacon_deployedAsTUP() public view {
+        // Verify ExtensionBeacon is deployed behind a TransparentUpgradeableProxy.
+        // ERC-1967 implementation slot: 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
+        bytes32 implSlot = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+        bytes32 implValue = vm.load(address(extensionBeacon), implSlot);
+        assertTrue(uint256(implValue) != 0, "ERC-1967 implementation slot must be non-zero (TUP)");
 
-        vm.prank(factoryManager);
-        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, newImpl);
+        // ERC-1967 admin slot: 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103
+        bytes32 adminSlot = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+        bytes32 adminValue = vm.load(address(extensionBeacon), adminSlot);
+        assertTrue(uint256(adminValue) != 0, "ERC-1967 admin slot must be non-zero (TUP)");
     }
 
-    function test_setImplementation_zeroAddress() public {
-        vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
+    /* ============ MultiMint Beacon Proxy Tests ============ */
 
-        vm.prank(factoryManager);
-        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, address(0));
-    }
+    function test_deployMultiMint_beaconProxy() public {
+        IExtensionFactory.MultiMintParams memory params = IExtensionFactory.MultiMintParams({
+            name: MM_NAME,
+            symbol: MM_SYMBOL,
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            assetCapManager: assetCapManager,
+            freezeManager: freezeManager,
+            pauser: pauser,
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
+        });
 
-    function test_setImplementation_eoa() public {
-        vm.expectRevert();
+        (address proxy, ) = factory.deployMultiMint(string("mm-beacon-test"), params);
 
-        vm.prank(factoryManager);
-        factory.setImplementation(IExtensionFactory.ExtensionType.YIELD_TO_ONE, alice);
+        // Verify beacon slot is set
+        bytes32 beaconSlot = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+        bytes32 beaconValue = vm.load(proxy, beaconSlot);
+        assertEq(address(uint160(uint256(beaconValue))), address(extensionBeacon));
+
+        // Verify no admin slot (not a TUP)
+        bytes32 adminSlot = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+        bytes32 adminValue = vm.load(proxy, adminSlot);
+        assertEq(adminValue, bytes32(0));
     }
 }

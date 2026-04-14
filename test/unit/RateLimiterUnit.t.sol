@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.34;
 
-import { Test } from "../../lib/evm-m-extensions/lib/forge-std/src/Test.sol";
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
 
 import { RateLimiterHarness } from "../harness/RateLimiterHarness.sol";
 
-contract RateLimiterTests is Test {
+import { BaseTest } from "../utils/BaseTest.sol";
+
+contract RateLimiterTests is BaseTest {
     RateLimiterHarness public limiter;
     address public limiterProxy;
 
     address public manager = makeAddr("manager");
-    address public admin = makeAddr("admin");
     address public issuer = makeAddr("issuer");
-    address public alice = makeAddr("alice");
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
+
         limiterProxy = UnsafeUpgrades.deployTransparentProxy(address(new RateLimiterHarness()), admin, "");
         limiter = RateLimiterHarness(limiterProxy);
 

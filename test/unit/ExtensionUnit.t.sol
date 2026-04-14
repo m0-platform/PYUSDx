@@ -15,24 +15,22 @@ import { ExtensionHarness } from "../harness/ExtensionHarness.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { MockERC20 } from "../mock/MockERC20.sol";
 
-contract ExtensionUnitTests is Test {
+import { BaseTest } from "../utils/BaseTest.sol";
+
+contract ExtensionUnitTests is BaseTest {
     MockERC20 public pyusdx;
     MockSwapFacility public swapFacility;
     ExtensionHarness public extension;
 
-    address public admin = makeAddr("admin");
-    address public freezeManager = makeAddr("freezeManager");
-    address public pauser = makeAddr("pauser");
-    address public alice = makeAddr("alice");
-    address public bob = makeAddr("bob");
-
     uint256 public constant MINT_AMOUNT = 1000e6;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
+
         pyusdx = new MockERC20("PYUSDX", "PYUSDX", 6);
         swapFacility = new MockSwapFacility(address(pyusdx));
 
-        address impl = address(new ExtensionHarness(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionHarness(address(pyusdx), address(swapFacility), 1));
         extension = ExtensionHarness(
             UnsafeUpgrades.deployTransparentProxy(
                 impl,
@@ -66,12 +64,12 @@ contract ExtensionUnitTests is Test {
 
     function test_constructor_revert_zeroPYUSDX() public {
         vm.expectRevert(IExtension.ZeroPYUSDX.selector);
-        new ExtensionHarness(address(0), address(swapFacility));
+        new ExtensionHarness(address(0), address(swapFacility), 1);
     }
 
     function test_constructor_revert_zeroSwapFacility() public {
         vm.expectRevert(IExtension.ZeroSwapFacility.selector);
-        new ExtensionHarness(address(pyusdx), address(0));
+        new ExtensionHarness(address(pyusdx), address(0), 1);
     }
 
     /* ============ initialize ============ */
@@ -82,7 +80,7 @@ contract ExtensionUnitTests is Test {
     }
 
     function test_initialize_revert_zeroFreezeManager() public {
-        address impl = address(new ExtensionHarness(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionHarness(address(pyusdx), address(swapFacility), 1));
         vm.expectRevert(IFreezable.ZeroFreezeManager.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,
@@ -99,7 +97,7 @@ contract ExtensionUnitTests is Test {
     }
 
     function test_initialize_revert_zeroPauser() public {
-        address impl = address(new ExtensionHarness(address(pyusdx), address(swapFacility)));
+        address impl = address(new ExtensionHarness(address(pyusdx), address(swapFacility), 1));
         vm.expectRevert(IPausable.ZeroPauser.selector);
         UnsafeUpgrades.deployTransparentProxy(
             impl,

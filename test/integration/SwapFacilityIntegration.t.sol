@@ -5,6 +5,7 @@ import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foun
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 
+import { IExtensionBeacon } from "../../src/platform/interfaces/IExtensionBeacon.sol";
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
@@ -29,12 +30,13 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
         vm.prank(admin);
-        (address yieldToOneProxy, , ) = factory.deployYieldToOne(string("yto-swap-integration"), ytoParams);
+        (address yieldToOneProxy, ) = factory.deployYieldToOne(string("yto-swap-integration"), ytoParams);
         yieldToOne = YieldToOne(yieldToOneProxy);
 
         // Enable earning for YieldToOne
@@ -50,11 +52,12 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
             assetCapManager: assetCapManager,
             freezeManager: freezeManager,
             pauser: pauser,
-            yieldRecipientManager: admin
+            yieldRecipientManager: yieldRecipientManager,
+            versionManager: versionManager
         });
 
         vm.prank(admin);
-        (address multiMintProxy, , ) = factory.deployMultiMint(string("mm-swap-integration"), mmParams);
+        (address multiMintProxy, ) = factory.deployMultiMint(string("mm-swap-integration"), mmParams);
         multiMintExtension = MultiMint(multiMintProxy);
 
         // Allow USDC in MultiMint by setting asset cap
@@ -71,22 +74,22 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
         assertTrue(factory.isApprovedExtension(address(multiMintExtension)));
         assertEq(
             uint8(factory.getExtensionType(address(yieldToOne))),
-            uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE)
+            uint8(IExtensionBeacon.ExtensionType.YIELD_TO_ONE)
         );
         assertEq(
             uint8(factory.getExtensionType(address(multiMintExtension))),
-            uint8(IExtensionFactory.ExtensionType.MULTI_MINT)
+            uint8(IExtensionBeacon.ExtensionType.MULTI_MINT)
         );
     }
 
     function testIntegration_factory_extensionType() public view {
         assertEq(
             uint8(factory.getExtensionType(address(yieldToOne))),
-            uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE)
+            uint8(IExtensionBeacon.ExtensionType.YIELD_TO_ONE)
         );
         assertEq(
             uint8(factory.getExtensionType(address(multiMintExtension))),
-            uint8(IExtensionFactory.ExtensionType.MULTI_MINT)
+            uint8(IExtensionBeacon.ExtensionType.MULTI_MINT)
         );
     }
 
@@ -96,20 +99,20 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
 
         // Deactivate
         vm.expectEmit();
-        emit IExtensionFactory.ExtensionTypeSet(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
+        emit IExtensionFactory.ExtensionTypeSet(address(yieldToOne), IExtensionBeacon.ExtensionType.NONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
+        factory.setExtensionType(address(yieldToOne), IExtensionBeacon.ExtensionType.NONE);
 
         assertFalse(factory.isApprovedExtension(address(yieldToOne)));
         assertFalse(swapFacility.isApprovedExtension(address(yieldToOne)));
 
         // Reactivate
         vm.expectEmit();
-        emit IExtensionFactory.ExtensionTypeSet(address(yieldToOne), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        emit IExtensionFactory.ExtensionTypeSet(address(yieldToOne), IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(address(yieldToOne), IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
 
         assertTrue(factory.isApprovedExtension(address(yieldToOne)));
     }
@@ -117,7 +120,7 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
     function testIntegration_factory_setExtensionStatus_idempotent() public {
         // Should not emit event when setting to same value
         vm.prank(factoryManager);
-        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.YIELD_TO_ONE); // Already true
+        factory.setExtensionType(address(yieldToOne), IExtensionBeacon.ExtensionType.YIELD_TO_ONE); // Already true
 
         assertTrue(factory.isApprovedExtension(address(yieldToOne)));
     }
@@ -132,19 +135,19 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
         );
 
         vm.prank(alice);
-        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
+        factory.setExtensionType(address(yieldToOne), IExtensionBeacon.ExtensionType.NONE);
     }
 
     function testIntegration_factory_setExtensionStatus_notRegistered() public {
         // Setting NONE on unregistered address is idempotent (no-op, no revert)
         vm.prank(factoryManager);
-        factory.setExtensionType(alice, IExtensionFactory.ExtensionType.NONE);
+        factory.setExtensionType(alice, IExtensionBeacon.ExtensionType.NONE);
 
         // Setting non-NONE on an invalid address reverts (EOA has no code, call to IExtension interface fails)
         vm.expectRevert();
 
         vm.prank(factoryManager);
-        factory.setExtensionType(alice, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(alice, IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
     }
 
     /* ============ Swap Tests ============ */
@@ -224,7 +227,8 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
                 admin,
                 freezeManager,
                 pauser,
-                admin
+                yieldRecipientManager,
+                versionManager
             )
         );
 
@@ -253,7 +257,7 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
 
         // Revoke extension
         vm.prank(factoryManager);
-        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
+        factory.setExtensionType(address(yieldToOne), IExtensionBeacon.ExtensionType.NONE);
 
         // Verify swapFacility rejects the extension
         assertFalse(swapFacility.isApprovedExtension(address(yieldToOne)));

@@ -5,6 +5,7 @@ import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IER
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 
+import { IExtensionBeacon } from "../../src/platform/interfaces/IExtensionBeacon.sol";
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
@@ -25,12 +26,13 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
             yieldRecipient: yieldRecipient,
             admin: admin,
             freezeManager: freezeManager,
-            yieldRecipientManager: admin,
-            pauser: pauser
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
         });
 
         vm.prank(admin);
-        (address yieldToOneProxy, , ) = factory.deployYieldToOne(string("yto-integration"), ytoParams);
+        (address yieldToOneProxy, ) = factory.deployYieldToOne(string("yto-integration"), ytoParams);
         yieldToOne = YieldToOne(yieldToOneProxy);
 
         // Enable earning for YieldToOne (claimRecipient = address(0) means yield stays on the contract)
@@ -148,7 +150,7 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         // Change recipient — this auto-claims yield for old recipient
         address newRecipient = makeAddr("newRecipient");
 
-        vm.prank(admin);
+        vm.prank(yieldRecipientManager);
         yieldToOne.setYieldRecipient(newRecipient);
 
         // Old recipient should have received auto-claimed yield
@@ -387,7 +389,7 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
 
         // Revoke the extension
         vm.prank(factoryManager);
-        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
+        factory.setExtensionType(address(yieldToOne), IExtensionBeacon.ExtensionType.NONE);
 
         assertFalse(swapFacility.isApprovedExtension(address(yieldToOne)));
 
