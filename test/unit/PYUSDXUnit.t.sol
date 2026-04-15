@@ -574,6 +574,39 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
     }
 
+    function test_burn_fullBalance_earning_yieldPreserved() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 0, address(0));
+
+        pyusdx.setAccountRateBps(alice, uint24(500));
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+
+        vm.warp(block.timestamp + 90 days);
+
+        uint256 yieldBefore = pyusdx.accruedYieldOf(alice);
+        assertGt(yieldBefore, 0);
+
+        uint256 fullBalance = pyusdx.balanceOf(alice);
+
+        issuerGateway.burn(alice, fullBalance);
+
+        assertEq(pyusdx.balanceOf(alice), 0);
+
+        // Residual earningPrincipal encodes the accrued yield
+        assertGt(pyusdx.earningPrincipalOf(alice), 0);
+
+        // Yield is still accessible after full-balance burn
+        uint256 yieldAfter = pyusdx.accruedYieldOf(alice);
+        assertEq(yieldAfter, yieldBefore);
+
+        // Claim materializes the yield into alice's balance
+        (uint256 claimed, , ) = pyusdx.claimFor(alice);
+
+        assertEq(claimed, yieldBefore);
+        assertEq(pyusdx.balanceOf(alice), yieldBefore);
+    }
+
     function test_burn_nonEarningToEarning_transition() public {
         // Mint as non-earning
         issuerGateway.mint(alice, MINT_AMOUNT);
@@ -973,6 +1006,80 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         // All principal transferred to bob
         assertEq(pyusdx.earningPrincipalOf(bob), alicePrincipalBefore);
+    }
+
+    function test_transfer_fullBalance_earningToEarning_yieldPreserved() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 0, address(0));
+
+        pyusdx.setAccountRateBps(alice, uint24(500));
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(bob, 500, 0, address(0));
+
+        pyusdx.setAccountRateBps(bob, uint24(500));
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+
+        vm.warp(block.timestamp + 90 days);
+
+        uint256 yieldBefore = pyusdx.accruedYieldOf(alice);
+        assertGt(yieldBefore, 0);
+
+        uint256 fullBalance = pyusdx.balanceOf(alice);
+
+        vm.prank(alice);
+        pyusdx.transfer(bob, fullBalance);
+
+        assertEq(pyusdx.balanceOf(alice), 0);
+
+        // Residual earningPrincipal encodes the accrued yield
+        assertGt(pyusdx.earningPrincipalOf(alice), 0);
+
+        // Yield is still accessible after full-balance transfer
+        uint256 yieldAfter = pyusdx.accruedYieldOf(alice);
+        assertEq(yieldAfter, yieldBefore);
+
+        // Claim materializes the yield into alice's balance
+        (uint256 claimed, , ) = pyusdx.claimFor(alice);
+
+        assertEq(claimed, yieldBefore);
+        assertEq(pyusdx.balanceOf(alice), yieldBefore);
+    }
+
+    function test_transfer_fullBalance_earningToNonEarning_yieldPreserved() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 0, address(0));
+
+        pyusdx.setAccountRateBps(alice, uint24(500));
+
+        issuerGateway.mint(alice, MINT_AMOUNT);
+
+        vm.warp(block.timestamp + 90 days);
+
+        uint256 yieldBefore = pyusdx.accruedYieldOf(alice);
+        assertGt(yieldBefore, 0);
+
+        uint256 fullBalance = pyusdx.balanceOf(alice);
+
+        // Transfer full balance to non-earning bob (simulates Portal bridge path)
+        vm.prank(alice);
+        pyusdx.transfer(bob, fullBalance);
+
+        assertEq(pyusdx.balanceOf(alice), 0);
+
+        // Residual earningPrincipal encodes the accrued yield
+        assertGt(pyusdx.earningPrincipalOf(alice), 0);
+
+        // Yield is still accessible after full-balance transfer
+        uint256 yieldAfter = pyusdx.accruedYieldOf(alice);
+        assertEq(yieldAfter, yieldBefore);
+
+        // Claim materializes the yield into alice's balance
+        (uint256 claimed, , ) = pyusdx.claimFor(alice);
+
+        assertEq(claimed, yieldBefore);
+        assertEq(pyusdx.balanceOf(alice), yieldBefore);
     }
 
     function test_transfer_earningToNonEarning_indexGrowth() public {
