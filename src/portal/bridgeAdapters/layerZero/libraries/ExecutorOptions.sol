@@ -18,4 +18,8 @@ library ExecutorOptions {
     function encodeLzReceiveOption(uint128 gas, uint128 value) internal pure returns (bytes memory) {
         return value == 0 ? abi.encodePacked(gas) : abi.encodePacked(gas, value);
     }
+
+    function encodeLzComposeOption(uint16 index, uint128 gas, uint128 value) internal pure returns (bytes memory) {
+        return value == 0 ? abi.encodePacked(index, gas) : abi.encodePacked(index, gas, value);
+    }
 }

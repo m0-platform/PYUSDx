@@ -31,4 +31,6 @@ contract MockLayerZeroEndpoint {
 
     /// @notice Allows the contract to receive ETH for fee handling.
     receive() external payable {}
+
+    function sendCompose(address to, bytes32 guid, uint16 index, bytes calldata message) external {}
 }

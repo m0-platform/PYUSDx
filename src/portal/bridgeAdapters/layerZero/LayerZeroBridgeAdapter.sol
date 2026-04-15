@@ -47,12 +47,13 @@ contract LayerZeroBridgeAdapter is BridgeAdapter, ILayerZeroBridgeAdapter {
     function sendMessage(
         uint32 destinationChainId,
         uint256 gasLimit,
+        uint256 composedMessageGasLimit,
         bytes32 refundAddress,
         bytes memory payload
     ) external payable {
         _revertIfNotPortal();
 
-        bytes memory options = _buildOptions(gasLimit);
+        bytes memory options = _buildOptions(gasLimit, composedMessageGasLimit);
         bytes32 destinationPeer = _getPeerOrRevert(destinationChainId);
         uint32 destinationEid = _getLayerZeroEndpointIdOrRevert(destinationChainId);
 
@@ -67,7 +68,7 @@ contract LayerZeroBridgeAdapter is BridgeAdapter, ILayerZeroBridgeAdapter {
     /// @inheritdoc ILayerZeroReceiver
     function lzReceive(
         Origin calldata origin,
-        bytes32 /* LayerZero message guid */,
+        bytes32 lzMessageGuid,
         bytes calldata payload,
         address /* executor */,
         bytes calldata /* extraData */
@@ -77,7 +78,13 @@ contract LayerZeroBridgeAdapter is BridgeAdapter, ILayerZeroBridgeAdapter {
         uint32 sourceChainId = _getChainIdOrRevert(origin.srcEid);
         if (origin.sender != _getPeerOrRevert(sourceChainId)) revert UnsupportedSender(origin.sender);
 
-        IPortal(portal).receiveMessage(sourceChainId, payload);
+        (address composer, bytes memory composedMessage) = IPortal(portal).receiveMessage(sourceChainId, payload);
+
+        // Forward the composed message to the LayerZero Endpoint, which will deliver it
+        // to the composer contract via `lzCompose`.
+        if (composer != address(0) && composedMessage.length > 0) {
+            ILayerZeroEndpointV2(endpoint).sendCompose(composer, lzMessageGuid, 0, composedMessage);
+        }
     }
 
     /// @inheritdoc ILayerZeroBridgeAdapter
@@ -106,9 +113,10 @@ contract LayerZeroBridgeAdapter is BridgeAdapter, ILayerZeroBridgeAdapter {
     function quote(
         uint32 destinationChainId,
         uint256 gasLimit,
+        uint256 composedMessageGasLimit,
         bytes memory payload
     ) external view returns (uint256 fee) {
-        bytes memory options = _buildOptions(gasLimit);
+        bytes memory options = _buildOptions(gasLimit, composedMessageGasLimit);
         uint32 destinationEid = _getLayerZeroEndpointIdOrRevert(destinationChainId);
         bytes32 destinationPeer = _getPeerOrRevert(destinationChainId);
 
@@ -141,10 +149,17 @@ contract LayerZeroBridgeAdapter is BridgeAdapter, ILayerZeroBridgeAdapter {
     /* ============ Private View/Pure Functions ============ */
 
     /// @notice Builds LayerZero execution options with the specified gas limit.
-    /// @param  gasLimit The gas limit for destination execution.
-    /// @return options The encoded options bytes.
-    function _buildOptions(uint256 gasLimit) internal pure returns (bytes memory) {
-        return OptionsBuilder.newOptions().addExecutorLzReceiveOption(gasLimit.toUint128(), 0);
+    /// @param  gasLimit                The gas limit for destination execution.
+    /// @param  composedMessageGasLimit The gas limit for the composed message execution on the destination chain.
+    /// @return options                 The encoded options bytes.
+    function _buildOptions(
+        uint256 gasLimit,
+        uint256 composedMessageGasLimit
+    ) internal pure returns (bytes memory options) {
+        options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(gasLimit.toUint128(), 0);
+        if (composedMessageGasLimit > 0) {
+            options = options.addExecutorLzComposeOption(0, composedMessageGasLimit.toUint128(), 0);
+        }
     }
 
     /// @notice Returns LayerZero Endpoint Id by chain Id

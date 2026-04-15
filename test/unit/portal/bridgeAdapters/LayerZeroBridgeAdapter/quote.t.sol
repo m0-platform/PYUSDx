@@ -24,7 +24,24 @@ contract QuoteUnitTest is LayerZeroBridgeAdapterUnitTestBase {
             abi.encode(MessagingFee({ nativeFee: expectedFee, lzTokenFee: 0 }))
         );
 
-        uint256 fee = adapter.quote(SPOKE_CHAIN_ID, gasLimit, payload);
+        uint256 fee = adapter.quote(SPOKE_CHAIN_ID, gasLimit, 0, payload);
+
+        assertEq(fee, expectedFee);
+    }
+
+    function test_quote_withComposedMessageGasLimit() external {
+        uint256 gasLimit = 250_000;
+        uint256 composedMessageGasLimit = 100_000;
+        bytes memory payload = "test payload";
+        uint256 expectedFee = 0.005 ether;
+
+        vm.mockCall(
+            address(lzEndpoint),
+            abi.encodeWithSelector(ILayerZeroEndpointV2.quote.selector),
+            abi.encode(MessagingFee({ nativeFee: expectedFee, lzTokenFee: 0 }))
+        );
+
+        uint256 fee = adapter.quote(SPOKE_CHAIN_ID, gasLimit, composedMessageGasLimit, payload);
 
         assertEq(fee, expectedFee);
     }
@@ -41,7 +58,7 @@ contract QuoteUnitTest is LayerZeroBridgeAdapterUnitTestBase {
             abi.encode(MessagingFee({ nativeFee: expectedFee, lzTokenFee: 0 }))
         );
 
-        uint256 fee = adapter.quote(SPOKE_CHAIN_ID, gasLimit, payload);
+        uint256 fee = adapter.quote(SPOKE_CHAIN_ID, gasLimit, 0, payload);
 
         assertEq(fee, expectedFee);
     }
@@ -53,7 +70,7 @@ contract QuoteUnitTest is LayerZeroBridgeAdapterUnitTestBase {
 
         vm.expectRevert(abi.encodeWithSelector(IBridgeAdapter.UnsupportedChain.selector, unconfiguredChain));
 
-        adapter.quote(unconfiguredChain, gasLimit, payload);
+        adapter.quote(unconfiguredChain, gasLimit, 0, payload);
     }
 
     function test_quote_revertsIfBridgeChainIdNotSet() external {
@@ -66,6 +83,6 @@ contract QuoteUnitTest is LayerZeroBridgeAdapterUnitTestBase {
 
         vm.expectRevert(abi.encodeWithSelector(IBridgeAdapter.UnsupportedChain.selector, newChainId));
 
-        adapter.quote(newChainId, 250_000, "test");
+        adapter.quote(newChainId, 250_000, 0, "test");
     }
 }

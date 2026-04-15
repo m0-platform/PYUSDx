@@ -1,6 +1,32 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
+struct TokenTransferParams {
+    /// @notice The amount of tokens to transfer.
+    uint256 amount;
+    /// @notice The address of the token (PYUSDX or PYUSDX Extension) on the source chain.
+    address sourceToken;
+    /// @notice The ID of the destination chain.
+    uint32 destinationChainId;
+    /// @notice The address of the token (PYUSDX or PYUSDX Extension) on the destination chain.
+    bytes32 destinationToken;
+    /// @notice The account to receive tokens.
+    bytes32 recipient;
+    /// @notice The address to receive excess native gas on the source chain.
+    bytes32 refundAddress;
+    /// @notice The address of the bridge adapter to use. If set to `address(0)`, the default bridge adapter for the destination chain will be used.
+    address bridgeAdapter;
+}
+
+struct ComposeMessageParams {
+    /// @notice The address of the contract on the destination chain that will receive the composed message.
+    bytes32 composer;
+    /// @notice The arbitrary calldata forwarded to the composer contract.
+    bytes message;
+    /// @notice The gas limit for processing the composed message on the destination chain.
+    uint256 gasLimit;
+}
+
 /// @title  IPortal interface
 /// @author M0 Labs
 /// @notice Interface for bridging PYUSDX and PYUSDX Extension tokens across chains via pluggable bridge adapters.
@@ -48,6 +74,18 @@ interface IPortal {
     /// @param  recipient            The account receiving tokens.
     /// @param  amount               The amount of tokens.
     event WrapFailed(address indexed destinationExtension, address indexed recipient, uint256 amount);
+
+    /// @notice Emitted when a composed message is sent alongside a token transfer.
+    /// @param  destinationChainId The ID of the destination chain.
+    /// @param  messageId          The unique ID of the message.
+    /// @param  composer           The address of the composer contract on the destination chain.
+    /// @param  message            The composed message forwarded to the composer contract.
+    event ComposedMessageSent(
+        uint32 indexed destinationChainId,
+        bytes32 indexed messageId,
+        bytes32 composer,
+        bytes message
+    );
 
     /// @notice Emitted when the gas limit for processing messages on a destination chain is updated.
     /// @param  destinationChainId The ID of the destination chain.
@@ -136,6 +174,15 @@ interface IPortal {
     /// @notice Thrown when the gas limit for the specified payload type is not configured.
     error PayloadGasLimitNotSet(uint32 destinationChainId);
 
+    /// @notice Thrown when the composer address is 0x0.
+    error ZeroComposer();
+
+    /// @notice Thrown when the composed message gas limit is 0.
+    error ZeroComposedGasLimit();
+
+    /// @notice Thrown when the composed message is empty.
+    error ZeroComposedMessage();
+
     /* ============ View/Pure Functions ============ */
 
     /// @notice The role that can pause and unpause sending and receiving cross-chain messages.
@@ -162,8 +209,8 @@ interface IPortal {
 
     /// @notice Indicates whether the provided bridge adapter is supported for the destination chain.
     /// @param  destinationChainId The ID of the destination chain.
-    /// @param  bridgingAdapter    The address of the bridge adapter.
-    function supportedBridgeAdapter(uint32 destinationChainId, address bridgingAdapter) external view returns (bool);
+    /// @param  bridgeAdapter       The address of the bridge adapter.
+    function supportedBridgeAdapter(uint32 destinationChainId, address bridgeAdapter) external view returns (bool);
 
     /// @notice Returns the gas limit required to process a message on the destination chain.
     /// @param  destinationChainId The ID of the destination chain.
@@ -172,16 +219,22 @@ interface IPortal {
     /// @notice The address of the original caller of `sendToken` function.
     function msgSender() external view returns (address);
 
-    /// @notice Returns the fee for delivering a cross-chain message using the default bridge adapter.
+    /// @notice Returns the fee for delivering a cross-chain message.
     /// @dev    The fee must be passed as msg.value when calling `sendToken`.
     /// @param  destinationChainId The ID of the destination chain.
-    function quote(uint32 destinationChainId) external view returns (uint256);
-
-    /// @notice Returns the fee for delivering a cross-chain message using the specified bridge adapter.
-    /// @dev    The fee must be passed as msg.value when calling `sendToken`.
-    /// @param  destinationChainId The ID of the destination chain.
-    /// @param  bridgeAdapter      The address of the bridge adapter.
+    /// @param  bridgeAdapter      The address of the bridge adapter. If set to `address(0)`, the default bridge adapter for the destination chain will be used.
     function quote(uint32 destinationChainId, address bridgeAdapter) external view returns (uint256);
+
+    /// @notice Returns the fee for delivering a cross-chain message and executing a composed message.
+    /// @dev    The fee must be passed as msg.value when calling `sendToken`.
+    /// @param  destinationChainId The ID of the destination chain.
+    /// @param  bridgeAdapter      The address of the bridge adapter. If set to `address(0)`, the default bridge adapter for the destination chain will be used.
+    /// @param  composeParams      The parameters for composing a message with the token transfer.
+    function quote(
+        uint32 destinationChainId,
+        address bridgeAdapter,
+        ComposeMessageParams calldata composeParams
+    ) external view returns (uint256);
 
     /// @notice Indicates whether sending cross-chain messages is paused.
     function sendPaused() external view returns (bool);
@@ -207,48 +260,32 @@ interface IPortal {
     /// @param  supported          `True` if the bridge adapter is supported, `false` otherwise.
     function setSupportedBridgeAdapter(uint32 destinationChainId, address bridgeAdapter, bool supported) external;
 
-    /// @notice Transfers PYUSDX or PYUSDX Extension to the destination chain using the default bridge adapter.
+    /// @notice Transfers PYUSDX or PYUSDX Extension to the destination chain.
     /// @dev    If wrapping on the destination fails, the recipient will receive PYUSDX token.
-    /// @param  amount             The amount of tokens to transfer.
-    /// @param  sourceToken        The address of the token (PYUSDX or PYUSDX Extension) on the source chain.
-    /// @param  destinationChainId The ID of the destination chain.
-    /// @param  destinationToken   The address of the token (PYUSDX or PYUSDX Extension) on the destination chain.
-    /// @param  recipient          The account to receive tokens.
-    /// @param  refundAddress      The address to receive excess native gas on the source chain.
+    /// @param  transferParams     The parameters for the cross-chain token transfer.
     /// @return messageId          The unique identifier of the message sent.
-    function sendToken(
-        uint256 amount,
-        address sourceToken,
-        uint32 destinationChainId,
-        bytes32 destinationToken,
-        bytes32 recipient,
-        bytes32 refundAddress
-    ) external payable returns (bytes32 messageId);
+    function sendToken(TokenTransferParams calldata transferParams) external payable returns (bytes32 messageId);
 
-    /// @notice Transfers PYUSDX Token or PYUSDX Extension to the destination chain using the specified bridge adapter.
+    /// @notice Transfers PYUSDX or PYUSDX Extension to the destination chain and executes a composed message.
+    /// @dev    Only supported by LayerZeroBridgeAdapter.
+    ///         If wrapping on the destination fails, the recipient will receive PYUSDX token.
     /// @dev    If wrapping on the destination fails, the recipient will receive PYUSDX token.
-    /// @param  amount             The amount of tokens to transfer.
-    /// @param  sourceToken        The address of the token (PYUSDX or PYUSDX Extension) on the source chain.
-    /// @param  destinationChainId The ID of the destination chain.
-    /// @param  destinationToken   The address of the token (PYUSDX or PYUSDX Extension) on the destination chain.
-    /// @param  recipient          The account to receive tokens.
-    /// @param  refundAddress      The address to receive excess native gas on the source chain.
-    /// @param  bridgeAdapter      The address of the bridge adapter to use.
+    /// @param  composeParams      The parameters for composing a message with the token transfer.
     /// @return messageId          The unique identifier of the message sent.
-    function sendToken(
-        uint256 amount,
-        address sourceToken,
-        uint32 destinationChainId,
-        bytes32 destinationToken,
-        bytes32 recipient,
-        bytes32 refundAddress,
-        address bridgeAdapter
+    function sendTokenAndCompose(
+        TokenTransferParams calldata transferParams,
+        ComposeMessageParams calldata composeParams
     ) external payable returns (bytes32 messageId);
 
     /// @notice Receives a message from the bridge.
-    /// @param  sourceChainId The chain Id of the source chain.
-    /// @param  payload       The message payload.
-    function receiveMessage(uint32 sourceChainId, bytes calldata payload) external;
+    /// @param  sourceChainId   The chain Id of the source chain.
+    /// @param  payload         The message payload.
+    /// @return composer        The address of the composer contract on the destination chain. Returns `address(0)` if the message is not composed.
+    /// @return composedMessage The composed message to forward to the composer contract. Returns empty bytes if the message is not composed.
+    function receiveMessage(
+        uint32 sourceChainId,
+        bytes calldata payload
+    ) external returns (address composer, bytes memory composedMessage);
 
     /// @notice Pauses sending cross-chain messages.
     function pauseSend() external;

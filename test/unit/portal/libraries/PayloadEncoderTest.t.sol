@@ -3,11 +3,30 @@ pragma solidity 0.8.34;
 
 import { Test } from "forge-std/Test.sol";
 import { TypeConverter } from "../../../../lib/evm-m-extensions/lib/common/src/libs/TypeConverter.sol";
-import { PayloadEncoder } from "../../../../src/portal/libraries/PayloadEncoder.sol";
+import { PayloadEncoder, PayloadType } from "../../../../src/portal/libraries/PayloadEncoder.sol";
+
+/// @dev External wrapper to test library functions that accept `bytes calldata`.
+///      Solidity cannot implicitly convert `bytes memory` to `bytes calldata` in internal calls,
+///      so an external call boundary is needed to place the data in calldata.
+contract PayloadEncoderHarness {
+    function decodeTokenTransfer(bytes calldata payload) external pure returns (uint256, address, bytes32, address) {
+        return PayloadEncoder.decodeTokenTransfer(payload);
+    }
+
+    function decodeMessageId(bytes calldata payload) external pure returns (bytes32) {
+        return PayloadEncoder.decodeMessageId(payload);
+    }
+
+    function decodePayloadType(bytes calldata payload) external pure returns (PayloadType) {
+        return PayloadEncoder.decodePayloadType(payload);
+    }
+}
 
 contract PayloadEncoderTest is Test {
     using PayloadEncoder for bytes;
     using TypeConverter for *;
+
+    PayloadEncoderHarness harness = new PayloadEncoderHarness();
 
     uint32 DESTINATION_CHAIN_ID = 1;
     bytes32 DESTINATION_PEER = "peer";
@@ -32,6 +51,7 @@ contract PayloadEncoderTest is Test {
         assertEq(
             payload,
             abi.encodePacked(
+                PayloadType.TokenTransfer,
                 DESTINATION_CHAIN_ID,
                 DESTINATION_PEER,
                 MESSAGE_ID,
@@ -63,6 +83,7 @@ contract PayloadEncoderTest is Test {
         assertEq(
             payload,
             abi.encodePacked(
+                PayloadType.TokenTransfer,
                 DESTINATION_CHAIN_ID,
                 DESTINATION_PEER,
                 messageId,
@@ -79,7 +100,7 @@ contract PayloadEncoderTest is Test {
         bytes memory payload = "";
 
         vm.expectRevert(abi.encodeWithSelector(PayloadEncoder.InvalidPayloadLength.selector, payload.length));
-        PayloadEncoder.decodeTokenTransfer(payload);
+        harness.decodeTokenTransfer(payload);
     }
 
     function test_decodeTokenTransfer() external {
@@ -99,15 +120,9 @@ contract PayloadEncoderTest is Test {
             recipient.toBytes32()
         );
 
-        (
-            bytes32 decodedMessageId,
-            uint256 decodedAmount,
-            address decodedToken,
-            bytes32 decodedSender,
-            address decodedRecipient
-        ) = PayloadEncoder.decodeTokenTransfer(payload);
+        (uint256 decodedAmount, address decodedToken, bytes32 decodedSender, address decodedRecipient) = harness
+            .decodeTokenTransfer(payload);
 
-        assertEq(decodedMessageId, messageId);
         assertEq(decodedAmount, amount);
         assertEq(decodedToken, token);
         assertEq(decodedSender, sender.toBytes32());
@@ -132,15 +147,9 @@ contract PayloadEncoderTest is Test {
             sender,
             recipient.toBytes32()
         );
-        (
-            bytes32 decodedMessageId,
-            uint256 decodedAmount,
-            address decodedToken,
-            bytes32 decodedSender,
-            address decodedRecipient
-        ) = PayloadEncoder.decodeTokenTransfer(payload);
+        (uint256 decodedAmount, address decodedToken, bytes32 decodedSender, address decodedRecipient) = harness
+            .decodeTokenTransfer(payload);
 
-        assertEq(decodedMessageId, messageId);
         assertEq(decodedAmount, amount);
         assertEq(decodedToken, token);
         assertEq(decodedSender, sender.toBytes32());

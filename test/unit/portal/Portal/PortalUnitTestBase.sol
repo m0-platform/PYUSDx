@@ -68,9 +68,6 @@ abstract contract PortalUnitTestBase is Test {
         portal.setDefaultBridgeAdapter(CHAIN_ID_2, address(bridgeAdapter));
         portal.setPayloadGasLimit(CHAIN_ID_2, TOKEN_TRANSFER_GAS_LIMIT);
 
-        // Configure second spoke (for cross-spoke transfer tests)
-        portal.setDefaultBridgeAdapter(CHAIN_ID_2, address(bridgeAdapter));
-
         vm.stopPrank();
 
         // Fund accounts

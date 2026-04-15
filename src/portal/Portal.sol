@@ -8,7 +8,7 @@ import { SafeERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppeli
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 import { IBridgeAdapter } from "./interfaces/IBridgeAdapter.sol";
-import { IPortal } from "./interfaces/IPortal.sol";
+import { TokenTransferParams, ComposeMessageParams, IPortal } from "./interfaces/IPortal.sol";
 import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
 import { IPYUSDX } from "../IPYUSDX.sol";
 import { ReentrancyLock } from "./ReentrancyLock.sol";
@@ -108,59 +108,65 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
 
     /// @inheritdoc IPortal
     function sendToken(
-        uint256 amount,
-        address sourceToken,
-        uint32 destinationChainId,
-        bytes32 destinationToken,
-        bytes32 recipient,
-        bytes32 refundAddress
+        TokenTransferParams calldata transferParams
     ) external payable whenSendNotPaused whenNotLocked returns (bytes32 messageId) {
-        return
-            _sendToken(
-                amount,
-                sourceToken,
-                destinationChainId,
-                destinationToken,
-                recipient,
-                refundAddress,
-                defaultBridgeAdapter(destinationChainId)
-            );
+        return _sendToken(transferParams);
     }
 
     /// @inheritdoc IPortal
-    function sendToken(
-        uint256 amount,
-        address sourceToken,
-        uint32 destinationChainId,
-        bytes32 destinationToken,
-        bytes32 recipient,
-        bytes32 refundAddress,
-        address bridgeAdapter
+    function sendTokenAndCompose(
+        TokenTransferParams calldata transferParams,
+        ComposeMessageParams calldata composeParams
     ) external payable whenSendNotPaused whenNotLocked returns (bytes32 messageId) {
-        return
-            _sendToken(
-                amount,
-                sourceToken,
-                destinationChainId,
-                destinationToken,
-                recipient,
-                refundAddress,
-                bridgeAdapter
-            );
+        return _sendTokenAndCompose(transferParams, composeParams);
     }
 
     /// @inheritdoc IPortal
-    function receiveMessage(uint32 sourceChainId, bytes calldata payload) external whenReceiveNotPaused whenNotLocked {
+    function receiveMessage(
+        uint32 sourceChainId,
+        bytes calldata payload
+    ) external whenReceiveNotPaused whenNotLocked returns (address composer, bytes memory composedMessage) {
         _revertIfUnsupportedBridgeAdapter(sourceChainId, msg.sender);
 
-        (bytes32 messageId, uint256 amount, address destinationToken, bytes32 sender, address recipient) = payload
-            .decodeTokenTransfer();
-
+        PayloadType payloadType = payload.decodePayloadType();
+        bytes32 messageId = payload.decodeMessageId();
         PortalStorageStruct storage $ = _getPortalStorageLocation();
         if ($.processedMessages[messageId]) revert MessageAlreadyProcessed(messageId);
 
         $.processedMessages[messageId] = true;
 
+        if (payloadType == PayloadType.TokenTransfer) {
+            (uint256 amount, address destinationToken, bytes32 sender, address recipient) = payload
+                .decodeTokenTransfer();
+            _receiveToken(sourceChainId, messageId, amount, destinationToken, sender, recipient);
+            // Not a composed message, return zero address and empty bytes.
+            return (address(0), "");
+        }
+
+        if (payloadType == PayloadType.ComposedTokenTransfer) {
+            (
+                uint256 amount,
+                address destinationToken,
+                bytes32 sender,
+                address recipient,
+                address composerAddress,
+                bytes calldata composedMessageCalldata
+            ) = payload.decodeComposedTokenTransfer();
+
+            _receiveToken(sourceChainId, messageId, amount, destinationToken, sender, recipient);
+            return (composerAddress, composedMessageCalldata);
+        }
+    }
+
+    /// @dev Mints PYUSDX tokens and optionally wraps them to the destination token.
+    function _receiveToken(
+        uint32 sourceChainId,
+        bytes32 messageId,
+        uint256 amount,
+        address destinationToken,
+        bytes32 sender,
+        address recipient
+    ) internal {
         emit TokenReceived(sourceChainId, destinationToken, sender, recipient, amount, messageId);
 
         if (destinationToken == pyusdx) {
@@ -313,13 +319,18 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     }
 
     /// @inheritdoc IPortal
-    function quote(uint32 destinationChainId) external view returns (uint256) {
-        return _quote(destinationChainId, defaultBridgeAdapter(destinationChainId));
+    function quote(uint32 destinationChainId, address bridgeAdapter) external view returns (uint256) {
+        return _quote(destinationChainId, _resolveBridgeAdapter(destinationChainId, bridgeAdapter));
     }
 
     /// @inheritdoc IPortal
-    function quote(uint32 destinationChainId, address bridgeAdapter) external view returns (uint256) {
-        return _quote(destinationChainId, bridgeAdapter);
+    function quote(
+        uint32 destinationChainId,
+        address bridgeAdapter,
+        ComposeMessageParams calldata composeParams
+    ) external view returns (uint256) {
+        return
+            _quoteComposed(destinationChainId, _resolveBridgeAdapter(destinationChainId, bridgeAdapter), composeParams);
     }
 
     /// @inheritdoc IPortal
@@ -334,63 +345,85 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
 
     /* ============ Internal Interactive Functions ============ */
 
-    /// @dev Sends the specified payload to the destination chain.
-    function _sendMessage(
-        uint32 destinationChainId,
-        bytes32 refundAddress,
-        bytes memory payload,
-        address bridgeAdapter
-    ) internal {
-        IBridgeAdapter(bridgeAdapter).sendMessage{ value: msg.value }(
-            destinationChainId,
-            _getPayloadGasLimitOrRevert(destinationChainId),
-            refundAddress,
-            payload
+    /// @dev Transfers PYUSDX Token or PYUSDX Extension to the destination chain.
+    function _sendToken(TokenTransferParams calldata transferParams) internal returns (bytes32 messageId) {
+        address bridgeAdapter = _resolveBridgeAdapter(transferParams.destinationChainId, transferParams.bridgeAdapter);
+
+        _validateTokenTransfer(transferParams, bridgeAdapter);
+        _transferAndUnwrap(transferParams.sourceToken, transferParams.amount);
+        IPYUSDX(pyusdx).burn(address(this), transferParams.amount);
+
+        messageId = _getMessageId(transferParams.destinationChainId);
+        bytes memory payload = PayloadEncoder.encodeTokenTransfer(
+            transferParams.destinationChainId,
+            IBridgeAdapter(bridgeAdapter).getPeer(transferParams.destinationChainId),
+            messageId,
+            transferParams.amount,
+            transferParams.destinationToken,
+            msg.sender,
+            transferParams.recipient
+        );
+
+        _dispatchMessage(transferParams, bridgeAdapter, messageId, 0, payload);
+    }
+
+    /// @dev Transfers PYUSDX Token or PYUSDX Extension to the destination chain and executes a composed message.
+    function _sendTokenAndCompose(
+        TokenTransferParams calldata transferParams,
+        ComposeMessageParams calldata composeParams
+    ) internal returns (bytes32 messageId) {
+        address bridgeAdapter = _resolveBridgeAdapter(transferParams.destinationChainId, transferParams.bridgeAdapter);
+
+        _validateTokenTransfer(transferParams, bridgeAdapter);
+        _validateComposeMessage(composeParams);
+        _transferAndUnwrap(transferParams.sourceToken, transferParams.amount);
+        IPYUSDX(pyusdx).burn(address(this), transferParams.amount);
+
+        messageId = _getMessageId(transferParams.destinationChainId);
+        bytes memory payload = PayloadEncoder.encodeComposedTokenTransfer(
+            transferParams.destinationChainId,
+            IBridgeAdapter(bridgeAdapter).getPeer(transferParams.destinationChainId),
+            messageId,
+            transferParams.amount,
+            transferParams.destinationToken,
+            msg.sender,
+            transferParams.recipient,
+            composeParams.composer,
+            composeParams.message
+        );
+
+        _dispatchMessage(transferParams, bridgeAdapter, messageId, composeParams.gasLimit, payload);
+        emit ComposedMessageSent(
+            transferParams.destinationChainId,
+            messageId,
+            composeParams.composer,
+            composeParams.message
         );
     }
 
-    /// @dev Transfers PYUSDX Token or PYUSDX Extension to the destination chain.
-    function _sendToken(
-        uint256 amount,
-        address sourceToken,
-        uint32 destinationChainId,
-        bytes32 destinationToken,
-        bytes32 recipient,
-        bytes32 refundAddress,
-        address bridgeAdapter
-    ) internal returns (bytes32 messageId) {
-        _revertIfZeroAmount(amount);
-        _revertIfZeroRefundAddress(refundAddress);
-        _revertIfZeroSourceToken(sourceToken);
-        _revertIfZeroDestinationToken(destinationToken);
-        _revertIfZeroRecipient(recipient);
-        _revertIfUnsupportedBridgeAdapter(destinationChainId, bridgeAdapter);
-
-        // Transfer and if the source token isn't PYUSDX token, unwrap it to PYUSDX token.
-        _transferAndUnwrap(sourceToken, amount);
-
-        // Burn PYUSDX tokens
-        IPYUSDX(pyusdx).burn(address(this), amount);
-
-        bytes memory payload;
-        (payload, messageId) = _createTokenTransferPayload(
-            amount,
-            destinationChainId,
-            destinationToken,
-            msg.sender,
-            recipient,
-            bridgeAdapter
+    /// @dev Sends a cross-chain message via the bridge adapter and emits the TokenSent event.
+    function _dispatchMessage(
+        TokenTransferParams calldata transferParams,
+        address bridgeAdapter,
+        bytes32 messageId,
+        uint256 composedMessageGasLimit,
+        bytes memory payload
+    ) private {
+        IBridgeAdapter(bridgeAdapter).sendMessage{ value: msg.value }(
+            transferParams.destinationChainId,
+            _getPayloadGasLimitOrRevert(transferParams.destinationChainId),
+            composedMessageGasLimit,
+            transferParams.refundAddress,
+            payload
         );
 
-        _sendMessage(destinationChainId, refundAddress, payload, bridgeAdapter);
-
         emit TokenSent(
-            sourceToken,
-            destinationChainId,
-            destinationToken,
+            transferParams.sourceToken,
+            transferParams.destinationChainId,
+            transferParams.destinationToken,
             msg.sender,
-            recipient,
-            amount,
+            transferParams.recipient,
+            transferParams.amount,
             bridgeAdapter,
             messageId
         );
@@ -428,30 +461,6 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         // Portal doesn't support fee-on-transfer tokens.
         // Revert if the actual amount received is less than the specified amount.
         if (actualAmount < specifiedAmount) revert InsufficientAmountReceived(specifiedAmount, actualAmount);
-    }
-
-    /// @dev Creates token transfer payload.
-    /// @return payload   The encoded payload.
-    /// @return messageId The message ID for the cross-chain transfer.
-    function _createTokenTransferPayload(
-        uint256 transferAmount,
-        uint32 destinationChainId,
-        bytes32 destinationToken,
-        address sender,
-        bytes32 recipient,
-        address bridgeAdapter
-    ) internal returns (bytes memory payload, bytes32 messageId) {
-        messageId = _getMessageId(destinationChainId);
-        bytes32 destinationPeer = IBridgeAdapter(bridgeAdapter).getPeer(destinationChainId);
-        payload = PayloadEncoder.encodeTokenTransfer(
-            destinationChainId,
-            destinationPeer,
-            messageId,
-            transferAmount,
-            destinationToken,
-            sender,
-            recipient
-        );
     }
 
     /// @dev   Wraps PYUSDX token to the token specified by `destinationToken`.
@@ -530,9 +539,30 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         // NOTE: For quoting delivery fee, the content of the message doesn’t matter,
         //       only the destination chain, gas limit required to process the message on the destination
         //       and, for some protocols, payload size is relevant.
-        bytes memory payload = PayloadEncoder.generateEmptyPayload();
+        bytes memory payload = PayloadEncoder.generateEmptyTokenTransferPayload();
 
-        return IBridgeAdapter(bridgeAdapter).quote(destinationChainId, gasLimit, payload);
+        return IBridgeAdapter(bridgeAdapter).quote(destinationChainId, gasLimit, 0, payload);
+    }
+
+    /// @dev Returns the fee for delivering a cross-chain message with a composed message.
+    /// @param  destinationChainId The ID of the destination chain.
+    /// @param  bridgeAdapter      The address of the bridge adapter.
+    /// @param  composeParams      The parameters for composing a message with the token transfer.
+    function _quoteComposed(
+        uint32 destinationChainId,
+        address bridgeAdapter,
+        ComposeMessageParams calldata composeParams
+    ) internal view returns (uint256) {
+        _revertIfUnsupportedBridgeAdapter(destinationChainId, bridgeAdapter);
+        _validateComposeMessage(composeParams);
+
+        uint256 gasLimit = _getPayloadGasLimitOrRevert(destinationChainId);
+        bytes memory payload = PayloadEncoder.generateEmptyComposedTokenTransferPayload(
+            composeParams.composer,
+            composeParams.message
+        );
+
+        return IBridgeAdapter(bridgeAdapter).quote(destinationChainId, gasLimit, composeParams.gasLimit, payload);
     }
 
     /// @dev Returns the gas limit for the specified payload type on the destination chain.
@@ -541,6 +571,28 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         uint256 gasLimit = payloadGasLimit(destinationChainId);
         if (gasLimit == 0) revert PayloadGasLimitNotSet(destinationChainId);
         return gasLimit;
+    }
+
+    /// @dev Returns the resolved bridge adapter, falling back to the default if `address(0)` is specified.
+    function _resolveBridgeAdapter(uint32 destinationChainId, address bridgeAdapter) internal view returns (address) {
+        return bridgeAdapter == address(0) ? defaultBridgeAdapter(destinationChainId) : bridgeAdapter;
+    }
+
+    /// @dev Validates token transfer parameters.
+    function _validateTokenTransfer(TokenTransferParams calldata transferParams, address bridgeAdapter) internal view {
+        _revertIfZeroAmount(transferParams.amount);
+        _revertIfZeroRefundAddress(transferParams.refundAddress);
+        _revertIfZeroSourceToken(transferParams.sourceToken);
+        _revertIfZeroDestinationToken(transferParams.destinationToken);
+        _revertIfZeroRecipient(transferParams.recipient);
+        _revertIfUnsupportedBridgeAdapter(transferParams.destinationChainId, bridgeAdapter);
+    }
+
+    /// @dev Validates compose message parameters.
+    function _validateComposeMessage(ComposeMessageParams calldata composeParams) internal pure {
+        if (composeParams.composer == bytes32(0)) revert ZeroComposer();
+        if (composeParams.gasLimit == 0) revert ZeroComposedGasLimit();
+        if (composeParams.message.length == 0) revert ZeroComposedMessage();
     }
 
     /// @dev Reverts if `amount` is zero.
