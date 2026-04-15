@@ -10,6 +10,8 @@ import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
 
+import { MockERC20 } from "../mock/MockERC20.sol";
+
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
 contract MultiMintIntegrationTests is IntegrationForkTest {
@@ -162,6 +164,44 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         assertEq(multiMint.totalAssets(), 0);
         assertEq(pyusdx.balanceOf(address(multiMint)), AMOUNT);
         assertEq(multiMint.totalSupply(), AMOUNT);
+    }
+
+    function testIntegration_replaceAsset_truncationRefund() public {
+        // Deploy a 2-decimal token (factor = 10_000 vs PYUSDX's 6 decimals).
+        MockERC20 twoDec = new MockERC20("TwoDec", "2DEC", 2);
+
+        vm.prank(assetCapManager);
+        multiMint.setAssetCap(address(twoDec), type(uint256).max);
+
+        // Alice wraps 100 twoDec units = 1_000_000 PYUSDX-equivalent.
+        uint256 wrapAmount = 100e2;
+        twoDec.mint(alice, wrapAmount);
+
+        vm.startPrank(alice);
+
+        IERC20(address(twoDec)).approve(address(swapFacility), wrapAmount);
+        swapFacility.swap(address(twoDec), address(multiMint), wrapAmount, alice);
+
+        vm.stopPrank();
+
+        // Bob calls replaceAsset with 25001 PYUSDX (not divisible by 10000).
+        // assetAmount    = 25001 / 10000 = 2
+        // extensionAmount = 2 * 10000    = 20000  ← only this is charged
+        // refund          = 25001 - 20000 = 5001
+        uint256 replaceAmount = 25001;
+        _mintPYUSDX(bob, replaceAmount);
+
+        vm.startPrank(bob);
+
+        IERC20(address(pyusdx)).approve(address(swapFacility), replaceAmount);
+        swapFacility.replaceAsset(address(twoDec), address(pyusdx), address(multiMint), replaceAmount, bob);
+
+        vm.stopPrank();
+
+        assertEq(twoDec.balanceOf(bob), 2);
+        assertEq(pyusdx.balanceOf(bob), 5001);
+        assertEq(multiMint.assetBalanceOf(address(twoDec)), wrapAmount - 2);
+        assertEq(multiMint.totalAssets(), wrapAmount * 10_000 - 20000);
     }
 
     function testIntegration_replaceAsset_revert_insufficientAssetBacking() public {

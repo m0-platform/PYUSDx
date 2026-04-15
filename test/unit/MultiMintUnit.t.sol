@@ -28,7 +28,7 @@ contract MultiMintTest is BaseTest {
 
     MockERC20 public usdc; // 6 decimals
     MockERC20 public dai; // 18 decimals
-    MockERC20 public fourDec; // 4 decimals
+    MockERC20 public twoDec; // 2 decimals
 
     uint256 public constant MINT_AMOUNT = 1000e6;
 
@@ -90,12 +90,12 @@ contract MultiMintTest is BaseTest {
 
         usdc = new MockERC20("USD Coin", "USDC", 6);
         dai = new MockERC20("Dai", "DAI", 18);
-        fourDec = new MockERC20("FourDec", "4DEC", 4);
+        twoDec = new MockERC20("TwoDec", "2DEC", 2);
 
         vm.startPrank(assetCapManager);
         extension.setAssetCap(address(usdc), 1_000_000e6);
         extension.setAssetCap(address(dai), 1_000_000e18);
-        extension.setAssetCap(address(fourDec), 1_000_000e4);
+        extension.setAssetCap(address(twoDec), 1_000_000e2);
         vm.stopPrank();
     }
 
@@ -207,13 +207,13 @@ contract MultiMintTest is BaseTest {
         assertEq(extension.assetBalanceOf(address(dai)), 500e18);
     }
 
-    function test_wrap_asset_4decimals() public {
-        _wrapAssetFor(alice, address(fourDec), 500e4, 500e6);
+    function test_wrap_asset_2decimals() public {
+        _wrapAssetFor(alice, address(twoDec), 500e2, 500e6);
 
         assertEq(extension.balanceOf(alice), 500e6);
         assertEq(extension.totalSupply(), 500e6);
         assertEq(extension.totalAssets(), 500e6);
-        assertEq(extension.assetBalanceOf(address(fourDec)), 500e4);
+        assertEq(extension.assetBalanceOf(address(twoDec)), 500e2);
     }
 
     function test_wrap_asset_revert_invalidAsset_zero() public {
@@ -533,6 +533,79 @@ contract MultiMintTest is BaseTest {
         assertEq(dai.balanceOf(bob), 200e18);
         assertEq(extension.assetBalanceOf(address(dai)), 300e18);
         assertEq(extension.totalAssets(), 300e6);
+    }
+
+    function test_replaceAsset_truncationAccounting() public {
+        // Wrap 200 twoDec units (2 decimals) = 200e2 raw = 200_000_000 PYUSDX-equivalent.
+        _wrapAssetFor(alice, address(twoDec), 200e2, 200e6);
+
+        // Replace with 25001 PYUSDX (not divisible by 10000).
+        // assetAmount = 25001 / 10000 = 2 (truncated)
+        // extensionAmount = 2 * 10000 = 20000 — only this is charged.
+        issuerGateway.mint(bob, 25001);
+
+        vm.startPrank(bob);
+
+        IERC20(address(pyusdx)).approve(address(swapFacility), 25001);
+        swapFacility.replaceAsset(address(extension), address(twoDec), 25001, bob);
+
+        vm.stopPrank();
+
+        // Bob is only charged extensionAmount (20000), not the full 25001.
+        assertEq(twoDec.balanceOf(bob), 2);
+        assertEq(pyusdx.balanceOf(bob), 5001);
+        assertEq(extension.assetBalanceOf(address(twoDec)), 200e2 - 2);
+        assertEq(extension.totalAssets(), 200e6 - 20000);
+    }
+
+    function testFuzz_replaceAsset_truncationAccounting(
+        uint256 assetWrapAmount,
+        uint256 assetAmountOut,
+        uint256 remainder
+    ) public {
+        // twoDec has 2 decimals; PYUSDX has 6 — conversion factor is 10_000.
+        // Need at least 2 units so one can be returned while one remains.
+        assetWrapAmount = bound(assetWrapAmount, 2, 1_000_000e2);
+
+        // Return strictly fewer units than wrapped so the extension is never fully drained.
+        assetAmountOut = bound(assetAmountOut, 1, assetWrapAmount - 1);
+
+        // Force a non-zero remainder so truncation always occurs.
+        remainder = bound(remainder, 1, 9_999);
+
+        // replaceAmount is always non-multiple of 10_000 and fits within available backing.
+        // Max: (assetWrapAmount - 1) * 10_000 + 9_999 = assetWrapAmount * 10_000 - 1.
+        uint256 replaceAmount = assetAmountOut * 10_000 + remainder;
+        uint256 wrappedExtensionAmount = assetWrapAmount * 10_000;
+
+        twoDec.mint(alice, assetWrapAmount);
+
+        vm.startPrank(alice);
+
+        IERC20(address(twoDec)).approve(address(swapFacility), assetWrapAmount);
+        swapFacility.swapInAsset(address(extension), address(twoDec), assetWrapAmount, alice);
+
+        vm.stopPrank();
+
+        issuerGateway.mint(bob, replaceAmount);
+
+        vm.startPrank(bob);
+
+        IERC20(address(pyusdx)).approve(address(swapFacility), replaceAmount);
+        swapFacility.replaceAsset(address(extension), address(twoDec), replaceAmount, bob);
+
+        vm.stopPrank();
+
+        uint256 extensionAmount = assetAmountOut * 10_000;
+
+        // Bob is only charged extensionAmount; the remainder is always non-zero and stays in his wallet.
+        assertEq(twoDec.balanceOf(bob), assetAmountOut);
+        assertEq(pyusdx.balanceOf(bob), remainder);
+        assertEq(extension.assetBalanceOf(address(twoDec)), assetWrapAmount - assetAmountOut);
+        assertEq(extension.totalAssets(), wrappedExtensionAmount - extensionAmount);
+
+        // Invariant: totalAssets always equals assetBalance * conversionFactor for twoDec.
+        assertEq(extension.totalAssets(), extension.assetBalanceOf(address(twoDec)) * 10_000);
     }
 
     function test_replaceAsset_revert_paused() public {

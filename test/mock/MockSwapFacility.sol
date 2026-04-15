@@ -57,6 +57,11 @@ contract MockSwapFacility {
         IERC20(pyusdx).transferFrom(msg.sender, address(this), amount);
         IERC20(pyusdx).approve(extension, amount);
         IMultiMint(extension).replaceAsset(asset, recipient, amount);
+
+        // Refund any PYUSDX not consumed by the extension (truncation remainder).
+        uint256 refund = IERC20(pyusdx).balanceOf(address(this));
+        if (refund > 0) IERC20(pyusdx).transfer(msg.sender, refund);
+
         _locker = address(0);
     }
 }

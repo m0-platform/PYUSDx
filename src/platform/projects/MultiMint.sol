@@ -283,7 +283,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         _revertIfZeroAccount(recipient);
         _revertIfZeroAmount(amount);
 
-        // Convert PYUSDX amount to asset decimals and revert if truncates to zero.
+        // NOTE: Convert PYUSDX amount to asset decimals and revert if truncates to zero.
         uint256 assetAmount = _fromExtensionToAssetAmount(asset, amount);
 
         _revertIfZeroAmount(assetAmount);
@@ -291,17 +291,17 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
         MultiMintStorage storage $ = _getMultiMintStorage();
 
-        // Update non-PYUSDX asset backing.
         $.assets[asset].balance -= UIntMath.safe240(assetAmount);
-        $.totalAssets -= amount;
 
-        // Pull PYUSDX from caller.
-        IERC20(pyusdx).transferFrom(msg.sender, address(this), amount);
+        // NOTE: Re-upscale to PYUSDX decimals so totalAssets (denominated in 6 decimals) reflects
+        //       the actual asset value removed, discarding any sub-unit truncation remainder.
+        uint256 extensionAmount = _fromAssetToExtensionAmount(asset, assetAmount);
+        $.totalAssets -= extensionAmount;
 
-        // Send alt-asset to recipient.
+        IERC20(pyusdx).transferFrom(msg.sender, address(this), extensionAmount);
         IERC20Metadata(asset).safeTransfer(recipient, assetAmount);
 
-        emit AssetReplaced(asset, assetAmount, recipient, amount);
+        emit AssetReplaced(asset, assetAmount, recipient, extensionAmount);
     }
 
     /* ============ Internal View Functions ============ */

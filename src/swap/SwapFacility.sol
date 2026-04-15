@@ -297,7 +297,17 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         IERC20(pyusdx).approve(extensionOut, amount);
         IMultiMint(extensionOut).replaceAsset(asset, recipient, amount);
 
-        emit MultiMintAssetReplaced(asset, extensionOut, amount, recipient);
+        // NOTE: Both subtractions are safe:
+        //       - `refund`: balance can only have grown by `amount` then shrunk by `extensionAmount`
+        //         (where `extensionAmount <= amount`), so balance >= pyusdxBalanceBefore always.
+        //       - `amount - refund`: refund = amount - extensionAmount, and extensionAmount > 0
+        //         (replaceAsset reverts on zero assetAmount), so refund < amount always.
+        unchecked {
+            uint256 refund = _pyusdxBalanceOf(address(this)) - pyusdxBalanceBefore;
+            if (refund > 0) IERC20(pyusdx).transfer(msg.sender, refund);
+
+            emit MultiMintAssetReplaced(asset, extensionOut, amount - refund, recipient);
+        }
     }
 
     /* ============ Internal View/Pure Functions ============ */
