@@ -297,7 +297,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         IERC20(pyusdx).approve(extensionOut, amount);
         IMultiMint(extensionOut).replaceAsset(asset, recipient, amount);
 
-        emit MultiMintAssetReplaced(asset, extensionOut, amount);
+        emit MultiMintAssetReplaced(asset, extensionOut, amount, recipient);
     }
 
     /* ============ Internal View/Pure Functions ============ */

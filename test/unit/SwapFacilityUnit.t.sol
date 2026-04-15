@@ -494,7 +494,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         IERC20(address(extensionB)).approve(address(swapFacility), AMOUNT);
 
         vm.expectEmit();
-        emit ISwapFacility.MultiMintAssetReplaced(address(mockUSDC), address(multiMintExtension), AMOUNT);
+        emit ISwapFacility.MultiMintAssetReplaced(address(mockUSDC), address(multiMintExtension), AMOUNT, bob);
 
         vm.prank(bob);
         swapFacility.replaceAsset(address(mockUSDC), address(extensionB), address(multiMintExtension), AMOUNT, bob);
@@ -542,7 +542,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
 
         vm.expectEmit();
-        emit ISwapFacility.MultiMintAssetReplaced(address(mockUSDC), address(multiMintExtension), AMOUNT);
+        emit ISwapFacility.MultiMintAssetReplaced(address(mockUSDC), address(multiMintExtension), AMOUNT, bob);
 
         vm.prank(bob);
         swapFacility.replaceAsset(address(mockUSDC), address(pyusdx), address(multiMintExtension), AMOUNT, bob);

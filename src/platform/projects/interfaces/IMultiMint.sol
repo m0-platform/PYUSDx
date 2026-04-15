@@ -109,6 +109,6 @@ interface IMultiMint is IYieldToOne {
     function isAllowedToUnwrap(uint256 amount) external view returns (bool);
 
     /// @notice Checks if replacing `asset` with the backing asset is allowed.
-    /// @dev    `amount` MUST be formatted in `asset`'s decimals.
+    /// @dev    `amount` MUST be formatted in PYUSDX decimals.
     function isAllowedToReplaceAsset(address asset, uint256 amount) external view returns (bool);
 }
