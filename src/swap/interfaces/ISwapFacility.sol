@@ -4,7 +4,7 @@ pragma solidity ^0.8.34;
 /// @title  Swap Facility interface.
 /// @author M0 Labs
 interface ISwapFacility {
-    //// ============ Events ============ */
+    /* ============ Events ============ */
 
     /// @notice Emitted when PYUSDX Extension is swapped for another PYUSDX Extension.
     /// @param  extensionIn  The address of the input PYUSDX Extension.

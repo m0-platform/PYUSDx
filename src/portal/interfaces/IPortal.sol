@@ -43,8 +43,8 @@ interface IPortal {
         bytes32 messageId
     );
 
-    /// @notice Emitted when wrapping M token to the Extension token is failed on the destination.
-    /// @param  destinationExtension The address of M Extension on the destination chain.
+    /// @notice Emitted when wrapping PYUSDX token to the Extension token is failed on the destination.
+    /// @param  destinationExtension The address of PYUSDX Extension on the destination chain.
     /// @param  recipient            The account receiving tokens.
     /// @param  amount               The amount of tokens.
     event WrapFailed(address indexed destinationExtension, address indexed recipient, uint256 amount);
@@ -114,9 +114,6 @@ interface IPortal {
 
     /// @notice Thrown when the payload gas limit is 0.
     error ZeroPayloadGasLimit();
-
-    /// @notice Thrown when `receiveMessage` function caller is not the bridge.
-    error NotBridgeAdapter();
 
     /// @notice Thrown when the destination chain id is equal to the source one.
     error InvalidDestinationChain(uint32 destinationChainId);
