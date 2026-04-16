@@ -77,6 +77,28 @@ interface IPortal {
     /// @notice Emitted when receiving is unpaused.
     event ReceiveUnpaused();
 
+    /// @notice Emitted when the fallback recipient is set.
+    /// @param  fallbackRecipient The address that receives PYUSDX on the destination chain when the intended recipient is frozen.
+    event FallbackRecipientSet(address indexed fallbackRecipient);
+
+    /// @notice Emitted when an inbound transfer is routed to the fallback recipient because the intended recipient is frozen.
+    /// @param  sourceChainId     The ID of the source chain.
+    /// @param  destinationToken  The address of the token on the destination chain.
+    /// @param  sender            The account that sent the tokens.
+    /// @param  recipient         The intended recipient that is frozen.
+    /// @param  amount            The amount of tokens.
+    /// @param  messageId         The unique ID of the message.
+    /// @param  fallbackRecipient The address that received the tokens instead of the frozen recipient.
+    event RedirectedToFallbackRecipient(
+        uint32 sourceChainId,
+        address indexed destinationToken,
+        bytes32 indexed sender,
+        address indexed recipient,
+        uint256 amount,
+        bytes32 messageId,
+        address fallbackRecipient
+    );
+
     /* ============ Custom Errors ============ */
 
     /// @notice Thrown when the PYUSDX token is 0x0.
@@ -115,6 +137,9 @@ interface IPortal {
     /// @notice Thrown when the payload gas limit is 0.
     error ZeroPayloadGasLimit();
 
+    /// @notice Thrown when the fallback recipient address is 0x0.
+    error ZeroFallbackRecipient();
+
     /// @notice Thrown when the destination chain id is equal to the source one.
     error InvalidDestinationChain(uint32 destinationChainId);
 
@@ -149,6 +174,11 @@ interface IPortal {
 
     /// @notice The address of the Swap Facility contract.
     function swapFacility() external view returns (address);
+
+    /// @notice The address that receives PYUSDX or PYUSDX Extension on the destination chain when the intended recipient is frozen.
+    /// @dev    Used as a safety fallback to prevent inbound cross-chain transfers from reverting when the
+    ///         original recipient cannot receive tokens`.
+    function fallbackRecipient() external view returns (address);
 
     /// @notice The ID of the chain on which the Portal contract is deployed.
     function currentChainId() external view returns (uint32);
@@ -206,6 +236,10 @@ interface IPortal {
     /// @param  bridgeAdapter      The address of the bridge adapter.
     /// @param  supported          `True` if the bridge adapter is supported, `false` otherwise.
     function setSupportedBridgeAdapter(uint32 destinationChainId, address bridgeAdapter, bool supported) external;
+
+    /// @notice Sets the address that receives PYUSDX or PYUSDX Extension on the destination chain when the intended recipient is frozen.
+    /// @param  fallbackRecipient The address of the fallback recipient.
+    function setFallbackRecipient(address fallbackRecipient) external;
 
     /// @notice Transfers PYUSDX or PYUSDX Extension to the destination chain using the default bridge adapter.
     /// @dev    If wrapping on the destination fails, the recipient will receive PYUSDX token.
