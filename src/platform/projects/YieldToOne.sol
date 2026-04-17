@@ -175,13 +175,14 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
 
     /* ============ Hooks ============ */
 
-    /// @dev Hook called before claiming yield. Reverts if the yield recipient is frozen.
+    /// @dev Hook called before claiming yield. Restricts the caller to
+    ///      `YIELD_RECIPIENT_MANAGER_ROLE` and reverts if the yield recipient is frozen.
     ///      Intentionally omits `_requireNotPaused()` so the admin can rotate a compromised
     ///      recipient mid-incident via `setYieldRecipient` (which calls `claimYield`
     ///      internally). Minted extension tokens cannot move while paused —
     ///      `_beforeTransfer`, `_beforeWrap`, and `_beforeUnwrap` all enforce the pause —
     ///      so supply minted during pause is economically inert until unpause.
-    function _beforeClaimYield() internal view virtual {
+    function _beforeClaimYield() internal view virtual onlyRole(YIELD_RECIPIENT_MANAGER_ROLE) {
         _revertIfFrozen(_getFreezableStorageLocation(), yieldRecipient());
     }
 
