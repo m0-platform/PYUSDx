@@ -38,6 +38,7 @@ abstract contract PortalUnitTestBase is Test {
     address internal admin = makeAddr("admin");
     address internal operator = makeAddr("operator");
     address internal pauser = makeAddr("pauser");
+    address internal fallbackRecipient = makeAddr("fallbackRecipient");
     address internal user = makeAddr("user");
 
     function setUp() public virtual {
@@ -52,7 +53,7 @@ abstract contract PortalUnitTestBase is Test {
         implementation = new Portal(address(pyusdx), address(swapFacility));
 
         // Deploy Transparent proxy
-        bytes memory initializeData = abi.encodeCall(Portal.initialize, (admin, pauser, operator));
+        bytes memory initializeData = abi.encodeCall(Portal.initialize, (admin, pauser, operator, fallbackRecipient));
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(implementation),
             admin,

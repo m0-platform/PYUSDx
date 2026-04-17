@@ -6,6 +6,7 @@ import { TypeConverter } from "../../lib/evm-m-extensions/lib/common/src/libs/Ty
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 
 import { IBridgeAdapter } from "./interfaces/IBridgeAdapter.sol";
 import { IPortal } from "./interfaces/IPortal.sol";
@@ -34,6 +35,8 @@ abstract contract PortalStorageLayout {
         mapping(uint32 chainId => ChainConfig) remoteChainConfig;
         /// @notice Indicates whether a message with a given hash has been processed.
         mapping(bytes32 messageId => bool) processedMessages;
+        /// @notice The address that receives PYUSDX or PYUSDX Extension on the destination chain when the intended recipient is frozen.
+        address fallbackRecipient;
         /// @notice Indicates whether sending cross-chain messages is paused.
         bool sendPaused;
         /// @notice Indicates whether receiving cross-chain messages is paused.
@@ -91,10 +94,16 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     }
 
     /// @notice Initializes the Proxy's storage
-    /// @param  admin    The address of the admin.
-    /// @param  pauser   The address of the pauser.
-    /// @param  operator The address of the operator.
-    function initialize(address admin, address pauser, address operator) external initializer {
+    /// @param  admin              The address of the admin.
+    /// @param  pauser             The address of the pauser.
+    /// @param  operator           The address of the operator.
+    /// @param  fallbackRecipient_ The address that receives PYUSDX or PYUSDX Extension on the destination chain when the intended recipient is frozen.
+    function initialize(
+        address admin,
+        address pauser,
+        address operator,
+        address fallbackRecipient_
+    ) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
         if (pauser == address(0)) revert ZeroPauser();
         if (operator == address(0)) revert ZeroOperator();
@@ -102,6 +111,7 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(PAUSER_ROLE, pauser);
         _grantRole(OPERATOR_ROLE, operator);
+        _setFallbackRecipient(fallbackRecipient_);
     }
 
     /* ============ External Interactive Functions ============ */
@@ -160,6 +170,25 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         if ($.processedMessages[messageId]) revert MessageAlreadyProcessed(messageId);
 
         $.processedMessages[messageId] = true;
+
+        // NOTE: Only the PYUSDX freeze list is checked here. If the recipient is frozen on PYUSDX,
+        //       tokens are redirected to the fallback recipient to prevent a revert on mint.
+        //       If the recipient is frozen on a PYUSDX Extension but not on PYUSDX, the wrap via
+        //       SwapFacility will fail and the recipient will receive PYUSDX directly (see WrapFailed).
+        //       In reality, we expect recipients to be frozen both on PYUSDX and all PYUSDX Extensions.
+        if (IFreezable(pyusdx).isFrozen(recipient)) {
+            address fallbackRecipient_ = fallbackRecipient();
+            emit RedirectedToFallbackRecipient(
+                sourceChainId,
+                destinationToken,
+                sender,
+                recipient,
+                amount,
+                messageId,
+                fallbackRecipient_
+            );
+            recipient = fallbackRecipient_;
+        }
 
         emit TokenReceived(sourceChainId, destinationToken, sender, recipient, amount, messageId);
 
@@ -239,6 +268,13 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     }
 
     /// @inheritdoc IPortal
+    /// @dev Gated by `DEFAULT_ADMIN_ROLE` rather than `OPERATOR_ROLE` because the fallback recipient
+    ///      custodies inbound PYUSDX redirected from frozen accounts and must be controlled by the highest-trust role.
+    function setFallbackRecipient(address fallbackRecipient_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setFallbackRecipient(fallbackRecipient_);
+    }
+
+    /// @inheritdoc IPortal
     function pauseSend() public onlyRole(PAUSER_ROLE) {
         _pauseSend();
     }
@@ -271,6 +307,11 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     }
 
     /* ============ External View/Pure Functions ============ */
+
+    /// @inheritdoc IPortal
+    function fallbackRecipient() public view returns (address) {
+        return _getPortalStorageLocation().fallbackRecipient;
+    }
 
     /// @inheritdoc IPortal
     /// @dev Using block.chainid directly to prevent a replay attack if a chain undergoes a contentious hard fork.
@@ -509,6 +550,17 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         if (!$.receivePaused) return;
         $.receivePaused = false;
         emit ReceiveUnpaused();
+    }
+
+    /// @dev Sets the address that receives PYUSDX or PYUSDX Extension on the destination chain when the intended recipient is frozen.
+    function _setFallbackRecipient(address fallbackRecipient_) internal {
+        if (fallbackRecipient_ == address(0)) revert ZeroFallbackRecipient();
+
+        PortalStorageStruct storage $ = _getPortalStorageLocation();
+        if ($.fallbackRecipient == fallbackRecipient_) return;
+
+        $.fallbackRecipient = fallbackRecipient_;
+        emit FallbackRecipientSet(fallbackRecipient_);
     }
 
     /// @dev Generates a unique across all chains message ID.
