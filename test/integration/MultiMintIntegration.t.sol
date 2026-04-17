@@ -240,6 +240,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         assertGt(multiMint.yield(), 0);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = multiMint.claimYield();
 
         assertGt(claimed, 0);
@@ -266,6 +267,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         // Excess = 700 - 500 = 200
         assertEq(multiMint.yield(), 200e6);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = multiMint.claimYield();
 
         assertGe(claimed, 200e6);
@@ -285,6 +287,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         assertEq(multiMint.yield(), 0);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = multiMint.claimYield();
 
         assertEq(claimed, 0);
@@ -314,6 +317,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         assertGt(multiMint.yield(), 0);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = multiMint.claimYield();
 
         assertGt(claimed, 0);
@@ -372,6 +376,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         // 2. Yield accrues on 500 PYUSDX
         vm.warp(block.timestamp + 365 days);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = multiMint.claimYield();
 
         assertGt(claimed, 0);
@@ -418,6 +423,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         vm.warp(block.timestamp + 365 days);
 
+        vm.prank(yieldRecipientManager);
         uint256 yieldFirstPeriod = multiMint.claimYield();
 
         assertGt(yieldFirstPeriod, 0);
@@ -433,6 +439,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         vm.warp(block.timestamp + 365 days);
 
+        vm.prank(yieldRecipientManager);
         uint256 yieldSecondPeriod = multiMint.claimYield();
 
         assertGt(yieldSecondPeriod, yieldFirstPeriod);
@@ -466,6 +473,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         assertFalse(swapFacility.isApprovedExtension(address(multiMint)));
 
         // claimYield still works (bypasses swap facility)
+        vm.prank(yieldRecipientManager);
         uint256 claimed = multiMint.claimYield();
 
         assertGt(claimed, 0);

@@ -137,6 +137,13 @@ interface IPYUSDX {
 
     /// @notice Sets account info for a single account.
     /// @dev    MUST only be callable by the earner manager.
+    /// @dev    Callable while paused so the earner manager retains an emergency lever over
+    ///         earner configuration. When called while paused, any accrued yield is
+    ///         materialized onto `account`'s own balance and the `claimRecipient` routing and
+    ///         fee `_transfer` are skipped — the earner manager forgoes the fee for that call.
+    ///         The forgone fee is recoverable: `freeze(account)` followed by
+    ///         `forceTransfer(account, feeRecipient, amount)` can move the fee portion out of
+    ///         the earner's balance after the incident response.
     /// @param  account        The account to configure.
     /// @param  earnerRate     The earner rate in basis points (0 to stop earning).
     /// @param  feeRate        The fee rate on yield (basis points, 0-10000).
@@ -146,6 +153,10 @@ interface IPYUSDX {
     /// @notice Sets account info for multiple accounts.
     /// @dev    MUST only be callable by the earner manager.
     /// @dev    MUST revert if array lengths do not match.
+    /// @dev    Pause semantics match the single-account overload: yield materializes to each
+    ///         account's own balance, fee and `claimRecipient` routing are skipped per entry.
+    ///         The forgone fee on any entry is recoverable post-incident via `freeze` +
+    ///         `forceTransfer`.
     /// @param  accounts        The accounts to configure.
     /// @param  earnerRates     The earner rates for each account (basis points).
     /// @param  feeRates        The fee rates for each account (basis points).

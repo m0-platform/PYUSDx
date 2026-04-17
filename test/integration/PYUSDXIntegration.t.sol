@@ -55,7 +55,7 @@ contract PYUSDXIntegrationTests is IntegrationForkTest {
         assertGt(pyusdx.balanceOf(alice), 0);
     }
 
-    /* ============ Freeze + _claimFor(forFreeze=true) Integration ============ */
+    /* ============ Freeze + _claimFor(skipTransfer=true) Integration ============ */
 
     function testIntegration_freeze_whilePaused_forceTransfer() public {
         uint256 initialBalance = 1000e6;
@@ -131,6 +131,69 @@ contract PYUSDXIntegrationTests is IntegrationForkTest {
 
         assertEq(pyusdx.balanceOf(alice), 0);
         assertEq(pyusdx.balanceOf(carol), carolBalanceBefore + expectedTotal);
+    }
+
+    /* ============ Pause-time setAccountInfo + fee recovery Integration ============ */
+
+    // Incident-response flow documented in `IPYUSDX.setAccountInfo` NatSpec:
+    // 1. pause the contract
+    // 2. earner manager disables a misbehaving earner via `setAccountInfo` — yield materializes
+    //    to the earner, the fee hop is skipped (earner keeps the fee portion)
+    // 3. freeze the earner
+    // 4. force-transfer the forgone fee from the earner to the fee recipient
+    //
+    // This test validates that the recovery path is reachable end-to-end and that no balance
+    // is left stranded: principal + net yield → original custodian; fee portion → fee recipient.
+    function testIntegration_setAccountInfo_whilePaused_forgoneFeeRecoverable() public {
+        uint256 initialBalance = 1000e6;
+        _mintPYUSDX(alice, initialBalance);
+
+        // Alice: earner, 10% fee, bob as claim recipient
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 1000, bob);
+
+        vm.warp(block.timestamp + 365 days);
+
+        (uint256 yieldWithFee, uint256 expectedFee, uint256 expectedNetYield) = pyusdx.accruedYieldAndFeeOf(alice);
+        assertGt(expectedFee, 0, "test requires non-zero fee");
+
+        // Pause the contract (incident starts)
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        // Disable earning while paused: full yieldWithFee materializes on alice (bob and
+        // earnerManager get nothing via this call — the fee/routing hops are skipped).
+        uint256 bobBalanceBefore = pyusdx.balanceOf(bob);
+        uint256 earnerManagerBalanceBefore = pyusdx.balanceOf(earnerManager);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 0, 0, address(0));
+
+        assertFalse(pyusdx.isEarning(alice));
+        assertEq(pyusdx.balanceOf(alice), initialBalance + yieldWithFee);
+        assertEq(pyusdx.balanceOf(bob), bobBalanceBefore, "claim recipient unchanged while paused");
+        assertEq(pyusdx.balanceOf(earnerManager), earnerManagerBalanceBefore, "fee recipient unchanged while paused");
+
+        // Freeze alice — `forceTransfer` requires the source to be frozen.
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        assertTrue(pyusdx.isFrozen(alice));
+
+        // Recover the forgone fee: force-transfer the fee portion from alice → earnerManager.
+        vm.prank(forcedTransferManager);
+        pyusdx.forceTransfer(alice, earnerManager, expectedFee);
+
+        assertEq(
+            pyusdx.balanceOf(earnerManager),
+            earnerManagerBalanceBefore + expectedFee,
+            "fee recipient recovered forgone fee"
+        );
+        assertEq(
+            pyusdx.balanceOf(alice),
+            initialBalance + expectedNetYield,
+            "alice retains principal + net yield after fee recovery"
+        );
     }
 
     function testIntegration_freezeAccounts_batch_yieldMaterialized() public {

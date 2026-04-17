@@ -381,7 +381,12 @@ contract PYUSDX is
         emit AccountInfoUpdated(account, earnerRate, feeRate, claimRecipient);
 
         // Claim accrued yield for earners before changing their earning status & configuration.
-        _claimFor(account);
+        // When paused, skip the `claimRecipient` routing and fee `_transfer` (same carve-out as
+        // `_beforeFreeze`): yield materializes to `account`'s own balance and the earner manager
+        // knowingly forgoes the fee. This keeps `setAccountInfo` usable as an emergency lever
+        // across every earner configuration while paused. The forgone fee is recoverable
+        // post-incident via `freeze(account)` + `forceTransfer(account, feeRecipient, amount)`.
+        _claimFor(account, paused());
 
         // Option 1: Disable earning for an earner, resetting all earning-related fields to 0, address(0).
         if (wasEarning && !willBeEarning) {
@@ -425,11 +430,11 @@ contract PYUSDX is
     }
 
     /// @dev   Internal claim implementation.
-    /// @param account   The account to claim yield for.
-    /// @param forFreeze Whether the claim is happening during a freeze operation.
+    /// @param account      The account to claim yield for.
+    /// @param skipTransfer Whether to skip the `claimRecipient` routing and fee `_transfer` calls.
     function _claimFor(
         address account,
-        bool forFreeze
+        bool skipTransfer
     ) internal returns (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) {
         _revertIfFrozen(account);
 
@@ -450,11 +455,11 @@ contract PYUSDX is
             $.accounts[account].balance += yieldWithFee;
         }
 
-        // NOTE: When claiming during freeze, skip the `claimRecipient` routing and fee transfer.
-        //       This avoids calling `_transfer` which has `whenNotPaused` and `_revertIfFrozen` checks
-        //       that would cause freeze to revert while paused or when `claimRecipient` is frozen.
-        //       `forceTransfer` can then be used to transfer all funds from the frozen account.
-        if (forFreeze) return (yieldWithFee, fee, yieldNetOfFee);
+        // NOTE: Callers set `skipTransfer=true` to avoid `_transfer`, which has `whenNotPaused`
+        //       and `_revertIfFrozen` checks. Used by freeze (recipient may be frozen) and by
+        //       pause-time `_setAccountInfo` (contract is paused). Yield stays on `account`'s
+        //       balance; routing to `claimRecipient` and the fee hop are skipped.
+        if (skipTransfer) return (yieldWithFee, fee, yieldNetOfFee);
 
         address claimRecipient = claimRecipientFor(account);
 

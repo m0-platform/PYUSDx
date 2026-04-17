@@ -140,8 +140,13 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
 
     /// @inheritdoc IYieldToOne
     function setYieldRecipient(address account) external virtual onlyRole(YIELD_RECIPIENT_MANAGER_ROLE) {
-        // Claim yield for the previous yield recipient before changing.
-        claimYield();
+        // NOTE: Skip the claim when the outgoing recipient is frozen — `_beforeClaimYield`
+        //       would otherwise revert on the freeze check, blocking the admin's ability
+        //       to rotate a compromised recipient mid-incident. Pending PYUSDX yield
+        //       remains as `_excess()` and is paid to the next recipient on their first
+        //       claim. The frozen recipient's forgone slice is an accepted cost of the
+        //       incident-response path.
+        if (!isFrozen(yieldRecipient())) claimYield();
 
         _setYieldRecipient(account);
     }
@@ -170,8 +175,16 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
 
     /* ============ Hooks ============ */
 
-    /// @dev Hook called before claiming yield.
-    function _beforeClaimYield() internal view virtual {}
+    /// @dev Hook called before claiming yield. Restricts the caller to
+    ///      `YIELD_RECIPIENT_MANAGER_ROLE` and reverts if the yield recipient is frozen.
+    ///      Intentionally omits `_requireNotPaused()` so the admin can rotate a compromised
+    ///      recipient mid-incident via `setYieldRecipient` (which calls `claimYield`
+    ///      internally). Minted extension tokens cannot move while paused —
+    ///      `_beforeTransfer`, `_beforeWrap`, and `_beforeUnwrap` all enforce the pause —
+    ///      so supply minted during pause is economically inert until unpause.
+    function _beforeClaimYield() internal view virtual onlyRole(YIELD_RECIPIENT_MANAGER_ROLE) {
+        _revertIfFrozen(_getFreezableStorageLocation(), yieldRecipient());
+    }
 
     /* ============ Internal Interactive Functions ============ */
 

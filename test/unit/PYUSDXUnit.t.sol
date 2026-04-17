@@ -2307,6 +2307,217 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertTrue(pyusdx.isEarning(bob));
     }
 
+    /* ============ setAccountInfo: pause-consistent behavior ============ */
+
+    // Disabling an earner while paused must not revert, even when the earner has a non-zero `feeRate`.
+    function test_setAccountInfo_whenPaused_disableEarner_feeRate_doesNotRevert() public {
+        issuerGateway.mint(alice, 1000e6);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 5000, address(0));
+        pyusdx.setAccountRateBps(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        assertGt(pyusdx.accruedYieldOf(alice), 0);
+
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 0, 0, address(0));
+
+        assertFalse(pyusdx.isEarning(alice));
+    }
+
+    // Disabling an earner with a custom `claimRecipient` while paused must not revert and must
+    // not emit a routing `Transfer` from earner → recipient.
+    function test_setAccountInfo_whenPaused_disableEarner_customRecipient_doesNotRevert() public {
+        issuerGateway.mint(alice, 1000e6);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 0, bob);
+        pyusdx.setAccountRateBps(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+        assertGt(pyusdx.accruedYieldOf(alice), 0);
+
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        vm.recordLogs();
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 0, 0, address(0));
+
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] != Transfer.selector) continue;
+            // `Transfer(address,address,uint256)` is indexed on `from` and `to`.
+            address from = address(uint160(uint256(logs[i].topics[1])));
+            address to = address(uint160(uint256(logs[i].topics[2])));
+            assertFalse(from == alice && to == bob, "routing transfer should be skipped while paused");
+        }
+
+        assertFalse(pyusdx.isEarning(alice));
+    }
+
+    // When `setAccountInfo` runs while paused, the full `yieldWithFee` (net + fee) must
+    // materialize to the earner's own balance — the fee recipient gets nothing, and the earner
+    // keeps the fee. `totalSupply` grows by `yieldWithFee`. This documents the deliberate
+    // trade-off: emergency lever for the earner manager costs them the fee.
+    function test_setAccountInfo_whenPaused_disableEarner_yieldMaterializesOnEarner_feeForfeited() public {
+        issuerGateway.mint(alice, 1000e6);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 5000, address(0));
+        pyusdx.setAccountRateBps(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        (uint256 yieldWithFee, uint256 fee, ) = pyusdx.accruedYieldAndFeeOf(alice);
+        assertGt(yieldWithFee, 0);
+        assertGt(fee, 0);
+
+        uint256 aliceBefore = pyusdx.balanceOf(alice);
+        uint256 managerBefore = pyusdx.balanceOf(earnerManager);
+        uint256 supplyBefore = pyusdx.totalSupply();
+
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 0, 0, address(0));
+
+        assertEq(pyusdx.balanceOf(alice), aliceBefore + yieldWithFee, "earner keeps full yield incl. fee");
+        assertEq(pyusdx.balanceOf(earnerManager), managerBefore, "fee recipient unchanged while paused");
+        assertEq(pyusdx.totalSupply(), supplyBefore + yieldWithFee, "supply grows by yieldWithFee");
+    }
+
+    // Updating the earner rate while paused: old-rate yield materializes to the earner, new
+    // rate is written, and routing `Transfer` events are skipped. After unpause + warp + claim,
+    // yield is computed against the post-update balance at the new rate.
+    function test_setAccountInfo_whenPaused_updatesEarnerRate() public {
+        issuerGateway.mint(alice, 1000e6);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 0, address(0));
+        pyusdx.setAccountRateBps(alice, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        (uint256 yieldWithFee, , ) = pyusdx.accruedYieldAndFeeOf(alice);
+        assertGt(yieldWithFee, 0);
+
+        uint256 aliceBefore = pyusdx.balanceOf(alice);
+        uint256 supplyBefore = pyusdx.totalSupply();
+
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        vm.recordLogs();
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 700, 0, address(0));
+
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] != Transfer.selector) continue;
+            address from = address(uint160(uint256(logs[i].topics[1])));
+            // The only `Transfer` expected is the mint-like `Transfer(address(0), alice, ...)`
+            // emitted by `_claimFor` for the materialization. Any `from == alice` would be a
+            // routing/fee transfer that should have been skipped.
+            assertNotEq(from, alice, "no routing transfer from earner while paused");
+        }
+
+        (uint32 earnerRate, , ) = pyusdx.getAccountEarningInfo(alice);
+
+        assertEq(earnerRate, 700);
+        assertEq(pyusdx.balanceOf(alice), aliceBefore + yieldWithFee);
+        assertEq(pyusdx.totalSupply(), supplyBefore + yieldWithFee);
+    }
+
+    // Enabling earning for a non-earner while paused: no accrued yield to materialize, supply
+    // and balance unchanged, `StartedEarning` emitted, state correctly written.
+    function test_setAccountInfo_whenPaused_enablesEarningForNonEarner() public {
+        issuerGateway.mint(bob, 1000e6);
+        assertFalse(pyusdx.isEarning(bob));
+
+        uint256 bobBefore = pyusdx.balanceOf(bob);
+        uint256 supplyBefore = pyusdx.totalSupply();
+
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        vm.expectEmit();
+        emit IPYUSDX.AccountInfoUpdated(bob, 500, 0, address(0));
+
+        vm.expectEmit();
+        emit IPYUSDX.StartedEarning(bob);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(bob, 500, 0, address(0));
+
+        assertTrue(pyusdx.isEarning(bob));
+        assertEq(pyusdx.balanceOf(bob), bobBefore);
+        assertEq(pyusdx.totalSupply(), supplyBefore);
+    }
+
+    // Batch overload exercises the same pause path per entry: update, enable, disable must all
+    // succeed without reverting and without any routing `Transfer` from an earner.
+    function test_setAccountInfo_batch_whenPaused_mixedPaths() public {
+        // alice: existing earner — rate update
+        // bob: non-earner → enable
+        // carol: existing earner → disable (with fee)
+        issuerGateway.mint(alice, 1000e6);
+        issuerGateway.mint(bob, 1000e6);
+        issuerGateway.mint(carol, 1000e6);
+
+        vm.startPrank(earnerManager);
+
+        pyusdx.setAccountInfo(alice, 500, 0, address(0));
+        pyusdx.setAccountInfo(carol, 500, 5000, address(0));
+
+        vm.stopPrank();
+
+        pyusdx.setAccountRateBps(alice, 500);
+        pyusdx.setAccountRateBps(carol, 500);
+
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        address[] memory batchAccounts = new address[](3);
+        batchAccounts[0] = alice;
+        batchAccounts[1] = bob;
+        batchAccounts[2] = carol;
+
+        uint32[] memory earnerRates = new uint32[](3);
+        earnerRates[0] = 800;
+        earnerRates[1] = 500;
+        earnerRates[2] = 0;
+
+        uint16[] memory feeRates = new uint16[](3);
+        feeRates[0] = 0;
+        feeRates[1] = 0;
+        feeRates[2] = 0;
+
+        address[] memory recipients = new address[](3);
+        recipients[0] = address(0);
+        recipients[1] = address(0);
+        recipients[2] = address(0);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(batchAccounts, earnerRates, feeRates, recipients);
+
+        (uint32 aliceRate, , ) = pyusdx.getAccountEarningInfo(alice);
+
+        assertEq(aliceRate, 800, "alice rate updated");
+        assertTrue(pyusdx.isEarning(bob), "bob enabled");
+        assertFalse(pyusdx.isEarning(carol), "carol disabled");
+    }
+
     /* ============ freeze / freezeAccounts (earning stop) ============ */
 
     function test_freeze_earningAccount_claimsYieldAndStopsEarning() public {

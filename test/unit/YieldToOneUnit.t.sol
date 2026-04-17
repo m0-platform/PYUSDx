@@ -13,6 +13,7 @@ import { IYieldToOne } from "../../src/platform/projects/interfaces/IYieldToOne.
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 
 import { BaseTest } from "../utils/BaseTest.sol";
 
@@ -260,6 +261,7 @@ contract YieldToOneUnitTests is BaseTest {
         assertGt(pyusdx.accruedYieldOf(address(extension)), 0);
         assertGt(extension.yield(), 0);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
 
         assertGt(claimed, 0);
@@ -271,6 +273,7 @@ contract YieldToOneUnitTests is BaseTest {
     function test_claimYield_noYield() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
         assertEq(claimed, 0);
         assertEq(extension.balanceOf(yieldRecipient), 0);
@@ -286,6 +289,7 @@ contract YieldToOneUnitTests is BaseTest {
 
         (uint256 grossYield, , ) = pyusdx.accruedYieldAndFeeOf(address(extension));
 
+        vm.prank(yieldRecipientManager);
         extension.claimYield();
 
         uint256 yieldRecipientBalance = extension.balanceOf(yieldRecipient);
@@ -306,8 +310,19 @@ contract YieldToOneUnitTests is BaseTest {
         assertGt(pyusdx.accruedYieldOf(address(extension)), 0);
         assertEq(extension.yield(), 0);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
         assertEq(claimed, 0);
+    }
+
+    function test_claimYield_revert_recipientFrozen() public {
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, yieldRecipient));
+
+        vm.prank(yieldRecipientManager);
+        extension.claimYield();
     }
 
     /* ============ SetYieldRecipient ============ */
@@ -325,9 +340,74 @@ contract YieldToOneUnitTests is BaseTest {
         assertGt(extension.balanceOf(yieldRecipient), 0);
 
         vm.warp(block.timestamp + 365 days);
+
+        vm.prank(yieldRecipientManager);
         extension.claimYield();
 
         assertGt(extension.balanceOf(newRecipient), 0);
+    }
+
+    function test_setYieldRecipient_recipientFrozen_skipsClaim() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 yieldBefore = extension.yield();
+        assertGt(yieldBefore, 0);
+
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        address newRecipient = makeAddr("newRecipient");
+
+        vm.prank(yieldRecipientManager);
+        extension.setYieldRecipient(newRecipient);
+
+        assertEq(extension.yieldRecipient(), newRecipient);
+        assertEq(extension.balanceOf(yieldRecipient), 0);
+    }
+
+    function test_setYieldRecipient_recipientFrozen_excessPreservedForNextRecipient() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 yieldBefore = extension.yield();
+
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        address newRecipient = makeAddr("newRecipient");
+
+        vm.prank(yieldRecipientManager);
+        extension.setYieldRecipient(newRecipient);
+
+        // Old recipient received nothing.
+        assertEq(extension.balanceOf(yieldRecipient), 0);
+
+        // New recipient's first claim captures at least the yield that was pending at rotation time.
+        vm.prank(yieldRecipientManager);
+        uint256 claimed = extension.claimYield();
+
+        assertGe(claimed, yieldBefore);
+        assertEq(extension.balanceOf(newRecipient), claimed);
+    }
+
+    function test_setYieldRecipient_recipientFrozenAndPaused() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        address newRecipient = makeAddr("newRecipient");
+
+        vm.prank(yieldRecipientManager);
+        extension.setYieldRecipient(newRecipient);
+
+        assertEq(extension.yieldRecipient(), newRecipient);
+        assertEq(extension.balanceOf(yieldRecipient), 0);
     }
 
     /* ============ Yield View ============ */
@@ -348,6 +428,7 @@ contract YieldToOneUnitTests is BaseTest {
         assertEq(yieldAfter, pyusdx.balanceOf(address(extension)) - extension.totalSupply());
 
         // claimYield should recover the excess.
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
         assertEq(claimed, yieldAfter);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
@@ -367,6 +448,7 @@ contract YieldToOneUnitTests is BaseTest {
         assertGe(extension.yield(), gift);
 
         // claimYield recovers it.
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
         assertGe(claimed, gift);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
@@ -381,12 +463,73 @@ contract YieldToOneUnitTests is BaseTest {
         vm.prank(pauser);
         extension.pause();
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
         assertGt(claimed, 0);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 
+    function test_incidentResponse_freezeRotateClaim() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        address newRecipient = makeAddr("newRecipient");
+
+        vm.prank(yieldRecipientManager);
+        extension.setYieldRecipient(newRecipient);
+
+        assertEq(extension.yieldRecipient(), newRecipient);
+        assertEq(extension.balanceOf(yieldRecipient), 0);
+
+        vm.prank(pauser);
+        extension.unpause();
+
+        vm.prank(yieldRecipientManager);
+        uint256 claimed = extension.claimYield();
+
+        assertGt(claimed, 0);
+        assertEq(extension.balanceOf(newRecipient), claimed);
+        assertEq(extension.balanceOf(yieldRecipient), 0);
+    }
+
+    function test_claimYield_revert_recipientFrozenWhilePaused() public {
+        _wrapFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        // Pause does not mask the freeze check — rotation is the only valid path
+        // forward; see `setYieldRecipient` for the incident-response flow.
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, yieldRecipient));
+
+        vm.prank(yieldRecipientManager);
+        extension.claimYield();
+    }
+
     /* ============ Access Control ============ */
+
+    function test_claimYield_revert_notManager() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                extension.YIELD_RECIPIENT_MANAGER_ROLE()
+            )
+        );
+
+        vm.prank(alice);
+        extension.claimYield();
+    }
 
     function test_setYieldRecipient_revert_notManager() public {
         address newRecipient = makeAddr("newRecipient");
@@ -420,6 +563,7 @@ contract YieldToOneUnitTests is BaseTest {
         vm.expectEmit();
         emit IYieldToOne.YieldClaimed(expectedYield);
 
+        vm.prank(yieldRecipientManager);
         extension.claimYield();
     }
 

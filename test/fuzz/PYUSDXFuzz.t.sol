@@ -446,4 +446,62 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             }
         }
     }
+
+    /* ============ Fuzz: setAccountInfo pause invariant ============ */
+
+    // Invariant under pause: calling `setAccountInfo` with arbitrary earner configs and target
+    // configs must not revert, and `totalSupply` must grow by exactly the pre-call `yieldWithFee`
+    // — the earner keeps the full materialized amount; routing and fee hops are skipped.
+    function testFuzz_setAccountInfo_whenPaused_supplyDeltaEqualsYield(
+        uint256 mintAmount,
+        uint32 earnerRate,
+        uint16 feeRate,
+        uint40 elapsed,
+        uint8 targetPath,
+        bool customRecipient
+    ) public {
+        mintAmount = bound(mintAmount, 1e6, 1e18);
+        uint32 boundedEarnerRate = uint32(bound(earnerRate, 1, MAX_FEE_RATE));
+        uint16 boundedFeeRate = uint16(bound(feeRate, 0, MAX_FEE_RATE));
+        uint40 boundedElapsed = uint40(bound(elapsed, 1 days, 365 days));
+        uint8 boundedPath = uint8(bound(targetPath, 0, 2)); // 0=disable, 1=update rate, 2=update recipient
+
+        address initialRecipient = customRecipient ? bob : address(0);
+
+        issuerGateway.mint(alice, mintAmount);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, boundedEarnerRate, boundedFeeRate, initialRecipient);
+        pyusdx.setAccountRateBps(alice, boundedEarnerRate);
+
+        vm.warp(block.timestamp + boundedElapsed);
+
+        (uint256 yieldWithFee, , ) = pyusdx.accruedYieldAndFeeOf(alice);
+
+        uint256 supplyBefore = pyusdx.totalSupply();
+        uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
+
+        vm.prank(pauser);
+        pyusdx.pause();
+
+        vm.prank(earnerManager);
+        if (boundedPath == 0) {
+            pyusdx.setAccountInfo(alice, 0, 0, address(0));
+            assertFalse(pyusdx.isEarning(alice));
+        } else if (boundedPath == 1) {
+            uint32 newRate = boundedEarnerRate == MAX_FEE_RATE ? 1 : boundedEarnerRate + 1;
+            pyusdx.setAccountInfo(alice, newRate, boundedFeeRate, initialRecipient);
+            (uint32 postRate, , ) = pyusdx.getAccountEarningInfo(alice);
+            assertEq(postRate, newRate);
+        } else {
+            address newRecipient = initialRecipient == address(0) ? carol : address(0);
+            pyusdx.setAccountInfo(alice, boundedEarnerRate, boundedFeeRate, newRecipient);
+            // Read raw storage — `getAccountEarningInfo` collapses `address(0)` → `account`.
+            (, , address storedRecipient) = pyusdx.getAccountStorage(alice);
+            assertEq(storedRecipient, newRecipient);
+        }
+
+        assertEq(pyusdx.totalSupply(), supplyBefore + yieldWithFee, "supply grows by pre-call yieldWithFee");
+        assertEq(pyusdx.balanceOf(alice), aliceBalanceBefore + yieldWithFee, "earner keeps full yield");
+    }
 }

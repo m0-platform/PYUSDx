@@ -682,6 +682,7 @@ contract MultiMintTest is BaseTest {
         assertGt(yieldAfterClaim, 0);
 
         // claimYield recovers it.
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
 
         assertEq(claimed, yieldAfterClaim);
@@ -695,6 +696,7 @@ contract MultiMintTest is BaseTest {
 
         vm.warp(block.timestamp + 365 days);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
 
         assertGt(claimed, 0);
@@ -716,9 +718,37 @@ contract MultiMintTest is BaseTest {
         assertGt(excess, 0);
 
         // claimYield recovers the excess.
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
 
         assertEq(claimed, excess);
+        assertEq(extension.balanceOf(yieldRecipient), claimed);
+    }
+
+    function test_claimYield_revert_recipientFrozen() public {
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, yieldRecipient));
+
+        vm.prank(yieldRecipientManager);
+        extension.claimYield();
+    }
+
+    function test_claimYield_succeedsWhenPaused() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 expectedYield = extension.yield();
+        assertGt(expectedYield, 0);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        vm.prank(yieldRecipientManager);
+        uint256 claimed = extension.claimYield();
+
+        assertEq(claimed, expectedYield);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
     }
 
@@ -735,6 +765,94 @@ contract MultiMintTest is BaseTest {
 
         assertEq(extension.yieldRecipient(), newRecipient);
         assertGt(extension.balanceOf(yieldRecipient), 0);
+    }
+
+    function test_setYieldRecipient_recipientFrozen_skipsClaim() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        address newRecipient = makeAddr("newRecipient");
+
+        vm.prank(yieldRecipientManager);
+        extension.setYieldRecipient(newRecipient);
+
+        assertEq(extension.yieldRecipient(), newRecipient);
+        assertEq(extension.balanceOf(yieldRecipient), 0);
+    }
+
+    function test_setYieldRecipient_recipientFrozen_excessPreservedForNextRecipient() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 yieldBefore = extension.yield();
+
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        address newRecipient = makeAddr("newRecipient");
+
+        vm.prank(yieldRecipientManager);
+        extension.setYieldRecipient(newRecipient);
+
+        assertEq(extension.balanceOf(yieldRecipient), 0);
+
+        vm.prank(yieldRecipientManager);
+        uint256 claimed = extension.claimYield();
+
+        assertGe(claimed, yieldBefore);
+        assertEq(extension.balanceOf(newRecipient), claimed);
+    }
+
+    function test_setYieldRecipient_recipientFrozenAndPaused() public {
+        _wrapPyusdxFor(alice, alice, MINT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        address newRecipient = makeAddr("newRecipient");
+
+        vm.prank(yieldRecipientManager);
+        extension.setYieldRecipient(newRecipient);
+
+        assertEq(extension.yieldRecipient(), newRecipient);
+        assertEq(extension.balanceOf(yieldRecipient), 0);
+    }
+
+    function test_incidentResponse_freezeRotateClaim() public {
+        _wrapPyusdxFor(alice, alice, 500e6);
+        _wrapAssetFor(alice, address(usdc), 500e6, 500e6);
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(pauser);
+        extension.pause();
+
+        vm.prank(freezeManager);
+        extension.freeze(yieldRecipient);
+
+        address newRecipient = makeAddr("newRecipient");
+
+        vm.prank(yieldRecipientManager);
+        extension.setYieldRecipient(newRecipient);
+
+        assertEq(extension.yieldRecipient(), newRecipient);
+        assertEq(extension.balanceOf(yieldRecipient), 0);
+
+        vm.prank(pauser);
+        extension.unpause();
+
+        vm.prank(yieldRecipientManager);
+        uint256 claimed = extension.claimYield();
+
+        assertGt(claimed, 0);
+        assertEq(extension.balanceOf(newRecipient), claimed);
+        assertEq(extension.balanceOf(yieldRecipient), 0);
     }
 
     /* ============ View Functions ============ */
