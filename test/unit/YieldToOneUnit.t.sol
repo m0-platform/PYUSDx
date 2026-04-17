@@ -261,6 +261,7 @@ contract YieldToOneUnitTests is BaseTest {
         assertGt(pyusdx.accruedYieldOf(address(extension)), 0);
         assertGt(extension.yield(), 0);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
 
         assertGt(claimed, 0);
@@ -272,6 +273,7 @@ contract YieldToOneUnitTests is BaseTest {
     function test_claimYield_noYield() public {
         _wrapFor(alice, alice, MINT_AMOUNT);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
         assertEq(claimed, 0);
         assertEq(extension.balanceOf(yieldRecipient), 0);
@@ -287,6 +289,7 @@ contract YieldToOneUnitTests is BaseTest {
 
         (uint256 grossYield, , ) = pyusdx.accruedYieldAndFeeOf(address(extension));
 
+        vm.prank(yieldRecipientManager);
         extension.claimYield();
 
         uint256 yieldRecipientBalance = extension.balanceOf(yieldRecipient);
@@ -307,6 +310,7 @@ contract YieldToOneUnitTests is BaseTest {
         assertGt(pyusdx.accruedYieldOf(address(extension)), 0);
         assertEq(extension.yield(), 0);
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
         assertEq(claimed, 0);
     }
@@ -317,6 +321,7 @@ contract YieldToOneUnitTests is BaseTest {
 
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, yieldRecipient));
 
+        vm.prank(yieldRecipientManager);
         extension.claimYield();
     }
 
@@ -335,6 +340,8 @@ contract YieldToOneUnitTests is BaseTest {
         assertGt(extension.balanceOf(yieldRecipient), 0);
 
         vm.warp(block.timestamp + 365 days);
+
+        vm.prank(yieldRecipientManager);
         extension.claimYield();
 
         assertGt(extension.balanceOf(newRecipient), 0);
@@ -377,6 +384,7 @@ contract YieldToOneUnitTests is BaseTest {
         assertEq(extension.balanceOf(yieldRecipient), 0);
 
         // New recipient's first claim captures at least the yield that was pending at rotation time.
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
 
         assertGe(claimed, yieldBefore);
@@ -420,6 +428,7 @@ contract YieldToOneUnitTests is BaseTest {
         assertEq(yieldAfter, pyusdx.balanceOf(address(extension)) - extension.totalSupply());
 
         // claimYield should recover the excess.
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
         assertEq(claimed, yieldAfter);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
@@ -439,6 +448,7 @@ contract YieldToOneUnitTests is BaseTest {
         assertGe(extension.yield(), gift);
 
         // claimYield recovers it.
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
         assertGe(claimed, gift);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
@@ -453,6 +463,7 @@ contract YieldToOneUnitTests is BaseTest {
         vm.prank(pauser);
         extension.pause();
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
         assertGt(claimed, 0);
         assertEq(extension.balanceOf(yieldRecipient), claimed);
@@ -479,6 +490,7 @@ contract YieldToOneUnitTests is BaseTest {
         vm.prank(pauser);
         extension.unpause();
 
+        vm.prank(yieldRecipientManager);
         uint256 claimed = extension.claimYield();
 
         assertGt(claimed, 0);
@@ -500,10 +512,24 @@ contract YieldToOneUnitTests is BaseTest {
         // forward; see `setYieldRecipient` for the incident-response flow.
         vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, yieldRecipient));
 
+        vm.prank(yieldRecipientManager);
         extension.claimYield();
     }
 
     /* ============ Access Control ============ */
+
+    function test_claimYield_revert_notManager() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                extension.YIELD_RECIPIENT_MANAGER_ROLE()
+            )
+        );
+
+        vm.prank(alice);
+        extension.claimYield();
+    }
 
     function test_setYieldRecipient_revert_notManager() public {
         address newRecipient = makeAddr("newRecipient");
@@ -537,6 +563,7 @@ contract YieldToOneUnitTests is BaseTest {
         vm.expectEmit();
         emit IYieldToOne.YieldClaimed(expectedYield);
 
+        vm.prank(yieldRecipientManager);
         extension.claimYield();
     }
 

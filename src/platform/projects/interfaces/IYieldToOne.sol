@@ -31,6 +31,7 @@ interface IYieldToOne {
     /* ============ Interactive Functions ============ */
 
     /// @notice Claims accrued yield to the yield recipient.
+    /// @dev    MUST only be callable by the YIELD_RECIPIENT_MANAGER_ROLE.
     /// @dev    Calls `pyusdx.claimFor(address(this))` to realize pending yield,
     ///         then mints extension tokens for the resulting increase in totalSupply.
     /// @dev    Callable while paused so the admin retains an emergency lever to rotate a
