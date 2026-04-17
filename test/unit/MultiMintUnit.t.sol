@@ -769,4 +769,29 @@ contract MultiMintTest is BaseTest {
         assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 0));
         assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 101e6));
     }
+
+    function test_isAllowedToReplaceAsset_18DecimalAsset() public {
+        // Wrap 100 DAI (18 decimals) — amount parameter is in PYUSDX decimals (6)
+        _wrapAssetFor(alice, address(dai), 100e18, 100e6);
+
+        // 100 PYUSDX worth → converts to 100e18 DAI → exactly covers balance
+        assertTrue(extension.isAllowedToReplaceAsset(address(dai), 100e6));
+
+        // 50 PYUSDX worth → converts to 50e18 DAI → under balance
+        assertTrue(extension.isAllowedToReplaceAsset(address(dai), 50e6));
+
+        // 101 PYUSDX worth → converts to 101e18 DAI → exceeds balance
+        assertFalse(extension.isAllowedToReplaceAsset(address(dai), 101e6));
+
+        // Zero → always false
+        assertFalse(extension.isAllowedToReplaceAsset(address(dai), 0));
+
+        // Prove pre-check matches execution: replace 50 PYUSDX worth of DAI
+        issuerGateway.mint(bob, 50e6);
+        vm.startPrank(bob);
+        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
+        swapFacility.replaceAsset(address(extension), address(dai), 50e6, bob);
+        vm.stopPrank();
+        assertEq(dai.balanceOf(bob), 50e18);
+    }
 }

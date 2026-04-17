@@ -203,7 +203,9 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
     /// @inheritdoc IMultiMint
     function isAllowedToReplaceAsset(address asset, uint256 amount) external view returns (bool) {
-        return amount != 0 && assetBalanceOf(asset) >= amount;
+        if (amount == 0) return false;
+        uint256 assetAmount = _fromExtensionToAssetAmount(asset, amount);
+        return assetAmount != 0 && assetBalanceOf(asset) >= assetAmount;
     }
 
     /* ============ Hooks ============ */

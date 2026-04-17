@@ -43,7 +43,13 @@ interface ISwapFacility {
     /// @param  asset        The address of an asset.
     /// @param  extensionOut The address of a MultiMint Extension.
     /// @param  amount       The amount of PYUSDX tokens deposited to replace `asset`.
-    event MultiMintAssetReplaced(address indexed asset, address indexed extensionOut, uint256 amount);
+    /// @param  recipient    The address that received the `asset` tokens.
+    event MultiMintAssetReplaced(
+        address indexed asset,
+        address indexed extensionOut,
+        uint256 amount,
+        address indexed recipient
+    );
 
     /* ============ Custom Errors ============ */
 
