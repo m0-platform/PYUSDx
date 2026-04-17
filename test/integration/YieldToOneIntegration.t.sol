@@ -280,7 +280,9 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         vm.prank(pauser);
         yieldToOne.pause();
 
-        // claimYield should still succeed — _beforeClaimYield is a no-op
+        // claimYield is intentionally callable during pause so the admin can still
+        // rotate the yield recipient mid-incident via setYieldRecipient. Minted tokens
+        // are inert because transfer/wrap/unwrap all block while paused.
         uint256 claimed = yieldToOne.claimYield();
         assertGt(claimed, 0);
     }
@@ -362,24 +364,6 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
 
         vm.prank(alice);
         swapFacility.swapIn(address(yieldToOne), AMOUNT, bob);
-    }
-
-    function testIntegration_freeze_doesNotBlockClaimYield() public {
-        _wrapFor(alice, AMOUNT);
-
-        // Freeze alice
-        vm.prank(freezeManager);
-        yieldToOne.freeze(alice);
-
-        vm.warp(block.timestamp + 365 days);
-
-        // Yield still accrues on the contract's PYUSDX balance
-        assertGt(yieldToOne.yield(), 0);
-
-        // claimYield succeeds — _beforeClaimYield is a no-op, doesn't check freeze
-        uint256 claimed = yieldToOne.claimYield();
-        assertGt(claimed, 0);
-        assertEq(yieldToOne.balanceOf(yieldRecipient), claimed);
     }
 
     function testIntegration_claimYield_afterExtensionRevoked() public {
