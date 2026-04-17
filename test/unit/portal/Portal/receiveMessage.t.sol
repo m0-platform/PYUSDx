@@ -94,7 +94,42 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
         assertEq(extension.balanceOf(recipient), 0);
     }
 
-    function test_receiveMessage_tokenTransfer_frozenRecipient_pyusdx() external {
+    function test_receiveMessage_tokenTransfer_extension_recipientFrozenInExtension() external {
+        bytes memory payload = PayloadEncoder.encodeTokenTransfer(
+            CHAIN_ID_2,
+            address(bridgeAdapter).toBytes32(),
+            messageId,
+            amount,
+            address(extension).toBytes32(),
+            sender,
+            recipient.toBytes32()
+        );
+
+        // Recipient is NOT frozen on PYUSDX (default mock from setUp), but frozen on Extension.
+        // SwapFacility.swapIn will revert because Extension._beforeWrap checks its own freeze list.
+        vm.mockCallRevert(
+            address(swapFacility),
+            abi.encodeWithSelector(ISwapFacility.swapIn.selector),
+            "FrozenAccount"
+        );
+
+        // No RedirectedToFallbackRecipient — recipient is not frozen on PYUSDX
+        vm.expectEmit();
+        emit IPortal.TokenReceived(CHAIN_ID_2, address(extension), sender.toBytes32(), recipient, amount, messageId);
+
+        vm.expectEmit();
+        emit IPortal.WrapFailed(address(extension), recipient, amount);
+
+        vm.prank(address(bridgeAdapter));
+        portal.receiveMessage(CHAIN_ID_2, payload);
+
+        // Recipient receives PYUSDX directly since wrap failed; no redirect to fallback
+        assertEq(pyusdx.balanceOf(recipient), amount);
+        assertEq(extension.balanceOf(recipient), 0);
+        assertEq(pyusdx.balanceOf(fallbackRecipient), 0);
+    }
+
+    function test_receiveMessage_tokenTransfer_pyusdx_recipientFrozenInPyusdx() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
             CHAIN_ID_2,
             address(bridgeAdapter).toBytes32(),
@@ -138,7 +173,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
         assertEq(pyusdx.balanceOf(recipient), 0);
     }
 
-    function test_receiveMessage_tokenTransfer_frozenRecipient_extension() external {
+    function test_receiveMessage_tokenTransfer_extension_recipientFrozenInPyusdx() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
             CHAIN_ID_2,
             address(bridgeAdapter).toBytes32(),
@@ -183,7 +218,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
         assertEq(pyusdx.balanceOf(recipient), 0);
     }
 
-    function test_receiveMessage_tokenTransfer_frozenRecipient_extension_wrapFailed() external {
+    function test_receiveMessage_tokenTransfer_extension_recipientFrozenInPyusdx_wrapFailed() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
             CHAIN_ID_2,
             address(bridgeAdapter).toBytes32(),
@@ -234,7 +269,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
         assertEq(extension.balanceOf(recipient), 0);
     }
 
-    function test_receiveMessage_tokenTransfer_frozenRecipient_revertsIfFallbackFrozen() external {
+    function test_receiveMessage_tokenTransfer_pyusdx_recipientFrozenInPyusdx_revertsIfFallbackFrozen() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
             CHAIN_ID_2,
             address(bridgeAdapter).toBytes32(),
@@ -286,7 +321,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
         assertEq(pyusdx.balanceOf(newFallback), amount);
     }
 
-    function test_receiveMessage_tokenTransfer_frozenRecipient_cannotBeReplayed() external {
+    function test_receiveMessage_tokenTransfer_pyusdx_recipientFrozenInPyusdx_cannotBeReplayed() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
             CHAIN_ID_2,
             address(bridgeAdapter).toBytes32(),

@@ -171,7 +171,11 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
 
         $.processedMessages[messageId] = true;
 
-        // If the intended recipient is frozen, use fallback recipient.
+        // NOTE: Only the PYUSDX freeze list is checked here. If the recipient is frozen on PYUSDX,
+        //       tokens are redirected to the fallback recipient to prevent a revert on mint.
+        //       If the recipient is frozen on a PYUSDX Extension but not on PYUSDX, the wrap via
+        //       SwapFacility will fail and the recipient will receive PYUSDX directly (see WrapFailed).
+        //       In reality, we expect recipients to be frozen both on PYUSDX and all PYUSDX Extensions.
         if (IFreezable(pyusdx).isFrozen(recipient)) {
             address fallbackRecipient_ = fallbackRecipient();
             emit RedirectedToFallbackRecipient(

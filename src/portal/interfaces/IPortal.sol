@@ -177,7 +177,7 @@ interface IPortal {
 
     /// @notice The address that receives PYUSDX or PYUSDX Extension on the destination chain when the intended recipient is frozen.
     /// @dev    Used as a safety fallback to prevent inbound cross-chain transfers from reverting when the
-    ///         original recipient cannot receive tokens`.
+    ///         original recipient cannot receive tokens.
     function fallbackRecipient() external view returns (address);
 
     /// @notice The ID of the chain on which the Portal contract is deployed.
