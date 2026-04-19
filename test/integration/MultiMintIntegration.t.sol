@@ -187,7 +187,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         // Bob calls replaceAsset with 25001 PYUSDX (not divisible by 10000).
         // assetAmount    = 25001 / 10000 = 2
         // extensionAmount = 2 * 10000    = 20000  ← only this is charged
-        // refund          = 25001 - 20000 = 5001
+        // refund          = 25001 - 20000 = 5001 is left in SwapFacility
         uint256 replaceAmount = 25001;
         _mintPYUSDX(bob, replaceAmount);
 
@@ -199,7 +199,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         vm.stopPrank();
 
         assertEq(twoDec.balanceOf(bob), 2);
-        assertEq(pyusdx.balanceOf(bob), 5001);
+        assertEq(pyusdx.balanceOf(address(swapFacility)), 5001);
         assertEq(multiMint.assetBalanceOf(address(twoDec)), wrapAmount - 2);
         assertEq(multiMint.totalAssets(), wrapAmount * 10_000 - 20000);
     }
