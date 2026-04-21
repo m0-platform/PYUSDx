@@ -6,10 +6,11 @@ import { Config } from "./Config.sol";
 import { Script } from "../lib/forge-std/src/Script.sol";
 
 contract ScriptBase is Script, Config {
+    /// @dev Fields MUST be in alphabetical order
     struct Deployments {
         address[] extensionAddresses;
-        string[] extensionNames;
         address extensionFactory;
+        string[] extensionNames;
         address issuerGateway;
         address layerZeroBridgeAdapter;
         address portal;
@@ -66,8 +67,8 @@ contract ScriptBase is Script, Config {
             ? _readDeployment(chainId_)
             : Deployments(
                 new address[](0),
-                new string[](0),
                 address(0),
+                new string[](0),
                 address(0),
                 address(0),
                 address(0),
@@ -135,8 +136,8 @@ contract ScriptBase is Script, Config {
             return
                 Deployments(
                     new address[](0),
-                    new string[](0),
                     address(0),
+                    new string[](0),
                     address(0),
                     address(0),
                     address(0),
