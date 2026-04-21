@@ -9,6 +9,8 @@ import { IssuerGateway } from "../../src/core/IssuerGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
+import { Portal } from "../../src/portal/Portal.sol";
+import { LayerZeroBridgeAdapter } from "../../src/portal/bridgeAdapters/layerZero/LayerZeroBridgeAdapter.sol";
 
 import { BaseForkTest } from "./BaseForkTest.sol";
 
@@ -18,9 +20,20 @@ contract CoreDeployer is DeployBase {
         PYUSDXConfig memory pyusdxConfig_,
         IssuerGatewayConfig memory issuerGatewayConfig_,
         SwapFacilityConfig memory swapFacilityConfig_,
-        FactoryConfig memory factoryConfig_
+        FactoryConfig memory factoryConfig_,
+        PortalConfig memory portalConfig_,
+        LayerZeroBridgeAdapterConfig memory layerZeroBridgeAdapterConfig_
     ) external returns (CoreDeployments memory) {
-        return _deployCore(address(this), pyusdxConfig_, issuerGatewayConfig_, swapFacilityConfig_, factoryConfig_);
+        return
+            _deployCore(
+                address(this),
+                pyusdxConfig_,
+                issuerGatewayConfig_,
+                swapFacilityConfig_,
+                factoryConfig_,
+                portalConfig_,
+                layerZeroBridgeAdapterConfig_
+            );
     }
 }
 
@@ -35,11 +48,18 @@ abstract contract IntegrationForkTest is BaseForkTest {
     SwapFacility public swapFacility;
     ExtensionFactory public factory;
     ExtensionBeacon public extensionBeacon;
+    Portal public portal;
+    LayerZeroBridgeAdapter public layerZeroBridgeAdapter;
 
     DeployBase.CoreDeployments internal _coreDeployments;
 
     uint32 public constant MINT_DELAY = 1; // 1 second for testing
     uint32 public constant MINT_TTL = 3600; // 1 hour
+
+    /// @dev LayerZero V2 Endpoint deployed on Ethereum mainnet.
+    address public constant LZ_ENDPOINT = 0x1a44076050125825900e736c501f859c50fE728c;
+
+    address public fallbackRecipient = makeAddr("fallbackRecipient");
 
     function setUp() public virtual override {
         super.setUp();
@@ -68,7 +88,14 @@ abstract contract IntegrationForkTest is BaseForkTest {
                 mintTTL: MINT_TTL
             }),
             Config.SwapFacilityConfig({ admin: admin, pauser: pauser }),
-            Config.FactoryConfig({ admin: admin, factoryManager: factoryManager })
+            Config.FactoryConfig({ admin: admin, factoryManager: factoryManager }),
+            Config.PortalConfig({
+                admin: admin,
+                pauser: pauser,
+                operator: operator,
+                fallbackRecipient: fallbackRecipient
+            }),
+            Config.LayerZeroBridgeAdapterConfig({ lzEndpoint: LZ_ENDPOINT, admin: admin, operator: operator })
         );
 
         pyusdx = PYUSDX(deployments_.pyusdxProxy);
@@ -76,6 +103,8 @@ abstract contract IntegrationForkTest is BaseForkTest {
         swapFacility = SwapFacility(deployments_.swapFacilityProxy);
         factory = ExtensionFactory(deployments_.factoryProxy);
         extensionBeacon = ExtensionBeacon(deployments_.beaconProxy);
+        portal = Portal(deployments_.portalProxy);
+        layerZeroBridgeAdapter = LayerZeroBridgeAdapter(deployments_.layerZeroBridgeAdapterProxy);
         _coreDeployments = deployments_;
     }
 

@@ -13,6 +13,8 @@ contract DeployAll is DeployBase {
         IssuerGatewayConfig memory issuerGatewayConfig = _loadIssuerGatewayConfig();
         SwapFacilityConfig memory swapConfig = _loadSwapFacilityConfig();
         FactoryConfig memory factoryConfig = _loadFactoryConfig();
+        PortalConfig memory portalConfig = _loadPortalConfig();
+        LayerZeroBridgeAdapterConfig memory layerZeroBridgeAdapterConfig = _loadLayerZeroBridgeAdapterConfig();
 
         vm.startBroadcast(deployer);
 
@@ -21,7 +23,9 @@ contract DeployAll is DeployBase {
             pyusdxConfig,
             issuerGatewayConfig,
             swapConfig,
-            factoryConfig
+            factoryConfig,
+            portalConfig,
+            layerZeroBridgeAdapterConfig
         );
 
         vm.stopBroadcast();
@@ -42,12 +46,20 @@ contract DeployAll is DeployBase {
         console.log("Factory Proxy:                    ", deployment.factoryProxy);
         console.log("Factory ProxyAdmin:               ", deployment.factoryProxyAdmin);
         console.log("Factory Implementation:           ", deployment.factoryImplementation);
+        console.log("Portal Proxy:                     ", deployment.portalProxy);
+        console.log("Portal ProxyAdmin:                ", deployment.portalProxyAdmin);
+        console.log("Portal Implementation:            ", deployment.portalImplementation);
+        console.log("LayerZeroBridgeAdapter Proxy:     ", deployment.layerZeroBridgeAdapterProxy);
+        console.log("LayerZeroBridgeAdapter ProxyAdmin:", deployment.layerZeroBridgeAdapterProxyAdmin);
+        console.log("LayerZeroBridgeAdapter Impl:      ", deployment.layerZeroBridgeAdapterImplementation);
         console.log("================================================================================");
 
         _writeDeployment(block.chainid, "pyusdx", deployment.pyusdxProxy);
         _writeDeployment(block.chainid, "issuerGateway", deployment.issuerGatewayProxy);
         _writeDeployment(block.chainid, "swapFacility", deployment.swapFacilityProxy);
         _writeDeployment(block.chainid, "extensionFactory", deployment.factoryProxy);
+        _writeDeployment(block.chainid, "portal", deployment.portalProxy);
+        _writeDeployment(block.chainid, "layerZeroBridgeAdapter", deployment.layerZeroBridgeAdapterProxy);
     }
 
     function _loadPYUSDXConfig() private view returns (PYUSDXConfig memory config) {
@@ -77,5 +89,18 @@ contract DeployAll is DeployBase {
     function _loadFactoryConfig() private view returns (FactoryConfig memory config) {
         config.admin = vm.envAddress("FACTORY_ADMIN");
         config.factoryManager = vm.envAddress("FACTORY_MANAGER");
+    }
+
+    function _loadPortalConfig() private view returns (PortalConfig memory config) {
+        config.admin = vm.envAddress("PORTAL_ADMIN");
+        config.pauser = vm.envAddress("PORTAL_PAUSER");
+        config.operator = vm.envAddress("PORTAL_OPERATOR");
+        config.fallbackRecipient = vm.envAddress("PORTAL_FALLBACK_RECIPIENT");
+    }
+
+    function _loadLayerZeroBridgeAdapterConfig() private view returns (LayerZeroBridgeAdapterConfig memory config) {
+        config.lzEndpoint = vm.envAddress("LAYER_ZERO_ENDPOINT");
+        config.admin = vm.envAddress("LAYER_ZERO_BRIDGE_ADAPTER_ADMIN");
+        config.operator = vm.envAddress("LAYER_ZERO_BRIDGE_ADAPTER_OPERATOR");
     }
 }

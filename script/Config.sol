@@ -53,4 +53,17 @@ contract Config {
         address pauser;
         address yieldRecipientManager;
     }
+
+    struct PortalConfig {
+        address admin;
+        address pauser;
+        address operator;
+        address fallbackRecipient;
+    }
+
+    struct LayerZeroBridgeAdapterConfig {
+        address lzEndpoint;
+        address admin;
+        address operator;
+    }
 }

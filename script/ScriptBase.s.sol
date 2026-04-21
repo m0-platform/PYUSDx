@@ -11,6 +11,8 @@ contract ScriptBase is Script, Config {
         string[] extensionNames;
         address extensionFactory;
         address issuerGateway;
+        address layerZeroBridgeAdapter;
+        address portal;
         address pyusdx;
         address swapFacility;
     }
@@ -62,13 +64,24 @@ contract ScriptBase is Script, Config {
 
         Deployments memory deployments_ = vm.isFile(_deployOutputPath(chainId_))
             ? _readDeployment(chainId_)
-            : Deployments(new address[](0), new string[](0), address(0), address(0), address(0), address(0));
+            : Deployments(
+                new address[](0),
+                new string[](0),
+                address(0),
+                address(0),
+                address(0),
+                address(0),
+                address(0),
+                address(0)
+            );
 
         if (
             keccak256(bytes(key_)) != keccak256(bytes("pyusdx")) &&
             keccak256(bytes(key_)) != keccak256(bytes("issuerGateway")) &&
             keccak256(bytes(key_)) != keccak256(bytes("swapFacility")) &&
-            keccak256(bytes(key_)) != keccak256(bytes("extensionFactory"))
+            keccak256(bytes(key_)) != keccak256(bytes("extensionFactory")) &&
+            keccak256(bytes(key_)) != keccak256(bytes("layerZeroBridgeAdapter")) &&
+            keccak256(bytes(key_)) != keccak256(bytes("portal"))
         ) {
             deployments_ = _setExtensionDeployment(deployments_, key_, value_);
         }
@@ -97,6 +110,18 @@ contract ScriptBase is Script, Config {
             keccak256(bytes(key_)) == keccak256("extensionFactory") ? value_ : deployments_.extensionFactory
         );
 
+        vm.serializeAddress(
+            root,
+            "layerZeroBridgeAdapter",
+            keccak256(bytes(key_)) == keccak256("layerZeroBridgeAdapter") ? value_ : deployments_.layerZeroBridgeAdapter
+        );
+
+        vm.serializeAddress(
+            root,
+            "portal",
+            keccak256(bytes(key_)) == keccak256("portal") ? value_ : deployments_.portal
+        );
+
         vm.serializeString(root, "extensionNames", deployments_.extensionNames);
 
         vm.writeJson(
@@ -107,7 +132,17 @@ contract ScriptBase is Script, Config {
 
     function _readDeployment(uint256 chainId_) internal view returns (Deployments memory) {
         if (!vm.isFile(_deployOutputPath(chainId_))) {
-            return Deployments(new address[](0), new string[](0), address(0), address(0), address(0), address(0));
+            return
+                Deployments(
+                    new address[](0),
+                    new string[](0),
+                    address(0),
+                    address(0),
+                    address(0),
+                    address(0),
+                    address(0),
+                    address(0)
+                );
         }
 
         bytes memory data = vm.parseJson(vm.readFile(_deployOutputPath(chainId_)));
@@ -148,6 +183,24 @@ contract ScriptBase is Script, Config {
             return vm.envAddress("EXTENSION_FACTORY");
         } else {
             return deployments_.extensionFactory;
+        }
+    }
+
+    function _getLayerZeroBridgeAdapter() internal view returns (address) {
+        Deployments memory deployments_ = _readDeployment(block.chainid);
+        if (deployments_.layerZeroBridgeAdapter == address(0)) {
+            return vm.envAddress("LAYER_ZERO_BRIDGE_ADAPTER");
+        } else {
+            return deployments_.layerZeroBridgeAdapter;
+        }
+    }
+
+    function _getPortal() internal view returns (address) {
+        Deployments memory deployments_ = _readDeployment(block.chainid);
+        if (deployments_.portal == address(0)) {
+            return vm.envAddress("PORTAL");
+        } else {
+            return deployments_.portal;
         }
     }
 }
