@@ -15,6 +15,8 @@ import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
+import { Portal } from "../../src/portal/Portal.sol";
+import { LayerZeroBridgeAdapter } from "../../src/portal/bridgeAdapters/layerZero/LayerZeroBridgeAdapter.sol";
 
 import { ScriptBase } from "../ScriptBase.s.sol";
 
@@ -29,6 +31,12 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address swapFacilityProxy;
         address swapFacilityProxyAdmin;
         address swapFacilityImplementation;
+        address portalProxy;
+        address portalProxyAdmin;
+        address portalImplementation;
+        address layerZeroBridgeAdapterProxy;
+        address layerZeroBridgeAdapterProxyAdmin;
+        address layerZeroBridgeAdapterImplementation;
         address beaconProxy;
         address beaconProxyAdmin;
         address beaconImplementation;
@@ -159,6 +167,47 @@ contract DeployBase is DeployHelpers, ScriptBase {
         proxyAdmin = Upgrades.getAdminAddress(proxy);
     }
 
+    function _deployPortal(
+        address deployer,
+        address pyusdxProxy,
+        address swapFacilityProxy,
+        PortalConfig memory config
+    ) internal returns (address proxy, address proxyAdmin, address implementation) {
+        implementation = address(new Portal(pyusdxProxy, swapFacilityProxy));
+
+        proxy = _deployCreate3TransparentProxy(
+            implementation,
+            config.admin,
+            abi.encodeWithSelector(
+                Portal.initialize.selector,
+                config.admin,
+                config.pauser,
+                config.operator,
+                config.fallbackRecipient
+            ),
+            _computeSalt(deployer, "PYUSDXPortal")
+        );
+
+        proxyAdmin = Upgrades.getAdminAddress(proxy);
+    }
+
+    function _deployLayerZeroBridgeAdapter(
+        address deployer,
+        address portalProxy,
+        LayerZeroBridgeAdapterConfig memory config
+    ) internal returns (address proxy, address proxyAdmin, address implementation) {
+        implementation = address(new LayerZeroBridgeAdapter(config.lzEndpoint, portalProxy));
+
+        proxy = _deployCreate3TransparentProxy(
+            implementation,
+            config.admin,
+            abi.encodeWithSelector(LayerZeroBridgeAdapter.initialize.selector, config.admin, config.operator),
+            _computeSalt(deployer, "PYUSDXLayerZeroBridgeAdapter")
+        );
+
+        proxyAdmin = Upgrades.getAdminAddress(proxy);
+    }
+
     /* ============ Core Stack Orchestrator ============ */
 
     function _deployCore(
@@ -166,9 +215,30 @@ contract DeployBase is DeployHelpers, ScriptBase {
         PYUSDXConfig memory pyusdxConfig,
         IssuerGatewayConfig memory issuerGatewayConfig,
         SwapFacilityConfig memory swapFacilityConfig,
-        FactoryConfig memory factoryConfig
+        FactoryConfig memory factoryConfig,
+        PortalConfig memory portalConfig,
+        LayerZeroBridgeAdapterConfig memory layerZeroBridgeAdapterConfig
     ) internal returns (CoreDeployments memory deployment) {
-        // 1. Pre-compute CREATE3 addresses for all 4 proxies
+        _deployCoreContracts(
+            deployer,
+            pyusdxConfig,
+            issuerGatewayConfig,
+            swapFacilityConfig,
+            factoryConfig,
+            deployment
+        );
+        _deployPortalStack(deployer, portalConfig, layerZeroBridgeAdapterConfig, deployment);
+    }
+
+    function _deployCoreContracts(
+        address deployer,
+        PYUSDXConfig memory pyusdxConfig,
+        IssuerGatewayConfig memory issuerGatewayConfig,
+        SwapFacilityConfig memory swapFacilityConfig,
+        FactoryConfig memory factoryConfig,
+        CoreDeployments memory deployment
+    ) internal {
+        // 1. Pre-compute CREATE3 addresses
         address predictedPYUSDX = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDX"));
         address predictedIssuerGateway = _getCreate3Address(deployer, _computeSalt(deployer, "IssuerGateway"));
         address predictedSwapFacility = _getCreate3Address(deployer, _computeSalt(deployer, "SwapFacility"));
@@ -231,5 +301,43 @@ contract DeployBase is DeployHelpers, ScriptBase {
         );
 
         require(deployment.factoryProxy == predictedFactory, "Factory proxy address mismatch");
+    }
+
+    function _deployPortalStack(
+        address deployer,
+        PortalConfig memory portalConfig,
+        LayerZeroBridgeAdapterConfig memory layerZeroBridgeAdapterConfig,
+        CoreDeployments memory deployment
+    ) internal {
+        address predictedPortal = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDXPortal"));
+        address predictedLayerZeroBridgeAdapter = _getCreate3Address(
+            deployer,
+            _computeSalt(deployer, "PYUSDXLayerZeroBridgeAdapter")
+        );
+
+        console.log("Predicted Portal proxy:            ", predictedPortal);
+        console.log("Predicted LayerZeroBridgeAdapter:  ", predictedLayerZeroBridgeAdapter);
+
+        // Deploy Portal (implementation needs actual PYUSDX + SwapFacility proxies)
+        (deployment.portalProxy, deployment.portalProxyAdmin, deployment.portalImplementation) = _deployPortal(
+            deployer,
+            deployment.pyusdxProxy,
+            deployment.swapFacilityProxy,
+            portalConfig
+        );
+
+        require(deployment.portalProxy == predictedPortal, "Portal proxy address mismatch");
+
+        // Deploy LayerZeroBridgeAdapter (implementation needs actual Portal proxy)
+        (
+            deployment.layerZeroBridgeAdapterProxy,
+            deployment.layerZeroBridgeAdapterProxyAdmin,
+            deployment.layerZeroBridgeAdapterImplementation
+        ) = _deployLayerZeroBridgeAdapter(deployer, deployment.portalProxy, layerZeroBridgeAdapterConfig);
+
+        require(
+            deployment.layerZeroBridgeAdapterProxy == predictedLayerZeroBridgeAdapter,
+            "LayerZeroBridgeAdapter proxy address mismatch"
+        );
     }
 }
