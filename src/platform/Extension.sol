@@ -9,6 +9,8 @@ import { StorageSlot } from "../../lib/evm-m-extensions/lib/common/lib/openzeppe
 import { Freezable } from "../../lib/evm-m-extensions/src/components/freezable/Freezable.sol";
 import { Pausable } from "../../lib/evm-m-extensions/src/components/pausable/Pausable.sol";
 
+import { IERC1967 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts/contracts/interfaces/IERC1967.sol";
+
 import { IExtension } from "./interfaces/IExtension.sol";
 import { IExtensionBeacon } from "./interfaces/IExtensionBeacon.sol";
 import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
@@ -20,21 +22,20 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, 
     /* ============ Constants ============ */
 
     /// @dev ERC-1967 beacon storage slot (shared with ExtensionBeaconProxy).
+    ///      bytes32(uint256(keccak256("eip1967.proxy.beacon")) - 1)
     bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
 
-    /// @dev Storage location for the extension type (shared with ExtensionBeaconProxy).
-    ///      keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXExtensionType")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 internal constant _EXTENSION_TYPE_STORAGE_LOCATION =
-        0x50809f8892663c0bc92e8283fda4cb9143fb961da9c4bc5652b13b5c450bbc00;
+    /// @dev ERC-1967 implementation storage slot (used for pinned mode, shared with ExtensionBeaconProxy).
+    ///      bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
+    bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
-    /// @dev Storage location for the pinned implementation version (shared with ExtensionBeaconProxy).
-    ///      keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXPinnedVersion")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 internal constant _PINNED_VERSION_STORAGE_LOCATION =
-        0xfec66d3fc30888a287564007fecbbfaf6a964b972d5e0e57e4d8faceddbe2b00;
+    /// @dev Storage location for the origin beacon address (shared with ExtensionBeaconProxy).
+    ///      keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXOriginBeacon")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 internal constant _ORIGIN_BEACON_SLOT = 0x0db096ce50da19b63b97b47df5b0c87e2ed1677b3d801ad424e1bbfc0bb0c300;
 
     /* ============ Variables ============ */
 
-    /// @notice Role required to call `pinVersion`.
+    /// @inheritdoc IExtension
     bytes32 public constant VERSION_MANAGER_ROLE = keccak256("VERSION_MANAGER_ROLE");
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
@@ -98,20 +99,33 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, 
 
     /// @inheritdoc IExtension
     function pinVersion(uint256 version) external onlyRole(VERSION_MANAGER_ROLE) {
-        if (version != 0) {
-            address beacon = StorageSlot.getAddressSlot(_BEACON_SLOT).value;
-            IExtensionBeacon.ExtensionType extensionType = IExtensionBeacon.ExtensionType(
-                StorageSlot.getUint256Slot(_EXTENSION_TYPE_STORAGE_LOCATION).value
-            );
+        if (version == 0) revert ZeroVersion();
 
-            // NOTE: This call is purely for validation — it reverts with `NoImplementationRegistered`
-            //       if the version does not exist in the beacon.
-            IExtensionBeacon(beacon).implementation(extensionType, version);
-        }
+        address beacon = StorageSlot.getAddressSlot(_ORIGIN_BEACON_SLOT).value;
+        address implementation = IExtensionBeacon(beacon).implementation(version);
 
-        StorageSlot.getUint256Slot(_PINNED_VERSION_STORAGE_LOCATION).value = version;
+        //  NOTE: Mutates both ERC-1967 slots to switch the proxy from beacon mode to direct mode,
+        //        so that external ERC-1967 readers (block explorers, tooling) detect a direct proxy
+        //        pointing at the pinned implementation, instead of resolving the latest version via the beacon.
+        StorageSlot.getAddressSlot(_BEACON_SLOT).value = address(0);
+        StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value = implementation;
 
-        emit VersionPinned(version);
+        emit IERC1967.Upgraded(implementation);
+    }
+
+    /// @inheritdoc IExtension
+    function unpinVersion() external onlyRole(VERSION_MANAGER_ROLE) {
+        if (StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value == address(0)) revert NotPinned();
+
+        address beacon = StorageSlot.getAddressSlot(_ORIGIN_BEACON_SLOT).value;
+
+        //  NOTE: Mutates both ERC-1967 slots to switch the proxy back to beacon mode,
+        //        so external ERC-1967 readers detect a beacon proxy again and
+        //        resolve the latest implementation via the beacon registry.
+        StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value = address(0);
+        StorageSlot.getAddressSlot(_BEACON_SLOT).value = beacon;
+
+        emit IERC1967.BeaconUpgraded(beacon);
     }
 
     /* ============ View/Pure Functions ============ */
@@ -120,8 +134,18 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, 
     function balanceOf(address account) public view virtual returns (uint256);
 
     /// @inheritdoc IExtension
-    function pinnedVersion() external view returns (uint256) {
-        return StorageSlot.getUint256Slot(_PINNED_VERSION_STORAGE_LOCATION).value;
+    function pinnedImplementation() public view returns (address) {
+        return StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value;
+    }
+
+    /// @inheritdoc IExtension
+    function originBeacon() external view returns (address) {
+        return StorageSlot.getAddressSlot(_ORIGIN_BEACON_SLOT).value;
+    }
+
+    /// @inheritdoc IExtension
+    function isPinned() external view returns (bool) {
+        return pinnedImplementation() != address(0);
     }
 
     /* ============ Hooks For Internal Interactive Functions ============ */

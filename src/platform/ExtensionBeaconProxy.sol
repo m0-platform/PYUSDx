@@ -11,8 +11,8 @@ import { IExtensionBeacon } from "./interfaces/IExtensionBeacon.sol";
 
 /// @title  Extension Beacon Proxy
 /// @notice Custom proxy that resolves its implementation via an ExtensionBeacon registry.
-///         Stores the beacon address and extension type as immutables. All proxies of the same
-///         type share the same beacon and are upgraded atomically when the beacon is updated.
+///         Supports two modes: beacon mode (follows latest) and pinned mode (frozen to a
+///         specific implementation). Fully ERC-1967 compliant.
 /// @author M0 Labs
 contract ExtensionBeaconProxy is Proxy {
     /* ============ Constants ============ */
@@ -21,40 +21,26 @@ contract ExtensionBeaconProxy is Proxy {
     /// @dev    bytes32(uint256(keccak256("eip1967.proxy.beacon")) - 1)
     bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
 
-    /// @notice Storage location for the extension type (accessible to implementations via delegatecall).
-    /// @dev    keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXExtensionType")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 internal constant _EXTENSION_TYPE_STORAGE_LOCATION =
-        0x50809f8892663c0bc92e8283fda4cb9143fb961da9c4bc5652b13b5c450bbc00;
+    /// @notice ERC-1967 implementation storage slot (used for pinned mode).
+    /// @dev    bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
+    bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
-    /// @notice Storage location for the pinned implementation version (0 = follow latest).
-    /// @dev    keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXPinnedVersion")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 internal constant _PINNED_VERSION_STORAGE_LOCATION =
-        0xfec66d3fc30888a287564007fecbbfaf6a964b972d5e0e57e4d8faceddbe2b00;
-
-    /* ============ Immutables ============ */
-
-    /// @notice The address of the ExtensionBeacon registry.
-    address public immutable beacon;
-
-    /// @notice The extension type for this proxy instance.
-    IExtensionBeacon.ExtensionType public immutable extensionType;
+    /// @notice Storage location for the origin beacon address (written at construction, never modified).
+    /// @dev    keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXOriginBeacon")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 internal constant _ORIGIN_BEACON_SLOT = 0x0db096ce50da19b63b97b47df5b0c87e2ed1677b3d801ad424e1bbfc0bb0c300;
 
     /* ============ Constructor ============ */
 
-    /// @param  beacon_        The address of the ExtensionBeacon registry.
-    /// @param  extensionType_ The extension type for this proxy.
-    /// @param  data           The initializer calldata to delegate to the implementation.
-    constructor(address beacon_, IExtensionBeacon.ExtensionType extensionType_, bytes memory data) payable {
+    /// @param  beacon_ The address of the ExtensionBeacon registry.
+    /// @param  data    The initializer calldata to delegate to the implementation.
+    constructor(address beacon_, bytes memory data) payable {
         if (beacon_.code.length == 0) revert ERC1967Utils.ERC1967InvalidBeacon(beacon_);
 
-        beacon = beacon_;
-        extensionType = extensionType_;
-
-        address implementation = IExtensionBeacon(beacon_).implementation(extensionType_);
+        address implementation = IExtensionBeacon(beacon_).implementation();
         if (implementation.code.length == 0) revert ERC1967Utils.ERC1967InvalidImplementation(implementation);
 
         StorageSlot.getAddressSlot(_BEACON_SLOT).value = beacon_;
-        StorageSlot.getUint256Slot(_EXTENSION_TYPE_STORAGE_LOCATION).value = uint256(extensionType_);
+        StorageSlot.getAddressSlot(_ORIGIN_BEACON_SLOT).value = beacon_;
 
         emit IERC1967.BeaconUpgraded(beacon_);
 
@@ -65,16 +51,15 @@ contract ExtensionBeaconProxy is Proxy {
 
     /* ============ Internal Functions ============ */
 
-    /// @notice Returns the current implementation address resolved from the beacon.
-    /// @dev    If a version is pinned, resolves that specific version; otherwise resolves the latest.
+    /// @notice Returns the current implementation address.
+    /// @dev    If pinned (non-zero _IMPLEMENTATION_SLOT), returns the pinned implementation.
+    ///         Otherwise reads the beacon from _BEACON_SLOT and queries its latest implementation.
     /// @return The address of the implementation contract.
     function _implementation() internal view virtual override returns (address) {
-        uint256 pinnedVersion = StorageSlot.getUint256Slot(_PINNED_VERSION_STORAGE_LOCATION).value;
+        address implementation = StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value;
+        if (implementation != address(0)) return implementation;
 
-        if (pinnedVersion == 0) {
-            return IExtensionBeacon(beacon).implementation(extensionType);
-        }
-
-        return IExtensionBeacon(beacon).implementation(extensionType, pinnedVersion);
+        address beacon = StorageSlot.getAddressSlot(_BEACON_SLOT).value;
+        return IExtensionBeacon(beacon).implementation();
     }
 }

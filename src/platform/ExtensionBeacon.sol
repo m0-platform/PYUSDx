@@ -12,8 +12,8 @@ import { ISwapFacility } from "../swap/interfaces/ISwapFacility.sol";
 abstract contract ExtensionBeaconStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.PYUSDXExtensionBeacon
     struct ExtensionBeaconStorage {
-        mapping(IExtensionBeacon.ExtensionType extensionType => mapping(uint256 version => address implementation)) implementations;
-        mapping(IExtensionBeacon.ExtensionType extensionType => uint256 latestVersion) latestVersions;
+        mapping(uint256 version => address implementation) implementations;
+        uint256 latestVersion;
     }
 
     // keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXExtensionBeacon")) - 1)) & ~bytes32(uint256(0xff))
@@ -29,8 +29,9 @@ abstract contract ExtensionBeaconStorageLayout {
 }
 
 /// @title  Extension Beacon
-/// @notice Upgradeable registry contract mapping ExtensionType to versioned implementations.
-///         Serves as the single source of truth for implementation resolution by ExtensionBeaconProxy.
+/// @notice Upgradeable registry contract for a single extension type (YieldToOne or MultiMint).
+///         ERC-1967 compliant: emits `Upgraded(address)` on every registration and provides
+///         a zero-arg `implementation()` returning the latest.
 /// @author M0 Labs
 contract ExtensionBeacon is IExtensionBeacon, AccessControlUpgradeable, ExtensionBeaconStorageLayout {
     /* ============ Variables ============ */
@@ -64,76 +65,56 @@ contract ExtensionBeacon is IExtensionBeacon, AccessControlUpgradeable, Extensio
     /* ============ Initializer ============ */
 
     /// @notice Initializes the ExtensionBeacon proxy.
-    /// @param  admin                    The address granted DEFAULT_ADMIN_ROLE.
-    /// @param  beaconManager            The address granted BEACON_MANAGER_ROLE.
-    /// @param  yieldToOneImplementation The initial YieldToOne implementation address.
-    /// @param  multiMintImplementation  The initial MultiMint implementation address.
-    function initialize(
-        address admin,
-        address beaconManager,
-        address yieldToOneImplementation,
-        address multiMintImplementation
-    ) external initializer {
+    /// @param  admin                 The address granted DEFAULT_ADMIN_ROLE.
+    /// @param  beaconManager         The address granted BEACON_MANAGER_ROLE.
+    /// @param  initialImplementation The initial implementation address.
+    function initialize(address admin, address beaconManager, address initialImplementation) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
         if (beaconManager == address(0)) revert ZeroBeaconManager();
 
-        _validateImplementation(yieldToOneImplementation);
-        _validateImplementation(multiMintImplementation);
+        _validateImplementation(initialImplementation);
 
         __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(BEACON_MANAGER_ROLE, beaconManager);
 
-        _registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, yieldToOneImplementation);
-        _registerImplementation(IExtensionBeacon.ExtensionType.MULTI_MINT, multiMintImplementation);
+        _registerImplementation(initialImplementation);
     }
 
     /* ============ External Functions ============ */
 
     /// @inheritdoc IExtensionBeacon
-    function registerImplementation(
-        IExtensionBeacon.ExtensionType extensionType,
-        address implementation
-    ) external onlyRole(BEACON_MANAGER_ROLE) returns (uint256) {
-        if (extensionType == IExtensionBeacon.ExtensionType.NONE) revert InvalidExtensionType();
-
+    function registerImplementation(address implementation) external onlyRole(BEACON_MANAGER_ROLE) returns (uint256) {
         _validateImplementation(implementation);
 
-        return _registerImplementation(extensionType, implementation);
+        return _registerImplementation(implementation);
     }
 
     /* ============ Public View Functions ============ */
 
     /// @inheritdoc IExtensionBeacon
-    function implementation(IExtensionBeacon.ExtensionType extensionType) external view returns (address) {
-        return _implementation(extensionType, latestVersion(extensionType));
+    function implementation() external view returns (address) {
+        return _implementation(latestVersion());
     }
 
     /// @inheritdoc IExtensionBeacon
-    function implementation(
-        IExtensionBeacon.ExtensionType extensionType,
-        uint256 version
-    ) external view returns (address) {
-        return _implementation(extensionType, version);
+    function implementation(uint256 version) external view returns (address) {
+        return _implementation(version);
     }
 
     /// @inheritdoc IExtensionBeacon
-    function latestVersion(IExtensionBeacon.ExtensionType extensionType) public view returns (uint256) {
-        return _getExtensionBeaconStorage().latestVersions[extensionType];
+    function latestVersion() public view returns (uint256) {
+        return _getExtensionBeaconStorage().latestVersion;
     }
 
     /* ============ Internal Functions ============ */
 
-    /// @dev    Returns the implementation address for the given extension type and version.
-    /// @param  extensionType  The type of extension.
-    /// @param  version        The version number.
-    /// @return                The address of the implementation contract.
-    function _implementation(
-        IExtensionBeacon.ExtensionType extensionType,
-        uint256 version
-    ) internal view returns (address) {
-        address implementation = _getExtensionBeaconStorage().implementations[extensionType][version];
+    /// @dev    Returns the implementation address for the given version.
+    /// @param  version The version number.
+    /// @return The address of the implementation contract.
+    function _implementation(uint256 version) internal view returns (address) {
+        address implementation = _getExtensionBeaconStorage().implementations[version];
 
         if (implementation == address(0)) revert NoImplementationRegistered();
 
@@ -153,19 +134,15 @@ contract ExtensionBeacon is IExtensionBeacon, AccessControlUpgradeable, Extensio
     }
 
     /// @dev    Registers an implementation, auto-incrementing the version.
-    /// @param  extensionType  The type of extension.
     /// @param  implementation The address of the implementation.
-    /// @return version        The version number assigned.
-    function _registerImplementation(
-        IExtensionBeacon.ExtensionType extensionType,
-        address implementation
-    ) internal returns (uint256 version) {
+    /// @return version The version number assigned.
+    function _registerImplementation(address implementation) internal returns (uint256 version) {
         ExtensionBeaconStorage storage $ = _getExtensionBeaconStorage();
 
-        version = ++$.latestVersions[extensionType];
-        $.implementations[extensionType][version] = implementation;
+        version = ++$.latestVersion;
+        $.implementations[version] = implementation;
 
         emit IERC1967.Upgraded(implementation);
-        emit ImplementationRegistered(extensionType, version, implementation);
+        emit ImplementationRegistered(version, implementation);
     }
 }

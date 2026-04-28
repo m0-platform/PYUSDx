@@ -7,7 +7,7 @@ import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interf
 import { Initializable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 
-import { IExtensionBeacon } from "../../src/platform/interfaces/IExtensionBeacon.sol";
+import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 
 import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
@@ -41,13 +41,14 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         // After super.setUp(), nonce is 4
         // new SwapFacility impl: 4 -> 5
         // deployTransparentProxy: 5 -> 6
-        // new MockExtensionBeacon: 6 -> 7
-        // new ExtensionFactoryHarness: 7 -> 8
-        // deployTransparentProxy: 8 -> 9
-        // Factory proxy is at nonce 8 = 4 + 4
+        // new MockExtensionBeacon (YTO): 6 -> 7
+        // new MockExtensionBeacon (MM): 7 -> 8
+        // new ExtensionFactoryHarness: 8 -> 9
+        // deployTransparentProxy: 9 -> 10
+        // Factory proxy is at nonce 9 = 4 + 5
 
         uint64 nonceBeforeDeployments = vm.getNonce(address(this));
-        address predictedFactory = vm.computeCreateAddress(address(this), nonceBeforeDeployments + 4);
+        address predictedFactory = vm.computeCreateAddress(address(this), nonceBeforeDeployments + 5);
 
         // Deploy SwapFacility with predicted factory address
         swapFacility = SwapFacility(
@@ -58,13 +59,21 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
             )
         );
 
-        // Deploy mock beacon (unit tests use mocks, not real extensions)
-        MockExtensionBeacon mockBeacon = new MockExtensionBeacon();
+        // Deploy mock beacons (unit tests use mocks, not real extensions)
+        MockExtensionBeacon mockYTOBeacon = new MockExtensionBeacon();
+        MockExtensionBeacon mockMMBeacon = new MockExtensionBeacon();
 
         // Deploy factory with actual SwapFacility address
         factory = ExtensionFactoryHarness(
             UnsafeUpgrades.deployTransparentProxy(
-                address(new ExtensionFactoryHarness(address(pyusdx), address(swapFacility), address(mockBeacon))),
+                address(
+                    new ExtensionFactoryHarness(
+                        address(pyusdx),
+                        address(swapFacility),
+                        address(mockYTOBeacon),
+                        address(mockMMBeacon)
+                    )
+                ),
                 admin,
                 abi.encodeWithSelector(ExtensionFactory.initialize.selector, admin, factoryManager)
             )
@@ -80,9 +89,9 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         multiMintExtension = new MockMultiMint(address(pyusdx), address(swapFacility), makeAddr("yieldRecipient"));
 
         // Register mock extensions by default
-        factory.registerExtension(address(extensionA), IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
-        factory.registerExtension(address(extensionB), IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
-        factory.registerExtension(address(multiMintExtension), IExtensionBeacon.ExtensionType.MULTI_MINT);
+        factory.registerExtension(address(extensionA), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(extensionB), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(multiMintExtension), IExtensionFactory.ExtensionType.MULTI_MINT);
 
         // Allow mockUSDC in multiMintExtension
         multiMintExtension.setAllowedAsset(address(mockUSDC), true);
@@ -143,7 +152,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         assertFalse(swapFacility.isApprovedExtension(address(fresh)));
 
         // After registration, it should be approved
-        factory.registerExtension(address(fresh), IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(fresh), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
         assertTrue(swapFacility.isApprovedExtension(address(fresh)));
     }
 
