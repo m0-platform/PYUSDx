@@ -85,7 +85,9 @@ abstract contract IntegrationForkTest is BaseForkTest {
                 issuer: operator,
                 minter: executor,
                 mintDelay: MINT_DELAY,
-                mintTTL: MINT_TTL
+                mintTTL: MINT_TTL,
+                rateLimitCapacity: type(uint128).max,
+                rateLimitRefillPerSecond: 0
             }),
             Config.SwapFacilityConfig({ admin: admin, pauser: pauser }),
             Config.FactoryConfig({ admin: admin, factoryManager: factoryManager }),

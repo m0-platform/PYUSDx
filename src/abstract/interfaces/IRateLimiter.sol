@@ -16,6 +16,10 @@ interface IRateLimiter {
     /// @param  refillPerSecond Invalid non-zero refill rate.
     error InvalidRateLimitRemoval(uint128 capacity, uint128 refillPerSecond);
 
+    /// @notice Reverted when an unconfigured issuer attempts a rate-limited action.
+    /// @param  issuer Address of the unconfigured issuer.
+    error RateLimitNotConfigured(address issuer);
+
     /// @notice Reverted when rate limit manager is the zero address.
     error ZeroRateLimitManager();
 
@@ -43,13 +47,14 @@ interface IRateLimiter {
     /// @notice The role that can set rate limits.
     function RATE_LIMIT_MANAGER_ROLE() external view returns (bytes32);
 
-    /// @notice Returns issuer rate-limit config.
+    /// @notice Returns issuer rate-limit config. Returns (0, 0) for unconfigured issuers.
     /// @param  issuer          Address of the issuer.
     /// @return capacity        Maximum bucket capacity.
     /// @return refillPerSecond Refill rate per second.
     function getRateLimitConfig(address issuer) external view returns (uint128 capacity, uint128 refillPerSecond);
 
     /// @notice Returns currently available amount in issuer mint bucket (after virtual refill).
+    ///         Returns 0 for unconfigured issuers.
     /// @param  issuer Address of the issuer.
     /// @return The remaining amount in the bucket.
     function getRemainingAmount(address issuer) external view returns (uint128);

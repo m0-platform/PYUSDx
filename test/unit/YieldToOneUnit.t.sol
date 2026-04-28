@@ -55,6 +55,10 @@ contract YieldToOneUnitTests is BaseTest {
         );
         issuerGateway.setPyusdx(address(pyusdx));
 
+        // Configure rate limit for the issuer gateway (fail-closed: unconfigured issuers revert)
+        vm.prank(rateManager);
+        pyusdx.setRateLimit(address(issuerGateway), type(uint128).max, 0, true);
+
         swapFacility = new MockSwapFacility(address(pyusdx));
 
         address extensionImpl = address(new YieldToOne(address(pyusdx), address(swapFacility)));

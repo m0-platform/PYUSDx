@@ -3,6 +3,8 @@ pragma solidity 0.8.34;
 
 import { console } from "../../lib/forge-std/src/console.sol";
 
+import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+
 import { DeployHelpers } from "../../lib/evm-m-extensions/lib/common/script/deploy/DeployHelpers.sol";
 
 import { Upgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
@@ -10,6 +12,7 @@ import { Upgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-up
 import { IssuerGateway } from "../../src/core/IssuerGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
+import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
 import { ExtensionBeacon } from "../../src/platform/ExtensionBeacon.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
@@ -249,7 +252,13 @@ contract DeployBase is DeployHelpers, ScriptBase {
         console.log("Predicted SwapFacility proxy:      ", predictedSwapFacility);
         console.log("Predicted Factory proxy:           ", predictedFactory);
 
-        // 2. Deploy PYUSDX (implementation needs pre-computed IssuerGateway proxy address)
+        // 2. Deploy PYUSDX with deployer as transient admin/rateLimitManager for role bootstrapping
+        address targetAdmin = pyusdxConfig.admin;
+        address targetRateManager = pyusdxConfig.rateManager;
+
+        pyusdxConfig.admin = deployer;
+        pyusdxConfig.rateManager = deployer;
+
         (deployment.pyusdxProxy, deployment.pyusdxProxyAdmin, deployment.pyusdxImplementation) = _deployPYUSDX(
             deployer,
             predictedIssuerGateway,
@@ -267,7 +276,17 @@ contract DeployBase is DeployHelpers, ScriptBase {
 
         require(deployment.issuerGatewayProxy == predictedIssuerGateway, "IssuerGateway proxy address mismatch");
 
-        // 4. Deploy SwapFacility (implementation needs actual PYUSDX proxy + pre-computed Factory proxy)
+        // 4. Configure rate limit for IssuerGateway and transfer roles to target holders
+        _bootstrapPYUSDXRoles(
+            deployment.pyusdxProxy,
+            deployment.issuerGatewayProxy,
+            deployer,
+            targetAdmin,
+            targetRateManager,
+            issuerGatewayConfig
+        );
+
+        // 5. Deploy SwapFacility (implementation needs actual PYUSDX proxy + pre-computed Factory proxy)
         (
             deployment.swapFacilityProxy,
             deployment.swapFacilityProxyAdmin,
@@ -276,11 +295,11 @@ contract DeployBase is DeployHelpers, ScriptBase {
 
         require(deployment.swapFacilityProxy == predictedSwapFacility, "SwapFacility proxy address mismatch");
 
-        // 5. Deploy extension implementations
+        // 6. Deploy extension implementations
         address yieldToOneImpl = address(new YieldToOne(deployment.pyusdxProxy, deployment.swapFacilityProxy));
         address multiMintImpl = address(new MultiMint(deployment.pyusdxProxy, deployment.swapFacilityProxy));
 
-        // 6. Deploy ExtensionBeacon behind TUP
+        // 7. Deploy ExtensionBeacon behind TUP
         (deployment.beaconProxy, deployment.beaconProxyAdmin, deployment.beaconImplementation) = _deployBeacon(
             deployer,
             deployment.pyusdxProxy,
@@ -290,7 +309,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
             factoryConfig
         );
 
-        // 7. Deploy Factory (implementation needs actual PYUSDX + SwapFacility + beacon proxies)
+        // 8. Deploy Factory (implementation needs actual PYUSDX + SwapFacility + beacon proxies)
         //    Constructor validates swapFacility.pyusdx(), so SwapFacility must be deployed first
         (deployment.factoryProxy, deployment.factoryProxyAdmin, deployment.factoryImplementation) = _deployFactory(
             deployer,
@@ -301,6 +320,36 @@ contract DeployBase is DeployHelpers, ScriptBase {
         );
 
         require(deployment.factoryProxy == predictedFactory, "Factory proxy address mismatch");
+    }
+
+    /// @dev Configures the IssuerGateway rate limit and transfers admin/rate-manager roles
+    ///      from the deployer to the target holders, then renounces the deployer's roles.
+    function _bootstrapPYUSDXRoles(
+        address pyusdxProxy,
+        address issuerGatewayProxy,
+        address deployer,
+        address targetAdmin,
+        address targetRateManager,
+        IssuerGatewayConfig memory issuerGatewayConfig
+    ) internal {
+        // Configure rate limit for the IssuerGateway (deployer holds RATE_LIMIT_MANAGER_ROLE)
+        IRateLimiter(pyusdxProxy).setRateLimit(
+            issuerGatewayProxy,
+            issuerGatewayConfig.rateLimitCapacity,
+            issuerGatewayConfig.rateLimitRefillPerSecond,
+            true
+        );
+
+        // Transfer roles to target holders
+        bytes32 rateLimitManagerRole = IRateLimiter(pyusdxProxy).RATE_LIMIT_MANAGER_ROLE();
+        bytes32 defaultAdminRole = 0x00;
+
+        IAccessControl(pyusdxProxy).grantRole(rateLimitManagerRole, targetRateManager);
+        IAccessControl(pyusdxProxy).grantRole(defaultAdminRole, targetAdmin);
+
+        // Renounce deployer's transient roles
+        IAccessControl(pyusdxProxy).renounceRole(rateLimitManagerRole, deployer);
+        IAccessControl(pyusdxProxy).renounceRole(defaultAdminRole, deployer);
     }
 
     function _deployPortalStack(

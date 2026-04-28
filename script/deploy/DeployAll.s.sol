@@ -79,6 +79,8 @@ contract DeployAll is DeployBase {
         config.minter = vm.envAddress("ISSUER_GATEWAY_MINTER");
         config.mintDelay = uint32(vm.envUint("ISSUER_GATEWAY_MINT_DELAY"));
         config.mintTTL = uint32(vm.envUint("ISSUER_GATEWAY_MINT_TTL"));
+        config.rateLimitCapacity = uint128(vm.envUint("ISSUER_GATEWAY_RATE_LIMIT_CAPACITY"));
+        config.rateLimitRefillPerSecond = uint128(vm.envUint("ISSUER_GATEWAY_RATE_LIMIT_REFILL"));
     }
 
     function _loadSwapFacilityConfig() private view returns (SwapFacilityConfig memory config) {
