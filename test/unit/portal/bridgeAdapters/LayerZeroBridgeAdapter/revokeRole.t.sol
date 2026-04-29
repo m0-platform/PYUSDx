@@ -37,7 +37,7 @@ contract RevokeRoleUnitTest is LayerZeroBridgeAdapterUnitTestBase {
         assertEq(lzEndpoint.delegates(address(adapter)), address(0));
     }
 
-    function test_revokeRole_clearsDelegateWhenRevokingAdminRole() external {
+    function test_revokeRole_doesNotClearDelegateWhenRevokingAdminRole() external {
         // Grant admin role to operator so we can test revoking it.
         vm.startPrank(admin);
         adapter.grantRole(adapter.DEFAULT_ADMIN_ROLE(), operator);
@@ -45,12 +45,29 @@ contract RevokeRoleUnitTest is LayerZeroBridgeAdapterUnitTestBase {
         // Operator is the delegate.
         assertEq(lzEndpoint.delegates(address(adapter)), operator);
 
-        // Revoking the admin role should clear the delegate.
+        // Revoking a non-OPERATOR role must not affect the delegate.
         adapter.revokeRole(adapter.DEFAULT_ADMIN_ROLE(), operator);
         vm.stopPrank();
 
-        // The delegate should be cleared on the endpoint.
-        assertEq(lzEndpoint.delegates(address(adapter)), address(0));
+        // The delegate remains unchanged.
+        assertEq(lzEndpoint.delegates(address(adapter)), operator);
+    }
+
+    function test_revokeRole_doesNotClearDelegateWhenNoOpRevoke() external {
+        // Account does not hold OPERATOR_ROLE — revoke is a no-op.
+        address notOperator = makeAddr("notOperator");
+        assertFalse(adapter.hasRole(adapter.OPERATOR_ROLE(), notOperator));
+
+        // Operator is still the delegate.
+        assertEq(lzEndpoint.delegates(address(adapter)), operator);
+
+        // Revoking OPERATOR_ROLE from an account that doesn't have it must not clear the delegate.
+        vm.startPrank(admin);
+        adapter.revokeRole(adapter.OPERATOR_ROLE(), notOperator);
+        vm.stopPrank();
+
+        // The delegate remains unchanged.
+        assertEq(lzEndpoint.delegates(address(adapter)), operator);
     }
 
     function test_revokeRole_clearsDelegateAfterDelegateWasChanged() external {
@@ -61,7 +78,8 @@ contract RevokeRoleUnitTest is LayerZeroBridgeAdapterUnitTestBase {
 
         assertEq(lzEndpoint.delegates(address(adapter)), newDelegate);
 
-        // Revoking operator should clear the delegate.
+        // Revoking OPERATOR_ROLE from the operator should clear the delegate, even though the
+        // current delegate is a different address.
         vm.startPrank(admin);
         adapter.revokeRole(adapter.OPERATOR_ROLE(), operator);
         vm.stopPrank();

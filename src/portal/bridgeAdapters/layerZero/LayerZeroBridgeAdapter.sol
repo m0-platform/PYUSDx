@@ -87,11 +87,15 @@ contract LayerZeroBridgeAdapter is BridgeAdapter, ILayerZeroBridgeAdapter {
 
     /* ============ Internal Functions ============ */
 
-    /// @dev Clears the LayerZero Endpoint delegate when the OPERATOR_ROLE is revoked.
+    /// @dev Clears the LayerZero Endpoint delegate when the OPERATOR_ROLE is revoked from the current delegate.
     function _revokeRole(bytes32 role, address account) internal override returns (bool) {
-        ILayerZeroEndpointV2(endpoint).setDelegate(address(0));
+        bool revoked = super._revokeRole(role, account);
 
-        return super._revokeRole(role, account);
+        if (revoked && role == OPERATOR_ROLE) {
+            ILayerZeroEndpointV2(endpoint).setDelegate(address(0));
+        }
+
+        return revoked;
     }
 
     /* ============ External View/Pure Functions ============ */
