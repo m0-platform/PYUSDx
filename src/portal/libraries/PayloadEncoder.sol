@@ -76,31 +76,45 @@ library PayloadEncoder {
     }
 
     /// @notice Decodes a token transfer payload.
-    /// @param  payload          The payload to decode.
-    /// @return messageId        The message ID.
-    /// @return amount           The amount of tokens to transfer.
-    /// @return destinationToken The address of the destination token.
-    /// @return sender           The address of the sender.
-    /// @return recipient        The address of the recipient.
+    /// @param  payload            The payload to decode.
+    /// @return destinationChainId The destination chain ID.
+    /// @return destinationPeer    The address of the peer bridge adapter on the destination chain.
+    /// @return messageId          The message ID.
+    /// @return amount             The amount of tokens to transfer.
+    /// @return destinationToken   The address of the destination token.
+    /// @return sender             The address of the sender.
+    /// @return recipient          The address of the recipient.
     function decodeTokenTransfer(
         bytes memory payload
     )
         internal
         pure
-        returns (bytes32 messageId, uint256 amount, address destinationToken, bytes32 sender, address recipient)
+        returns (
+            uint32 destinationChainId,
+            address destinationPeer,
+            bytes32 messageId,
+            uint256 amount,
+            address destinationToken,
+            bytes32 sender,
+            address recipient
+        )
     {
         if (payload.length != PAYLOAD_LENGTH) revert InvalidPayloadLength(payload.length);
 
-        uint256 offset = DESTINATION_CHAIN_ID_LENGTH + DESTINATION_PEER_LENGTH;
+        uint256 offset = 0;
+        bytes32 destinationPeerBytes32;
         bytes32 destinationTokenBytes32;
         bytes32 recipientBytes32;
 
+        (destinationChainId, offset) = payload.asUint32Unchecked(offset);
+        (destinationPeerBytes32, offset) = payload.asBytes32Unchecked(offset);
         (messageId, offset) = payload.asBytes32Unchecked(offset);
         (amount, offset) = payload.asUint128Unchecked(offset);
         (destinationTokenBytes32, offset) = payload.asBytes32Unchecked(offset);
         (sender, offset) = payload.asBytes32Unchecked(offset);
         (recipientBytes32, offset) = payload.asBytes32Unchecked(offset);
 
+        destinationPeer = destinationPeerBytes32.toAddress();
         destinationToken = destinationTokenBytes32.toAddress();
         recipient = recipientBytes32.toAddress();
 

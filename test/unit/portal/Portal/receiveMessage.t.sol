@@ -27,7 +27,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
 
     function test_receiveMessage_tokenTransfer_pyusdx() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
-            CHAIN_ID_2,
+            CHAIN_ID_1,
             address(bridgeAdapter).toBytes32(),
             messageId,
             amount,
@@ -47,7 +47,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
 
     function test_receiveMessage_tokenTransfer_extension() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
-            CHAIN_ID_2,
+            CHAIN_ID_1,
             address(bridgeAdapter).toBytes32(),
             messageId,
             amount,
@@ -67,7 +67,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
 
     function test_receiveMessage_tokenTransfer_wrapFailed() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
-            CHAIN_ID_2,
+            CHAIN_ID_1,
             address(bridgeAdapter).toBytes32(),
             messageId,
             amount,
@@ -96,7 +96,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
 
     function test_receiveMessage_tokenTransfer_extension_recipientFrozenInExtension() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
-            CHAIN_ID_2,
+            CHAIN_ID_1,
             address(bridgeAdapter).toBytes32(),
             messageId,
             amount,
@@ -131,7 +131,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
 
     function test_receiveMessage_tokenTransfer_pyusdx_recipientFrozenInPyusdx() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
-            CHAIN_ID_2,
+            CHAIN_ID_1,
             address(bridgeAdapter).toBytes32(),
             messageId,
             amount,
@@ -175,7 +175,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
 
     function test_receiveMessage_tokenTransfer_extension_recipientFrozenInPyusdx() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
-            CHAIN_ID_2,
+            CHAIN_ID_1,
             address(bridgeAdapter).toBytes32(),
             messageId,
             amount,
@@ -220,7 +220,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
 
     function test_receiveMessage_tokenTransfer_extension_recipientFrozenInPyusdx_wrapFailed() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
-            CHAIN_ID_2,
+            CHAIN_ID_1,
             address(bridgeAdapter).toBytes32(),
             messageId,
             amount,
@@ -271,7 +271,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
 
     function test_receiveMessage_tokenTransfer_pyusdx_recipientFrozenInPyusdx_revertsIfFallbackFrozen() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
-            CHAIN_ID_2,
+            CHAIN_ID_1,
             address(bridgeAdapter).toBytes32(),
             messageId,
             amount,
@@ -299,7 +299,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
         // The whole tx reverted — message should not be marked processed, so it can be retried
         // once the fallback is replaced or unfrozen.
         bytes memory retryPayload = PayloadEncoder.encodeTokenTransfer(
-            CHAIN_ID_2,
+            CHAIN_ID_1,
             address(bridgeAdapter).toBytes32(),
             messageId,
             amount,
@@ -323,7 +323,7 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
 
     function test_receiveMessage_tokenTransfer_pyusdx_recipientFrozenInPyusdx_cannotBeReplayed() external {
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
-            CHAIN_ID_2,
+            CHAIN_ID_1,
             address(bridgeAdapter).toBytes32(),
             messageId,
             amount,
@@ -341,6 +341,42 @@ contract ReceiveMessageUnitTest is PortalUnitTestBase {
 
         // Replaying the same message must revert even though it was redirected to the fallback
         vm.expectRevert(abi.encodeWithSelector(IPortal.MessageAlreadyProcessed.selector, messageId));
+        vm.prank(address(bridgeAdapter));
+        portal.receiveMessage(CHAIN_ID_2, payload);
+    }
+
+    function test_receiveMessage_revertsIfInvalidTargetChain() external {
+        // Encode a payload whose destination chain ID does not match the current chain.
+        uint32 invalidTargetChainId = 999;
+        bytes memory payload = PayloadEncoder.encodeTokenTransfer(
+            invalidTargetChainId,
+            address(bridgeAdapter).toBytes32(),
+            messageId,
+            amount,
+            address(pyusdx).toBytes32(),
+            sender,
+            recipient.toBytes32()
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(IPortal.InvalidTargetChain.selector, invalidTargetChainId));
+        vm.prank(address(bridgeAdapter));
+        portal.receiveMessage(CHAIN_ID_2, payload);
+    }
+
+    function test_receiveMessage_revertsIfInvalidTargetBridgeAdapter() external {
+        // Encode a payload whose destination bridge adapter does not match msg.sender.
+        address wrongBridgeAdapter = makeAddr("wrongBridgeAdapter");
+        bytes memory payload = PayloadEncoder.encodeTokenTransfer(
+            CHAIN_ID_1,
+            wrongBridgeAdapter.toBytes32(),
+            messageId,
+            amount,
+            address(pyusdx).toBytes32(),
+            sender,
+            recipient.toBytes32()
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(IPortal.InvalidTargetBridgeAdapter.selector, wrongBridgeAdapter));
         vm.prank(address(bridgeAdapter));
         portal.receiveMessage(CHAIN_ID_2, payload);
     }

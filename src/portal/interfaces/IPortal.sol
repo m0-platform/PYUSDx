@@ -155,8 +155,14 @@ interface IPortal {
     /// @notice Thrown when receiving is paused.
     error ReceivingPaused();
 
-    /// @notice Thrown when a message with the given ID has already been processed.
+    /// @notice Thrown  on the destination when a message with the given ID has already been processed.
     error MessageAlreadyProcessed(bytes32 messageId);
+
+    /// @notice Thrown on the destination when the target chain ID does not match the current chain ID.
+    error InvalidTargetChain(uint32 targetChainId);
+
+    /// @notice Thrown  on the destination when the target bridge adapter does not match the current adapter.
+    error InvalidTargetBridgeAdapter(address targetBridgeAdapter);
 
     /// @notice Thrown when the gas limit for the specified payload type is not configured.
     error PayloadGasLimitNotSet(uint32 destinationChainId);
