@@ -145,6 +145,13 @@ contract RateLimiterTests is BaseTest {
         limiter.setRateLimit(issuer, 0, 5, false);
     }
 
+    function test_setRateLimit_revertIfZeroCapacity() public {
+        vm.expectRevert(IRateLimiter.InvalidRateLimitConfig.selector);
+
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 0, 0, true);
+    }
+
     function test_setRateLimit_zeroRefillPerSecond() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 0, true);

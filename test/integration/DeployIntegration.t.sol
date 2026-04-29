@@ -33,7 +33,12 @@ contract DeployIntegrationTests is IntegrationForkTest {
         assertTrue(pyusdx.hasRole(pyusdx.PAUSER_ROLE(), pauser));
         assertTrue(pyusdx.hasRole(pyusdx.FREEZE_MANAGER_ROLE(), freezeManager));
         assertTrue(pyusdx.hasRole(pyusdx.FORCED_TRANSFER_MANAGER_ROLE(), forcedTransferManager));
+        assertTrue(pyusdx.hasRole(pyusdx.RATE_LIMIT_MANAGER_ROLE(), rateManager));
         assertEq(pyusdx.earnerManager(), earnerManager);
+
+        // Deployer's transient roles must be renounced after deployment
+        assertFalse(pyusdx.hasRole(pyusdx.DEFAULT_ADMIN_ROLE(), address(coreDeployer)));
+        assertFalse(pyusdx.hasRole(pyusdx.RATE_LIMIT_MANAGER_ROLE(), address(coreDeployer)));
     }
 
     function test_coreDeployment_issuerGatewayRoles() public view {

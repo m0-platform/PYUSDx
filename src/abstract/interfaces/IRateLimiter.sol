@@ -20,6 +20,9 @@ interface IRateLimiter {
     /// @param  issuer Address of the unconfigured issuer.
     error RateLimitNotConfigured(address issuer);
 
+    /// @notice Reverted when enabling a rate limit with zero capacity.
+    error InvalidRateLimitConfig();
+
     /// @notice Reverted when rate limit manager is the zero address.
     error ZeroRateLimitManager();
 

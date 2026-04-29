@@ -52,6 +52,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
     LayerZeroBridgeAdapter public layerZeroBridgeAdapter;
 
     DeployBase.CoreDeployments internal _coreDeployments;
+    CoreDeployer public coreDeployer;
 
     uint32 public constant MINT_DELAY = 1; // 1 second for testing
     uint32 public constant MINT_TTL = 3600; // 1 hour
@@ -67,9 +68,9 @@ abstract contract IntegrationForkTest is BaseForkTest {
     }
 
     function _deployCoreStack() internal {
-        CoreDeployer coreDeployer_ = new CoreDeployer();
+        coreDeployer = new CoreDeployer();
 
-        DeployBase.CoreDeployments memory deployments_ = coreDeployer_.deployCore(
+        DeployBase.CoreDeployments memory deployments_ = coreDeployer.deployCore(
             Config.PYUSDXConfig({
                 name: "PayPal USD Yield",
                 symbol: "PYUSDX",
