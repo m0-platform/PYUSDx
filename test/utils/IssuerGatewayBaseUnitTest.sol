@@ -59,16 +59,15 @@ abstract contract IssuerGatewayBaseUnitTest is BaseTest {
     /// @notice Warps time to when a mint proposal becomes executable
     /// @param mintId The mint proposal ID
     function _warpToMintable(uint48 mintId) internal {
-        (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
-        vm.warp(createdAt + issuerGateway.mintDelay());
+        (, uint40 activeAt, , , , ) = issuerGateway.getMintProposal(mintId);
+        vm.warp(activeAt);
     }
 
     /// @notice Warps time to when a mint proposal is expired
     /// @param mintId The mint proposal ID
     /// @return expiresAt The timestamp at which the proposal expired
     function _warpToExpired(uint48 mintId) internal returns (uint40 expiresAt) {
-        (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
-        expiresAt = createdAt + issuerGateway.mintDelay() + issuerGateway.mintTTL();
+        (, , expiresAt, , , ) = issuerGateway.getMintProposal(mintId);
         vm.warp(expiresAt + 1);
     }
 }

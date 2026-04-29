@@ -18,7 +18,9 @@ abstract contract IssuerGatewayStorageLayout {
 
     struct MintProposal {
         uint40 createdAt; // ──╮ Timestamp when the proposal was created, good for 100+ years.
-        address minter; // ────╯ Address that proposed the mint.
+        uint40 activeAt; //    │ Snapshotted timestamp when the proposal becomes executable.
+        uint40 expiresAt; // ──╯ Snapshotted timestamp when the proposal expires.
+        address minter; //       Address that proposed the mint.
         address recipient; //    Address that will receive the minted tokens.
         uint256 amount; //       Amount of PYUSDX to mint.
     }
@@ -113,6 +115,8 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
 
         $.mintProposals[mintId] = MintProposal({
             createdAt: createdAt,
+            activeAt: activeAt,
+            expiresAt: expiresAt,
             minter: msg.sender,
             recipient: recipient,
             amount: amount
@@ -129,13 +133,7 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
         if (proposal.createdAt == 0) revert InvalidMintProposal();
         if (proposal.minter != msg.sender) revert NotMintProposalCreator();
 
-        uint40 activeAt;
-
-        // NOTE: safe to use unchecked, uint40 timestamps overflow past year 36812,
-        //       and max uint32 delay (~136 years) cannot push them past that until then.
-        unchecked {
-            activeAt = proposal.createdAt + $.mintDelay;
-        }
+        uint40 activeAt = proposal.activeAt;
 
         if (block.timestamp >= activeAt) revert ActiveMintProposal(activeAt);
 
@@ -151,21 +149,11 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
 
         if (proposal.createdAt == 0) revert InvalidMintProposal();
 
-        uint40 activeAt;
-        uint40 expiresAt;
-
-        // NOTE: compute activeAt first; expiresAt only needed if proposal is active.
-        //       Safe to use unchecked, uint40 timestamps overflow past year 36812,
-        //       and max uint32 delay (~136 years) cannot push them past that until then.
-        unchecked {
-            activeAt = proposal.createdAt + $.mintDelay;
-        }
+        uint40 activeAt = proposal.activeAt;
 
         if (block.timestamp < activeAt) revert PendingMintProposal(activeAt);
 
-        unchecked {
-            expiresAt = activeAt + $.mintTTL;
-        }
+        uint40 expiresAt = proposal.expiresAt;
 
         if (block.timestamp > expiresAt) revert ExpiredMintProposal(expiresAt);
 
@@ -220,9 +208,21 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
     /// @inheritdoc IIssuerGateway
     function getMintProposal(
         uint48 mintId
-    ) external view returns (uint40 createdAt, address minter, address recipient, uint256 amount) {
+    )
+        external
+        view
+        returns (uint40 createdAt, uint40 activeAt, uint40 expiresAt, address minter, address recipient, uint256 amount)
+    {
         MintProposal memory proposal = _getIssuerGatewayStorage().mintProposals[mintId];
-        return (proposal.createdAt, proposal.minter, proposal.recipient, proposal.amount);
+
+        return (
+            proposal.createdAt,
+            proposal.activeAt,
+            proposal.expiresAt,
+            proposal.minter,
+            proposal.recipient,
+            proposal.amount
+        );
     }
 
     /* ============ Internal Functions ============ */
