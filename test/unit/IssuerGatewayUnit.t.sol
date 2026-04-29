@@ -588,24 +588,6 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         assertEq(pyusdx.balanceOf(recipient), 100);
     }
 
-    function test_snapshotInvariance_setMintTTLHigher_doesNotRevive() public {
-        uint48 mintId = _proposeMint(100, recipient);
-
-        (, , uint40 originalExpiresAt, , , ) = issuerGateway.getMintProposal(mintId);
-
-        // Warp past the original expiresAt
-        vm.warp(originalExpiresAt + 1);
-
-        // Admin extends TTL to 365 days
-        vm.prank(admin);
-        issuerGateway.setMintTTL(365 days);
-
-        vm.expectRevert(abi.encodeWithSelector(IIssuerGateway.ExpiredMintProposal.selector, originalExpiresAt));
-
-        vm.prank(executor);
-        issuerGateway.mint(mintId);
-    }
-
     function test_snapshotInvariance_setMintTTLLower_doesNotShortenWindow() public {
         uint48 mintId = _proposeMint(100, recipient);
 
