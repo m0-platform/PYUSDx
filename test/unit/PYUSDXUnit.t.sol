@@ -3341,4 +3341,26 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         assertEq(pyusdx.lastUpdateTimestampOf(alice), 1);
     }
+
+    /* ============ _getPrincipalAmountRoundedDown ============ */
+
+    function test_getPrincipalAmountRoundedDown_overflow() public {
+        uint256 overflowAmount = uint256(type(uint240).max) + 1;
+        uint128 index = 1e12;
+
+        vm.expectRevert(abi.encodeWithSelector(UIntMath.InvalidUInt240.selector));
+
+        pyusdx.getPrincipalAmountRoundedDown(overflowAmount, index);
+    }
+
+    /* ============ _getPrincipalAmountRoundedUp ============ */
+
+    function test_getPrincipalAmountRoundedUp_overflow() public {
+        uint256 overflowAmount = uint256(type(uint240).max) + 1;
+        uint128 index = 1e12;
+
+        vm.expectRevert(abi.encodeWithSelector(UIntMath.InvalidUInt240.selector));
+
+        pyusdx.getPrincipalAmountRoundedUp(overflowAmount, index);
+    }
 }

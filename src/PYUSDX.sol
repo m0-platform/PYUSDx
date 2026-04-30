@@ -625,12 +625,12 @@ contract PYUSDX is
 
     /// @dev Returns the principal amount (rounded down) given the present amount and an index.
     function _getPrincipalAmountRoundedDown(uint256 presentAmount, uint128 index) internal pure returns (uint112) {
-        return IndexingMath.getPrincipalAmountRoundedDown(uint240(presentAmount), index);
+        return IndexingMath.getPrincipalAmountRoundedDown(UIntMath.safe240(presentAmount), index);
     }
 
     /// @dev Returns the principal amount (rounded up) given the present amount and an index.
     function _getPrincipalAmountRoundedUp(uint256 presentAmount, uint128 index) internal pure returns (uint112) {
-        return IndexingMath.getPrincipalAmountRoundedUp(uint240(presentAmount), index);
+        return IndexingMath.getPrincipalAmountRoundedUp(UIntMath.safe240(presentAmount), index);
     }
 
     /// @dev Reverts if amount is zero.

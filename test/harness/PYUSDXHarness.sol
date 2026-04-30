@@ -68,6 +68,16 @@ contract PYUSDXHarness is PYUSDX {
         _getPYUSDXStorage().accounts[account].earnerRate = newRateBps;
     }
 
+    /// @notice Expose internal _getPrincipalAmountRoundedDown for testing.
+    function getPrincipalAmountRoundedDown(uint256 presentAmount, uint128 index) external pure returns (uint112) {
+        return _getPrincipalAmountRoundedDown(presentAmount, index);
+    }
+
+    /// @notice Expose internal _getPrincipalAmountRoundedUp for testing.
+    function getPrincipalAmountRoundedUp(uint256 presentAmount, uint128 index) external pure returns (uint112) {
+        return _getPrincipalAmountRoundedUp(presentAmount, index);
+    }
+
     /// @notice Sets rate-limit storage directly for edge-case testing.
     function setRateLimitState(
         address issuer,
