@@ -77,6 +77,8 @@ interface IMultiMint is IYieldToOne {
 
     /// @notice Sets the asset cap for a given `asset`.
     /// @dev    MUST only be callable by an account with the ASSET_CAP_MANAGER_ROLE.
+    ///         Setting `cap` to 0 disables both `wrap` and `replaceAsset` for this asset;
+    ///         existing balances remain unwrappable to PYUSDX.
     /// @param  asset Address of the asset.
     /// @param  cap   Maximum allowed amount of `asset` that can back the extension.
     function setAssetCap(address asset, uint256 cap) external;

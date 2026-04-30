@@ -525,6 +525,46 @@ contract MultiMintTest is BaseTest {
         extension.replaceAsset(rando, bob, 50e6);
     }
 
+    function test_replaceAsset_revertsWhenAssetDisabled() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
+
+        // Disable USDC by setting cap to 0.
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(usdc), 0);
+
+        issuerGateway.mint(bob, 50e6);
+
+        vm.startPrank(bob);
+        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
+
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.AssetNotAllowed.selector, address(usdc)));
+        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
+        vm.stopPrank();
+
+        assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 50e6));
+    }
+
+    function test_replaceAsset_succeedsAfterReenable() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
+
+        // Disable then re-enable USDC.
+        vm.startPrank(assetCapManager);
+        extension.setAssetCap(address(usdc), 0);
+        extension.setAssetCap(address(usdc), 1_000_000e6);
+        vm.stopPrank();
+
+        issuerGateway.mint(bob, 50e6);
+
+        vm.startPrank(bob);
+        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
+        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
+        vm.stopPrank();
+
+        assertEq(usdc.balanceOf(bob), 50e6);
+        assertEq(extension.assetBalanceOf(address(usdc)), 50e6);
+        assertTrue(extension.isAllowedToReplaceAsset(address(usdc), 50e6));
+    }
+
     function test_replaceAsset_crossDecimal() public {
         _wrapAssetFor(alice, address(dai), 500e18, 500e6);
 
