@@ -280,6 +280,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         _requireNotPaused();
 
         _revertIfInvalidAsset(asset);
+        if (assetDecimals(asset) == 0) revert InvalidAsset(asset);
         _revertIfZeroAccount(recipient);
         _revertIfZeroAmount(amount);
 
