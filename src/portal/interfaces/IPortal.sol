@@ -161,7 +161,7 @@ interface IPortal {
     /// @notice Thrown on the destination when the target chain ID does not match the current chain ID.
     error InvalidTargetChain(uint32 targetChainId);
 
-    /// @notice Thrown  on the destination when the target bridge adapter does not match the current adapter.
+    /// @notice Thrown on the destination when the target bridge adapter does not match the current adapter.
     error InvalidTargetBridgeAdapter(address targetBridgeAdapter);
 
     /// @notice Thrown when the gas limit for the specified payload type is not configured.
