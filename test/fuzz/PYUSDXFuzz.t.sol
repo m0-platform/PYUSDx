@@ -455,15 +455,15 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     // — the earner keeps the full materialized amount; routing and fee hops are skipped.
     function testFuzz_setAccountInfo_whenPaused_supplyDeltaEqualsYield(
         uint256 mintAmount,
-        uint32 earnerRate,
+        uint16 earnerRate,
         uint16 feeRate,
         uint40 elapsed,
         uint8 targetPath,
         bool customRecipient
     ) public {
         mintAmount = bound(mintAmount, 1e6, 1e18);
-        uint32 boundedEarnerRate = uint32(bound(earnerRate, 1, MAX_FEE_RATE));
-        uint16 boundedFeeRate = uint16(bound(feeRate, 0, MAX_FEE_RATE));
+        uint16 boundedEarnerRate = uint16(bound(earnerRate, 1, MAX_RATE));
+        uint16 boundedFeeRate = uint16(bound(feeRate, 0, MAX_RATE));
         uint40 boundedElapsed = uint40(bound(elapsed, 1 days, 365 days));
         uint8 boundedPath = uint8(bound(targetPath, 0, 2)); // 0=disable, 1=update rate, 2=update recipient
 
@@ -490,9 +490,9 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
             pyusdx.setAccountInfo(alice, 0, 0, address(0));
             assertFalse(pyusdx.isEarning(alice));
         } else if (boundedPath == 1) {
-            uint32 newRate = boundedEarnerRate == MAX_FEE_RATE ? 1 : boundedEarnerRate + 1;
+            uint16 newRate = boundedEarnerRate == MAX_RATE ? 1 : boundedEarnerRate + 1;
             pyusdx.setAccountInfo(alice, newRate, boundedFeeRate, initialRecipient);
-            (uint32 postRate, , ) = pyusdx.getAccountEarningInfo(alice);
+            (uint16 postRate, , ) = pyusdx.getAccountEarningInfo(alice);
             assertEq(postRate, newRate);
         } else {
             address newRecipient = initialRecipient == address(0) ? carol : address(0);

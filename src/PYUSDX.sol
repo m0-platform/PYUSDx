@@ -30,10 +30,10 @@ abstract contract PYUSDXStorageLayout {
     struct Account {
         // Slot 0: 256/256
         uint256 balance;
-        // Slot 1: 200/256 — earnerRate + index math (single SLOAD)
+        // Slot 1: 184/256 — earnerRate + index math (single SLOAD)
         uint128 lastIndex;
         uint40 lastUpdateTimestamp;
-        uint32 earnerRate;
+        uint16 earnerRate;
         // Slot 2: 160/256 — claim config (cold path)
         address claimRecipient;
         // Slot 3: 128/256 — principal + fee (co-read in _claim)
@@ -168,7 +168,7 @@ contract PYUSDX is
     /// @inheritdoc IPYUSDX
     function setAccountInfo(
         address account,
-        uint32 earnerRate,
+        uint16 earnerRate,
         uint16 feeRate,
         address claimRecipient
     ) external onlyEarnerManager {
@@ -178,7 +178,7 @@ contract PYUSDX is
     /// @inheritdoc IPYUSDX
     function setAccountInfo(
         address[] calldata accounts,
-        uint32[] calldata earnerRates,
+        uint16[] calldata earnerRates,
         uint16[] calldata feeRates,
         address[] calldata claimRecipients
     ) external onlyEarnerManager {
@@ -274,7 +274,7 @@ contract PYUSDX is
     /// @inheritdoc IPYUSDX
     function getAccountEarningInfo(
         address account
-    ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient) {
+    ) external view returns (uint16 earnerRate, uint16 feeRate, address claimRecipient) {
         Account memory accountInfo = _getPYUSDXStorage().accounts[account];
         return (accountInfo.earnerRate, accountInfo.feeRate, claimRecipientFor(account));
     }
@@ -352,10 +352,10 @@ contract PYUSDX is
     }
 
     /// @dev Internal implementation for setting earning details.
-    function _setAccountInfo(address account, uint32 earnerRate, uint16 feeRate, address claimRecipient) internal {
+    function _setAccountInfo(address account, uint16 earnerRate, uint16 feeRate, address claimRecipient) internal {
         _revertIfZeroAccount(account);
-        if (feeRate > ONE_HUNDRED_PERCENT) revert FeeRateTooHigh(feeRate);
         if (earnerRate > ONE_HUNDRED_PERCENT) revert EarnerRateTooHigh(earnerRate);
+        if (feeRate > ONE_HUNDRED_PERCENT) revert FeeRateTooHigh(feeRate);
 
         // Disable earning should have all earning-related fields set to 0, address(0).
         if (earnerRate == 0 && (feeRate != 0 || claimRecipient != address(0))) revert InvalidAccountInfo();

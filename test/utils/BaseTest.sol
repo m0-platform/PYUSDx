@@ -41,7 +41,7 @@ abstract contract BaseTest is Test {
 
     // Constants
     uint128 public constant PRECISION = 1e12;
-    uint16 public constant MAX_FEE_RATE = 10_000;
+    uint16 public constant MAX_RATE = 10_000;
 
     bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
     bytes32 public constant BEACON_MANAGER_ROLE = keccak256("BEACON_MANAGER_ROLE");

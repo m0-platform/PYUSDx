@@ -90,7 +90,7 @@ contract MultiMintTest is BaseTest {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(address(extension), 500, 0, address(0));
 
-        pyusdx.setAccountRateBps(address(extension), uint24(500));
+        pyusdx.setAccountRateBps(address(extension), uint16(500));
 
         usdc = new MockERC20("USD Coin", "USDC", 6);
         dai = new MockERC20("Dai", "DAI", 18);
