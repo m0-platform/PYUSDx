@@ -105,10 +105,14 @@ contract PYUSDXIntegrationTests is IntegrationForkTest {
         // Warp to accrue yield
         vm.warp(block.timestamp + 365 days);
 
-        (uint256 yieldWithFee, , ) = pyusdx.accruedYieldAndFeeOf(alice);
+        (uint256 yieldWithFee, uint256 fee, uint256 yieldNetOfFee) = pyusdx.accruedYieldAndFeeOf(alice);
         assertGt(yieldWithFee, 0);
+        assertGt(fee, 0);
 
-        uint256 expectedTotal = initialBalance + yieldWithFee;
+        // Freeze-time _claimFor skips claim-recipient routing (bob is frozen) but still routes
+        // the fee to earnerManager since the contract is not paused.
+        uint256 aliceExpectedTotal = initialBalance + yieldNetOfFee;
+        uint256 earnerManagerBalanceBefore = pyusdx.balanceOf(earnerManager);
 
         // Freeze bob (the claim recipient) first
         vm.prank(freezeManager);
@@ -116,21 +120,23 @@ contract PYUSDXIntegrationTests is IntegrationForkTest {
 
         assertTrue(pyusdx.isFrozen(bob));
 
-        // Freeze alice — _claimFor skips _transfer to frozen bob, all yield stays on alice
+        // Freeze alice — claim-recipient transfer is skipped (bob frozen); fee transfer still
+        // succeeds and routes to earnerManager.
         vm.prank(freezeManager);
         pyusdx.freeze(alice);
 
         assertTrue(pyusdx.isFrozen(alice));
-        assertEq(pyusdx.balanceOf(alice), expectedTotal);
+        assertEq(pyusdx.balanceOf(alice), aliceExpectedTotal);
+        assertEq(pyusdx.balanceOf(earnerManager), earnerManagerBalanceBefore + fee);
 
-        // forceTransfer the full balance (principal + yield) to carol
+        // forceTransfer the full remaining balance (principal + net yield) to carol
         uint256 carolBalanceBefore = pyusdx.balanceOf(carol);
 
         vm.prank(forcedTransferManager);
-        pyusdx.forceTransfer(alice, carol, expectedTotal);
+        pyusdx.forceTransfer(alice, carol, aliceExpectedTotal);
 
         assertEq(pyusdx.balanceOf(alice), 0);
-        assertEq(pyusdx.balanceOf(carol), carolBalanceBefore + expectedTotal);
+        assertEq(pyusdx.balanceOf(carol), carolBalanceBefore + aliceExpectedTotal);
     }
 
     /* ============ Pause-time setAccountInfo + fee recovery Integration ============ */
@@ -214,14 +220,19 @@ contract PYUSDXIntegrationTests is IntegrationForkTest {
         // Warp to accrue yield
         vm.warp(block.timestamp + 365 days);
 
-        (uint256 aliceYieldWithFee, , ) = pyusdx.accruedYieldAndFeeOf(alice);
+        (uint256 aliceYieldWithFee, uint256 aliceFee, uint256 aliceYieldNetOfFee) = pyusdx.accruedYieldAndFeeOf(alice);
         uint256 carolYield = pyusdx.accruedYieldOf(carol);
 
         assertGt(aliceYieldWithFee, 0);
+        assertGt(aliceFee, 0);
         assertGt(carolYield, 0);
 
-        uint256 aliceExpectedTotal = initialBalance + aliceYieldWithFee;
+        // Freeze-time _claimFor skips claim-recipient routing but still routes the fee to
+        // earnerManager since the contract is not paused. Alice has a non-zero fee → balance
+        // grows by yieldNetOfFee. Carol has fee=0 → balance grows by full yield.
+        uint256 aliceExpectedTotal = initialBalance + aliceYieldNetOfFee;
         uint256 carolExpectedTotal = initialBalance + carolYield;
+        uint256 earnerManagerBalanceBefore = pyusdx.balanceOf(earnerManager);
 
         // Batch freeze both accounts
         address[] memory accountsToFreeze = new address[](2);
@@ -234,9 +245,10 @@ contract PYUSDXIntegrationTests is IntegrationForkTest {
         assertTrue(pyusdx.isFrozen(alice));
         assertTrue(pyusdx.isFrozen(carol));
 
-        // Verify yield materialized on each account (no routing to recipients/fee)
+        // Alice: net yield on balance, fee routed to earnerManager. Carol: full yield on balance.
         assertEq(pyusdx.balanceOf(alice), aliceExpectedTotal);
         assertEq(pyusdx.balanceOf(carol), carolExpectedTotal);
+        assertEq(pyusdx.balanceOf(earnerManager), earnerManagerBalanceBefore + aliceFee);
 
         // Earning should be stopped for both
         assertFalse(pyusdx.isEarning(alice));
