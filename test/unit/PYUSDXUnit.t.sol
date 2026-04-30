@@ -2768,18 +2768,28 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertGt(fee, 0, "Should have fee");
 
         uint256 aliceBalanceBefore = pyusdx.balanceOf(alice);
-        uint256 expectedTotal = aliceBalanceBefore + yieldWithFee;
+        uint256 earnerManagerBalanceBefore = pyusdx.balanceOf(earnerManager);
 
-        // Freeze alice — succeeds, all yield (including fee) stays on alice's balance
+        // Freeze alice — claimRecipient routing is skipped (bob is frozen), but the fee is
+        // still collected by the earner manager since the contract is not paused and the
+        // earner manager is not frozen.
         vm.prank(freezeManager);
         pyusdx.freeze(alice);
 
         // Verify frozen
         assertTrue(pyusdx.isFrozen(alice));
 
-        // Verify ALL yield stays on alice's balance (not routed to claimRecipient or earnerManager)
-        // Balance increases by yieldWithFee (the full yield including the fee portion)
-        assertEq(pyusdx.balanceOf(alice), expectedTotal, "All yield should stay on alice");
+        // Net yield (yieldWithFee - fee) stays on alice; fee is routed to the earner manager.
+        assertEq(
+            pyusdx.balanceOf(alice),
+            aliceBalanceBefore + yieldWithFee - fee,
+            "Net yield should stay on alice"
+        );
+        assertEq(
+            pyusdx.balanceOf(earnerManager),
+            earnerManagerBalanceBefore + fee,
+            "Fee should be routed to earner manager"
+        );
     }
 
     function test_freeze_succeeds_whilePaused_noYield() public {

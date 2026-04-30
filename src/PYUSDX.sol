@@ -458,8 +458,18 @@ contract PYUSDX is
         // NOTE: Callers set `skipTransfer=true` to avoid `_transfer`, which has `whenNotPaused`
         //       and `_revertIfFrozen` checks. Used by freeze (recipient may be frozen) and by
         //       pause-time `_setAccountInfo` (contract is paused). Yield stays on `account`'s
-        //       balance; routing to `claimRecipient` and the fee hop are skipped.
-        if (skipTransfer) return (yieldWithFee, fee, yieldNetOfFee);
+        //       balance; routing to `claimRecipient` is skipped. The fee is still collected when
+        //       safe (contract not paused and earner manager not frozen).
+        if (skipTransfer) {
+            if (fee > 0 && !paused()) {
+                address feeRecipient = $.earnerManager;
+                if (!isFrozen(feeRecipient)) {
+                    emit FeeClaimed(account, feeRecipient, fee);
+                    _transfer(account, feeRecipient, fee);
+                }
+            }
+            return (yieldWithFee, fee, yieldNetOfFee);
+        }
 
         address claimRecipient = claimRecipientFor(account);
 
