@@ -19,9 +19,9 @@ import { IPYUSDX } from "./IPYUSDX.sol";
 abstract contract PYUSDXStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.PYUSDX
     struct PYUSDXStorage {
-        // Supply tracking
+        // Supply tracking. Tracks realized supply only — excludes accrued but unclaimed yield.
         uint256 totalSupply;
-        // earner manager address (can manage earners and receive fees from their accounts)
+        // Earner Manager address (can manage earners and receive fees from their accounts)
         address earnerManager;
         // Account data
         mapping(address account => Account) accounts;
