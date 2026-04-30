@@ -518,8 +518,9 @@ contract PYUSDX is
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `mint`.
         unchecked {
             $.accounts[account].balance += amount;
-            $.accounts[account].earningPrincipal += principal;
         }
+
+        $.accounts[account].earningPrincipal += principal;
     }
 
     /// @dev   Subtracts amount from a non-earning account's balance.

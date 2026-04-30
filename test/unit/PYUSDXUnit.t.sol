@@ -11,6 +11,7 @@ import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/o
 import { UIntMath } from "../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
 import { IndexingMath } from "../../lib/evm-m-extensions/lib/common/src/libs/IndexingMath.sol";
 import { VmSafe } from "../../lib/evm-m-extensions/lib/forge-std/src/Vm.sol";
+import { stdError } from "../../lib/evm-m-extensions/lib/forge-std/src/StdError.sol";
 
 import { UnsafeUpgrades } from "../../lib/evm-m-extensions/lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
@@ -305,6 +306,15 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         assertEq(pyusdx.balanceOf(alice), balanceBefore + MINT_AMOUNT);
         assertEq(pyusdx.earningPrincipalOf(alice), 0);
+    }
+
+    /* ============ addEarningAmount ============ */
+
+    function test_addEarningAmount_earningPrincipalOverflow() public {
+        pyusdx.setEarningPrincipal(alice, type(uint112).max);
+
+        vm.expectRevert(stdError.arithmeticError);
+        pyusdx.addEarningAmount(alice, 1e6);
     }
 
     /* ============ distributeReward ============ */
@@ -1786,19 +1796,15 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         pyusdx.setAccountLastIndex(alice, PRECISION);
         pyusdx.setAccountLastIndex(bob, PRECISION);
 
-        // Set bob's principal near max
+        // Set bob's principal near max so the incoming 100-unit transfer overflows uint112
         pyusdx.setEarningPrincipal(bob, type(uint112).max - 50);
 
-        // Mint and transfer large amount
         issuerGateway.mint(alice, 100);
 
-        // Transfer succeeds - earningPrincipal addition is unchecked (wraps around)
+        vm.expectRevert(stdError.arithmeticError);
+
         vm.prank(alice);
         pyusdx.transfer(bob, 100);
-
-        // Verify balances transferred correctly
-        assertEq(pyusdx.balanceOf(bob), 100);
-        assertEq(pyusdx.balanceOf(alice), 0);
     }
 
     /* ============ min112 Capping Behavior Tests ============ */
