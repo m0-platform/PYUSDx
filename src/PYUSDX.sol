@@ -460,28 +460,22 @@ contract PYUSDX is
         //       pause-time `_setAccountInfo` (contract is paused). Yield stays on `account`'s
         //       balance; routing to `claimRecipient` is skipped. The fee is still collected when
         //       safe (contract not paused and earner manager not frozen).
-        if (skipTransfer) {
-            if (fee > 0 && !paused()) {
-                address feeRecipient = $.earnerManager;
-                if (!isFrozen(feeRecipient)) {
-                    emit FeeClaimed(account, feeRecipient, fee);
-                    _transfer(account, feeRecipient, fee);
-                }
+        if (!skipTransfer) {
+            address claimRecipient = claimRecipientFor(account);
+
+            // Transfer net yield to claim recipient (if different from account).
+            if (claimRecipient != account && yieldNetOfFee > 0) {
+                _transfer(account, claimRecipient, yieldNetOfFee);
             }
+        }
+
+        address feeRecipient = $.earnerManager;
+
+        // Skip fee transfer when there is no fee, or on the freeze/pause path
+        // when paused or the earner manager is frozen.
+        if (fee == 0 || (skipTransfer && (paused() || isFrozen(feeRecipient)))) {
             return (yieldWithFee, fee, yieldNetOfFee);
         }
-
-        address claimRecipient = claimRecipientFor(account);
-
-        // Transfer net yield to claim recipient (if different from account).
-        if (claimRecipient != account && yieldNetOfFee > 0) {
-            _transfer(account, claimRecipient, yieldNetOfFee);
-        }
-
-        if (fee == 0) return (yieldWithFee, 0, yieldNetOfFee);
-
-        // Transfer fee to an earner manager.
-        address feeRecipient = $.earnerManager;
 
         emit FeeClaimed(account, feeRecipient, fee);
 
