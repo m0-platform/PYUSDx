@@ -32,6 +32,9 @@ contract MockMultiMint is ERC20, IMultiMint {
     /// @notice Cached asset decimals.
     mapping(address asset => uint8) public cachedAssetDecimals;
 
+    /// @notice Dust the mock leaves with the caller on the next wrap (0 = pull full amount).
+    uint256 public nextWrapDust;
+
     /// @notice Yield recipient.
     address public override yieldRecipient;
 
@@ -69,14 +72,19 @@ contract MockMultiMint is ERC20, IMultiMint {
     function wrap(address asset, address recipient, uint256 amount) external override {
         if (!allowedAssets[asset]) revert AssetNotAllowed(asset);
 
+        // Pull a reduced amount when configured to simulate the production
+        // contract's truncating-decimals dust behavior.
+        uint256 effective = amount - nextWrapDust;
+        nextWrapDust = 0;
+
         // Transfer asset from caller to this contract.
-        IERC20(asset).transferFrom(msg.sender, address(this), amount);
+        IERC20(asset).transferFrom(msg.sender, address(this), effective);
 
         // Mint extension tokens 1:1 (ignoring decimal conversion for simplicity).
-        _mint(recipient, amount);
-        assetBalances[asset] += amount;
+        _mint(recipient, effective);
+        assetBalances[asset] += effective;
 
-        emit AssetWrapped(asset, amount, recipient, amount);
+        emit AssetWrapped(asset, effective, recipient, effective);
     }
 
     /**
@@ -210,6 +218,15 @@ contract MockMultiMint is ERC20, IMultiMint {
      */
     function setAssetBalance(address asset, uint256 amount) external {
         assetBalances[asset] = amount;
+    }
+
+    /**
+     * @notice Configures the mock to pull `amount - dust` from msg.sender on the next wrap call,
+     *         simulating MultiMint's high-decimal dust handling.
+     * @param dust Amount of dust to leave with msg.sender on the next wrap.
+     */
+    function setNextWrapDust(uint256 dust) external {
+        nextWrapDust = dust;
     }
 
     /* ============ ERC20 Overrides ============ */

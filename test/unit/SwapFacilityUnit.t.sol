@@ -426,6 +426,28 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         swapFacility.swap(address(mockUSDC), address(multiMintExtension), AMOUNT, alice);
     }
 
+    function test_swapInMultiMint_refundsDustToCaller() public {
+        uint256 dust = 12345;
+
+        mockUSDC.mint(alice, AMOUNT);
+        multiMintExtension.setNextWrapDust(dust);
+
+        vm.prank(alice);
+        IERC20(address(mockUSDC)).approve(address(swapFacility), AMOUNT);
+
+        vm.expectEmit();
+        emit ISwapFacility.SwappedInMultiMint(address(mockUSDC), address(multiMintExtension), AMOUNT - dust, alice);
+
+        vm.prank(alice);
+        swapFacility.swap(address(mockUSDC), address(multiMintExtension), AMOUNT, alice);
+
+        assertEq(mockUSDC.balanceOf(alice), dust);
+        assertEq(mockUSDC.balanceOf(address(swapFacility)), 0);
+        assertEq(mockUSDC.balanceOf(address(multiMintExtension)), AMOUNT - dust);
+        assertEq(multiMintExtension.balanceOf(alice), AMOUNT - dust);
+        assertEq(IERC20(address(mockUSDC)).allowance(address(swapFacility), address(multiMintExtension)), 0);
+    }
+
     /* ============ Self-Swap Guard ============ */
 
     function test_swap_selfSwapPyusdx() public {

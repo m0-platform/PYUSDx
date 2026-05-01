@@ -216,6 +216,62 @@ contract MultiMintTest is BaseTest {
         assertEq(extension.assetBalanceOf(address(fourDec)), 500e4);
     }
 
+    function test_wrap_asset_18decimals_dustRefundedToCaller() public {
+        uint256 dust = 700e9;
+        uint256 amount = 500e18 + dust;
+
+        dai.mint(alice, amount);
+
+        vm.startPrank(alice);
+
+        dai.approve(address(swapFacility), amount);
+
+        vm.expectEmit(true, true, false, true, address(extension));
+        emit IMultiMint.AssetWrapped(address(dai), 500e18, alice, 500e6);
+
+        swapFacility.swapInAsset(address(extension), address(dai), amount, alice);
+
+        vm.stopPrank();
+
+        assertEq(extension.balanceOf(alice), 500e6);
+        assertEq(extension.totalSupply(), 500e6);
+        assertEq(extension.totalAssets(), 500e6);
+        assertEq(extension.assetBalanceOf(address(dai)), 500e18);
+
+        assertEq(dai.balanceOf(address(extension)), 500e18);
+        assertEq(dai.balanceOf(address(swapFacility)), 0);
+        assertEq(dai.balanceOf(alice), dust);
+    }
+
+    function test_wrap_asset_18decimals_dustInvariantHolds() public {
+        // Two wraps whose dust would otherwise cross the 1e12 boundary and
+        // make balance/factor exceed totalAssets by 1.
+        uint256 amountAlice = 500e18 + 700e9;
+        uint256 amountBob = 100e18 + 500e9;
+
+        dai.mint(alice, amountAlice);
+        dai.mint(bob, amountBob);
+
+        vm.startPrank(alice);
+
+        dai.approve(address(swapFacility), amountAlice);
+        swapFacility.swapInAsset(address(extension), address(dai), amountAlice, alice);
+
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+
+        dai.approve(address(swapFacility), amountBob);
+        swapFacility.swapInAsset(address(extension), address(dai), amountBob, bob);
+
+        vm.stopPrank();
+
+        uint256 factor = 10 ** (18 - 6);
+
+        assertEq(extension.assetBalanceOf(address(dai)), extension.totalAssets() * factor);
+        assertEq(dai.balanceOf(address(extension)), extension.totalAssets() * factor);
+    }
+
     function test_wrap_asset_revert_invalidAsset_zero() public {
         vm.expectRevert(abi.encodeWithSelector(IMultiMint.InvalidAsset.selector, address(0)));
 
@@ -865,6 +921,10 @@ contract MultiMintTest is BaseTest {
     function test_isAllowedToWrap() public {
         assertTrue(extension.isAllowedToWrap(address(usdc), 100e6));
         assertFalse(extension.isAllowedToWrap(address(usdc), 0));
+    }
+
+    function test_isAllowedToWrap_truncatesToZero() public view {
+        assertFalse(extension.isAllowedToWrap(address(dai), 1));
     }
 
     function test_isAllowedToUnwrap() public {
