@@ -15,7 +15,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     /* ============ Fuzz: mint ============ */
 
     function testFuzz_mint_nonEarningAccount(uint256 amount) public {
-        uint256 boundedAmount = bound(amount, 1, type(uint240).max);
+        uint256 boundedAmount = bound(amount, 1, type(uint128).max);
 
         uint256 totalSupplyBefore = pyusdx.totalSupply();
 
@@ -29,7 +29,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(alice, 500, 0, address(0));
 
-        uint256 boundedAmount = bound(amount, 1, uint256(type(uint240).max) + 1);
+        uint256 boundedAmount = bound(amount, 1, uint256(type(uint128).max));
         uint128 boundedIndex = uint128(bound(index, 1e12, 1e18)); // From 1x to 1,000,000x index
 
         uint256 totalSupplyBefore = pyusdx.totalSupply();
@@ -142,8 +142,9 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     /* ============ Fuzz: burn ============ */
 
     function testFuzz_burn_nonEarningAccount(uint256 mintAmount, uint256 burnAmount) public {
-        burnAmount = bound(burnAmount, 1, type(uint240).max);
-        mintAmount = bound(mintAmount, 1, type(uint240).max);
+        burnAmount = bound(burnAmount, 1, type(uint128).max);
+        mintAmount = bound(mintAmount, 1, type(uint128).max);
+
         issuerGateway.mint(alice, mintAmount);
 
         bool wouldExceedBalance = burnAmount > mintAmount;
@@ -165,8 +166,8 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     /* ============ Fuzz: burn ============ */
 
     function testFuzz_burn_earningAccount(uint256 mintAmount, uint256 burnAmount, uint128 index) public {
-        mintAmount = bound(mintAmount, 1, type(uint240).max);
-        burnAmount = bound(burnAmount, 1, type(uint240).max);
+        mintAmount = bound(mintAmount, 1, type(uint128).max);
+        burnAmount = bound(burnAmount, 1, type(uint128).max);
 
         uint128 boundedIndex = uint128(bound(index, 1e12, 1e15)); // From 1x to 1,000x index
 
@@ -214,7 +215,7 @@ contract PYUSDXFuzzTests is PYUSDXBaseUnitTest {
     /* ============ Fuzz: transfer ============ */
 
     function testFuzz_Transfer(uint256 amount, uint128 index, uint8 path) public {
-        uint256 boundedAmount = bound(amount, 1, uint256(type(uint240).max) + 1);
+        uint256 boundedAmount = bound(amount, 1, uint256(type(uint128).max));
         uint128 boundedIndex = uint128(bound(index, 1e12, 1e15)); // From 1x to 1,000x index
         uint8 boundedPath = uint8(bound(path, 0, 7)); // 8 path variations
 

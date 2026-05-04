@@ -21,6 +21,8 @@ contract Config {
         address minter;
         uint32 mintDelay;
         uint32 mintTTL;
+        uint128 rateLimitCapacity;
+        uint128 rateLimitRefillPerSecond;
     }
 
     struct SwapFacilityConfig {

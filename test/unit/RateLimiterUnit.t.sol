@@ -115,12 +115,12 @@ contract RateLimiterTests is BaseTest {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 0, 0, false);
 
-        // Unconfigured issuer returns unlimited
+        // Unconfigured issuer returns zero capacity (fail-closed)
         (uint128 capacity, uint128 refillPerSecond) = limiter.getRateLimitConfig(issuer);
 
-        assertEq(capacity, type(uint128).max);
+        assertEq(capacity, 0);
         assertEq(refillPerSecond, 0);
-        assertEq(limiter.getRemainingAmount(issuer), type(uint128).max);
+        assertEq(limiter.getRemainingAmount(issuer), 0);
     }
 
     function test_setRateLimit_remove_revertIfNonZeroCapacity() public {
@@ -145,6 +145,13 @@ contract RateLimiterTests is BaseTest {
         limiter.setRateLimit(issuer, 0, 5, false);
     }
 
+    function test_setRateLimit_revertIfZeroCapacity() public {
+        vm.expectRevert(IRateLimiter.InvalidRateLimitConfig.selector);
+
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 0, 0, true);
+    }
+
     function test_setRateLimit_zeroRefillPerSecond() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 0, true);
@@ -161,14 +168,14 @@ contract RateLimiterTests is BaseTest {
     function test_getRateLimitConfig_unconfiguredIssuer() public {
         (uint128 capacity, uint128 refillPerSecond) = limiter.getRateLimitConfig(makeAddr("unknown"));
 
-        assertEq(capacity, type(uint128).max);
+        assertEq(capacity, 0);
         assertEq(refillPerSecond, 0);
     }
 
     /* ============ getRemainingAmount ============ */
 
     function test_getRemainingAmount_unconfiguredIssuer() public {
-        assertEq(limiter.getRemainingAmount(makeAddr("unknown")), type(uint128).max);
+        assertEq(limiter.getRemainingAmount(makeAddr("unknown")), 0);
     }
 
     function test_getRemainingAmount_noRefill() public {
@@ -220,8 +227,21 @@ contract RateLimiterTests is BaseTest {
     /* ============ enforceRateLimit ============ */
 
     function test_enforceRateLimit_unconfiguredIssuer() public {
-        // Should not revert for unconfigured issuer
-        limiter.enforceRateLimit(makeAddr("unknown"), 1e18);
+        address unknown = makeAddr("unknown");
+
+        vm.expectRevert(abi.encodeWithSelector(IRateLimiter.RateLimitNotConfigured.selector, unknown));
+        limiter.enforceRateLimit(unknown, 1e18);
+    }
+
+    function test_setRateLimit_removeLocksOutIssuer() public {
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 100e6, 10, true);
+
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 0, 0, false);
+
+        vm.expectRevert(abi.encodeWithSelector(IRateLimiter.RateLimitNotConfigured.selector, issuer));
+        limiter.enforceRateLimit(issuer, 1);
     }
 
     function test_enforceRateLimit_withinLimit() public {

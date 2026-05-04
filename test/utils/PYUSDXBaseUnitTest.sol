@@ -49,6 +49,14 @@ abstract contract PYUSDXBaseUnitTest is BaseTest {
         );
 
         issuerGateway.setPyusdx(address(pyusdx));
+
+        // Configure rate limit for the issuer gateway (fail-closed: unconfigured issuers revert)
+        vm.prank(rateLimitManager);
+        pyusdx.setRateLimit(address(issuerGateway), type(uint128).max, 0, true);
+
+        // Configure rate limit for the earner manager (distributeReward also calls _mint → _enforceRateLimit)
+        vm.prank(rateLimitManager);
+        pyusdx.setRateLimit(earnerManager, type(uint128).max, 0, true);
     }
 
     /* ============ Indexing Math Helpers ============ */

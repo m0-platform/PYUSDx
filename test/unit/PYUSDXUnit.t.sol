@@ -242,8 +242,8 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     }
 
     function test_mint_maxSafeAmount() public {
-        // The maximum safe amount is limited by uint240 totalSupply
-        uint240 maxSafeAmount = type(uint240).max;
+        // The maximum safe amount is limited by uint128 rate-limit capacity
+        uint128 maxSafeAmount = type(uint128).max;
 
         issuerGateway.mint(alice, uint256(maxSafeAmount));
 

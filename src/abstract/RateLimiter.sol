@@ -72,6 +72,8 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
             return;
         }
 
+        if (capacity == 0) revert InvalidRateLimitConfig();
+
         // NOTE: Start with full bucket on first setup. Otherwise, calculate refilled amount and cap to new capacity.
         bucket.remainingAmount = bucket.lastRefillTime == 0
             ? capacity
@@ -98,8 +100,8 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
     function getRateLimitConfig(address issuer) external view returns (uint128 capacity, uint128 refillPerSecond) {
         Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];
 
-        // NOTE: Unconfigured issuers have unlimited capacity
-        if (bucket.lastRefillTime == 0) return (type(uint128).max, 0);
+        // NOTE: Unconfigured issuers have zero capacity.
+        if (bucket.lastRefillTime == 0) return (0, 0);
 
         return (bucket.capacity, bucket.refillPerSecond);
     }
@@ -108,8 +110,8 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
     function getRemainingAmount(address issuer) external view returns (uint128) {
         Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];
 
-        // NOTE: Unconfigured issuers have unlimited capacity
-        if (bucket.lastRefillTime == 0) return type(uint128).max;
+        // NOTE: Unconfigured issuers have zero capacity.
+        if (bucket.lastRefillTime == 0) return 0;
 
         return
             _calculateRemainingAmount(
@@ -128,8 +130,7 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
     function _enforceRateLimit(address issuer, uint256 amount) internal {
         Bucket storage bucket = _getRateLimiterStorage().issuerBuckets[issuer];
 
-        // NOTE: Unconfigured issuers have unlimited capacity
-        if (bucket.lastRefillTime == 0) return;
+        if (bucket.lastRefillTime == 0) revert RateLimitNotConfigured(issuer);
 
         uint128 amount_ = UIntMath.safe128(amount);
         uint128 remainingAmount = _calculateRemainingAmount(
