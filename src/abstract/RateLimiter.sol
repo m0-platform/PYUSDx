@@ -173,9 +173,12 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
         }
 
         // NOTE: remaining(t) = min(capacity, remaining(t-1) + (t - t-1) * refillPerSecond)
-        (bool mulOk, uint256 refillAmount) = Math.tryMul(elapsed, refillPerSecond);
-        (bool addOk, uint256 total) = Math.tryAdd(remaining, refillAmount);
+        // Cannot overflow uint256: elapsed ≤ 2^40, refillPerSecond ≤ 2^128, remaining ≤ 2^128.
+        uint256 total;
+        unchecked {
+            total = remaining + elapsed * refillPerSecond;
+        }
 
-        return (!mulOk || !addOk) ? capacity : uint128(Math.min(total, capacity));
+        return uint128(Math.min(total, capacity));
     }
 }
