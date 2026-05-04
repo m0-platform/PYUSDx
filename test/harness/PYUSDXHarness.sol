@@ -36,7 +36,7 @@ contract PYUSDXHarness is PYUSDX {
     /// @return claimRecipient The claim recipient
     function getAccountStorage(
         address account
-    ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient) {
+    ) external view returns (uint16 earnerRate, uint16 feeRate, address claimRecipient) {
         Account memory accountData = _getPYUSDXStorage().accounts[account];
         return (accountData.earnerRate, accountData.feeRate, accountData.claimRecipient);
     }
@@ -64,8 +64,18 @@ contract PYUSDXHarness is PYUSDX {
     /// @notice Set the per-account earner rate directly for testing
     /// @param account The account to configure
     /// @param newRateBps The rate in basis points
-    function setAccountRateBps(address account, uint32 newRateBps) external {
+    function setAccountRateBps(address account, uint16 newRateBps) external {
         _getPYUSDXStorage().accounts[account].earnerRate = newRateBps;
+    }
+
+    /// @notice Expose internal _getPrincipalAmountRoundedDown for testing.
+    function getPrincipalAmountRoundedDown(uint256 presentAmount, uint128 index) external pure returns (uint112) {
+        return _getPrincipalAmountRoundedDown(presentAmount, index);
+    }
+
+    /// @notice Expose internal _getPrincipalAmountRoundedUp for testing.
+    function getPrincipalAmountRoundedUp(uint256 presentAmount, uint128 index) external pure returns (uint112) {
+        return _getPrincipalAmountRoundedUp(presentAmount, index);
     }
 
     /// @notice Sets rate-limit storage directly for edge-case testing.

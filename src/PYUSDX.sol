@@ -19,9 +19,9 @@ import { IPYUSDX } from "./IPYUSDX.sol";
 abstract contract PYUSDXStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.PYUSDX
     struct PYUSDXStorage {
-        // Supply tracking
+        // Supply tracking. Tracks realized supply only — excludes accrued but unclaimed yield.
         uint256 totalSupply;
-        // earner manager address (can manage earners and receive fees from their accounts)
+        // Earner Manager address (can manage earners and receive fees from their accounts)
         address earnerManager;
         // Account data
         mapping(address account => Account) accounts;
@@ -30,10 +30,10 @@ abstract contract PYUSDXStorageLayout {
     struct Account {
         // Slot 0: 256/256
         uint256 balance;
-        // Slot 1: 200/256 — earnerRate + index math (single SLOAD)
+        // Slot 1: 184/256 — earnerRate + index math (single SLOAD)
         uint128 lastIndex;
         uint40 lastUpdateTimestamp;
-        uint32 earnerRate;
+        uint16 earnerRate;
         // Slot 2: 160/256 — claim config (cold path)
         address claimRecipient;
         // Slot 3: 128/256 — principal + fee (co-read in _claim)
@@ -168,7 +168,7 @@ contract PYUSDX is
     /// @inheritdoc IPYUSDX
     function setAccountInfo(
         address account,
-        uint32 earnerRate,
+        uint16 earnerRate,
         uint16 feeRate,
         address claimRecipient
     ) external onlyEarnerManager {
@@ -178,7 +178,7 @@ contract PYUSDX is
     /// @inheritdoc IPYUSDX
     function setAccountInfo(
         address[] calldata accounts,
-        uint32[] calldata earnerRates,
+        uint16[] calldata earnerRates,
         uint16[] calldata feeRates,
         address[] calldata claimRecipients
     ) external onlyEarnerManager {
@@ -274,7 +274,7 @@ contract PYUSDX is
     /// @inheritdoc IPYUSDX
     function getAccountEarningInfo(
         address account
-    ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient) {
+    ) external view returns (uint16 earnerRate, uint16 feeRate, address claimRecipient) {
         Account memory accountInfo = _getPYUSDXStorage().accounts[account];
         return (accountInfo.earnerRate, accountInfo.feeRate, claimRecipientFor(account));
     }
@@ -352,10 +352,10 @@ contract PYUSDX is
     }
 
     /// @dev Internal implementation for setting earning details.
-    function _setAccountInfo(address account, uint32 earnerRate, uint16 feeRate, address claimRecipient) internal {
+    function _setAccountInfo(address account, uint16 earnerRate, uint16 feeRate, address claimRecipient) internal {
         _revertIfZeroAccount(account);
-        if (feeRate > ONE_HUNDRED_PERCENT) revert FeeRateTooHigh(feeRate);
         if (earnerRate > ONE_HUNDRED_PERCENT) revert EarnerRateTooHigh(earnerRate);
+        if (feeRate > ONE_HUNDRED_PERCENT) revert FeeRateTooHigh(feeRate);
 
         // Disable earning should have all earning-related fields set to 0, address(0).
         if (earnerRate == 0 && (feeRate != 0 || claimRecipient != address(0))) revert InvalidAccountInfo();
@@ -518,8 +518,9 @@ contract PYUSDX is
         // NOTE: Safe to use unchecked here since overflow of the total supply is checked in `mint`.
         unchecked {
             $.accounts[account].balance += amount;
-            $.accounts[account].earningPrincipal += principal;
         }
+
+        $.accounts[account].earningPrincipal += principal;
     }
 
     /// @dev   Subtracts amount from a non-earning account's balance.
@@ -624,12 +625,12 @@ contract PYUSDX is
 
     /// @dev Returns the principal amount (rounded down) given the present amount and an index.
     function _getPrincipalAmountRoundedDown(uint256 presentAmount, uint128 index) internal pure returns (uint112) {
-        return IndexingMath.getPrincipalAmountRoundedDown(uint240(presentAmount), index);
+        return IndexingMath.getPrincipalAmountRoundedDown(UIntMath.safe240(presentAmount), index);
     }
 
     /// @dev Returns the principal amount (rounded up) given the present amount and an index.
     function _getPrincipalAmountRoundedUp(uint256 presentAmount, uint128 index) internal pure returns (uint112) {
-        return IndexingMath.getPrincipalAmountRoundedUp(uint240(presentAmount), index);
+        return IndexingMath.getPrincipalAmountRoundedUp(UIntMath.safe240(presentAmount), index);
     }
 
     /// @dev Reverts if amount is zero.

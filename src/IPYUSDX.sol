@@ -26,7 +26,7 @@ interface IPYUSDX {
     /// @param  claimRecipient The new claim recipient address.
     event AccountInfoUpdated(
         address indexed account,
-        uint32 earnerRate,
+        uint16 earnerRate,
         uint16 feeRate,
         address indexed claimRecipient
     );
@@ -89,7 +89,7 @@ interface IPYUSDX {
     error FeeRateTooHigh(uint16 feeRate);
 
     /// @notice Thrown when the earner rate exceeds the maximum.
-    error EarnerRateTooHigh(uint32 earnerRate);
+    error EarnerRateTooHigh(uint16 earnerRate);
 
     /// @notice Thrown when an input array is empty.
     error ArrayLengthZero();
@@ -148,7 +148,7 @@ interface IPYUSDX {
     /// @param  earnerRate     The earner rate in basis points (0 to stop earning).
     /// @param  feeRate        The fee rate on yield (basis points, 0-10000).
     /// @param  claimRecipient The address to receive claimed yield (address(0) to clear).
-    function setAccountInfo(address account, uint32 earnerRate, uint16 feeRate, address claimRecipient) external;
+    function setAccountInfo(address account, uint16 earnerRate, uint16 feeRate, address claimRecipient) external;
 
     /// @notice Sets account info for multiple accounts.
     /// @dev    MUST only be callable by the earner manager.
@@ -163,7 +163,7 @@ interface IPYUSDX {
     /// @param  claimRecipients The addresses to receive claimed yield.
     function setAccountInfo(
         address[] calldata accounts,
-        uint32[] calldata earnerRates,
+        uint16[] calldata earnerRates,
         uint16[] calldata feeRates,
         address[] calldata claimRecipients
     ) external;
@@ -213,7 +213,7 @@ interface IPYUSDX {
     /// @return claimRecipient The address that receives claimed yield.
     function getAccountEarningInfo(
         address account
-    ) external view returns (uint32 earnerRate, uint16 feeRate, address claimRecipient);
+    ) external view returns (uint16 earnerRate, uint16 feeRate, address claimRecipient);
 
     /// @notice Returns accrued yield, fee, and net yield for an account.
     /// @param  account The account to query.

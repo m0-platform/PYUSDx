@@ -83,7 +83,7 @@ contract YieldToOneUnitTests is BaseTest {
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(address(extension), 500, 0, address(0));
 
-        pyusdx.setAccountRateBps(address(extension), uint24(500));
+        pyusdx.setAccountRateBps(address(extension), uint16(500));
     }
 
     /* ============ Helpers ============ */
