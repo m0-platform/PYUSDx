@@ -92,9 +92,7 @@ contract LayerZeroBridgeAdapter is BridgeAdapter, ILayerZeroBridgeAdapter {
         bool revoked = super._revokeRole(role, account);
 
         if (revoked && role == OPERATOR_ROLE) {
-            if (ILayerZeroEndpointV2(endpoint).delegates(address(this)) == account) {
-                ILayerZeroEndpointV2(endpoint).setDelegate(address(0));
-            }
+            ILayerZeroEndpointV2(endpoint).setDelegate(address(0));
         }
 
         return revoked;
