@@ -163,12 +163,24 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     function receiveMessage(uint32 sourceChainId, bytes calldata payload) external whenReceiveNotPaused whenNotLocked {
         _revertIfUnsupportedBridgeAdapter(sourceChainId, msg.sender);
 
-        (bytes32 messageId, uint256 amount, address destinationToken, bytes32 sender, address recipient) = payload
-            .decodeTokenTransfer();
-
+        (
+            uint32 targetChainId,
+            address targetBridgeAdapter,
+            bytes32 messageId,
+            uint256 amount,
+            address destinationToken,
+            bytes32 sender,
+            address recipient
+        ) = payload.decodeTokenTransfer();
         PortalStorageStruct storage $ = _getPortalStorageLocation();
-        if ($.processedMessages[messageId]) revert MessageAlreadyProcessed(messageId);
 
+        // NOTE: Defense-in-depth checks.
+        //       These checks are enforced at the application layer regardless of what the
+        //       underlying messaging protocol guarantees, so behavior is consistent across
+        //       adapters and resilient to changes of the messaging provider.
+        if (targetChainId != currentChainId()) revert InvalidTargetChain(targetChainId);
+        if (targetBridgeAdapter != msg.sender) revert InvalidTargetBridgeAdapter(targetBridgeAdapter);
+        if ($.processedMessages[messageId]) revert MessageAlreadyProcessed(messageId);
         $.processedMessages[messageId] = true;
 
         // NOTE: Only the PYUSDX freeze list is checked here. If the recipient is frozen on PYUSDX,

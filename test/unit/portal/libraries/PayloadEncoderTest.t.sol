@@ -10,7 +10,7 @@ contract PayloadEncoderTest is Test {
     using TypeConverter for *;
 
     uint32 DESTINATION_CHAIN_ID = 1;
-    bytes32 DESTINATION_PEER = "peer";
+    address DESTINATION_PEER = makeAddr("peer");
     bytes32 MESSAGE_ID = "message id";
 
     function test_encodeTokenTransfer() external {
@@ -21,7 +21,7 @@ contract PayloadEncoderTest is Test {
 
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
             DESTINATION_CHAIN_ID,
-            DESTINATION_PEER,
+            DESTINATION_PEER.toBytes32(),
             MESSAGE_ID,
             amount,
             token,
@@ -33,7 +33,7 @@ contract PayloadEncoderTest is Test {
             payload,
             abi.encodePacked(
                 DESTINATION_CHAIN_ID,
-                DESTINATION_PEER,
+                DESTINATION_PEER.toBytes32(),
                 MESSAGE_ID,
                 amount.toUint128(),
                 token,
@@ -53,7 +53,7 @@ contract PayloadEncoderTest is Test {
         vm.assume(amount < type(uint128).max);
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
             DESTINATION_CHAIN_ID,
-            DESTINATION_PEER,
+            DESTINATION_PEER.toBytes32(),
             messageId,
             amount,
             token,
@@ -64,7 +64,7 @@ contract PayloadEncoderTest is Test {
             payload,
             abi.encodePacked(
                 DESTINATION_CHAIN_ID,
-                DESTINATION_PEER,
+                DESTINATION_PEER.toBytes32(),
                 messageId,
                 amount.toUint128(),
                 token,
@@ -91,7 +91,7 @@ contract PayloadEncoderTest is Test {
 
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
             DESTINATION_CHAIN_ID,
-            DESTINATION_PEER,
+            DESTINATION_PEER.toBytes32(),
             messageId,
             amount,
             token.toBytes32(),
@@ -100,6 +100,8 @@ contract PayloadEncoderTest is Test {
         );
 
         (
+            uint32 decodedDestinationChainId,
+            address decodedDestinationPeer,
             bytes32 decodedMessageId,
             uint256 decodedAmount,
             address decodedToken,
@@ -107,6 +109,8 @@ contract PayloadEncoderTest is Test {
             address decodedRecipient
         ) = PayloadEncoder.decodeTokenTransfer(payload);
 
+        assertEq(decodedDestinationChainId, DESTINATION_CHAIN_ID);
+        assertEq(decodedDestinationPeer, DESTINATION_PEER);
         assertEq(decodedMessageId, messageId);
         assertEq(decodedAmount, amount);
         assertEq(decodedToken, token);
@@ -125,7 +129,7 @@ contract PayloadEncoderTest is Test {
 
         bytes memory payload = PayloadEncoder.encodeTokenTransfer(
             DESTINATION_CHAIN_ID,
-            DESTINATION_PEER,
+            DESTINATION_PEER.toBytes32(),
             messageId,
             amount,
             token.toBytes32(),
@@ -133,6 +137,8 @@ contract PayloadEncoderTest is Test {
             recipient.toBytes32()
         );
         (
+            uint32 decodedDestinationChainId,
+            address decodedDestinationPeer,
             bytes32 decodedMessageId,
             uint256 decodedAmount,
             address decodedToken,
@@ -140,6 +146,8 @@ contract PayloadEncoderTest is Test {
             address decodedRecipient
         ) = PayloadEncoder.decodeTokenTransfer(payload);
 
+        assertEq(decodedDestinationChainId, DESTINATION_CHAIN_ID);
+        assertEq(decodedDestinationPeer, DESTINATION_PEER);
         assertEq(decodedMessageId, messageId);
         assertEq(decodedAmount, amount);
         assertEq(decodedToken, token);
