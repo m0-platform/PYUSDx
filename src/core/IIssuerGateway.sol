@@ -158,25 +158,37 @@ interface IIssuerGateway {
     /// @notice Returns the details of a mint proposal
     /// @param  mintId    The unique identifier for the mint proposal
     /// @return createdAt The timestamp when the proposal was created
+    /// @return activeAt  The snapshotted timestamp when the proposal becomes executable
+    /// @return expiresAt The snapshotted timestamp when the proposal expires
     /// @return minter    The address that proposed the mint
     /// @return recipient The address that will receive the minted tokens
     /// @return amount    The amount of PYUSDX to mint
     function getMintProposal(
         uint48 mintId
-    ) external view returns (uint40 createdAt, address minter, address recipient, uint256 amount);
+    )
+        external
+        view
+        returns (
+            uint40 createdAt,
+            uint40 activeAt,
+            uint40 expiresAt,
+            address minter,
+            address recipient,
+            uint256 amount
+        );
 
     /* ============ Admin Functions ============ */
 
     /// @notice Updates the mint delay
-    /// @dev    Only callable by addresses with DEFAULT_ADMIN_ROLE. Changes apply retroactively to all
-    ///         existing proposals since `activeAt` is computed from the current delay at execution time.
+    /// @dev    Only callable by addresses with DEFAULT_ADMIN_ROLE. Changes only affect proposals
+    ///         created after this call; existing proposals retain their snapshotted `activeAt`.
     ///         A value of 0 is permitted and makes proposals immediately executable upon creation.
     /// @param  mintDelay The mint delay in seconds
     function setMintDelay(uint32 mintDelay) external;
 
     /// @notice Updates the mint TTL
-    /// @dev    Only callable by addresses with DEFAULT_ADMIN_ROLE. Changes apply retroactively to all
-    ///         existing proposals since `expiresAt` is computed from the current TTL at execution time.
+    /// @dev    Only callable by addresses with DEFAULT_ADMIN_ROLE. Changes only affect proposals
+    ///         created after this call; existing proposals retain their snapshotted `expiresAt`.
     ///         A value of 0 is not permitted and will revert.
     /// @param  mintTTL The mint TTL in seconds
     function setMintTTL(uint32 mintTTL) external;

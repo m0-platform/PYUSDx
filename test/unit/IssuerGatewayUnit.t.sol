@@ -149,10 +149,18 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         assertEq(mintId, 1);
         assertEq(issuerGateway.mintNonce(), 1);
 
-        (uint40 createdAt, address storedOperator, address storedRecipient, uint256 storedAmount) = issuerGateway
-            .getMintProposal(mintId);
+        (
+            uint40 createdAt,
+            uint40 storedActiveAt,
+            uint40 storedExpiresAt,
+            address storedOperator,
+            address storedRecipient,
+            uint256 storedAmount
+        ) = issuerGateway.getMintProposal(mintId);
 
         assertEq(createdAt, block.timestamp);
+        assertEq(storedActiveAt, createdAt + DEFAULT_MINT_DELAY);
+        assertEq(storedExpiresAt, storedActiveAt + DEFAULT_MINT_TTL);
         assertEq(storedOperator, operator);
         assertEq(storedRecipient, recipient);
         assertEq(storedAmount, 100);
@@ -173,9 +181,9 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         assertEq(issuerGateway.mintNonce(), 3);
 
         // All proposals should be stored independently
-        (, , , uint256 amount1) = issuerGateway.getMintProposal(1);
-        (, , , uint256 amount2) = issuerGateway.getMintProposal(2);
-        (, , , uint256 amount3) = issuerGateway.getMintProposal(3);
+        (, , , , , uint256 amount1) = issuerGateway.getMintProposal(1);
+        (, , , , , uint256 amount2) = issuerGateway.getMintProposal(2);
+        (, , , , , uint256 amount3) = issuerGateway.getMintProposal(3);
 
         assertEq(amount1, 100);
         assertEq(amount2, 200);
@@ -231,8 +239,8 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         uint48 mintId = _proposeMint(100, recipient);
 
         // Warp to exact TTL boundary (activeAt + TTL)
-        (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
-        vm.warp(createdAt + DEFAULT_MINT_DELAY + DEFAULT_MINT_TTL);
+        (, uint40 activeAt, uint40 expiresAt, , , ) = issuerGateway.getMintProposal(mintId);
+        vm.warp(expiresAt);
 
         vm.prank(executor);
         issuerGateway.mint(mintId);
@@ -251,7 +259,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         issuerGateway.mint(mintId);
 
         // Check proposal deleted
-        (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
+        (uint40 createdAt, , , , , ) = issuerGateway.getMintProposal(mintId);
         assertEq(createdAt, 0);
 
         assertEq(pyusdx.balanceOf(recipient), 100);
@@ -322,8 +330,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         // Warp to when the proposal becomes active (at activeAt boundary)
         _warpToMintable(mintId);
 
-        (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
-        uint40 activeAt = createdAt + DEFAULT_MINT_DELAY;
+        (, uint40 activeAt, , , , ) = issuerGateway.getMintProposal(mintId);
 
         vm.expectRevert(abi.encodeWithSelector(IIssuerGateway.ActiveMintProposal.selector, activeAt));
 
@@ -335,9 +342,8 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         uint48 mintId = _proposeMint(100, recipient);
 
         // Warp to after the delay has passed but before TTL expires
-        (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
+        (, uint40 activeAt, , , , ) = issuerGateway.getMintProposal(mintId);
 
-        uint40 activeAt = createdAt + DEFAULT_MINT_DELAY;
         vm.warp(activeAt + 1 hours);
 
         vm.expectRevert(abi.encodeWithSelector(IIssuerGateway.ActiveMintProposal.selector, activeAt));
@@ -356,7 +362,7 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         issuerGateway.cancelMint(mintId);
 
         // Check proposal deleted
-        (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
+        (uint40 createdAt, , , , , ) = issuerGateway.getMintProposal(mintId);
         assertEq(createdAt, 0);
     }
 
@@ -379,16 +385,25 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         issuerGateway.cancelMint(mintId);
 
         // Check proposal deleted
-        (uint40 createdAt, , , ) = issuerGateway.getMintProposal(mintId);
+        (uint40 createdAt, , , , , ) = issuerGateway.getMintProposal(mintId);
         assertEq(createdAt, 0);
     }
 
     /* ============ View Functions ============ */
 
     function test_getMintProposal_returnsZeroForNonExistent() public view {
-        (uint40 createdAt, address minter_, address recipient_, uint256 amount) = issuerGateway.getMintProposal(999);
+        (
+            uint40 createdAt,
+            uint40 activeAt,
+            uint40 expiresAt,
+            address minter_,
+            address recipient_,
+            uint256 amount
+        ) = issuerGateway.getMintProposal(999);
 
         assertEq(createdAt, 0);
+        assertEq(activeAt, 0);
+        assertEq(expiresAt, 0);
         assertEq(minter_, address(0));
         assertEq(recipient_, address(0));
         assertEq(amount, 0);
@@ -397,11 +412,18 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
     function test_getMintProposal() public {
         uint48 mintId = _proposeMint(100, recipient);
 
-        (uint40 createdAt, address storedOperator, address recipient_, uint256 amount) = issuerGateway.getMintProposal(
-            mintId
-        );
+        (
+            uint40 createdAt,
+            uint40 activeAt,
+            uint40 expiresAt,
+            address storedOperator,
+            address recipient_,
+            uint256 amount
+        ) = issuerGateway.getMintProposal(mintId);
 
         assertEq(createdAt, block.timestamp);
+        assertEq(activeAt, createdAt + DEFAULT_MINT_DELAY);
+        assertEq(expiresAt, activeAt + DEFAULT_MINT_TTL);
         assertEq(storedOperator, operator);
         assertEq(recipient_, recipient);
         assertEq(amount, 100);
@@ -468,5 +490,123 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         issuerGateway.setMintTTL(14 days);
 
         assertEq(issuerGateway.mintTTL(), 14 days);
+    }
+
+    /* ============ Snapshot Invariance ============ */
+
+    function test_mint_usesSnapshottedActiveAt() public {
+        uint48 mintId = _proposeMint(100, recipient);
+
+        (, uint40 originalActiveAt, , , , ) = issuerGateway.getMintProposal(mintId);
+
+        // Admin shortens delay to 1 hour
+        vm.prank(admin);
+        issuerGateway.setMintDelay(1 hours);
+
+        // Warp to the new shorter delay — proposal should still be pending
+        vm.warp(block.timestamp + 1 hours);
+
+        vm.expectRevert(abi.encodeWithSelector(IIssuerGateway.PendingMintProposal.selector, originalActiveAt));
+
+        vm.prank(executor);
+        issuerGateway.mint(mintId);
+    }
+
+    function test_mint_usesSnapshottedExpiresAt() public {
+        uint48 mintId = _proposeMint(100, recipient);
+
+        (, , uint40 originalExpiresAt, , , ) = issuerGateway.getMintProposal(mintId);
+
+        // Warp past the original expiresAt
+        vm.warp(originalExpiresAt + 1);
+
+        // Admin extends TTL to 365 days — proposal should still be expired
+        vm.prank(admin);
+        issuerGateway.setMintTTL(365 days);
+
+        vm.expectRevert(abi.encodeWithSelector(IIssuerGateway.ExpiredMintProposal.selector, originalExpiresAt));
+
+        vm.prank(executor);
+        issuerGateway.mint(mintId);
+    }
+
+    function test_cancelMint_usesSnapshottedActiveAt() public {
+        uint48 mintId = _proposeMint(100, recipient);
+
+        (, uint40 originalActiveAt, , , , ) = issuerGateway.getMintProposal(mintId);
+
+        // Admin shortens delay to 1 hour — computed activeAt would be earlier than snapshot
+        vm.prank(admin);
+        issuerGateway.setMintDelay(1 hours);
+
+        // Warp between the new shorter computed activeAt and the original snapshot activeAt
+        vm.warp(block.timestamp + 1 hours);
+
+        // Proposal should still be cancellable because its snapshotted activeAt hasn't been reached
+        vm.prank(operator);
+        issuerGateway.cancelMint(mintId);
+
+        // Verify proposal is deleted
+        (uint40 createdAt, , , , , ) = issuerGateway.getMintProposal(mintId);
+        assertEq(createdAt, 0);
+    }
+
+    function test_snapshotInvariance_setMintDelayLower_doesNotAccelerate() public {
+        uint48 mintId = _proposeMint(100, recipient);
+
+        (, uint40 originalActiveAt, , , , ) = issuerGateway.getMintProposal(mintId);
+
+        // Admin sets delay to 0
+        vm.prank(admin);
+        issuerGateway.setMintDelay(0);
+
+        // Warp to just before the original activeAt
+        vm.warp(originalActiveAt - 1);
+
+        vm.expectRevert(abi.encodeWithSelector(IIssuerGateway.PendingMintProposal.selector, originalActiveAt));
+
+        vm.prank(executor);
+        issuerGateway.mint(mintId);
+    }
+
+    function test_snapshotInvariance_setMintDelayHigher_doesNotPostpone() public {
+        uint48 mintId = _proposeMint(100, recipient);
+
+        (, uint40 originalActiveAt, , , , ) = issuerGateway.getMintProposal(mintId);
+
+        // Admin raises delay to 7 days
+        vm.prank(admin);
+        issuerGateway.setMintDelay(7 days);
+
+        // Warp past the original snapshotted activeAt but before the recomputed one
+        vm.warp(originalActiveAt);
+
+        // Proposal should be executable because its snapshotted activeAt has been reached
+        vm.prank(executor);
+        issuerGateway.mint(mintId);
+
+        assertEq(pyusdx.balanceOf(recipient), 100);
+    }
+
+    function test_snapshotInvariance_setMintTTLLower_doesNotShortenWindow() public {
+        uint48 mintId = _proposeMint(100, recipient);
+
+        (, uint40 activeAt, uint40 originalExpiresAt, , , ) = issuerGateway.getMintProposal(mintId);
+
+        // Warp to active
+        vm.warp(activeAt);
+
+        // Admin shortens TTL to 1 second
+        vm.prank(admin);
+        issuerGateway.setMintTTL(1);
+
+        // Warp to a time after the recomputed expiry but before the snapshot's expiresAt
+        vm.warp(activeAt + 2);
+
+        // Proposal should still be executable because its snapshotted expiresAt hasn't been reached
+        vm.prank(executor);
+        issuerGateway.mint(mintId);
+
+        assertEq(pyusdx.balanceOf(recipient), 100);
     }
 }
