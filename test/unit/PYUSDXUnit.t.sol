@@ -311,6 +311,9 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     /* ============ addEarningAmount ============ */
 
     function test_addEarningAmount_earningPrincipalOverflow() public {
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 0, address(0));
+
         pyusdx.setEarningPrincipal(alice, type(uint112).max);
 
         vm.expectRevert(stdError.arithmeticError);
