@@ -42,10 +42,6 @@ contract MockMultiMint is ERC20, IMultiMint {
     /// @notice PYUSDX decimals constant.
     uint8 public constant override PYUSDX_DECIMALS = 6;
 
-    /* ============ Errors ============ */
-
-    error AssetNotAllowed(address asset);
-
     /* ============ Constructor ============ */
 
     constructor(
