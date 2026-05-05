@@ -525,7 +525,7 @@ contract MultiMintTest is BaseTest {
         extension.replaceAsset(rando, bob, 50e6);
     }
 
-    function test_replaceAsset_revertsWhenAssetDisabled() public {
+    function test_replaceAsset_revert_assetNotAllowed_disabled() public {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         // Disable USDC by setting cap to 0.
