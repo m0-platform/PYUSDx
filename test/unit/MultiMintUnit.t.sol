@@ -36,6 +36,7 @@ contract MultiMintTest is BaseTest {
         super.setUp();
 
         issuerGateway = new MockIssuerGateway(address(0));
+
         address pyusdxImplementation = address(new PYUSDXHarness());
         pyusdx = PYUSDXHarness(
             UnsafeUpgrades.deployTransparentProxy(
@@ -59,6 +60,7 @@ contract MultiMintTest is BaseTest {
                 )
             )
         );
+
         issuerGateway.setPyusdx(address(pyusdx));
 
         swapFacility = new MockSwapFacility(address(pyusdx));
@@ -93,9 +95,11 @@ contract MultiMintTest is BaseTest {
         fourDec = new MockERC20("FourDec", "4DEC", 4);
 
         vm.startPrank(assetCapManager);
+
         extension.setAssetCap(address(usdc), 1_000_000e6);
         extension.setAssetCap(address(dai), 1_000_000e18);
         extension.setAssetCap(address(fourDec), 1_000_000e4);
+
         vm.stopPrank();
     }
 
@@ -547,22 +551,27 @@ contract MultiMintTest is BaseTest {
     function test_replaceAsset_succeedsAfterReenable() public {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
-        // Disable then re-enable USDC.
-        vm.startPrank(assetCapManager);
+        vm.prank(assetCapManager);
         extension.setAssetCap(address(usdc), 0);
-        extension.setAssetCap(address(usdc), 1_000_000e6);
-        vm.stopPrank();
 
         issuerGateway.mint(bob, 50e6);
 
-        vm.startPrank(bob);
+        vm.prank(bob);
         IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
+
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.AssetNotAllowed.selector, address(usdc)));
+
+        vm.prank(bob);
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
-        vm.stopPrank();
+
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(usdc), 1_000_000e6);
+
+        vm.prank(bob);
+        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
 
         assertEq(usdc.balanceOf(bob), 50e6);
         assertEq(extension.assetBalanceOf(address(usdc)), 50e6);
-        assertTrue(extension.isAllowedToReplaceAsset(address(usdc), 50e6));
     }
 
     function test_replaceAsset_crossDecimal() public {
