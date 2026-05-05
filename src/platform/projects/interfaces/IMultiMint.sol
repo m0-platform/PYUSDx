@@ -55,6 +55,10 @@ interface IMultiMint is IYieldToOne {
     /// @param  asset Address of the invalid asset.
     error InvalidAsset(address asset);
 
+    /// @notice Emitted if `asset` has cap == 0 (unregistered or disabled).
+    /// @param  asset Address of the disallowed asset.
+    error AssetNotAllowed(address asset);
+
     /* ============ Interactive Functions ============ */
 
     /// @notice Mint extension tokens by depositing `asset` tokens.

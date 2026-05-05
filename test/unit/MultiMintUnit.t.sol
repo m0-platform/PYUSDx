@@ -518,6 +518,13 @@ contract MultiMintTest is BaseTest {
         extension.replaceAsset(address(pyusdx), bob, 50e6);
     }
 
+    function test_replaceAsset_revert_assetNotAllowed_unregistered() public {
+        address rando = address(0xCAFE);
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.AssetNotAllowed.selector, rando));
+        vm.prank(address(swapFacility));
+        extension.replaceAsset(rando, bob, 50e6);
+    }
+
     function test_replaceAsset_crossDecimal() public {
         _wrapAssetFor(alice, address(dai), 500e18, 500e6);
 
