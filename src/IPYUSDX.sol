@@ -111,6 +111,11 @@ interface IPYUSDX {
     /// @dev    MUST only be callable by ISSUER_ROLE.
     /// @dev    MUST revert if the contract is paused.
     /// @dev    MUST revert if the account is frozen.
+    /// @dev    `ISSUER_ROLE` is expected to be granted only to contracts that burn from their
+    ///         own non-earning balance (e.g., IssuerGateway, Portal). Burning directly from an
+    ///         earning account does not pre-claim accrued yield: `_subtractEarningAmount` rounds
+    ///         the consumed principal up (e.g. in favor of the protocol), so any unclaimed yield
+    ///         at the time of burn is subject to a sub-unit rounding loss in present value.
     /// @param  account The account from which PYUSDX is burnt.
     /// @param  amount  The amount of PYUSDX to burn.
     function burn(address account, uint256 amount) external;
