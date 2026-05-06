@@ -174,6 +174,22 @@ contract MockMultiMint is ERC20, IMultiMint {
         return allowedAssets[asset] && assetBalances[asset] >= amount;
     }
 
+    function isAllowedToReplaceAsset(address, address asset, uint256 amount) external view override returns (bool) {
+        return allowedAssets[asset] && assetBalances[asset] >= amount;
+    }
+
+    function isReplaceAssetWhitelistEnabled() external pure override returns (bool) {
+        return false;
+    }
+
+    function getReplaceAssetWhitelist() external pure override returns (address[] memory) {
+        return new address[](0);
+    }
+
+    function setReplaceAssetWhitelist(address, bool) external override {}
+
+    function setReplaceAssetWhitelist(address[] calldata, bool[] calldata) external override {}
+
     /// @notice The amount of pending accrued yield from PYUSDX.
     function yield() external pure override returns (uint256) {
         return 0; // Mock: no yield.

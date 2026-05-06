@@ -164,6 +164,23 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         assertEq(multiMint.totalSupply(), AMOUNT);
     }
 
+    function testIntegration_replaceAsset_whitelistedCaller() public {
+        _wrapUSDCFor(bob, AMOUNT);
+
+        vm.prank(assetCapManager);
+        multiMint.setReplaceAssetWhitelist(alice, true);
+
+        _mintPYUSDX(alice, AMOUNT);
+
+        vm.prank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), AMOUNT);
+
+        vm.prank(alice);
+        swapFacility.replaceAsset(address(USDC), address(pyusdx), address(multiMint), AMOUNT, alice);
+
+        assertEq(USDC.balanceOf(alice), AMOUNT);
+    }
+
     function testIntegration_replaceAsset_revert_insufficientAssetBacking() public {
         // Only 500e6 USDC deposited
         _wrapUSDCFor(alice, 500e6);

@@ -11,6 +11,11 @@ interface IMultiMint is IYieldToOne {
     /// @param  cap   Maximum allowed amount of `asset` that can back the extension.
     event AssetCapSet(address indexed asset, uint256 cap);
 
+    /// @notice Emitted when an account's replaceAsset whitelist status changes.
+    /// @param  account The account whose status changed.
+    /// @param  status  The new status (true = whitelisted, false = removed).
+    event ReplaceAssetWhitelistSet(address indexed account, bool indexed status);
+
     /// @notice Emitted when an asset is wrapped into extension tokens.
     /// @param  asset           Address of the asset deposited.
     /// @param  assetAmount     Amount of asset deposited (in asset decimals).
@@ -29,6 +34,9 @@ interface IMultiMint is IYieldToOne {
 
     /// @notice Emitted in initializer if Asset Cap Manager is 0x0.
     error ZeroAssetCapManager();
+
+    /// @notice Reverts when batch input arrays have differing lengths.
+    error ArrayLengthMismatch();
 
     /// @notice Emitted if the asset cap is reached.
     /// @param  asset Address of the asset.
@@ -59,6 +67,10 @@ interface IMultiMint is IYieldToOne {
     /// @param  asset Address of the disallowed asset.
     error AssetNotAllowed(address asset);
 
+    /// @notice Reverts when the caller is not permitted to perform the operation.
+    /// @param  caller The address that attempted the call.
+    error CallerNotAllowed(address caller);
+
     /* ============ Interactive Functions ============ */
 
     /// @notice Mint extension tokens by depositing `asset` tokens.
@@ -83,6 +95,20 @@ interface IMultiMint is IYieldToOne {
     /// @param  cap   Maximum allowed amount of `asset` that can back the extension.
     function setAssetCap(address asset, uint256 cap) external;
 
+    /// @notice Adds or removes a single account from the replaceAsset whitelist.
+    /// @dev    MUST only be callable by ASSET_CAP_MANAGER_ROLE.
+    ///         No-op (no event) if the account is already in the requested state.
+    /// @param  account The account to add or remove.
+    /// @param  status  True to add, false to remove.
+    function setReplaceAssetWhitelist(address account, bool status) external;
+
+    /// @notice Batch variant of setReplaceAssetWhitelist.
+    /// @dev    MUST only be callable by ASSET_CAP_MANAGER_ROLE.
+    ///         Reverts on array length mismatch.
+    /// @param  accounts The accounts to add or remove.
+    /// @param  statuses The corresponding statuses.
+    function setReplaceAssetWhitelist(address[] calldata accounts, bool[] calldata statuses) external;
+
     /* ============ View/Pure Functions ============ */
 
     /// @notice The role that can set the assets cap.
@@ -103,6 +129,9 @@ interface IMultiMint is IYieldToOne {
     /// @notice Gets the total non-PYUSDX assets held by the extension (in extension decimals).
     function totalAssets() external view returns (uint256);
 
+    /// @notice Get the addresses allowed to call `replaceAsset`.
+    function getReplaceAssetWhitelist() external view returns (address[] memory);
+
     /// @notice Checks if an asset is allowed as backing.
     function isAllowedAsset(address asset) external view returns (bool);
 
@@ -115,6 +144,17 @@ interface IMultiMint is IYieldToOne {
     function isAllowedToUnwrap(uint256 amount) external view returns (bool);
 
     /// @notice Checks if replacing `asset` with the backing asset is allowed.
-    /// @dev    `amount` MUST be formatted in PYUSDX decimals.
+    /// @dev    `amount` MUST be formatted in PYUSDX decimals. Uses `msg.sender` as the caller.
     function isAllowedToReplaceAsset(address asset, uint256 amount) external view returns (bool);
+
+    /// @notice Checks if `caller` is allowed to replace `asset` with `amount` of PYUSDX.
+    /// @dev    Caller-explicit variant for off-chain dry-run when calling via a trusted router.
+    ///         `amount` MUST be formatted in PYUSDX decimals.
+    /// @param  caller The address of the caller to check.
+    /// @param  asset  The address of the asset to replace.
+    /// @param  amount The amount of PYUSDX to deposit.
+    function isAllowedToReplaceAsset(address caller, address asset, uint256 amount) external view returns (bool);
+
+    /// @notice Whether the replaceAsset whitelist is currently enforced.
+    function isReplaceAssetWhitelistEnabled() external view returns (bool);
 }

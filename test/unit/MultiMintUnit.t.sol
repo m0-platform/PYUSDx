@@ -18,6 +18,8 @@ import { PausableUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/o
 import { MockERC20 } from "../mock/MockERC20.sol";
 import { MockFeeOnTransfer } from "../mock/MockFeeOnTransfer.sol";
 
+import { VmSafe } from "../../lib/evm-m-extensions/lib/forge-std/src/Vm.sol";
+
 import { BaseTest } from "../utils/BaseTest.sol";
 
 contract MultiMintTest is BaseTest {
@@ -659,6 +661,70 @@ contract MultiMintTest is BaseTest {
         extension.replaceAsset(address(usdc), bob, 0);
     }
 
+    /* ============ replaceAsset (whitelist enforcement) ============ */
+
+    function test_replaceAsset_enabledWhitelist_whitelistedCallerSucceeds() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(bob, true);
+
+        issuerGateway.mint(bob, 50e6);
+
+        vm.startPrank(bob);
+
+        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
+        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
+
+        vm.stopPrank();
+
+        assertEq(usdc.balanceOf(bob), 50e6);
+    }
+
+    function test_replaceAsset_enabledWhitelist_nonWhitelistedCallerReverts() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(bob, true);
+
+        issuerGateway.mint(alice, 50e6);
+
+        vm.prank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), 50e6);
+
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.CallerNotAllowed.selector, alice));
+
+        vm.prank(alice);
+        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, alice);
+    }
+
+    function test_replaceAsset_succeedsAfterRemovingLastReopensGate() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(bob, true);
+
+        issuerGateway.mint(alice, 100e6);
+
+        vm.prank(alice);
+        IERC20(address(pyusdx)).approve(address(swapFacility), 100e6);
+
+        // Alice is blocked while whitelist is enabled.
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.CallerNotAllowed.selector, alice));
+
+        vm.prank(alice);
+        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, alice);
+
+        // Removing the last entry re-opens the gate.
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(bob, false);
+
+        vm.prank(alice);
+        swapFacility.replaceAsset(address(extension), address(usdc), 50e6, alice);
+
+        assertEq(usdc.balanceOf(alice), 50e6);
+    }
+
     /* ============ setAssetCap ============ */
 
     function test_setAssetCap() public {
@@ -915,6 +981,157 @@ contract MultiMintTest is BaseTest {
         assertEq(extension.balanceOf(yieldRecipient), 0);
     }
 
+    /* ============ setReplaceAssetWhitelist (single) ============ */
+
+    function test_setReplaceAssetWhitelist_revert_notAssetCapManager() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                extension.ASSET_CAP_MANAGER_ROLE()
+            )
+        );
+
+        vm.prank(alice);
+        extension.setReplaceAssetWhitelist(bob, true);
+    }
+
+    function test_setReplaceAssetWhitelist_revert_zeroAccount() public {
+        vm.expectRevert(IExtension.ZeroAccount.selector);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(address(0), true);
+    }
+
+    function test_setReplaceAssetWhitelist_add() public {
+        vm.expectEmit();
+        emit IMultiMint.ReplaceAssetWhitelistSet(alice, true);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(alice, true);
+
+        assertTrue(extension.isReplaceAssetWhitelistEnabled());
+
+        address[] memory list = extension.getReplaceAssetWhitelist();
+
+        assertEq(list.length, 1);
+        assertEq(list[0], alice);
+    }
+
+    function test_setReplaceAssetWhitelist_remove() public {
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(alice, true);
+
+        vm.expectEmit();
+        emit IMultiMint.ReplaceAssetWhitelistSet(alice, false);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(alice, false);
+
+        assertFalse(extension.isReplaceAssetWhitelistEnabled());
+        assertEq(extension.getReplaceAssetWhitelist().length, 0);
+    }
+
+    function test_setReplaceAssetWhitelist_idempotentAdd() public {
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(alice, true);
+
+        vm.recordLogs();
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(alice, true);
+
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; ++i) {
+            assertNotEq(logs[i].topics[0], IMultiMint.ReplaceAssetWhitelistSet.selector);
+        }
+
+        assertEq(extension.getReplaceAssetWhitelist().length, 1);
+    }
+
+    function test_setReplaceAssetWhitelist_idempotentRemove() public {
+        vm.recordLogs();
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(alice, false);
+
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; ++i) {
+            assertNotEq(logs[i].topics[0], IMultiMint.ReplaceAssetWhitelistSet.selector);
+        }
+
+        assertEq(extension.getReplaceAssetWhitelist().length, 0);
+    }
+
+    /* ============ setReplaceAssetWhitelist (batch) ============ */
+
+    function test_setReplaceAssetWhitelistBatch_revert_notAssetCapManager() public {
+        address[] memory accounts = new address[](1);
+        accounts[0] = alice;
+
+        bool[] memory statuses = new bool[](1);
+        statuses[0] = true;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                extension.ASSET_CAP_MANAGER_ROLE()
+            )
+        );
+
+        vm.prank(alice);
+        extension.setReplaceAssetWhitelist(accounts, statuses);
+    }
+
+    function test_setReplaceAssetWhitelistBatch_revert_arrayLengthMismatch() public {
+        address[] memory accounts = new address[](2);
+        accounts[0] = alice;
+        accounts[1] = bob;
+
+        bool[] memory statuses = new bool[](1);
+        statuses[0] = true;
+
+        vm.expectRevert(IMultiMint.ArrayLengthMismatch.selector);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(accounts, statuses);
+    }
+
+    function test_setReplaceAssetWhitelistBatch_revert_zeroAccount() public {
+        address[] memory accounts = new address[](1);
+        accounts[0] = address(0);
+
+        bool[] memory statuses = new bool[](1);
+        statuses[0] = true;
+
+        vm.expectRevert(IExtension.ZeroAccount.selector);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(accounts, statuses);
+    }
+
+    function test_setReplaceAssetWhitelistBatch() public {
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(alice, true);
+
+        address[] memory accounts = new address[](2);
+        accounts[0] = alice;
+        accounts[1] = bob;
+
+        bool[] memory statuses = new bool[](2);
+        statuses[0] = false;
+        statuses[1] = true;
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(accounts, statuses);
+
+        address[] memory list = extension.getReplaceAssetWhitelist();
+
+        assertEq(list.length, 1);
+        assertEq(list[0], bob);
+    }
+
     /* ============ View Functions ============ */
 
     function test_isAllowedAsset() public {
@@ -971,5 +1188,87 @@ contract MultiMintTest is BaseTest {
         swapFacility.replaceAsset(address(extension), address(dai), 50e6, bob);
         vm.stopPrank();
         assertEq(dai.balanceOf(bob), 50e18);
+    }
+
+    /* ============ isAllowedToReplaceAsset ============ */
+
+    function test_isAllowedToReplaceAsset_disabledWhitelist_anyCaller() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
+
+        assertTrue(extension.isAllowedToReplaceAsset(makeAddr("randomCaller"), address(usdc), 50e6));
+    }
+
+    function test_isAllowedToReplaceAsset_enabledWhitelist_whitelistedCaller() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(bob, true);
+
+        assertTrue(extension.isAllowedToReplaceAsset(bob, address(usdc), 50e6));
+    }
+
+    function test_isAllowedToReplaceAsset_enabledWhitelist_nonWhitelistedCaller() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(bob, true);
+
+        assertFalse(extension.isAllowedToReplaceAsset(alice, address(usdc), 50e6));
+    }
+
+    function test_isAllowedToReplaceAsset_explicitCaller_matchesMsgSenderVariant() public {
+        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(bob, true);
+
+        bool viaExplicit = extension.isAllowedToReplaceAsset(bob, address(usdc), 50e6);
+
+        vm.prank(bob);
+        bool viaMsgSender = extension.isAllowedToReplaceAsset(address(usdc), 50e6);
+
+        assertEq(viaExplicit, viaMsgSender);
+    }
+
+    /* ============ isReplaceAssetWhitelistEnabled ============ */
+
+    function test_isReplaceAssetWhitelistEnabled() public {
+        assertFalse(extension.isReplaceAssetWhitelistEnabled());
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(alice, true);
+
+        assertTrue(extension.isReplaceAssetWhitelistEnabled());
+    }
+
+    function test_isReplaceAssetWhitelistEnabled_disabledAfterRemovingLast() public {
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(alice, true);
+
+        assertTrue(extension.isReplaceAssetWhitelistEnabled());
+
+        vm.prank(assetCapManager);
+        extension.setReplaceAssetWhitelist(alice, false);
+
+        assertFalse(extension.isReplaceAssetWhitelistEnabled());
+    }
+
+    /* ============ getReplaceAssetWhitelist ============ */
+
+    function test_getReplaceAssetWhitelist_returnsAllAdded() public {
+        assertEq(extension.getReplaceAssetWhitelist().length, 0);
+
+        vm.startPrank(assetCapManager);
+
+        extension.setReplaceAssetWhitelist(alice, true);
+        extension.setReplaceAssetWhitelist(bob, true);
+
+        vm.stopPrank();
+
+        address[] memory list = extension.getReplaceAssetWhitelist();
+
+        assertEq(list.length, 2);
+        assertEq(list[0], alice);
+        assertEq(list[1], bob);
     }
 }
