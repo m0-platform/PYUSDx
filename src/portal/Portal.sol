@@ -108,6 +108,8 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         if (pauser == address(0)) revert ZeroPauser();
         if (operator == address(0)) revert ZeroOperator();
 
+        __AccessControl_init();
+
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(PAUSER_ROLE, pauser);
         _grantRole(OPERATOR_ROLE, operator);

@@ -53,6 +53,8 @@ abstract contract BridgeAdapter is IBridgeAdapter, BridgeAdapterStorageLayout, A
         if (admin == address(0)) revert ZeroAdmin();
         if (operator == address(0)) revert ZeroOperator();
 
+        __AccessControl_init();
+
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(OPERATOR_ROLE, operator);
     }
