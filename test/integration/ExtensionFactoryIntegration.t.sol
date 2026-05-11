@@ -536,6 +536,58 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         factory.setExtensionType(proxy, IExtensionBeacon.ExtensionType.NONE);
     }
 
+    function test_setExtensionType_alreadyRegistered() public {
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: YTO_NAME,
+            symbol: YTO_SYMBOL,
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            freezeManager: freezeManager,
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
+        });
+
+        (address proxy, ) = factory.deployYieldToOne(string("yto-change-type-test"), params);
+
+        vm.expectRevert(IExtensionFactory.ExtensionAlreadyRegistered.selector);
+
+        vm.prank(factoryManager);
+        factory.setExtensionType(proxy, IExtensionBeacon.ExtensionType.MULTI_MINT);
+
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionBeacon.ExtensionType.YIELD_TO_ONE));
+    }
+
+    function test_setExtensionType_changeTypeViaRevoke() public {
+        IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
+            name: YTO_NAME,
+            symbol: YTO_SYMBOL,
+            yieldRecipient: yieldRecipient,
+            admin: admin,
+            freezeManager: freezeManager,
+            yieldRecipientManager: yieldRecipientManager,
+            pauser: pauser,
+            versionManager: versionManager
+        });
+
+        (address proxy, ) = factory.deployYieldToOne(string("yto-revoke-then-mm-test"), params);
+
+        vm.expectEmit();
+        emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionBeacon.ExtensionType.NONE);
+
+        vm.prank(factoryManager);
+        factory.setExtensionType(proxy, IExtensionBeacon.ExtensionType.NONE);
+
+        vm.expectEmit();
+        emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionBeacon.ExtensionType.MULTI_MINT);
+
+        vm.prank(factoryManager);
+        factory.setExtensionType(proxy, IExtensionBeacon.ExtensionType.MULTI_MINT);
+
+        assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionBeacon.ExtensionType.MULTI_MINT));
+        assertTrue(factory.isApprovedExtension(proxy));
+    }
+
     /* ============ Beacon Integration Tests ============ */
 
     function test_extensionBeacon_getter() public view {

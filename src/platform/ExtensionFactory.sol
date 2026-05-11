@@ -168,10 +168,12 @@ contract ExtensionFactory is
         IExtensionBeacon.ExtensionType extensionType
     ) external override onlyRole(FACTORY_MANAGER_ROLE) {
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
+        IExtensionBeacon.ExtensionType currentType = $.extensionTypes[extension];
 
-        if ($.extensionTypes[extension] == extensionType) return;
+        if (currentType == extensionType) return;
 
         if (extensionType != IExtensionBeacon.ExtensionType.NONE) {
+            if (currentType != IExtensionBeacon.ExtensionType.NONE) revert ExtensionAlreadyRegistered();
             _revertIfInvalidExtension(extension);
         }
 
