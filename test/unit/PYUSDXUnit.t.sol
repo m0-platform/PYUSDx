@@ -19,7 +19,6 @@ import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
 
 import { PYUSDXBaseUnitTest } from "../utils/PYUSDXBaseUnitTest.sol";
 import { PYUSDXHarness } from "../harness/PYUSDXHarness.sol";
-import { MockIssuerGateway } from "../mock/MockIssuerGateway.sol";
 
 contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -639,6 +638,74 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
         // Balance should still decrease
         assertEq(pyusdx.balanceOf(alice), MINT_AMOUNT - BURN_AMOUNT);
+    }
+
+    /* ============ approve ============ */
+
+    function test_approve_revertIfFrozen_account() public {
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        assertTrue(pyusdx.isFrozen(alice));
+        assertFalse(pyusdx.isFrozen(bob));
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+
+        vm.prank(alice);
+        pyusdx.approve(bob, TRANSFER_AMOUNT);
+    }
+
+    function test_approve_revertIfFrozen_spender() public {
+        vm.prank(freezeManager);
+        pyusdx.freeze(bob);
+
+        assertFalse(pyusdx.isFrozen(alice));
+        assertTrue(pyusdx.isFrozen(bob));
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+
+        vm.prank(alice);
+        pyusdx.approve(bob, TRANSFER_AMOUNT);
+    }
+
+    function test_permit_revertIfFrozen_account() public {
+        vm.prank(freezeManager);
+        pyusdx.freeze(alice);
+
+        assertTrue(pyusdx.isFrozen(alice));
+
+        uint256 deadline = block.timestamp + 1 hours;
+
+        bytes32 structHash = keccak256(
+            abi.encode(pyusdx.PERMIT_TYPEHASH(), alice, bob, TRANSFER_AMOUNT, pyusdx.nonces(alice), deadline)
+        );
+
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", pyusdx.DOMAIN_SEPARATOR(), structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(aliceKey, digest);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, alice));
+
+        pyusdx.permit(alice, bob, TRANSFER_AMOUNT, deadline, v, r, s);
+    }
+
+    function test_permit_revertIfFrozen_spender() public {
+        vm.prank(freezeManager);
+        pyusdx.freeze(bob);
+
+        assertTrue(pyusdx.isFrozen(bob));
+
+        uint256 deadline = block.timestamp + 1 hours;
+
+        bytes32 structHash = keccak256(
+            abi.encode(pyusdx.PERMIT_TYPEHASH(), alice, bob, TRANSFER_AMOUNT, pyusdx.nonces(alice), deadline)
+        );
+
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", pyusdx.DOMAIN_SEPARATOR(), structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(aliceKey, digest);
+
+        vm.expectRevert(abi.encodeWithSelector(IFreezable.AccountFrozen.selector, bob));
+
+        pyusdx.permit(alice, bob, TRANSFER_AMOUNT, deadline, v, r, s);
     }
 
     /* ============ transfer ============ */
