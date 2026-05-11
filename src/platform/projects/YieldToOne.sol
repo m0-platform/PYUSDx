@@ -106,6 +106,7 @@ contract YieldToOne is IYieldToOne, YieldToOneStorageLayout, Extension {
         if (yieldRecipientManager == address(0)) revert ZeroYieldRecipientManager();
         if (versionManager == address(0)) revert ZeroVersionManager();
 
+        __AccessControl_init();
         __Extension_init(name, symbol, freezeManager, pauser);
 
         _setYieldRecipient(yieldRecipient_);

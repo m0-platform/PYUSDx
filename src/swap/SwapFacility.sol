@@ -49,6 +49,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     /// @param  admin  Address of the SwapFacility admin.
     /// @param  pauser Address of the SwapFacility pauser.
     function initialize(address admin, address pauser) external initializer {
+        __AccessControl_init();
         __ReentrancyLock_init(admin);
         __Pausable_init(pauser);
     }
