@@ -74,8 +74,9 @@ abstract contract RateLimiter is IRateLimiter, RateLimiterStorageLayout, AccessC
 
         if (capacity == 0) revert InvalidRateLimitConfig();
 
-        // NOTE: Start with full bucket on first setup. Otherwise, calculate refilled amount and cap to new capacity.
-        bucket.remainingAmount = bucket.lastRefillTime == 0
+        // NOTE: Start with a full bucket on first setup or when the bucket does not refill.
+        //       Otherwise, calculate refilled amount and cap to new capacity.
+        bucket.remainingAmount = bucket.lastRefillTime == 0 || refillPerSecond == 0
             ? capacity
             : uint128(
                 Math.min(
