@@ -168,13 +168,14 @@ contract MockMultiMint is ERC20, IMultiMint {
     }
 
     /**
-     * @notice Checks if replacing `asset` with backing asset is allowed.
+     * @notice Checks if `caller` is allowed to replace `asset` with `amount` of extension tokens.
+     * @dev    `caller` is ignored in this mock since the whitelist is disabled in SwapFacility unit tests.
      */
-    function isAllowedToReplaceAsset(address asset, uint256 amount) external view override returns (bool) {
-        return allowedAssets[asset] && assetBalances[asset] >= amount;
-    }
-
-    function isAllowedToReplaceAsset(address, address asset, uint256 amount) external view override returns (bool) {
+    function isAllowedToReplaceAsset(
+        address /* caller */,
+        address asset,
+        uint256 amount
+    ) external view override returns (bool) {
         return allowedAssets[asset] && assetBalances[asset] >= amount;
     }
 

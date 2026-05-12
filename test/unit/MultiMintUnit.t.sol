@@ -551,7 +551,7 @@ contract MultiMintTest is BaseTest {
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, bob);
         vm.stopPrank();
 
-        assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 50e6));
+        assertFalse(extension.isAllowedToReplaceAsset(bob, address(usdc), 50e6));
     }
 
     function test_replaceAsset_succeedsAfterReenable() public {
@@ -1151,18 +1151,20 @@ contract MultiMintTest is BaseTest {
         assertFalse(extension.isAllowedToUnwrap(0));
     }
 
+    /* ============ isAllowedToReplaceAsset ============ */
+
     function test_isAllowedToReplaceAsset() public {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
-        assertTrue(extension.isAllowedToReplaceAsset(address(usdc), 50e6));
-        assertTrue(extension.isAllowedToReplaceAsset(address(usdc), 100e6));
+        assertTrue(extension.isAllowedToReplaceAsset(bob, address(usdc), 50e6));
+        assertTrue(extension.isAllowedToReplaceAsset(bob, address(usdc), 100e6));
     }
 
     function test_isAllowedToReplaceAsset_zeroOrExcessive() public {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
-        assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 0));
-        assertFalse(extension.isAllowedToReplaceAsset(address(usdc), 101e6));
+        assertFalse(extension.isAllowedToReplaceAsset(bob, address(usdc), 0));
+        assertFalse(extension.isAllowedToReplaceAsset(bob, address(usdc), 101e6));
     }
 
     function test_isAllowedToReplaceAsset_18DecimalAsset() public {
@@ -1170,16 +1172,16 @@ contract MultiMintTest is BaseTest {
         _wrapAssetFor(alice, address(dai), 100e18, 100e6);
 
         // 100 PYUSDX worth → converts to 100e18 DAI → exactly covers balance
-        assertTrue(extension.isAllowedToReplaceAsset(address(dai), 100e6));
+        assertTrue(extension.isAllowedToReplaceAsset(bob, address(dai), 100e6));
 
         // 50 PYUSDX worth → converts to 50e18 DAI → under balance
-        assertTrue(extension.isAllowedToReplaceAsset(address(dai), 50e6));
+        assertTrue(extension.isAllowedToReplaceAsset(bob, address(dai), 50e6));
 
         // 101 PYUSDX worth → converts to 101e18 DAI → exceeds balance
-        assertFalse(extension.isAllowedToReplaceAsset(address(dai), 101e6));
+        assertFalse(extension.isAllowedToReplaceAsset(bob, address(dai), 101e6));
 
         // Zero → always false
-        assertFalse(extension.isAllowedToReplaceAsset(address(dai), 0));
+        assertFalse(extension.isAllowedToReplaceAsset(bob, address(dai), 0));
 
         // Prove pre-check matches execution: replace 50 PYUSDX worth of DAI
         issuerGateway.mint(bob, 50e6);
@@ -1189,8 +1191,6 @@ contract MultiMintTest is BaseTest {
         vm.stopPrank();
         assertEq(dai.balanceOf(bob), 50e18);
     }
-
-    /* ============ isAllowedToReplaceAsset ============ */
 
     function test_isAllowedToReplaceAsset_disabledWhitelist_anyCaller() public {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
@@ -1214,20 +1214,6 @@ contract MultiMintTest is BaseTest {
         extension.setReplaceAssetWhitelist(bob, true);
 
         assertFalse(extension.isAllowedToReplaceAsset(alice, address(usdc), 50e6));
-    }
-
-    function test_isAllowedToReplaceAsset_explicitCaller_matchesMsgSenderVariant() public {
-        _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
-
-        vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(bob, true);
-
-        bool viaExplicit = extension.isAllowedToReplaceAsset(bob, address(usdc), 50e6);
-
-        vm.prank(bob);
-        bool viaMsgSender = extension.isAllowedToReplaceAsset(address(usdc), 50e6);
-
-        assertEq(viaExplicit, viaMsgSender);
     }
 
     /* ============ isReplaceAssetWhitelistEnabled ============ */

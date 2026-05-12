@@ -143,13 +143,8 @@ interface IMultiMint is IYieldToOne {
     /// @dev    `amount` MUST be formatted in extension's decimals (6).
     function isAllowedToUnwrap(uint256 amount) external view returns (bool);
 
-    /// @notice Checks if replacing `asset` with the backing asset is allowed.
-    /// @dev    `amount` MUST be formatted in PYUSDX decimals. Uses `msg.sender` as the caller.
-    function isAllowedToReplaceAsset(address asset, uint256 amount) external view returns (bool);
-
     /// @notice Checks if `caller` is allowed to replace `asset` with `amount` of PYUSDX.
-    /// @dev    Caller-explicit variant for off-chain dry-run when calling via a trusted router.
-    ///         `amount` MUST be formatted in PYUSDX decimals.
+    /// @dev    `amount` MUST be formatted in PYUSDX decimals.
     /// @param  caller The address of the caller to check.
     /// @param  asset  The address of the asset to replace.
     /// @param  amount The amount of PYUSDX to deposit.

@@ -232,12 +232,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     }
 
     /// @inheritdoc IMultiMint
-    function isAllowedToReplaceAsset(address asset, uint256 amount) external view returns (bool) {
-        return isAllowedToReplaceAsset(msg.sender, asset, amount);
-    }
-
-    /// @inheritdoc IMultiMint
-    function isAllowedToReplaceAsset(address caller, address asset, uint256 amount) public view returns (bool) {
+    function isAllowedToReplaceAsset(address caller, address asset, uint256 amount) external view returns (bool) {
         if (amount == 0 || !isAllowedAsset(asset) || !_isCallerAllowedToReplaceAsset(caller)) return false;
 
         uint256 assetAmount = _fromExtensionToAssetAmount(asset, amount);
