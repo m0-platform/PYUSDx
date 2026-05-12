@@ -157,6 +157,9 @@ contract IssuerGateway is IIssuerGateway, IssuerGatewayStorageLayout, AccessCont
 
         if (block.timestamp > expiresAt) revert ExpiredMintProposal(expiresAt);
 
+        // NOTE: Revalidate that the original proposer still holds `OPERATOR_ROLE`.
+        _checkRole(OPERATOR_ROLE, proposal.minter);
+
         address recipient = proposal.recipient;
         uint256 amount = proposal.amount;
 

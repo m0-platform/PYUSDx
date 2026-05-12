@@ -235,6 +235,23 @@ contract IssuerGatewayUnitTest is IssuerGatewayBaseUnitTest {
         issuerGateway.mint(mintId);
     }
 
+    function test_mint_revertIfMinterOperatorRoleRevoked() public {
+        bytes32 operatorRole = issuerGateway.OPERATOR_ROLE();
+        uint48 mintId = _proposeMint(100, recipient);
+
+        _warpToMintable(mintId);
+
+        vm.prank(admin);
+        issuerGateway.revokeRole(operatorRole, operator);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, operator, operatorRole)
+        );
+
+        vm.prank(executor);
+        issuerGateway.mint(mintId);
+    }
+
     function test_mint_successAtTTLBoundary() public {
         uint48 mintId = _proposeMint(100, recipient);
 
