@@ -247,7 +247,7 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     /// @param  asset        The address of the asset to swap.
     /// @param  extensionOut The address of the MultiMint Extension to swap to.
     /// @param  amount       The amount of `asset` to swap.
-    /// @param  recipient    The address to receive `amount` of MultiMint Extension tokens.
+    /// @param  recipient    The address to receive MultiMint Extension tokens equivalent to `amount` of `asset`.
     function _swapInMultiMint(address asset, address extensionOut, uint256 amount, address recipient) internal {
         _revertIfCannotMultiMint(asset, extensionOut);
 
@@ -260,12 +260,12 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
         emit SwappedInMultiMint(asset, extensionOut, amount, recipient);
     }
 
-    /// @notice Replaces `amount` of `asset` held in a MultiMint Extension with PYUSDX.
+    /// @notice Replaces `asset` held in a MultiMint Extension with `amount` of PYUSDX.
     /// @param  asset        The address of the asset.
     /// @param  tokenIn      The address of PYUSDX or a PYUSDX extension to provide PYUSDX from.
     /// @param  extensionOut The address of a MultiMint Extension.
     /// @param  amount       The amount of PYUSDX to replace.
-    /// @param  recipient    The address to receive `amount` of `asset` tokens.
+    /// @param  recipient    The address to receive `asset` tokens equivalent to `amount` of PYUSDX.
     function _replaceAsset(
         address asset,
         address tokenIn,
