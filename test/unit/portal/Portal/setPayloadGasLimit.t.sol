@@ -51,9 +51,16 @@ contract SetPayloadGasLimitUnitTest is PortalUnitTestBase {
         portal.setPayloadGasLimit(CHAIN_ID_1, gasLimit);
     }
 
-    function test_setPayloadGasLimit_revertsIfZeroGasLimit() external {
-        vm.expectRevert(IPortal.ZeroPayloadGasLimit.selector);
+    function test_setPayloadGasLimit_unsetsWithZero() external {
+        // Base setup already configures a non-zero gas limit for CHAIN_ID_2
+        assertEq(portal.payloadGasLimit(CHAIN_ID_2), TOKEN_TRANSFER_GAS_LIMIT);
+
         vm.prank(operator);
+        vm.expectEmit();
+        emit IPortal.PayloadGasLimitSet(CHAIN_ID_2, 0);
+
         portal.setPayloadGasLimit(CHAIN_ID_2, 0);
+
+        assertEq(portal.payloadGasLimit(CHAIN_ID_2), 0);
     }
 }
