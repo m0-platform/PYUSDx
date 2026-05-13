@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.34;
 
+import { EnumerableSet } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 import { SafeERC20 } from "../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { UIntMath } from "../../../lib/evm-m-extensions/lib/common/src/libs/UIntMath.sol";
 
@@ -23,6 +24,7 @@ abstract contract MultiMintStorageLayout {
     struct MultiMintStorage {
         mapping(address => Asset) assets;
         uint256 totalAssets;
+        EnumerableSet.AddressSet replaceAssetWhitelist;
     }
 
     // keccak256(abi.encode(uint256(keccak256("PYUSDX.storage.MultiMint")) - 1)) & ~bytes32(uint256(0xff))
@@ -45,6 +47,7 @@ abstract contract MultiMintStorageLayout {
 ///         stablecoins can only be extracted via `replaceAsset`.
 /// @author M0 Labs
 contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
+    using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20Metadata;
 
     /* ============ Variables ============ */
@@ -163,6 +166,23 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         emit AssetCapSet(asset, cap);
     }
 
+    /// @inheritdoc IMultiMint
+    function setReplaceAssetWhitelistCaller(address caller, bool allowed) external onlyRole(ASSET_CAP_MANAGER_ROLE) {
+        _setReplaceAssetWhitelistCaller(caller, allowed);
+    }
+
+    /// @inheritdoc IMultiMint
+    function setReplaceAssetWhitelistCaller(
+        address[] calldata callers,
+        bool[] calldata allowed
+    ) external onlyRole(ASSET_CAP_MANAGER_ROLE) {
+        if (callers.length != allowed.length) revert ArrayLengthMismatch();
+
+        for (uint256 i; i < callers.length; ++i) {
+            _setReplaceAssetWhitelistCaller(callers[i], allowed[i]);
+        }
+    }
+
     /* ============ View/Pure Functions ============ */
 
     /// @inheritdoc IMultiMint
@@ -202,9 +222,19 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     }
 
     /// @inheritdoc IMultiMint
-    function isAllowedToReplaceAsset(address asset, uint256 amount) external view returns (bool) {
-        if (amount == 0) return false;
-        if (!isAllowedAsset(asset)) return false;
+    function isReplaceAssetWhitelistEnabled() external view returns (bool) {
+        return _getMultiMintStorage().replaceAssetWhitelist.length() != 0;
+    }
+
+    /// @inheritdoc IMultiMint
+    function getReplaceAssetWhitelist() external view returns (address[] memory) {
+        return _getMultiMintStorage().replaceAssetWhitelist.values();
+    }
+
+    /// @inheritdoc IMultiMint
+    function isAllowedToReplaceAsset(address caller, address asset, uint256 amount) external view returns (bool) {
+        if (amount == 0 || !isAllowedAsset(asset) || !_isCallerAllowedToReplaceAsset(caller)) return false;
+
         uint256 assetAmount = _fromExtensionToAssetAmount(asset, amount);
         return assetAmount != 0 && assetBalanceOf(asset) >= assetAmount;
     }
@@ -272,8 +302,7 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         emit AssetWrapped(asset, amount, recipient, extensionAmount);
     }
 
-    /// @dev   Pulls PYUSDX from `msg.sender` and sends `asset` from reserves
-    ///        to `recipient`.
+    /// @dev   Pulls PYUSDX from `msg.sender` and sends `asset` from reserves to `recipient`.
     /// @param asset     Address of the asset to receive from reserves.
     /// @param recipient Address that will receive the `asset` tokens.
     /// @param amount    Amount of PYUSDX to deposit (in PYUSDX decimals).
@@ -282,6 +311,10 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
         _revertIfInvalidAsset(asset);
         if (!isAllowedAsset(asset)) revert AssetNotAllowed(asset);
+
+        address caller = ISwapFacility(msg.sender).msgSender();
+        if (!_isCallerAllowedToReplaceAsset(caller)) revert CallerNotAllowed(caller);
+
         _revertIfZeroAccount(recipient);
         _revertIfZeroAmount(amount);
 
@@ -306,6 +339,21 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         emit AssetReplaced(asset, assetAmount, recipient, amount);
     }
 
+    /// @dev   Adds or removes `caller` from the replaceAsset whitelist.
+    ///        Emits `ReplaceAssetWhitelistCallerSet` only when state actually changes.
+    /// @param caller  The caller to add or remove.
+    /// @param allowed True to add, false to remove.
+    function _setReplaceAssetWhitelistCaller(address caller, bool allowed) internal {
+        _revertIfZeroAccount(caller);
+
+        EnumerableSet.AddressSet storage whitelist = _getMultiMintStorage().replaceAssetWhitelist;
+        bool changed = allowed ? whitelist.add(caller) : whitelist.remove(caller);
+
+        if (!changed) return;
+
+        emit ReplaceAssetWhitelistCallerSet(caller, allowed);
+    }
+
     /* ============ Internal View Functions ============ */
 
     /// @dev Returns the excess PYUSDX balance that is not backing extension tokens.
@@ -326,6 +374,15 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         unchecked {
             return totalSupply_ > totalAssets_ ? totalSupply_ - totalAssets_ : 0;
         }
+    }
+
+    /// @dev    Returns true if `caller` passes the whitelist gate.
+    /// @param  caller The address to check.
+    /// @return True if the whitelist is disabled or `caller` is whitelisted.
+    function _isCallerAllowedToReplaceAsset(address caller) internal view returns (bool) {
+        EnumerableSet.AddressSet storage whitelist = _getMultiMintStorage().replaceAssetWhitelist;
+
+        return whitelist.length() == 0 || whitelist.contains(caller);
     }
 
     /// @dev   Reverts if `asset` is address(0) or PYUSDX.

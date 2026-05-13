@@ -12,7 +12,7 @@ import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.so
 contract MockMultiMint is ERC20, IMultiMint {
     /* ============ Immutable ============ */
 
-    /// @notice PYUSDF token address.
+    /// @notice PYUSDX token address.
     IERC20 public immutable pyusdx;
 
     /// @notice SwapFacility address.
@@ -168,11 +168,28 @@ contract MockMultiMint is ERC20, IMultiMint {
     }
 
     /**
-     * @notice Checks if replacing `asset` with backing asset is allowed.
+     * @notice Checks if `caller` is allowed to replace `asset` with `amount` of extension tokens.
+     * @dev    `caller` is ignored in this mock since the whitelist is disabled in SwapFacility unit tests.
      */
-    function isAllowedToReplaceAsset(address asset, uint256 amount) external view override returns (bool) {
+    function isAllowedToReplaceAsset(
+        address /* caller */,
+        address asset,
+        uint256 amount
+    ) external view override returns (bool) {
         return allowedAssets[asset] && assetBalances[asset] >= amount;
     }
+
+    function isReplaceAssetWhitelistEnabled() external pure override returns (bool) {
+        return false;
+    }
+
+    function getReplaceAssetWhitelist() external pure override returns (address[] memory) {
+        return new address[](0);
+    }
+
+    function setReplaceAssetWhitelistCaller(address, bool) external override {}
+
+    function setReplaceAssetWhitelistCaller(address[] calldata, bool[] calldata) external override {}
 
     /// @notice The amount of pending accrued yield from PYUSDX.
     function yield() external pure override returns (uint256) {

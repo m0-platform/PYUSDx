@@ -11,6 +11,11 @@ interface IMultiMint is IYieldToOne {
     /// @param  cap   Maximum allowed amount of `asset` that can back the extension.
     event AssetCapSet(address indexed asset, uint256 cap);
 
+    /// @notice Emitted when a caller's allow status on the replaceAsset whitelist changes.
+    /// @param  caller  The caller whose allow status changed.
+    /// @param  allowed The new allow status (true = whitelisted, false = removed).
+    event ReplaceAssetWhitelistCallerSet(address indexed caller, bool indexed allowed);
+
     /// @notice Emitted when an asset is wrapped into extension tokens.
     /// @param  asset           Address of the asset deposited.
     /// @param  assetAmount     Amount of asset deposited (in asset decimals).
@@ -29,6 +34,9 @@ interface IMultiMint is IYieldToOne {
 
     /// @notice Emitted in initializer if Asset Cap Manager is 0x0.
     error ZeroAssetCapManager();
+
+    /// @notice Reverts when batch input arrays have differing lengths.
+    error ArrayLengthMismatch();
 
     /// @notice Emitted if the asset cap is reached.
     /// @param  asset Address of the asset.
@@ -59,6 +67,10 @@ interface IMultiMint is IYieldToOne {
     /// @param  asset Address of the disallowed asset.
     error AssetNotAllowed(address asset);
 
+    /// @notice Reverts when the caller is not permitted to perform the operation.
+    /// @param  caller The address that attempted the call.
+    error CallerNotAllowed(address caller);
+
     /* ============ Interactive Functions ============ */
 
     /// @notice Mint extension tokens by depositing `asset` tokens.
@@ -83,6 +95,20 @@ interface IMultiMint is IYieldToOne {
     /// @param  cap   Maximum allowed amount of `asset` that can back the extension.
     function setAssetCap(address asset, uint256 cap) external;
 
+    /// @notice Sets `caller`'s allow status on the replaceAsset whitelist.
+    /// @dev    MUST only be callable by ASSET_CAP_MANAGER_ROLE.
+    ///         No-op (no event) if the caller is already in the requested state.
+    /// @param  caller  The caller to add or remove.
+    /// @param  allowed True to add, false to remove.
+    function setReplaceAssetWhitelistCaller(address caller, bool allowed) external;
+
+    /// @notice Batch variant of setReplaceAssetWhitelistCaller.
+    /// @dev    MUST only be callable by ASSET_CAP_MANAGER_ROLE.
+    ///         Reverts on array length mismatch.
+    /// @param  callers The callers to add or remove.
+    /// @param  allowed The corresponding allow statuses.
+    function setReplaceAssetWhitelistCaller(address[] calldata callers, bool[] calldata allowed) external;
+
     /* ============ View/Pure Functions ============ */
 
     /// @notice The role that can set the assets cap.
@@ -103,6 +129,9 @@ interface IMultiMint is IYieldToOne {
     /// @notice Gets the total non-PYUSDX assets held by the extension (in extension decimals).
     function totalAssets() external view returns (uint256);
 
+    /// @notice Get the addresses allowed to call `replaceAsset`.
+    function getReplaceAssetWhitelist() external view returns (address[] memory);
+
     /// @notice Checks if an asset is allowed as backing.
     function isAllowedAsset(address asset) external view returns (bool);
 
@@ -114,7 +143,13 @@ interface IMultiMint is IYieldToOne {
     /// @dev    `amount` MUST be formatted in extension's decimals (6).
     function isAllowedToUnwrap(uint256 amount) external view returns (bool);
 
-    /// @notice Checks if replacing `asset` with the backing asset is allowed.
+    /// @notice Checks if `caller` is allowed to replace `asset` with `amount` of PYUSDX.
     /// @dev    `amount` MUST be formatted in PYUSDX decimals.
-    function isAllowedToReplaceAsset(address asset, uint256 amount) external view returns (bool);
+    /// @param  caller The address of the caller to check.
+    /// @param  asset  The address of the asset to replace.
+    /// @param  amount The amount of PYUSDX to deposit.
+    function isAllowedToReplaceAsset(address caller, address asset, uint256 amount) external view returns (bool);
+
+    /// @notice Whether the replaceAsset whitelist is currently enforced.
+    function isReplaceAssetWhitelistEnabled() external view returns (bool);
 }
