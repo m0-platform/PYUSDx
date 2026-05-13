@@ -667,7 +667,7 @@ contract MultiMintTest is BaseTest {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(bob, true);
+        extension.setReplaceAssetWhitelistCaller(bob, true);
 
         issuerGateway.mint(bob, 50e6);
 
@@ -685,7 +685,7 @@ contract MultiMintTest is BaseTest {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(bob, true);
+        extension.setReplaceAssetWhitelistCaller(bob, true);
 
         issuerGateway.mint(alice, 50e6);
 
@@ -702,7 +702,7 @@ contract MultiMintTest is BaseTest {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(bob, true);
+        extension.setReplaceAssetWhitelistCaller(bob, true);
 
         issuerGateway.mint(alice, 100e6);
 
@@ -717,7 +717,7 @@ contract MultiMintTest is BaseTest {
 
         // Removing the last entry re-opens the gate.
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(bob, false);
+        extension.setReplaceAssetWhitelistCaller(bob, false);
 
         vm.prank(alice);
         swapFacility.replaceAsset(address(extension), address(usdc), 50e6, alice);
@@ -981,9 +981,9 @@ contract MultiMintTest is BaseTest {
         assertEq(extension.balanceOf(yieldRecipient), 0);
     }
 
-    /* ============ setReplaceAssetWhitelist (single) ============ */
+    /* ============ setReplaceAssetWhitelistCaller (single) ============ */
 
-    function test_setReplaceAssetWhitelist_revert_notAssetCapManager() public {
+    function test_setReplaceAssetWhitelistCaller_revert_notAssetCapManager() public {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -993,22 +993,22 @@ contract MultiMintTest is BaseTest {
         );
 
         vm.prank(alice);
-        extension.setReplaceAssetWhitelist(bob, true);
+        extension.setReplaceAssetWhitelistCaller(bob, true);
     }
 
-    function test_setReplaceAssetWhitelist_revert_zeroAccount() public {
+    function test_setReplaceAssetWhitelistCaller_revert_zeroAccount() public {
         vm.expectRevert(IExtension.ZeroAccount.selector);
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(address(0), true);
+        extension.setReplaceAssetWhitelistCaller(address(0), true);
     }
 
-    function test_setReplaceAssetWhitelist_add() public {
+    function test_setReplaceAssetWhitelistCaller_add() public {
         vm.expectEmit();
-        emit IMultiMint.ReplaceAssetWhitelistSet(alice, true);
+        emit IMultiMint.ReplaceAssetWhitelistCallerSet(alice, true);
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(alice, true);
+        extension.setReplaceAssetWhitelistCaller(alice, true);
 
         assertTrue(extension.isReplaceAssetWhitelistEnabled());
 
@@ -1018,54 +1018,54 @@ contract MultiMintTest is BaseTest {
         assertEq(list[0], alice);
     }
 
-    function test_setReplaceAssetWhitelist_remove() public {
+    function test_setReplaceAssetWhitelistCaller_remove() public {
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(alice, true);
+        extension.setReplaceAssetWhitelistCaller(alice, true);
 
         vm.expectEmit();
-        emit IMultiMint.ReplaceAssetWhitelistSet(alice, false);
+        emit IMultiMint.ReplaceAssetWhitelistCallerSet(alice, false);
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(alice, false);
+        extension.setReplaceAssetWhitelistCaller(alice, false);
 
         assertFalse(extension.isReplaceAssetWhitelistEnabled());
         assertEq(extension.getReplaceAssetWhitelist().length, 0);
     }
 
-    function test_setReplaceAssetWhitelist_idempotentAdd() public {
+    function test_setReplaceAssetWhitelistCaller_idempotentAdd() public {
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(alice, true);
+        extension.setReplaceAssetWhitelistCaller(alice, true);
 
         vm.recordLogs();
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(alice, true);
+        extension.setReplaceAssetWhitelistCaller(alice, true);
 
         VmSafe.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; ++i) {
-            assertNotEq(logs[i].topics[0], IMultiMint.ReplaceAssetWhitelistSet.selector);
+            assertNotEq(logs[i].topics[0], IMultiMint.ReplaceAssetWhitelistCallerSet.selector);
         }
 
         assertEq(extension.getReplaceAssetWhitelist().length, 1);
     }
 
-    function test_setReplaceAssetWhitelist_idempotentRemove() public {
+    function test_setReplaceAssetWhitelistCaller_idempotentRemove() public {
         vm.recordLogs();
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(alice, false);
+        extension.setReplaceAssetWhitelistCaller(alice, false);
 
         VmSafe.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; ++i) {
-            assertNotEq(logs[i].topics[0], IMultiMint.ReplaceAssetWhitelistSet.selector);
+            assertNotEq(logs[i].topics[0], IMultiMint.ReplaceAssetWhitelistCallerSet.selector);
         }
 
         assertEq(extension.getReplaceAssetWhitelist().length, 0);
     }
 
-    /* ============ setReplaceAssetWhitelist (batch) ============ */
+    /* ============ setReplaceAssetWhitelistCaller (batch) ============ */
 
-    function test_setReplaceAssetWhitelistBatch_revert_notAssetCapManager() public {
+    function test_setReplaceAssetWhitelistCallerBatch_revert_notAssetCapManager() public {
         address[] memory accounts = new address[](1);
         accounts[0] = alice;
 
@@ -1081,10 +1081,10 @@ contract MultiMintTest is BaseTest {
         );
 
         vm.prank(alice);
-        extension.setReplaceAssetWhitelist(accounts, statuses);
+        extension.setReplaceAssetWhitelistCaller(accounts, statuses);
     }
 
-    function test_setReplaceAssetWhitelistBatch_revert_arrayLengthMismatch() public {
+    function test_setReplaceAssetWhitelistCallerBatch_revert_arrayLengthMismatch() public {
         address[] memory accounts = new address[](2);
         accounts[0] = alice;
         accounts[1] = bob;
@@ -1095,10 +1095,10 @@ contract MultiMintTest is BaseTest {
         vm.expectRevert(IMultiMint.ArrayLengthMismatch.selector);
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(accounts, statuses);
+        extension.setReplaceAssetWhitelistCaller(accounts, statuses);
     }
 
-    function test_setReplaceAssetWhitelistBatch_revert_zeroAccount() public {
+    function test_setReplaceAssetWhitelistCallerBatch_revert_zeroAccount() public {
         address[] memory accounts = new address[](1);
         accounts[0] = address(0);
 
@@ -1108,12 +1108,12 @@ contract MultiMintTest is BaseTest {
         vm.expectRevert(IExtension.ZeroAccount.selector);
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(accounts, statuses);
+        extension.setReplaceAssetWhitelistCaller(accounts, statuses);
     }
 
-    function test_setReplaceAssetWhitelistBatch() public {
+    function test_setReplaceAssetWhitelistCallerBatch() public {
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(alice, true);
+        extension.setReplaceAssetWhitelistCaller(alice, true);
 
         address[] memory accounts = new address[](2);
         accounts[0] = alice;
@@ -1124,7 +1124,7 @@ contract MultiMintTest is BaseTest {
         statuses[1] = true;
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(accounts, statuses);
+        extension.setReplaceAssetWhitelistCaller(accounts, statuses);
 
         address[] memory list = extension.getReplaceAssetWhitelist();
 
@@ -1202,7 +1202,7 @@ contract MultiMintTest is BaseTest {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(bob, true);
+        extension.setReplaceAssetWhitelistCaller(bob, true);
 
         assertTrue(extension.isAllowedToReplaceAsset(bob, address(usdc), 50e6));
     }
@@ -1211,7 +1211,7 @@ contract MultiMintTest is BaseTest {
         _wrapAssetFor(alice, address(usdc), 100e6, 100e6);
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(bob, true);
+        extension.setReplaceAssetWhitelistCaller(bob, true);
 
         assertFalse(extension.isAllowedToReplaceAsset(alice, address(usdc), 50e6));
     }
@@ -1222,19 +1222,19 @@ contract MultiMintTest is BaseTest {
         assertFalse(extension.isReplaceAssetWhitelistEnabled());
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(alice, true);
+        extension.setReplaceAssetWhitelistCaller(alice, true);
 
         assertTrue(extension.isReplaceAssetWhitelistEnabled());
     }
 
     function test_isReplaceAssetWhitelistEnabled_disabledAfterRemovingLast() public {
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(alice, true);
+        extension.setReplaceAssetWhitelistCaller(alice, true);
 
         assertTrue(extension.isReplaceAssetWhitelistEnabled());
 
         vm.prank(assetCapManager);
-        extension.setReplaceAssetWhitelist(alice, false);
+        extension.setReplaceAssetWhitelistCaller(alice, false);
 
         assertFalse(extension.isReplaceAssetWhitelistEnabled());
     }
@@ -1246,8 +1246,8 @@ contract MultiMintTest is BaseTest {
 
         vm.startPrank(assetCapManager);
 
-        extension.setReplaceAssetWhitelist(alice, true);
-        extension.setReplaceAssetWhitelist(bob, true);
+        extension.setReplaceAssetWhitelistCaller(alice, true);
+        extension.setReplaceAssetWhitelistCaller(bob, true);
 
         vm.stopPrank();
 

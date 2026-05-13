@@ -168,7 +168,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         _wrapUSDCFor(bob, AMOUNT);
 
         vm.prank(assetCapManager);
-        multiMint.setReplaceAssetWhitelist(alice, true);
+        multiMint.setReplaceAssetWhitelistCaller(alice, true);
 
         _mintPYUSDX(alice, AMOUNT);
 

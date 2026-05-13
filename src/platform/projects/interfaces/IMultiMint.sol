@@ -11,10 +11,10 @@ interface IMultiMint is IYieldToOne {
     /// @param  cap   Maximum allowed amount of `asset` that can back the extension.
     event AssetCapSet(address indexed asset, uint256 cap);
 
-    /// @notice Emitted when an account's replaceAsset whitelist status changes.
-    /// @param  account The account whose status changed.
-    /// @param  status  The new status (true = whitelisted, false = removed).
-    event ReplaceAssetWhitelistSet(address indexed account, bool indexed status);
+    /// @notice Emitted when a caller's allow status on the replaceAsset whitelist changes.
+    /// @param  caller  The caller whose allow status changed.
+    /// @param  allowed The new allow status (true = whitelisted, false = removed).
+    event ReplaceAssetWhitelistCallerSet(address indexed caller, bool indexed allowed);
 
     /// @notice Emitted when an asset is wrapped into extension tokens.
     /// @param  asset           Address of the asset deposited.
@@ -95,19 +95,19 @@ interface IMultiMint is IYieldToOne {
     /// @param  cap   Maximum allowed amount of `asset` that can back the extension.
     function setAssetCap(address asset, uint256 cap) external;
 
-    /// @notice Adds or removes a single account from the replaceAsset whitelist.
+    /// @notice Sets `caller`'s allow status on the replaceAsset whitelist.
     /// @dev    MUST only be callable by ASSET_CAP_MANAGER_ROLE.
-    ///         No-op (no event) if the account is already in the requested state.
-    /// @param  account The account to add or remove.
-    /// @param  status  True to add, false to remove.
-    function setReplaceAssetWhitelist(address account, bool status) external;
+    ///         No-op (no event) if the caller is already in the requested state.
+    /// @param  caller  The caller to add or remove.
+    /// @param  allowed True to add, false to remove.
+    function setReplaceAssetWhitelistCaller(address caller, bool allowed) external;
 
-    /// @notice Batch variant of setReplaceAssetWhitelist.
+    /// @notice Batch variant of setReplaceAssetWhitelistCaller.
     /// @dev    MUST only be callable by ASSET_CAP_MANAGER_ROLE.
     ///         Reverts on array length mismatch.
-    /// @param  accounts The accounts to add or remove.
-    /// @param  statuses The corresponding statuses.
-    function setReplaceAssetWhitelist(address[] calldata accounts, bool[] calldata statuses) external;
+    /// @param  callers The callers to add or remove.
+    /// @param  allowed The corresponding allow statuses.
+    function setReplaceAssetWhitelistCaller(address[] calldata callers, bool[] calldata allowed) external;
 
     /* ============ View/Pure Functions ============ */
 

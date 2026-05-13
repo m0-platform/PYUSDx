@@ -12,7 +12,7 @@ import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.so
 contract MockMultiMint is ERC20, IMultiMint {
     /* ============ Immutable ============ */
 
-    /// @notice PYUSDF token address.
+    /// @notice PYUSDX token address.
     IERC20 public immutable pyusdx;
 
     /// @notice SwapFacility address.
@@ -187,9 +187,9 @@ contract MockMultiMint is ERC20, IMultiMint {
         return new address[](0);
     }
 
-    function setReplaceAssetWhitelist(address, bool) external override {}
+    function setReplaceAssetWhitelistCaller(address, bool) external override {}
 
-    function setReplaceAssetWhitelist(address[] calldata, bool[] calldata) external override {}
+    function setReplaceAssetWhitelistCaller(address[] calldata, bool[] calldata) external override {}
 
     /// @notice The amount of pending accrued yield from PYUSDX.
     function yield() external pure override returns (uint256) {

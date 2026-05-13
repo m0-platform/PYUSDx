@@ -167,19 +167,19 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     }
 
     /// @inheritdoc IMultiMint
-    function setReplaceAssetWhitelist(address account, bool status) external onlyRole(ASSET_CAP_MANAGER_ROLE) {
-        _setReplaceAssetWhitelist(account, status);
+    function setReplaceAssetWhitelistCaller(address caller, bool allowed) external onlyRole(ASSET_CAP_MANAGER_ROLE) {
+        _setReplaceAssetWhitelistCaller(caller, allowed);
     }
 
     /// @inheritdoc IMultiMint
-    function setReplaceAssetWhitelist(
-        address[] calldata accounts,
-        bool[] calldata statuses
+    function setReplaceAssetWhitelistCaller(
+        address[] calldata callers,
+        bool[] calldata allowed
     ) external onlyRole(ASSET_CAP_MANAGER_ROLE) {
-        if (accounts.length != statuses.length) revert ArrayLengthMismatch();
+        if (callers.length != allowed.length) revert ArrayLengthMismatch();
 
-        for (uint256 i; i < accounts.length; ++i) {
-            _setReplaceAssetWhitelist(accounts[i], statuses[i]);
+        for (uint256 i; i < callers.length; ++i) {
+            _setReplaceAssetWhitelistCaller(callers[i], allowed[i]);
         }
     }
 
@@ -339,19 +339,19 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         emit AssetReplaced(asset, assetAmount, recipient, amount);
     }
 
-    /// @dev   Adds or removes `account` from the replaceAsset whitelist.
-    ///        Emits `ReplaceAssetWhitelistSet` only when state actually changes.
-    /// @param account The account to add or remove.
-    /// @param status  True to add, false to remove.
-    function _setReplaceAssetWhitelist(address account, bool status) internal {
-        _revertIfZeroAccount(account);
+    /// @dev   Adds or removes `caller` from the replaceAsset whitelist.
+    ///        Emits `ReplaceAssetWhitelistCallerSet` only when state actually changes.
+    /// @param caller  The caller to add or remove.
+    /// @param allowed True to add, false to remove.
+    function _setReplaceAssetWhitelistCaller(address caller, bool allowed) internal {
+        _revertIfZeroAccount(caller);
 
         EnumerableSet.AddressSet storage whitelist = _getMultiMintStorage().replaceAssetWhitelist;
-        bool changed = status ? whitelist.add(account) : whitelist.remove(account);
+        bool changed = allowed ? whitelist.add(caller) : whitelist.remove(caller);
 
         if (!changed) return;
 
-        emit ReplaceAssetWhitelistSet(account, status);
+        emit ReplaceAssetWhitelistCallerSet(caller, allowed);
     }
 
     /* ============ Internal View Functions ============ */
