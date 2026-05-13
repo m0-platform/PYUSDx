@@ -34,6 +34,10 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
         (address yieldToOneProxy, ) = factory.deployYieldToOne(string("yto-integration"), ytoParams);
         yieldToOne = YieldToOne(yieldToOneProxy);
 
+        // Register the deployed YieldToOne so SwapFacility recognises it
+        vm.prank(factoryManager);
+        factory.setExtensionType(yieldToOneProxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+
         // Enable earning for YieldToOne (claimRecipient = address(0) means yield stays on the contract)
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(address(yieldToOne), 500, 0, address(0));

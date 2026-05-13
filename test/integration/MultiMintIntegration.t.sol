@@ -36,6 +36,10 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         (address multiMintProxy, ) = factory.deployMultiMint(string("mm-integration"), mmParams);
         multiMint = MultiMint(multiMintProxy);
 
+        // Register the deployed MultiMint so SwapFacility recognises it
+        vm.prank(factoryManager);
+        factory.setExtensionType(multiMintProxy, IExtensionFactory.ExtensionType.MULTI_MINT);
+
         // Enable PYUSDX earning for MultiMint (claimRecipient = address(0) means yield stays on contract)
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(address(multiMint), 500, 0, address(0));

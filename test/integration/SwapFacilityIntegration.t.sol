@@ -38,6 +38,10 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
         (address yieldToOneProxy, ) = factory.deployYieldToOne(string("yto-swap-integration"), ytoParams);
         yieldToOne = YieldToOne(yieldToOneProxy);
 
+        // Register the deployed YieldToOne so SwapFacility recognises it
+        vm.prank(factoryManager);
+        factory.setExtensionType(yieldToOneProxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+
         // Enable earning for YieldToOne
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(address(yieldToOne), 500, 0, yieldRecipient);
@@ -58,6 +62,10 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
         vm.prank(admin);
         (address multiMintProxy, ) = factory.deployMultiMint(string("mm-swap-integration"), mmParams);
         multiMintExtension = MultiMint(multiMintProxy);
+
+        // Register the deployed MultiMint so SwapFacility recognises it
+        vm.prank(factoryManager);
+        factory.setExtensionType(multiMintProxy, IExtensionFactory.ExtensionType.MULTI_MINT);
 
         // Allow USDC in MultiMint by setting asset cap
         vm.prank(assetCapManager);

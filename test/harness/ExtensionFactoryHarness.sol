@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.34;
 
-import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 
 /// @title ExtensionFactory Harness
@@ -15,10 +14,12 @@ contract ExtensionFactoryHarness is ExtensionFactory {
         address multiMintBeacon_
     ) ExtensionFactory(pyusdx_, swapFacility_, yieldToOneBeacon_, multiMintBeacon_) {}
 
-    /// @notice Exposes internal _registerExtension for testing
-    /// @param proxy The address of the extension proxy
-    /// @param extensionType The type of the extension
-    function registerExtension(address proxy, IExtensionFactory.ExtensionType extensionType) external {
-        _registerExtension(proxy, extensionType);
+    /// @notice Writes an extension's type directly, bypassing the role check and validation in
+    ///         `setExtensionType`. For unit tests that need to swap against pre-registered extensions
+    ///         without bootstrapping the FACTORY_MANAGER_ROLE flow.
+    /// @param proxy         The address of the extension proxy.
+    /// @param extensionType The type of the extension.
+    function registerExtension(address proxy, ExtensionType extensionType) external {
+        _getExtensionFactoryStorage().extensionTypes[proxy] = extensionType;
     }
 }

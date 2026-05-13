@@ -3,6 +3,7 @@ pragma solidity 0.8.34;
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
+import { IExtensionBeacon } from "../../src/platform/interfaces/IExtensionBeacon.sol";
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 
@@ -91,6 +92,14 @@ contract DeployIntegrationTests is IntegrationForkTest {
         vm.prank(admin);
         (address ytoProxy, ) = factory.deployYieldToOne(string("test-yto-deploy"), params);
 
+        // Deploy alone does not register; SwapFacility must not yet recognise the extension.
+        assertFalse(factory.isApprovedExtension(ytoProxy));
+        assertFalse(swapFacility.isApprovedExtension(ytoProxy));
+
+        // Factory manager registers the extension to make it usable.
+        vm.prank(factoryManager);
+        factory.setExtensionType(ytoProxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+
         assertTrue(factory.isApprovedExtension(ytoProxy));
         assertTrue(swapFacility.isApprovedExtension(ytoProxy));
     }
@@ -113,6 +122,10 @@ contract DeployIntegrationTests is IntegrationForkTest {
         vm.prank(admin);
         (address ytoProxy, ) = factory.deployYieldToOne(string("test-yto-swap"), params);
         YieldToOne yto = YieldToOne(ytoProxy);
+
+        // Register the deployed extension so SwapFacility recognises it
+        vm.prank(factoryManager);
+        factory.setExtensionType(ytoProxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         // Enable earning for the extension
         vm.prank(earnerManager);

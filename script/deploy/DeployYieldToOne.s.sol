@@ -35,5 +35,11 @@ contract DeployYieldToOne is DeployBase {
         console.log("YieldToOne Proxy:         ", proxy);
 
         _writeDeployment(block.chainid, _getExtensionName(), proxy);
+
+        console.log("");
+        console.log("NOTE: Extension is NOT yet approved in SwapFacility.");
+        console.log("      A FACTORY_MANAGER_ROLE holder must call:");
+        console.log("      ExtensionFactory.setExtensionType(<proxy>, YIELD_TO_ONE)");
+        console.log("      before swaps against this extension can succeed.");
     }
 }

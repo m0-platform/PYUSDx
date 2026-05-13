@@ -124,8 +124,6 @@ contract ExtensionFactory is
 
         proxy = _deployCreate3BeaconProxy(yieldToOneBeacon, initData, _computeExtensionSalt(msg.sender, extensionName));
 
-        _registerExtension(proxy, ExtensionType.YIELD_TO_ONE);
-
         emit ExtensionDeployed(ExtensionType.YIELD_TO_ONE, proxy, implementation, msg.sender);
     }
 
@@ -153,8 +151,6 @@ contract ExtensionFactory is
 
         proxy = _deployCreate3BeaconProxy(multiMintBeacon, initData, _computeExtensionSalt(msg.sender, extensionName));
 
-        _registerExtension(proxy, ExtensionType.MULTI_MINT);
-
         emit ExtensionDeployed(ExtensionType.MULTI_MINT, proxy, implementation, msg.sender);
     }
 
@@ -164,12 +160,12 @@ contract ExtensionFactory is
         ExtensionType extensionType
     ) external override onlyRole(FACTORY_MANAGER_ROLE) {
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
-        IExtensionFactory.ExtensionType currentType = $.extensionTypes[extension];
+        ExtensionType currentType = $.extensionTypes[extension];
 
         if (currentType == extensionType) return;
 
-        if (extensionType != IExtensionFactory.ExtensionType.NONE) {
-            if (currentType != IExtensionFactory.ExtensionType.NONE) revert ExtensionAlreadyRegistered();
+        if (extensionType != ExtensionType.NONE) {
+            if (currentType != ExtensionType.NONE) revert ExtensionAlreadySet();
             _revertIfInvalidExtension(extension);
         }
 
@@ -207,13 +203,6 @@ contract ExtensionFactory is
     }
 
     /* ============ Internal Interactive Functions ============ */
-
-    /// @dev   Registers an extension in the factory.
-    /// @param proxy         The address of the proxy.
-    /// @param extensionType The type of the extension.
-    function _registerExtension(address proxy, ExtensionType extensionType) internal {
-        _getExtensionFactoryStorage().extensionTypes[proxy] = extensionType;
-    }
 
     /// @dev    Deploys an ExtensionBeaconProxy via CREATE3.
     /// @param  beacon   The beacon address for the proxy.

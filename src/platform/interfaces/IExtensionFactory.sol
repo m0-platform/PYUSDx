@@ -88,8 +88,9 @@ interface IExtensionFactory {
     /// @notice Thrown if the MultiMint beacon address is 0x0.
     error ZeroMultiMintBeacon();
 
-    /// @notice Thrown when attempting to change a registered extension's type to a different non-NONE type.
-    error ExtensionAlreadyRegistered();
+    /// @notice Thrown when attempting to set a different non-NONE type on an extension whose type is already set.
+    ///         Set the extension type to NONE first to clear it, then set the new type.
+    error ExtensionAlreadySet();
 
     /* ============ View/Pure Functions ============ */
 
@@ -132,9 +133,12 @@ interface IExtensionFactory {
     /* ============ Deployment Functions ============ */
 
     /// @notice Deploys a new YieldToOne extension.
-    /// @param  extensionName The name of the extension (determines the deployment address).
-    /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
-    /// @return proxy         The address of the deployed proxy.
+    /// @dev    Deployment is permissionless. The deployed extension's type starts at NONE — it is NOT
+    ///         usable in SwapFacility until a `FACTORY_MANAGER_ROLE` holder calls
+    ///         `setExtensionType(proxy, YIELD_TO_ONE)` to register it.
+    /// @param  extensionName  The name of the extension (determines the deployment address).
+    /// @param  params         The deployment parameters (token name, symbol, roles, etc.).
+    /// @return proxy          The address of the deployed proxy.
     /// @return implementation The address of the deployed implementation.
     function deployYieldToOne(
         string calldata extensionName,
@@ -142,9 +146,12 @@ interface IExtensionFactory {
     ) external returns (address proxy, address implementation);
 
     /// @notice Deploys a new MultiMint extension.
-    /// @param  extensionName The name of the extension (determines the deployment address).
-    /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
-    /// @return proxy         The address of the deployed proxy.
+    /// @dev    Deployment is permissionless. The deployed extension's type starts at NONE — it is NOT
+    ///         usable in SwapFacility until a `FACTORY_MANAGER_ROLE` holder calls
+    ///         `setExtensionType(proxy, MULTI_MINT)` to register it.
+    /// @param  extensionName  The name of the extension (determines the deployment address).
+    /// @param  params         The deployment parameters (token name, symbol, roles, etc.).
+    /// @return proxy          The address of the deployed proxy.
     /// @return implementation The address of the deployed implementation.
     function deployMultiMint(
         string calldata extensionName,
@@ -156,9 +163,9 @@ interface IExtensionFactory {
     /// @notice Sets the extension type for a given extension address. Setting to NONE revokes approval.
     /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.
     ///         Validates the extension via `_revertIfInvalidExtension` when setting to a non-NONE type.
-    ///         Reverts with `ExtensionAlreadyRegistered` when the extension is already registered
+    ///         Reverts with `ExtensionAlreadySet` when the extension's type is already a non-NONE value
     ///         and a different non-NONE type is requested.
-    ///         The extension must be unregistered (set to NONE) before being re-registered at a new type.
+    ///         The extension must be cleared (set to NONE) before being assigned a new non-NONE type.
     /// @param  extension     The address of the extension.
     /// @param  extensionType The extension type to assign (NONE to revoke).
     function setExtensionType(address extension, ExtensionType extensionType) external;
