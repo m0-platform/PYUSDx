@@ -134,9 +134,6 @@ interface IPortal {
     /// @notice Thrown when the bridge adapter address is 0x0.
     error ZeroBridgeAdapter();
 
-    /// @notice Thrown when the payload gas limit is 0.
-    error ZeroPayloadGasLimit();
-
     /// @notice Thrown when the fallback recipient address is 0x0.
     error ZeroFallbackRecipient();
 
@@ -228,8 +225,10 @@ interface IPortal {
     /* ============ Interactive Functions ============ */
 
     /// @notice Sets the gas limit required to process a message on the destination chain.
+    /// @dev    Passing `gasLimit = 0` clears the configured gas limit, which disables `quote` and
+    ///         `transfer` for that destination chain until a non-zero gas limit is set again.
     /// @param  destinationChainId The ID of the destination chain.
-    /// @param  gasLimit           The gas limit required to process the message.
+    /// @param  gasLimit           The gas limit required to process the message, or 0 to unset it.
     function setPayloadGasLimit(uint32 destinationChainId, uint256 gasLimit) external;
 
     /// @notice Sets the default bridge adapter for a destination chain.

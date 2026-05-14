@@ -267,7 +267,6 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     /// @inheritdoc IPortal
     function setPayloadGasLimit(uint32 destinationChainId, uint256 gasLimit) external onlyRole(OPERATOR_ROLE) {
         _revertIfInvalidDestinationChain(destinationChainId);
-        if (gasLimit == 0) revert ZeroPayloadGasLimit();
         ChainConfig storage remoteChainConfig = _getPortalStorageLocation().remoteChainConfig[destinationChainId];
 
         // NOTE: Currently, only one payload type is supported.
