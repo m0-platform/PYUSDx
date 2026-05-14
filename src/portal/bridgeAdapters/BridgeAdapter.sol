@@ -86,12 +86,14 @@ abstract contract BridgeAdapter is IBridgeAdapter, BridgeAdapterStorageLayout, A
         uint32 oldInternalChainId = $.bridgeToInternalChainId[bridgeChainId];
         if (oldInternalChainId != 0 && oldInternalChainId != chainId) {
             delete $.internalToBridgeChainId[oldInternalChainId];
+            emit BridgeChainIdRemoved(oldInternalChainId, bridgeChainId);
         }
 
         // Clean up old reverse mapping if this internal chain was mapped to a different bridge chain
         uint256 oldBridgeChainId = $.internalToBridgeChainId[chainId];
         if (oldBridgeChainId != 0 && oldBridgeChainId != bridgeChainId) {
             delete $.bridgeToInternalChainId[oldBridgeChainId];
+            emit BridgeChainIdRemoved(chainId, oldBridgeChainId);
         }
 
         $.internalToBridgeChainId[chainId] = bridgeChainId;

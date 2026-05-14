@@ -17,6 +17,12 @@ interface IBridgeAdapter {
     /// @param  bridgeChainId The provider-specific chain ID.
     event BridgeChainIdSet(uint32 chainId, uint256 bridgeChainId);
 
+    /// @notice Emitted when a previously configured `(chainId, bridgeChainId)` pair is removed
+    ///         as a side effect of `setBridgeChainId` reassigning either side of the 1-1 mapping.
+    /// @param  chainId       The internal chain ID whose mapping was removed.
+    /// @param  bridgeChainId The provider-specific chain ID whose mapping was removed.
+    event BridgeChainIdRemoved(uint32 chainId, uint256 bridgeChainId);
+
     /* ============ Custom Errors ============ */
 
     /// @notice Thrown when `sendMessage` function caller is not the portal.
