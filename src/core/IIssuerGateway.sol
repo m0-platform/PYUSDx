@@ -123,7 +123,9 @@ interface IIssuerGateway {
     function proposeMint(uint256 amount, address recipient) external returns (uint48 mintId);
 
     /// @notice Executes a proposed mint after the delay has elapsed
-    /// @dev    Only callable by addresses with EXECUTOR_ROLE
+    /// @dev    Only callable by addresses with EXECUTOR_ROLE. Reverts with
+    ///         `AccessControlUnauthorizedAccount` if the original proposer no longer
+    ///         holds OPERATOR_ROLE at execution time.
     /// @param  mintId The unique identifier for the mint proposal
     function mint(uint48 mintId) external;
 
