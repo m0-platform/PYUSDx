@@ -105,6 +105,71 @@ contract RateLimiterTests is BaseTest {
         assertEq(limiter.getRemainingAmount(issuer), 30e6);
     }
 
+    function test_setRateLimit_shrinkThenRestoreWithZeroRefillResetsRemaining() public {
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 10e6, 0, true);
+
+        assertEq(limiter.getRemainingAmount(issuer), 10e6);
+
+        // Shrink: remaining drops to the new (smaller) capacity.
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 5e6, 0, true);
+
+        assertEq(limiter.getRemainingAmount(issuer), 5e6);
+
+        // Restore: remaining tracks the restored capacity, not the prior clamped value.
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 10e6, 0, true);
+
+        assertEq(limiter.getRemainingAmount(issuer), 10e6);
+    }
+
+    function test_setRateLimit_switchToZeroRefillResetsRemaining() public {
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 100e6, 10e6, true);
+
+        limiter.enforceRateLimit(issuer, 50e6);
+        assertEq(limiter.getRemainingAmount(issuer), 50e6);
+
+        // Switching refillPerSecond to 0 resets remaining to capacity regardless of prior consumption.
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 100e6, 0, true);
+
+        assertEq(limiter.getRemainingAmount(issuer), 100e6);
+    }
+
+    function test_setRateLimit_switchFromZeroRefillPreservesRemaining() public {
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 100e6, 0, true);
+
+        limiter.enforceRateLimit(issuer, 50e6);
+        assertEq(limiter.getRemainingAmount(issuer), 50e6);
+
+        // Switching to a non-zero refill rate keeps the prior remaining; the reset is asymmetric
+        // and only fires when the new refillPerSecond is 0.
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 100e6, 10e6, true);
+
+        assertEq(limiter.getRemainingAmount(issuer), 50e6);
+    }
+
+    function test_setRateLimit_disableThenReenableGivesFreshBucket() public {
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 10e6, 0, true);
+
+        limiter.enforceRateLimit(issuer, 10e6);
+        assertEq(limiter.getRemainingAmount(issuer), 0);
+
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 0, 0, false);
+
+        // Disable wipes the bucket; the next enable is a first-time setup with a full bucket at the new capacity.
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 1000e6, 0, true);
+
+        assertEq(limiter.getRemainingAmount(issuer), 1000e6);
+    }
+
     function test_setRateLimit_remove() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10, true);
@@ -150,17 +215,6 @@ contract RateLimiterTests is BaseTest {
 
         vm.prank(manager);
         limiter.setRateLimit(issuer, 0, 0, true);
-    }
-
-    function test_setRateLimit_zeroRefillPerSecond() public {
-        vm.prank(manager);
-        limiter.setRateLimit(issuer, 100e6, 0, true);
-
-        (uint128 capacity, uint128 refillPerSecond) = limiter.getRateLimitConfig(issuer);
-
-        assertEq(capacity, 100e6);
-        assertEq(refillPerSecond, 0);
-        assertEq(limiter.getRemainingAmount(issuer), 100e6);
     }
 
     /* ============ getRateLimitConfig ============ */
