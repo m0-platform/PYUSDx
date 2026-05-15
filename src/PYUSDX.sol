@@ -555,6 +555,18 @@ contract PYUSDX is
         }
     }
 
+    /// @dev   ERC20ExtendedUpgradeable override to block allowance grants when either
+    ///        party is frozen, covering both `approve` and EIP-2612 `permit`.
+    /// @param account The account granting the allowance.
+    /// @param spender The account being approved to spend.
+    /// @param amount  The allowance amount.
+    function _approve(address account, address spender, uint256 amount) internal override {
+        _revertIfFrozen(account);
+        _revertIfFrozen(spender);
+
+        super._approve(account, spender, amount);
+    }
+
     /// @dev   Required override for ERC20ExtendedUpgradeable.
     /// @param sender    The sender's address.
     /// @param recipient The recipient's address.
