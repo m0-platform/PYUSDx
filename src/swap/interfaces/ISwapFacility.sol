@@ -122,12 +122,12 @@ interface ISwapFacility {
     /// @param  recipient   The address to receive PYUSDX tokens.
     function swapOut(address extensionIn, uint256 amount, address recipient) external;
 
-    /// @notice Replaces `amount` of `asset` held in a MultiMint Extension with PYUSDX.
+    /// @notice Replaces `asset` held in a MultiMint Extension with `amount` of PYUSDX.
     /// @param  asset        The address of the asset.
     /// @param  tokenIn      The address of PYUSDX or a PYUSDX extension to provide PYUSDX from.
     /// @param  extensionOut The address of a MultiMint Extension.
     /// @param  amount       The amount of PYUSDX to replace.
-    /// @param  recipient    The address to receive `amount` of `asset` tokens.
+    /// @param  recipient    The address to receive `asset` tokens equivalent to `amount` of PYUSDX.
     function replaceAsset(
         address asset,
         address tokenIn,
@@ -136,12 +136,12 @@ interface ISwapFacility {
         address recipient
     ) external;
 
-    /// @notice Replaces `amount` of `asset` held in a MultiMint Extension with PYUSDX using permit.
+    /// @notice Replaces `asset` held in a MultiMint Extension with `amount` of PYUSDX using permit.
     /// @param  asset        The address of the asset.
     /// @param  tokenIn      The address of PYUSDX or a PYUSDX extension to provide PYUSDX from.
     /// @param  extensionOut The address of a MultiMint Extension.
     /// @param  amount       The amount of PYUSDX to replace.
-    /// @param  recipient    The address to receive `amount` of `asset` tokens.
+    /// @param  recipient    The address to receive `asset` tokens equivalent to `amount` of PYUSDX.
     /// @param  deadline     The last timestamp where the signature is still valid.
     /// @param  v            An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
     /// @param  r            An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
@@ -158,12 +158,12 @@ interface ISwapFacility {
         bytes32 s
     ) external;
 
-    /// @notice Replaces `amount` of `asset` held in a MultiMint Extension with PYUSDX using permit.
+    /// @notice Replaces `asset` held in a MultiMint Extension with `amount` of PYUSDX using permit.
     /// @param  asset        The address of the asset.
     /// @param  tokenIn      The address of PYUSDX or a PYUSDX extension to provide PYUSDX from.
     /// @param  extensionOut The address of a MultiMint Extension.
     /// @param  amount       The amount of PYUSDX to replace.
-    /// @param  recipient    The address to receive `amount` of `asset` tokens.
+    /// @param  recipient    The address to receive `asset` tokens equivalent to `amount` of PYUSDX.
     /// @param  deadline     The last timestamp where the signature is still valid.
     /// @param  signature    An arbitrary signature (EIP-712).
     function replaceAssetWithPermit(

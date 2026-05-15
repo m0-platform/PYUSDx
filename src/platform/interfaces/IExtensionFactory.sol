@@ -122,7 +122,7 @@ interface IExtensionFactory {
     /* ============ Deployment Functions ============ */
 
     /// @notice Deploys a new YieldToOne extension.
-    /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
+    /// @param  extensionName The name of the extension (determines the deployment address).
     /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
     /// @return proxy         The address of the deployed proxy.
     /// @return implementation The address of the deployed implementation.
@@ -132,7 +132,7 @@ interface IExtensionFactory {
     ) external returns (address proxy, address implementation);
 
     /// @notice Deploys a new MultiMint extension.
-    /// @param  extensionName The name of the extension (determines the deployment address, max 32 bytes).
+    /// @param  extensionName The name of the extension (determines the deployment address).
     /// @param  params        The deployment parameters (token name, symbol, roles, etc.).
     /// @return proxy         The address of the deployed proxy.
     /// @return implementation The address of the deployed implementation.
