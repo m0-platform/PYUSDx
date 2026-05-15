@@ -213,7 +213,12 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
     /// @inheritdoc IMultiMint
     function isAllowedToWrap(address asset, uint256 amount) public view returns (bool) {
         if (amount == 0) return false;
-        return assetCap(asset) >= (assetBalanceOf(asset) + amount);
+
+        uint256 extensionAmount = _fromAssetToExtensionAmount(asset, amount);
+        if (extensionAmount == 0) return false;
+
+        uint256 effectiveAmount = _fromExtensionToAssetAmount(asset, extensionAmount);
+        return assetCap(asset) >= (assetBalanceOf(asset) + effectiveAmount);
     }
 
     /// @inheritdoc IMultiMint
@@ -267,6 +272,9 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
 
     /// @dev   Mints extension tokens by pulling `asset` from `msg.sender`.
     ///        Reverts on fee-on-transfer tokens or if the asset cap is reached.
+    ///        For assets with more decimals than the extension, only the
+    ///        non-dust portion is pulled; any dust is left with `msg.sender`
+    ///        so that `assetBalance == totalAssets * factor` always holds.
     /// @param asset     Address of the asset to deposit.
     /// @param account   The original caller (resolved via swap facility).
     /// @param recipient Address that will receive the extension tokens.
@@ -276,30 +284,40 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         _revertIfZeroAccount(recipient);
         _revertIfZeroAmount(amount);
 
-        // Checks asset cap + pause + freeze via 4-arg hook.
-        _beforeWrap(asset, account, recipient, amount);
-
-        uint256 assetBalanceBefore = IERC20Metadata(asset).balanceOf(address(this));
-
-        // Pull asset from caller.
-        IERC20Metadata(asset).safeTransferFrom(msg.sender, address(this), amount);
-
-        // Fee-on-transfer detection.
-        uint256 amountReceived = IERC20Metadata(asset).balanceOf(address(this)) - assetBalanceBefore;
-        if (amountReceived < amount) revert InsufficientAssetReceived(asset, amount, amountReceived);
-
         // Convert to extension decimals and revert if it truncates to zero.
         uint256 extensionAmount = _fromAssetToExtensionAmount(asset, amount);
         _revertIfZeroAmount(extensionAmount);
 
+        // Round amount down to the largest non-dust multiple of factor. For
+        // assets with decimals <= 6 this equals `amount`; for higher decimals
+        // it discards the truncating-division dust so the asset/extension
+        // accounting stays exact across repeated wraps.
+        uint256 effectiveAmount = _fromExtensionToAssetAmount(asset, extensionAmount);
+
+        // Checks asset cap + pause + freeze via 4-arg hook.
+        _beforeWrap(asset, account, recipient, effectiveAmount);
+
+        uint256 assetBalanceBefore = IERC20Metadata(asset).balanceOf(address(this));
+
+        // Pull only the non-dust portion from caller.
+        IERC20Metadata(asset).safeTransferFrom(msg.sender, address(this), effectiveAmount);
+
+        // Fee-on-transfer detection.
+        uint256 amountReceived = IERC20Metadata(asset).balanceOf(address(this)) - assetBalanceBefore;
+
+        if (amountReceived < effectiveAmount) {
+            revert InsufficientAssetReceived(asset, effectiveAmount, amountReceived);
+        }
+
         MultiMintStorage storage $ = _getMultiMintStorage();
 
         // Update non-PYUSDX asset backing.
-        $.assets[asset].balance += UIntMath.safe240(amount);
+        $.assets[asset].balance += UIntMath.safe240(effectiveAmount);
         $.totalAssets += extensionAmount;
+
         _mint(recipient, extensionAmount);
 
-        emit AssetWrapped(asset, amount, recipient, extensionAmount);
+        emit AssetWrapped(asset, effectiveAmount, recipient, extensionAmount);
     }
 
     /// @dev   Pulls PYUSDX from `msg.sender` and sends `asset` from reserves to `recipient`.

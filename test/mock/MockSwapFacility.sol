@@ -46,9 +46,20 @@ contract MockSwapFacility {
 
     function swapInAsset(address extension, address asset, uint256 amount, address recipient) external {
         _locker = msg.sender;
+
+        uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
+
         IERC20(asset).transferFrom(msg.sender, address(this), amount);
         IERC20(asset).approve(extension, amount);
         IMultiMint(extension).wrap(asset, recipient, amount);
+
+        uint256 leftover = IERC20(asset).balanceOf(address(this)) - balanceBefore;
+
+        if (leftover != 0) {
+            IERC20(asset).approve(extension, 0);
+            IERC20(asset).transfer(msg.sender, leftover);
+        }
+
         _locker = address(0);
     }
 

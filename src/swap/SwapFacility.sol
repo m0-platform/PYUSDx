@@ -252,13 +252,24 @@ contract SwapFacility is ISwapFacility, Pausable, ReentrancyLock {
     function _swapInMultiMint(address asset, address extensionOut, uint256 amount, address recipient) internal {
         _revertIfCannotMultiMint(asset, extensionOut);
 
+        uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
+
         // NOTE: Use safeTransferFrom and forceApprove to handle assets that do not return a boolean value.
         // NOTE: Fee-on-transfer tokens are not supported. The full `amount` must be received by the contract.
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(asset).forceApprove(extensionOut, amount);
         IMultiMint(extensionOut).wrap(asset, recipient, amount);
 
-        emit SwappedInMultiMint(asset, extensionOut, amount, recipient);
+        // NOTE: Refund any dust the extension left behind to the caller.
+        uint256 leftover = IERC20(asset).balanceOf(address(this)) - balanceBefore;
+
+        if (leftover != 0) {
+            // NOTE: Clear the residual allowance scoped to this swap.
+            IERC20(asset).forceApprove(extensionOut, 0);
+            IERC20(asset).safeTransfer(msg.sender, leftover);
+        }
+
+        emit SwappedInMultiMint(asset, extensionOut, amount - leftover, recipient);
     }
 
     /// @notice Replaces `asset` held in a MultiMint Extension with `amount` of PYUSDX.
