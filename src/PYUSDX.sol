@@ -98,6 +98,7 @@ contract PYUSDX is
         if (params.admin == address(0)) revert ZeroAdmin();
         if (params.issuer == address(0)) revert ZeroIssuer();
 
+        __AccessControl_init();
         __ERC20ExtendedUpgradeable_init(params.name, params.symbol, 6);
         __ForcedTransferable_init(params.forcedTransferManager);
         __Freezable_init(params.freezeManager);
