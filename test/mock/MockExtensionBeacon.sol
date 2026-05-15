@@ -6,32 +6,32 @@ import { IExtensionBeacon } from "../../src/platform/interfaces/IExtensionBeacon
 /// @title Mock Extension Beacon
 /// @notice A minimal mock implementing IExtensionBeacon for unit tests.
 contract MockExtensionBeacon is IExtensionBeacon {
-    mapping(IExtensionBeacon.ExtensionType => address) private _implementations;
+    mapping(uint256 => address) private _implementations;
+    uint256 private _latestVersion;
+    address private _latestImpl;
 
-    function setImplementation(IExtensionBeacon.ExtensionType extensionType, address impl) external {
-        _implementations[extensionType] = impl;
+    function setImplementation(address implementation_) external {
+        _latestVersion++;
+        _implementations[_latestVersion] = implementation_;
+        _latestImpl = implementation_;
     }
 
-    function registerImplementation(
-        IExtensionBeacon.ExtensionType extensionType,
-        address implementation
-    ) external returns (uint256 version) {
-        _implementations[extensionType] = implementation;
-        version = 1;
+    function registerImplementation(address implementation_) external returns (uint256 version) {
+        _latestVersion++;
+        version = _latestVersion;
+        _implementations[version] = implementation_;
+        _latestImpl = implementation_;
     }
 
-    function implementation(IExtensionBeacon.ExtensionType extensionType) external view returns (address) {
-        return _implementations[extensionType];
+    function implementation() external view returns (address) {
+        return _latestImpl;
     }
 
-    function implementation(
-        IExtensionBeacon.ExtensionType extensionType,
-        uint256 /* version */
-    ) external view returns (address) {
-        return _implementations[extensionType];
+    function implementation(uint256 version) external view returns (address) {
+        return _implementations[version];
     }
 
-    function latestVersion(IExtensionBeacon.ExtensionType) external pure returns (uint256) {
+    function latestVersion() external pure returns (uint256) {
         return 1;
     }
 

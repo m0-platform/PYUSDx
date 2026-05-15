@@ -20,8 +20,7 @@ contract ExtensionBeaconTest is BaseTest {
     MockSwapFacility public swapFacility;
     ExtensionBeacon public beacon;
 
-    MockPYUSDXExtension public ytoImpl;
-    MockPYUSDXExtension public mmImpl;
+    MockPYUSDXExtension public impl;
 
     // ERC-1967 implementation slot
     bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
@@ -32,22 +31,15 @@ contract ExtensionBeaconTest is BaseTest {
         pyusdx = new MockERC20("PYUSDX", "PYUSDX", 6);
         swapFacility = new MockSwapFacility(address(pyusdx));
 
-        // Deploy mock implementations
-        ytoImpl = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
-        mmImpl = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
+        // Deploy mock implementation
+        impl = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
 
         // Deploy ExtensionBeacon behind TransparentProxy
         beacon = ExtensionBeacon(
             UnsafeUpgrades.deployTransparentProxy(
                 address(new ExtensionBeacon(address(pyusdx), address(swapFacility))),
                 admin,
-                abi.encodeWithSelector(
-                    ExtensionBeacon.initialize.selector,
-                    admin,
-                    beaconManager,
-                    address(ytoImpl),
-                    address(mmImpl)
-                )
+                abi.encodeWithSelector(ExtensionBeacon.initialize.selector, admin, beaconManager, address(impl))
             )
         );
     }
@@ -63,21 +55,14 @@ contract ExtensionBeaconTest is BaseTest {
         address swapFacility_,
         address admin_,
         address beaconManager_,
-        address ytoImpl_,
-        address mmImpl_
+        address initialImpl_
     ) internal returns (ExtensionBeacon) {
         return
             ExtensionBeacon(
                 UnsafeUpgrades.deployTransparentProxy(
                     _deployBeaconImpl(pyusdx_, swapFacility_),
                     admin_,
-                    abi.encodeWithSelector(
-                        ExtensionBeacon.initialize.selector,
-                        admin_,
-                        beaconManager_,
-                        ytoImpl_,
-                        mmImpl_
-                    )
+                    abi.encodeWithSelector(ExtensionBeacon.initialize.selector, admin_, beaconManager_, initialImpl_)
                 )
             );
     }
@@ -110,112 +95,50 @@ contract ExtensionBeaconTest is BaseTest {
     /* ============ initialize ============ */
 
     function test_initialize_zeroAdmin() public {
-        address impl = _deployBeaconImpl(address(pyusdx), address(swapFacility));
+        address impl_ = _deployBeaconImpl(address(pyusdx), address(swapFacility));
 
         vm.expectRevert(IExtensionBeacon.ZeroAdmin.selector);
         UnsafeUpgrades.deployTransparentProxy(
-            impl,
+            impl_,
             admin,
-            abi.encodeWithSelector(
-                ExtensionBeacon.initialize.selector,
-                address(0),
-                beaconManager,
-                address(ytoImpl),
-                address(mmImpl)
-            )
+            abi.encodeWithSelector(ExtensionBeacon.initialize.selector, address(0), beaconManager, address(impl))
         );
     }
 
     function test_initialize_zeroBeaconManager() public {
-        address impl = _deployBeaconImpl(address(pyusdx), address(swapFacility));
+        address impl_ = _deployBeaconImpl(address(pyusdx), address(swapFacility));
 
         vm.expectRevert(IExtensionBeacon.ZeroBeaconManager.selector);
         UnsafeUpgrades.deployTransparentProxy(
-            impl,
+            impl_,
             admin,
-            abi.encodeWithSelector(
-                ExtensionBeacon.initialize.selector,
-                admin,
-                address(0),
-                address(ytoImpl),
-                address(mmImpl)
-            )
+            abi.encodeWithSelector(ExtensionBeacon.initialize.selector, admin, address(0), address(impl))
         );
     }
 
-    function test_initialize_zeroYieldToOneImplementation() public {
-        address impl = _deployBeaconImpl(address(pyusdx), address(swapFacility));
+    function test_initialize_zeroImplementation() public {
+        address impl_ = _deployBeaconImpl(address(pyusdx), address(swapFacility));
 
         vm.expectRevert(IExtensionBeacon.ZeroImplementation.selector);
         UnsafeUpgrades.deployTransparentProxy(
-            impl,
+            impl_,
             admin,
-            abi.encodeWithSelector(
-                ExtensionBeacon.initialize.selector,
-                admin,
-                beaconManager,
-                address(0),
-                address(mmImpl)
-            )
+            abi.encodeWithSelector(ExtensionBeacon.initialize.selector, admin, beaconManager, address(0))
         );
     }
 
-    function test_initialize_zeroMultiMintImplementation() public {
-        address impl = _deployBeaconImpl(address(pyusdx), address(swapFacility));
-
-        vm.expectRevert(IExtensionBeacon.ZeroImplementation.selector);
-        UnsafeUpgrades.deployTransparentProxy(
-            impl,
-            admin,
-            abi.encodeWithSelector(
-                ExtensionBeacon.initialize.selector,
-                admin,
-                beaconManager,
-                address(ytoImpl),
-                address(0)
-            )
-        );
-    }
-
-    function test_initialize_invalidYieldToOneImplementation() public {
+    function test_initialize_invalidImplementation() public {
         MockERC20 wrongPyusdx = new MockERC20("Wrong", "WRONG", 6);
         MockSwapFacility wrongSwap = new MockSwapFacility(address(wrongPyusdx));
         MockPYUSDXExtension badImpl = new MockPYUSDXExtension(address(wrongPyusdx), address(wrongSwap));
 
-        address impl = _deployBeaconImpl(address(pyusdx), address(swapFacility));
+        address impl_ = _deployBeaconImpl(address(pyusdx), address(swapFacility));
 
         vm.expectRevert(IExtensionBeacon.InvalidExtension.selector);
         UnsafeUpgrades.deployTransparentProxy(
-            impl,
+            impl_,
             admin,
-            abi.encodeWithSelector(
-                ExtensionBeacon.initialize.selector,
-                admin,
-                beaconManager,
-                address(badImpl),
-                address(mmImpl)
-            )
-        );
-    }
-
-    function test_initialize_invalidMultiMintImplementation() public {
-        MockERC20 wrongPyusdx = new MockERC20("Wrong", "WRONG", 6);
-        MockSwapFacility wrongSwap = new MockSwapFacility(address(wrongPyusdx));
-        MockPYUSDXExtension badImpl = new MockPYUSDXExtension(address(wrongPyusdx), address(wrongSwap));
-
-        address impl = _deployBeaconImpl(address(pyusdx), address(swapFacility));
-
-        vm.expectRevert(IExtensionBeacon.InvalidExtension.selector);
-        UnsafeUpgrades.deployTransparentProxy(
-            impl,
-            admin,
-            abi.encodeWithSelector(
-                ExtensionBeacon.initialize.selector,
-                admin,
-                beaconManager,
-                address(ytoImpl),
-                address(badImpl)
-            )
+            abi.encodeWithSelector(ExtensionBeacon.initialize.selector, admin, beaconManager, address(badImpl))
         );
     }
 
@@ -226,16 +149,14 @@ contract ExtensionBeaconTest is BaseTest {
         assertFalse(beacon.hasRole(BEACON_MANAGER_ROLE, other));
     }
 
-    function test_initialize_registersImplementations() public view {
-        assertEq(beacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), address(ytoImpl));
-        assertEq(beacon.implementation(IExtensionBeacon.ExtensionType.MULTI_MINT), address(mmImpl));
-        assertEq(beacon.latestVersion(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), 1);
-        assertEq(beacon.latestVersion(IExtensionBeacon.ExtensionType.MULTI_MINT), 1);
+    function test_initialize_registersImplementation() public view {
+        assertEq(beacon.implementation(), address(impl));
+        assertEq(beacon.latestVersion(), 1);
     }
 
     function test_initialize_alreadyInitialized() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        beacon.initialize(admin, beaconManager, address(ytoImpl), address(mmImpl));
+        beacon.initialize(admin, beaconManager, address(impl));
     }
 
     /* ============ registerImplementation ============ */
@@ -244,11 +165,11 @@ contract ExtensionBeaconTest is BaseTest {
         MockPYUSDXExtension newImpl = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
 
         vm.prank(beaconManager);
-        uint256 version = beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(newImpl));
+        uint256 version = beacon.registerImplementation(address(newImpl));
 
         assertEq(version, 2);
-        assertEq(beacon.latestVersion(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), 2);
-        assertEq(beacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), address(newImpl));
+        assertEq(beacon.latestVersion(), 2);
+        assertEq(beacon.implementation(), address(newImpl));
     }
 
     function test_registerImplementation_autoIncrement() public {
@@ -256,16 +177,16 @@ contract ExtensionBeaconTest is BaseTest {
         MockPYUSDXExtension impl3 = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
 
         vm.startPrank(beaconManager);
-        uint256 v2 = beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(impl2));
-        uint256 v3 = beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(impl3));
+        uint256 v2 = beacon.registerImplementation(address(impl2));
+        uint256 v3 = beacon.registerImplementation(address(impl3));
         vm.stopPrank();
 
         assertEq(v2, 2);
         assertEq(v3, 3);
-        assertEq(beacon.latestVersion(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), 3);
-        assertEq(beacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, 1), address(ytoImpl));
-        assertEq(beacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, 2), address(impl2));
-        assertEq(beacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, 3), address(impl3));
+        assertEq(beacon.latestVersion(), 3);
+        assertEq(beacon.implementation(1), address(impl));
+        assertEq(beacon.implementation(2), address(impl2));
+        assertEq(beacon.implementation(3), address(impl3));
     }
 
     function test_registerImplementation_accessControl() public {
@@ -275,21 +196,13 @@ contract ExtensionBeaconTest is BaseTest {
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, other, BEACON_MANAGER_ROLE)
         );
-        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(newImpl));
-    }
-
-    function test_registerImplementation_invalidType() public {
-        MockPYUSDXExtension newImpl = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
-
-        vm.prank(beaconManager);
-        vm.expectRevert(IExtensionBeacon.InvalidExtensionType.selector);
-        beacon.registerImplementation(IExtensionBeacon.ExtensionType.NONE, address(newImpl));
+        beacon.registerImplementation(address(newImpl));
     }
 
     function test_registerImplementation_zeroAddress() public {
         vm.prank(beaconManager);
         vm.expectRevert(IExtensionBeacon.ZeroImplementation.selector);
-        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(0));
+        beacon.registerImplementation(address(0));
     }
 
     function test_registerImplementation_wrongWiring() public {
@@ -299,63 +212,65 @@ contract ExtensionBeaconTest is BaseTest {
 
         vm.prank(beaconManager);
         vm.expectRevert(IExtensionBeacon.InvalidExtension.selector);
-        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(badImpl));
+        beacon.registerImplementation(address(badImpl));
     }
 
     function test_registerImplementation_nonContract() public {
         address eoa = makeAddr("eoa");
 
         vm.prank(beaconManager);
-        // Non-contract addresses cause a low-level revert when trying to call pyusdx()
         vm.expectRevert();
-        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, eoa);
+        beacon.registerImplementation(eoa);
     }
 
     /* ============ implementation ============ */
 
-    function test_implementation_returnsLatest() public {
+    function test_implementation_zeroArg_returnsLatest() public {
         MockPYUSDXExtension impl2 = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
         MockPYUSDXExtension impl3 = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
 
         vm.startPrank(beaconManager);
-        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(impl2));
-        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(impl3));
+        beacon.registerImplementation(address(impl2));
+        beacon.registerImplementation(address(impl3));
         vm.stopPrank();
 
-        assertEq(beacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), address(impl3));
+        assertEq(beacon.implementation(), address(impl3));
     }
 
     function test_implementation_specificVersion() public {
         MockPYUSDXExtension impl2 = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
 
         vm.prank(beaconManager);
-        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(impl2));
+        beacon.registerImplementation(address(impl2));
 
-        assertEq(beacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, 1), address(ytoImpl));
-        assertEq(beacon.implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, 2), address(impl2));
+        assertEq(beacon.implementation(1), address(impl));
+        assertEq(beacon.implementation(2), address(impl2));
     }
 
     function test_implementation_noImplRegistered() public {
-        // Deploy a fresh beacon with no implementations registered for NONE type
-        // NONE type is never registered during initialize
-        vm.expectRevert(IExtensionBeacon.NoImplementationRegistered.selector);
-        beacon.implementation(IExtensionBeacon.ExtensionType.NONE);
+        // Deploy a fresh beacon with no implementations
+        ExtensionBeacon freshBeacon = ExtensionBeacon(
+            UnsafeUpgrades.deployTransparentProxy(
+                _deployBeaconImpl(address(pyusdx), address(swapFacility)),
+                admin,
+                abi.encodeWithSelector(ExtensionBeacon.initialize.selector, admin, beaconManager, address(impl))
+            )
+        );
 
-        // Also test the two-arg version
+        // Version 99 doesn't exist
         vm.expectRevert(IExtensionBeacon.NoImplementationRegistered.selector);
-        beacon.implementation(IExtensionBeacon.ExtensionType.NONE, 1);
+        freshBeacon.implementation(99);
     }
 
     /* ============ latestVersion ============ */
 
     function test_latestVersion() public {
-        MockPYUSDXExtension newYto = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
+        MockPYUSDXExtension newImpl = new MockPYUSDXExtension(address(pyusdx), address(swapFacility));
 
         vm.prank(beaconManager);
-        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(newYto));
+        beacon.registerImplementation(address(newImpl));
 
-        assertEq(beacon.latestVersion(IExtensionBeacon.ExtensionType.YIELD_TO_ONE), 2);
-        assertEq(beacon.latestVersion(IExtensionBeacon.ExtensionType.MULTI_MINT), 1);
+        assertEq(beacon.latestVersion(), 2);
     }
 
     /* ============ events ============ */
@@ -367,20 +282,15 @@ contract ExtensionBeaconTest is BaseTest {
         emit IERC1967.Upgraded(address(newImpl));
 
         vm.expectEmit(true, true, true, true);
-        emit IExtensionBeacon.ImplementationRegistered(
-            IExtensionBeacon.ExtensionType.YIELD_TO_ONE,
-            2,
-            address(newImpl)
-        );
+        emit IExtensionBeacon.ImplementationRegistered(2, address(newImpl));
 
         vm.prank(beaconManager);
-        beacon.registerImplementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, address(newImpl));
+        beacon.registerImplementation(address(newImpl));
     }
 
     /* ============ storage ============ */
 
     function test_storageLocation() public pure {
-        // Formula: keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXExtensionBeacon")) - 1)) & ~bytes32(uint256(0xff))
         bytes32 expected = keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXExtensionBeacon")) - 1)) &
             ~bytes32(uint256(0xff));
         bytes32 actual = 0xea0c2eec9f3cb72c51d142ff5c076f11b507be969141547f15f83f9b92f55900;

@@ -40,9 +40,12 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address layerZeroBridgeAdapterProxy;
         address layerZeroBridgeAdapterProxyAdmin;
         address layerZeroBridgeAdapterImplementation;
-        address beaconProxy;
-        address beaconProxyAdmin;
-        address beaconImplementation;
+        address yieldToOneBeaconProxy;
+        address yieldToOneBeaconProxyAdmin;
+        address yieldToOneBeaconImplementation;
+        address multiMintBeaconProxy;
+        address multiMintBeaconProxyAdmin;
+        address multiMintBeaconImplementation;
         address factoryProxy;
         address factoryProxyAdmin;
         address factoryImplementation;
@@ -128,11 +131,13 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address deployer,
         address pyusdxProxy,
         address swapFacilityProxy,
-        address extensionBeaconProxy,
+        address yieldToOneBeaconProxy,
+        address multiMintBeaconProxy,
         FactoryConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
-        // NOTE: SwapFacility must already be deployed since constructor calls ISwapFacility(swapFacility).pyusdx()
-        implementation = address(new ExtensionFactory(pyusdxProxy, swapFacilityProxy, extensionBeaconProxy));
+        implementation = address(
+            new ExtensionFactory(pyusdxProxy, swapFacilityProxy, yieldToOneBeaconProxy, multiMintBeaconProxy)
+        );
 
         proxy = _deployCreate3TransparentProxy(
             implementation,
@@ -148,8 +153,8 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address deployer,
         address pyusdxProxy,
         address swapFacilityProxy,
-        address yieldToOneImpl,
-        address multiMintImpl,
+        address initialImpl,
+        string memory saltSuffix,
         FactoryConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
         implementation = address(new ExtensionBeacon(pyusdxProxy, swapFacilityProxy));
@@ -161,10 +166,9 @@ contract DeployBase is DeployHelpers, ScriptBase {
                 ExtensionBeacon.initialize.selector,
                 config.admin,
                 config.factoryManager,
-                yieldToOneImpl,
-                multiMintImpl
+                initialImpl
             ),
-            _computeSalt(deployer, "ExtensionBeacon")
+            _computeSalt(deployer, saltSuffix)
         );
 
         proxyAdmin = Upgrades.getAdminAddress(proxy);
@@ -303,23 +307,41 @@ contract DeployBase is DeployHelpers, ScriptBase {
         address yieldToOneImpl = address(new YieldToOne(deployment.pyusdxProxy, deployment.swapFacilityProxy));
         address multiMintImpl = address(new MultiMint(deployment.pyusdxProxy, deployment.swapFacilityProxy));
 
-        // 8. Deploy ExtensionBeacon behind TUP
-        (deployment.beaconProxy, deployment.beaconProxyAdmin, deployment.beaconImplementation) = _deployBeacon(
+        // 8. Deploy two separate ExtensionBeacons behind Transparent Upgradeable Proxies
+        (
+            deployment.yieldToOneBeaconProxy,
+            deployment.yieldToOneBeaconProxyAdmin,
+            deployment.yieldToOneBeaconImplementation
+        ) = _deployBeacon(
             deployer,
             deployment.pyusdxProxy,
             deployment.swapFacilityProxy,
             yieldToOneImpl,
-            multiMintImpl,
+            "PYUSDXYieldToOneBeacon",
             factoryConfig
         );
 
-        // 9. Deploy Factory (implementation needs actual PYUSDX + SwapFacility + beacon proxies)
+        (
+            deployment.multiMintBeaconProxy,
+            deployment.multiMintBeaconProxyAdmin,
+            deployment.multiMintBeaconImplementation
+        ) = _deployBeacon(
+            deployer,
+            deployment.pyusdxProxy,
+            deployment.swapFacilityProxy,
+            multiMintImpl,
+            "PYUSDXMultiMintBeacon",
+            factoryConfig
+        );
+
+        // 9. Deploy Factory (implementation needs actual PYUSDX + SwapFacility + both beacon proxies)
         //    Constructor validates swapFacility.pyusdx(), so SwapFacility must be deployed first
         (deployment.factoryProxy, deployment.factoryProxyAdmin, deployment.factoryImplementation) = _deployFactory(
             deployer,
             deployment.pyusdxProxy,
             deployment.swapFacilityProxy,
-            deployment.beaconProxy,
+            deployment.yieldToOneBeaconProxy,
+            deployment.multiMintBeaconProxy,
             factoryConfig
         );
 

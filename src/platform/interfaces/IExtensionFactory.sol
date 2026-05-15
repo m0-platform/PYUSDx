@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
-import { IExtensionBeacon } from "./IExtensionBeacon.sol";
-
 /// @title  PYUSDX Extension Factory interface.
 /// @author M0 Labs
 interface IExtensionFactory {
+    /* ============ Enums ============ */
+
+    /// @notice The type of PYUSDX extension.
+    enum ExtensionType {
+        NONE,
+        YIELD_TO_ONE,
+        MULTI_MINT
+    }
+
     /* ============ Structs ============ */
 
     /// @notice Parameters for deploying a YieldToOne extension.
@@ -41,7 +48,7 @@ interface IExtensionFactory {
     /// @param  implementation The address of the implementation contract.
     /// @param  deployer       The address that deployed the extension.
     event ExtensionDeployed(
-        IExtensionBeacon.ExtensionType indexed extensionType,
+        ExtensionType indexed extensionType,
         address proxy,
         address indexed implementation,
         address indexed deployer
@@ -50,7 +57,7 @@ interface IExtensionFactory {
     /// @notice Emitted when an extension's type is set (or cleared to NONE).
     /// @param  extension     The address of the extension.
     /// @param  extensionType The new extension type.
-    event ExtensionTypeSet(address indexed extension, IExtensionBeacon.ExtensionType indexed extensionType);
+    event ExtensionTypeSet(address indexed extension, ExtensionType indexed extensionType);
 
     /* ============ Errors ============ */
 
@@ -75,14 +82,14 @@ interface IExtensionFactory {
     /// @notice Thrown if the extension address is invalid (e.g. wrong pyusdx/swapFacility wiring).
     error InvalidExtension();
 
-    /// @notice Thrown if the extension type is invalid for setting implementation.
-    error InvalidExtensionType();
+    /// @notice Thrown if the YieldToOne beacon address is 0x0.
+    error ZeroYieldToOneBeacon();
+
+    /// @notice Thrown if the MultiMint beacon address is 0x0.
+    error ZeroMultiMintBeacon();
 
     /// @notice Thrown when attempting to change a registered extension's type to a different non-NONE type.
     error ExtensionAlreadyRegistered();
-
-    /// @notice Thrown if the extension beacon address is 0x0.
-    error ZeroExtensionBeacon();
 
     /* ============ View/Pure Functions ============ */
 
@@ -98,12 +105,12 @@ interface IExtensionFactory {
     /// @notice Returns the extension type for a given extension address.
     /// @param  extension The address of the extension.
     /// @return The extension type (NONE if not registered).
-    function getExtensionType(address extension) external view returns (IExtensionBeacon.ExtensionType);
+    function getExtensionType(address extension) external view returns (ExtensionType);
 
-    /// @notice Returns the cached implementation address for a given extension type.
+    /// @notice Returns the latest implementation address for a given extension type.
     /// @param  extensionType The type of extension.
     /// @return The implementation address.
-    function getImplementation(IExtensionBeacon.ExtensionType extensionType) external view returns (address);
+    function getImplementation(ExtensionType extensionType) external view returns (address);
 
     /// @notice Returns true if the extension is approved (active).
     /// @param  extension The address of the extension to check.
@@ -116,8 +123,11 @@ interface IExtensionFactory {
     /// @notice The address of the SwapFacility contract.
     function swapFacility() external view returns (address);
 
-    /// @notice The address of the ExtensionBeacon contract.
-    function extensionBeacon() external view returns (address);
+    /// @notice The address of the YieldToOne beacon contract.
+    function yieldToOneBeacon() external view returns (address);
+
+    /// @notice The address of the MultiMint beacon contract.
+    function multiMintBeacon() external view returns (address);
 
     /* ============ Deployment Functions ============ */
 
@@ -151,5 +161,5 @@ interface IExtensionFactory {
     ///         The extension must be unregistered (set to NONE) before being re-registered at a new type.
     /// @param  extension     The address of the extension.
     /// @param  extensionType The extension type to assign (NONE to revoke).
-    function setExtensionType(address extension, IExtensionBeacon.ExtensionType extensionType) external;
+    function setExtensionType(address extension, ExtensionType extensionType) external;
 }

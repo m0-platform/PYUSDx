@@ -17,7 +17,7 @@ import { IExtensionFactory } from "./interfaces/IExtensionFactory.sol";
 abstract contract ExtensionFactoryStorageLayout {
     /// @custom:storage-location erc7201:M0.storage.PYUSDXExtensionFactory
     struct ExtensionFactoryStorage {
-        mapping(address extension => IExtensionBeacon.ExtensionType extensionType) extensionTypes;
+        mapping(address extension => IExtensionFactory.ExtensionType extensionType) extensionTypes;
     }
 
     // keccak256(abi.encode(uint256(keccak256("M0.storage.PYUSDXExtensionFactory")) - 1)) & ~bytes32(uint256(0xff))
@@ -35,7 +35,7 @@ abstract contract ExtensionFactoryStorageLayout {
 /// @title  Extension Factory
 /// @notice A factory contract for deploying and registering PYUSDX extensions (YieldToOne, MultiMint).
 ///         Serves as the single source of truth for extension approval in the SwapFacility.
-///         Uses an ExtensionBeacon for implementation resolution, deploying ExtensionBeaconProxy instances.
+///         Uses separate ExtensionBeacon instances for each extension type, deploying ExtensionBeaconProxy instances.
 /// @author M0 Labs
 contract ExtensionFactory is
     IExtensionFactory,
@@ -59,7 +59,11 @@ contract ExtensionFactory is
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     /// @inheritdoc IExtensionFactory
-    address public immutable override extensionBeacon;
+    address public immutable override yieldToOneBeacon;
+
+    /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
+    /// @inheritdoc IExtensionFactory
+    address public immutable override multiMintBeacon;
 
     /* ============ Constructor ============ */
 
@@ -68,14 +72,16 @@ contract ExtensionFactory is
     /// @dev    Sets immutable storage and validates wiring.
     /// @param  pyusdx_            The address of the PYUSDX token.
     /// @param  swapFacility_      The address of the SwapFacility contract.
-    /// @param  extensionBeacon_   The address of the ExtensionBeacon contract.
-    constructor(address pyusdx_, address swapFacility_, address extensionBeacon_) {
+    /// @param  yieldToOneBeacon_  The address of the YieldToOne ExtensionBeacon contract.
+    /// @param  multiMintBeacon_   The address of the MultiMint ExtensionBeacon contract.
+    constructor(address pyusdx_, address swapFacility_, address yieldToOneBeacon_, address multiMintBeacon_) {
         _disableInitializers();
 
         if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDX();
         if ((swapFacility = swapFacility_) == address(0)) revert ZeroSwapFacility();
         if (pyusdx != ISwapFacility(swapFacility).pyusdx()) revert PYUSDXMismatch();
-        if ((extensionBeacon = extensionBeacon_) == address(0)) revert ZeroExtensionBeacon();
+        if ((yieldToOneBeacon = yieldToOneBeacon_) == address(0)) revert ZeroYieldToOneBeacon();
+        if ((multiMintBeacon = multiMintBeacon_) == address(0)) revert ZeroMultiMintBeacon();
     }
 
     /* ============ Initializer ============ */
@@ -102,7 +108,7 @@ contract ExtensionFactory is
     ) external returns (address proxy, address implementation) {
         _revertIfZeroAdmin(params.admin);
 
-        implementation = IExtensionBeacon(extensionBeacon).implementation(IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
+        implementation = IExtensionBeacon(yieldToOneBeacon).implementation();
 
         bytes memory initData = abi.encodeWithSelector(
             YieldToOne.initialize.selector,
@@ -116,16 +122,11 @@ contract ExtensionFactory is
             params.versionManager
         );
 
-        // NOTE: Deploy at a predicted address using CREATE3, reverts when same deployer + extensionName.
-        proxy = _deployCreate3BeaconProxy(
-            IExtensionBeacon.ExtensionType.YIELD_TO_ONE,
-            initData,
-            _computeExtensionSalt(msg.sender, extensionName)
-        );
+        proxy = _deployCreate3BeaconProxy(yieldToOneBeacon, initData, _computeExtensionSalt(msg.sender, extensionName));
 
-        _registerExtension(proxy, IExtensionBeacon.ExtensionType.YIELD_TO_ONE);
+        _registerExtension(proxy, ExtensionType.YIELD_TO_ONE);
 
-        emit ExtensionDeployed(IExtensionBeacon.ExtensionType.YIELD_TO_ONE, proxy, implementation, msg.sender);
+        emit ExtensionDeployed(ExtensionType.YIELD_TO_ONE, proxy, implementation, msg.sender);
     }
 
     /// @inheritdoc IExtensionFactory
@@ -135,7 +136,7 @@ contract ExtensionFactory is
     ) external returns (address proxy, address implementation) {
         _revertIfZeroAdmin(params.admin);
 
-        implementation = IExtensionBeacon(extensionBeacon).implementation(IExtensionBeacon.ExtensionType.MULTI_MINT);
+        implementation = IExtensionBeacon(multiMintBeacon).implementation();
 
         bytes memory initData = abi.encodeWithSelector(
             MultiMint.initialize.selector,
@@ -150,30 +151,25 @@ contract ExtensionFactory is
             params.versionManager
         );
 
-        // NOTE: Deploy at a predicted address using CREATE3, reverts when same deployer + extensionName.
-        proxy = _deployCreate3BeaconProxy(
-            IExtensionBeacon.ExtensionType.MULTI_MINT,
-            initData,
-            _computeExtensionSalt(msg.sender, extensionName)
-        );
+        proxy = _deployCreate3BeaconProxy(multiMintBeacon, initData, _computeExtensionSalt(msg.sender, extensionName));
 
-        _registerExtension(proxy, IExtensionBeacon.ExtensionType.MULTI_MINT);
+        _registerExtension(proxy, ExtensionType.MULTI_MINT);
 
-        emit ExtensionDeployed(IExtensionBeacon.ExtensionType.MULTI_MINT, proxy, implementation, msg.sender);
+        emit ExtensionDeployed(ExtensionType.MULTI_MINT, proxy, implementation, msg.sender);
     }
 
     /// @inheritdoc IExtensionFactory
     function setExtensionType(
         address extension,
-        IExtensionBeacon.ExtensionType extensionType
+        ExtensionType extensionType
     ) external override onlyRole(FACTORY_MANAGER_ROLE) {
         ExtensionFactoryStorage storage $ = _getExtensionFactoryStorage();
-        IExtensionBeacon.ExtensionType currentType = $.extensionTypes[extension];
+        IExtensionFactory.ExtensionType currentType = $.extensionTypes[extension];
 
         if (currentType == extensionType) return;
 
-        if (extensionType != IExtensionBeacon.ExtensionType.NONE) {
-            if (currentType != IExtensionBeacon.ExtensionType.NONE) revert ExtensionAlreadyRegistered();
+        if (extensionType != IExtensionFactory.ExtensionType.NONE) {
+            if (currentType != IExtensionFactory.ExtensionType.NONE) revert ExtensionAlreadyRegistered();
             _revertIfInvalidExtension(extension);
         }
 
@@ -190,18 +186,24 @@ contract ExtensionFactory is
     }
 
     /// @inheritdoc IExtensionFactory
-    function getExtensionType(address extension) external view override returns (IExtensionBeacon.ExtensionType) {
+    function getExtensionType(address extension) external view override returns (ExtensionType) {
         return _getExtensionFactoryStorage().extensionTypes[extension];
     }
 
     /// @inheritdoc IExtensionFactory
-    function getImplementation(IExtensionBeacon.ExtensionType extensionType) external view override returns (address) {
-        return IExtensionBeacon(extensionBeacon).implementation(extensionType);
+    function getImplementation(ExtensionType extensionType) external view override returns (address) {
+        if (extensionType == ExtensionType.YIELD_TO_ONE) {
+            return IExtensionBeacon(yieldToOneBeacon).implementation();
+        } else if (extensionType == ExtensionType.MULTI_MINT) {
+            return IExtensionBeacon(multiMintBeacon).implementation();
+        }
+
+        revert InvalidExtension();
     }
 
     /// @inheritdoc IExtensionFactory
     function isApprovedExtension(address extension) public view override returns (bool) {
-        return _getExtensionFactoryStorage().extensionTypes[extension] != IExtensionBeacon.ExtensionType.NONE;
+        return _getExtensionFactoryStorage().extensionTypes[extension] != ExtensionType.NONE;
     }
 
     /* ============ Internal Interactive Functions ============ */
@@ -209,24 +211,17 @@ contract ExtensionFactory is
     /// @dev   Registers an extension in the factory.
     /// @param proxy         The address of the proxy.
     /// @param extensionType The type of the extension.
-    function _registerExtension(address proxy, IExtensionBeacon.ExtensionType extensionType) internal {
+    function _registerExtension(address proxy, ExtensionType extensionType) internal {
         _getExtensionFactoryStorage().extensionTypes[proxy] = extensionType;
     }
 
     /// @dev    Deploys an ExtensionBeaconProxy via CREATE3.
-    /// @param  extensionType The extension type for the proxy.
-    /// @param  initData      The initializer calldata.
-    /// @param  salt          The CREATE3 salt.
-    /// @return proxy         The address of the deployed proxy.
-    function _deployCreate3BeaconProxy(
-        IExtensionBeacon.ExtensionType extensionType,
-        bytes memory initData,
-        bytes32 salt
-    ) internal returns (address) {
-        bytes memory initCode = abi.encodePacked(
-            type(ExtensionBeaconProxy).creationCode,
-            abi.encode(extensionBeacon, extensionType, initData)
-        );
+    /// @param  beacon   The beacon address for the proxy.
+    /// @param  initData The initializer calldata.
+    /// @param  salt     The CREATE3 salt.
+    /// @return proxy    The address of the deployed proxy.
+    function _deployCreate3BeaconProxy(address beacon, bytes memory initData, bytes32 salt) internal returns (address) {
+        bytes memory initCode = abi.encodePacked(type(ExtensionBeaconProxy).creationCode, abi.encode(beacon, initData));
 
         return _deployCreate3(initCode, salt);
     }
@@ -234,11 +229,6 @@ contract ExtensionFactory is
     /* ============ Internal View Functions ============ */
 
     /// @dev    Computes a deployer-namespaced salt whose first 20 bytes match `address(this)`.
-    ///         This ensures CreateX's `_guard` takes the `SenderBytes.MsgSender` path (since
-    ///         the Factory is CreateX's `msg.sender`), while the deployer-specific hash in
-    ///         bytes 21-31 provides per-deployer uniqueness.
-    ///         Note: the salt is scoped to deployer+name only, not extension type — the same
-    ///         extensionName cannot be reused across YieldToOne and MultiMint by the same deployer.
     /// @param  deployer      The address of the deployer (e.g. `msg.sender` in deploy functions).
     /// @param  extensionName The human-readable extension name.
     /// @return The computed salt.

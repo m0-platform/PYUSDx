@@ -47,7 +47,8 @@ abstract contract IntegrationForkTest is BaseForkTest {
     IssuerGateway public issuerGateway;
     SwapFacility public swapFacility;
     ExtensionFactory public factory;
-    ExtensionBeacon public extensionBeacon;
+    ExtensionBeacon public yieldToOneBeacon;
+    ExtensionBeacon public multiMintBeacon;
     Portal public portal;
     LayerZeroBridgeAdapter public layerZeroBridgeAdapter;
 
@@ -105,7 +106,8 @@ abstract contract IntegrationForkTest is BaseForkTest {
         issuerGateway = IssuerGateway(deployments_.issuerGatewayProxy);
         swapFacility = SwapFacility(deployments_.swapFacilityProxy);
         factory = ExtensionFactory(deployments_.factoryProxy);
-        extensionBeacon = ExtensionBeacon(deployments_.beaconProxy);
+        yieldToOneBeacon = ExtensionBeacon(deployments_.yieldToOneBeaconProxy);
+        multiMintBeacon = ExtensionBeacon(deployments_.multiMintBeaconProxy);
         portal = Portal(deployments_.portalProxy);
         layerZeroBridgeAdapter = LayerZeroBridgeAdapter(deployments_.layerZeroBridgeAdapterProxy);
         _coreDeployments = deployments_;
