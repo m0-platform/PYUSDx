@@ -455,6 +455,9 @@ contract PYUSDX is
             $.accounts[account].balance += yieldWithFee;
         }
 
+        // NOTE: Refresh `lastIndex` and `lastUpdateTimestamp` regardless of which downstream transfer paths fire.
+        _updateIndexOf(account);
+
         // NOTE: Callers set `skipTransfer=true` to avoid `_transfer`, which has `whenNotPaused`
         //       and `_revertIfFrozen` checks. Used by freeze (recipient may be frozen) and by
         //       pause-time `_setAccountInfo` (contract is paused). Yield stays on `account`'s

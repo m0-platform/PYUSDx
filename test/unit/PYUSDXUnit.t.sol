@@ -3133,6 +3133,23 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
         assertEq(pyusdx.totalSupply(), totalSupplyBefore);
     }
 
+    function test_claimFor_selfClaimZeroFee_updatesLastIndexAndTimestamp() public {
+        issuerGateway.mint(alice, 1000e6);
+
+        vm.prank(earnerManager);
+        pyusdx.setAccountInfo(alice, 500, 0, address(0));
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint128 expectedIndex = pyusdx.currentIndexOf(alice);
+        assertGt(pyusdx.accruedYieldOf(alice), 0);
+
+        pyusdx.claimFor(alice);
+
+        assertEq(pyusdx.lastUpdateTimestampOf(alice), uint40(block.timestamp));
+        assertEq(pyusdx.lastIndexOf(alice), expectedIndex);
+    }
+
     /* ============ Per-account index isolation ============ */
 
     function test_perAccountIndexIsolation() public {
