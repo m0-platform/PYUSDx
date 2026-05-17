@@ -33,6 +33,7 @@ contract Config {
     struct FactoryConfig {
         address admin;
         address factoryManager;
+        address beaconManager;
     }
 
     struct YieldToOneConfig {

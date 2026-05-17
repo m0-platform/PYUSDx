@@ -71,6 +71,10 @@ interface IMultiMint is IYieldToOne {
     /// @param  caller The address that attempted the call.
     error CallerNotAllowed(address caller);
 
+    /// @notice Reverts when enabling an asset that is not globally whitelisted on the MultiMint beacon.
+    /// @param  asset Address of the non-whitelisted asset.
+    error AssetNotWhitelisted(address asset);
+
     /* ============ Interactive Functions ============ */
 
     /// @notice Mint extension tokens by depositing `asset` tokens.

@@ -14,6 +14,7 @@ import { PYUSDX } from "../../src/PYUSDX.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { IRateLimiter } from "../../src/abstract/interfaces/IRateLimiter.sol";
 import { ExtensionBeacon } from "../../src/platform/ExtensionBeacon.sol";
+import { MultiMintBeacon } from "../../src/platform/MultiMintBeacon.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
@@ -165,7 +166,33 @@ contract DeployBase is DeployHelpers, ScriptBase {
             abi.encodeWithSelector(
                 ExtensionBeacon.initialize.selector,
                 config.admin,
-                config.factoryManager,
+                config.beaconManager,
+                initialImpl
+            ),
+            _computeSalt(deployer, saltSuffix)
+        );
+
+        proxyAdmin = Upgrades.getAdminAddress(proxy);
+    }
+
+    /// @dev Deploys a MultiMintBeacon (ExtensionBeacon + global asset whitelist) behind a transparent proxy.
+    function _deployMultiMintBeacon(
+        address deployer,
+        address pyusdxProxy,
+        address swapFacilityProxy,
+        address initialImpl,
+        string memory saltSuffix,
+        FactoryConfig memory config
+    ) internal returns (address proxy, address proxyAdmin, address implementation) {
+        implementation = address(new MultiMintBeacon(pyusdxProxy, swapFacilityProxy));
+
+        proxy = _deployCreate3TransparentProxy(
+            implementation,
+            config.admin,
+            abi.encodeWithSelector(
+                ExtensionBeacon.initialize.selector,
+                config.admin,
+                config.beaconManager,
                 initialImpl
             ),
             _computeSalt(deployer, saltSuffix)
@@ -325,7 +352,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
             deployment.multiMintBeaconProxy,
             deployment.multiMintBeaconProxyAdmin,
             deployment.multiMintBeaconImplementation
-        ) = _deployBeacon(
+        ) = _deployMultiMintBeacon(
             deployer,
             deployment.pyusdxProxy,
             deployment.swapFacilityProxy,

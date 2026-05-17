@@ -94,6 +94,7 @@ contract DeployAll is DeployBase {
     function _loadFactoryConfig() private view returns (FactoryConfig memory config) {
         config.admin = vm.envAddress("FACTORY_ADMIN");
         config.factoryManager = vm.envAddress("FACTORY_MANAGER");
+        config.beaconManager = vm.envAddress("BEACON_MANAGER");
     }
 
     function _loadPortalConfig() private view returns (PortalConfig memory config) {

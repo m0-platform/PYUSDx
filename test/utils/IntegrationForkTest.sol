@@ -5,6 +5,7 @@ import { Config } from "../../script/Config.sol";
 import { DeployBase } from "../../script/deploy/DeployBase.s.sol";
 
 import { ExtensionBeacon } from "../../src/platform/ExtensionBeacon.sol";
+import { MultiMintBeacon } from "../../src/platform/MultiMintBeacon.sol";
 import { IssuerGateway } from "../../src/core/IssuerGateway.sol";
 import { PYUSDX } from "../../src/PYUSDX.sol";
 import { ExtensionFactory } from "../../src/platform/ExtensionFactory.sol";
@@ -48,7 +49,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
     SwapFacility public swapFacility;
     ExtensionFactory public factory;
     ExtensionBeacon public yieldToOneBeacon;
-    ExtensionBeacon public multiMintBeacon;
+    MultiMintBeacon public multiMintBeacon;
     Portal public portal;
     LayerZeroBridgeAdapter public layerZeroBridgeAdapter;
 
@@ -92,7 +93,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
                 rateLimitRefillPerSecond: 0
             }),
             Config.SwapFacilityConfig({ admin: admin, pauser: pauser }),
-            Config.FactoryConfig({ admin: admin, factoryManager: factoryManager }),
+            Config.FactoryConfig({ admin: admin, factoryManager: factoryManager, beaconManager: beaconManager }),
             Config.PortalConfig({
                 admin: admin,
                 pauser: pauser,
@@ -107,7 +108,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
         swapFacility = SwapFacility(deployments_.swapFacilityProxy);
         factory = ExtensionFactory(deployments_.factoryProxy);
         yieldToOneBeacon = ExtensionBeacon(deployments_.yieldToOneBeaconProxy);
-        multiMintBeacon = ExtensionBeacon(deployments_.multiMintBeaconProxy);
+        multiMintBeacon = MultiMintBeacon(deployments_.multiMintBeaconProxy);
         portal = Portal(deployments_.portalProxy);
         layerZeroBridgeAdapter = LayerZeroBridgeAdapter(deployments_.layerZeroBridgeAdapterProxy);
         _coreDeployments = deployments_;

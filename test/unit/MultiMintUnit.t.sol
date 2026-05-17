@@ -10,6 +10,8 @@ import { MockIssuerGateway } from "../mock/MockIssuerGateway.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
+import { MultiMintBeacon } from "../../src/platform/MultiMintBeacon.sol";
+import { ExtensionBeacon } from "../../src/platform/ExtensionBeacon.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
@@ -27,12 +29,16 @@ contract MultiMintTest is BaseTest {
     PYUSDXHarness public pyusdx;
     MockSwapFacility public swapFacility;
     MultiMint public extension;
+    MultiMintBeacon public multiMintBeacon;
 
     MockERC20 public usdc; // 6 decimals
     MockERC20 public dai; // 18 decimals
     MockERC20 public fourDec; // 4 decimals
 
     uint256 public constant MINT_AMOUNT = 1000e6;
+
+    /// @dev Origin beacon storage slot shared with ExtensionBeaconProxy / Extension.
+    bytes32 internal constant _ORIGIN_BEACON_SLOT = 0x0db096ce50da19b63b97b47df5b0c87e2ed1677b3d801ad424e1bbfc0bb0c300;
 
     function setUp() public override {
         super.setUp();
@@ -96,9 +102,29 @@ contract MultiMintTest is BaseTest {
 
         pyusdx.setAccountRateBps(address(extension), uint16(500));
 
+        // MultiMint enforces a global asset whitelist by reading its origin beacon.
+        // Deploy a MultiMintBeacon and point the extension's origin-beacon slot at it.
+        multiMintBeacon = MultiMintBeacon(
+            UnsafeUpgrades.deployTransparentProxy(
+                address(new MultiMintBeacon(address(pyusdx), address(swapFacility))),
+                admin,
+                abi.encodeWithSelector(ExtensionBeacon.initialize.selector, admin, beaconManager, extensionImpl)
+            )
+        );
+
+        vm.store(address(extension), _ORIGIN_BEACON_SLOT, bytes32(uint256(uint160(address(multiMintBeacon)))));
+
         usdc = new MockERC20("USD Coin", "USDC", 6);
         dai = new MockERC20("Dai", "DAI", 18);
         fourDec = new MockERC20("FourDec", "4DEC", 4);
+
+        vm.startPrank(beaconManager);
+
+        multiMintBeacon.setAssetWhitelist(address(usdc), true);
+        multiMintBeacon.setAssetWhitelist(address(dai), true);
+        multiMintBeacon.setAssetWhitelist(address(fourDec), true);
+
+        vm.stopPrank();
 
         vm.startPrank(assetCapManager);
 
@@ -315,6 +341,9 @@ contract MultiMintTest is BaseTest {
     function test_wrap_asset_revert_feeOnTransfer() public {
         MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
 
+        vm.prank(beaconManager);
+        multiMintBeacon.setAssetWhitelist(address(feeToken), true);
+
         vm.prank(assetCapManager);
         extension.setAssetCap(address(feeToken), 1_000_000e6);
 
@@ -334,6 +363,9 @@ contract MultiMintTest is BaseTest {
 
     function test_wrap_asset_revert_insufficientAssetReceived() public {
         MockFeeOnTransfer feeToken = new MockFeeOnTransfer("FeeToken", "FEE", 6);
+
+        vm.prank(beaconManager);
+        multiMintBeacon.setAssetWhitelist(address(feeToken), true);
 
         vm.prank(assetCapManager);
         extension.setAssetCap(address(feeToken), 1_000_000e6);
@@ -786,6 +818,9 @@ contract MultiMintTest is BaseTest {
     function test_setAssetCap() public {
         MockERC20 newToken = new MockERC20("New", "NEW", 8);
 
+        vm.prank(beaconManager);
+        multiMintBeacon.setAssetWhitelist(address(newToken), true);
+
         vm.prank(assetCapManager);
 
         vm.expectEmit(true, false, false, true, address(extension));
@@ -796,6 +831,41 @@ contract MultiMintTest is BaseTest {
         assertEq(extension.assetCap(address(newToken)), 500e8);
         assertEq(extension.assetDecimals(address(newToken)), 8);
         assertTrue(extension.isAllowedAsset(address(newToken)));
+    }
+
+    function test_setAssetCap_revert_assetNotWhitelisted() public {
+        MockERC20 newToken = new MockERC20("New", "NEW", 8);
+
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.AssetNotWhitelisted.selector, address(newToken)));
+
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(newToken), 500e8);
+    }
+
+    function test_setAssetCap_disableAllowedAfterDewhitelist() public {
+        MockERC20 newToken = new MockERC20("New", "NEW", 8);
+
+        vm.prank(beaconManager);
+        multiMintBeacon.setAssetWhitelist(address(newToken), true);
+
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(newToken), 500e8);
+
+        // Removing the asset from the global whitelist does not retroactively zero its cap.
+        vm.prank(beaconManager);
+        multiMintBeacon.setAssetWhitelist(address(newToken), false);
+
+        // Disabling (cap == 0) is always allowed, even for a de-whitelisted asset.
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(newToken), 0);
+
+        assertFalse(extension.isAllowedAsset(address(newToken)));
+
+        // Re-enabling a de-whitelisted asset reverts.
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.AssetNotWhitelisted.selector, address(newToken)));
+
+        vm.prank(assetCapManager);
+        extension.setAssetCap(address(newToken), 500e8);
     }
 
     function test_setAssetCap_revert_unauthorized() public {

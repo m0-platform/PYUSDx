@@ -11,6 +11,7 @@ import { IERC20 } from "../../../lib/evm-m-extensions/lib/common/src/interfaces/
 import { YieldToOne } from "./YieldToOne.sol";
 
 import { IMultiMint } from "./interfaces/IMultiMint.sol";
+import { IMultiMintBeacon } from "../interfaces/IMultiMintBeacon.sol";
 import { ISwapFacility } from "../../swap/interfaces/ISwapFacility.sol";
 
 abstract contract MultiMintStorageLayout {
@@ -158,6 +159,12 @@ contract MultiMint is IMultiMint, MultiMintStorageLayout, YieldToOne {
         MultiMintStorage storage $ = _getMultiMintStorage();
 
         if ($.assets[asset].cap == cap) return;
+
+        // NOTE: Enabling an asset (non-zero cap) requires it to be globally whitelisted on the MultiMint beacon.
+        //       Disabling (cap == 0) is always allowed.
+        if (cap != 0 && !IMultiMintBeacon(originBeacon()).isAssetWhitelisted(asset)) {
+            revert AssetNotWhitelisted(asset);
+        }
 
         if ($.assets[asset].decimals == 0) $.assets[asset].decimals = IERC20Metadata(asset).decimals();
 

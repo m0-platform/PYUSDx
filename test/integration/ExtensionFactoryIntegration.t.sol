@@ -741,8 +741,8 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         // Deploy a new V2 YieldToOne implementation
         address v2Impl = address(new YieldToOne(address(pyusdx), address(swapFacility)));
 
-        // Register the V2 implementation in the YTO beacon (factoryManager has BEACON_MANAGER_ROLE)
-        vm.prank(factoryManager);
+        // Register the V2 implementation in the YTO beacon (beaconManager has BEACON_MANAGER_ROLE)
+        vm.prank(beaconManager);
         yieldToOneBeacon.registerImplementation(v2Impl);
 
         // Verify the beacon now returns V2 as the latest implementation
@@ -773,7 +773,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         // Register v2 on YTO beacon - events only on YTO beacon address
         address v2YTO = address(new YieldToOne(address(pyusdx), address(swapFacility)));
 
-        vm.prank(factoryManager);
+        vm.prank(beaconManager);
         yieldToOneBeacon.registerImplementation(v2YTO);
 
         assertEq(yieldToOneBeacon.latestVersion(), 2);
@@ -782,7 +782,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         // Register v2 on MM beacon - events only on MM beacon address
         address v2MM = address(new MultiMint(address(pyusdx), address(swapFacility)));
 
-        vm.prank(factoryManager);
+        vm.prank(beaconManager);
         multiMintBeacon.registerImplementation(v2MM);
 
         assertEq(multiMintBeacon.latestVersion(), 2);

@@ -59,7 +59,10 @@ contract SwapFacilityIntegrationTests is IntegrationForkTest {
         (address multiMintProxy, ) = factory.deployMultiMint(string("mm-swap-integration"), mmParams);
         multiMintExtension = MultiMint(multiMintProxy);
 
-        // Allow USDC in MultiMint by setting asset cap
+        // Whitelist USDC globally on the MultiMint beacon, then allow it in MultiMint by setting asset cap
+        vm.prank(beaconManager);
+        multiMintBeacon.setAssetWhitelist(address(USDC), true);
+
         vm.prank(assetCapManager);
         multiMintExtension.setAssetCap(address(USDC), type(uint256).max);
     }

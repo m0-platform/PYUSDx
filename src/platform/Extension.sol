@@ -134,13 +134,13 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, 
     function balanceOf(address account) public view virtual returns (uint256);
 
     /// @inheritdoc IExtension
-    function pinnedImplementation() public view returns (address) {
-        return StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value;
+    function originBeacon() public view returns (address) {
+        return StorageSlot.getAddressSlot(_ORIGIN_BEACON_SLOT).value;
     }
 
     /// @inheritdoc IExtension
-    function originBeacon() external view returns (address) {
-        return StorageSlot.getAddressSlot(_ORIGIN_BEACON_SLOT).value;
+    function pinnedImplementation() public view returns (address) {
+        return StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value;
     }
 
     /// @inheritdoc IExtension

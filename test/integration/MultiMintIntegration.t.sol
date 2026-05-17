@@ -9,6 +9,8 @@ import { ISwapFacility } from "../../src/swap/interfaces/ISwapFacility.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
 
+import { MockERC20 } from "../mock/MockERC20.sol";
+
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
 contract MultiMintIntegrationTests is IntegrationForkTest {
@@ -39,6 +41,14 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
         // Enable PYUSDX earning for MultiMint (claimRecipient = address(0) means yield stays on contract)
         vm.prank(earnerManager);
         pyusdx.setAccountInfo(address(multiMint), 500, 0, address(0));
+
+        // Whitelist USDC and PYUSD globally on the MultiMint beacon so they can be enabled as collateral
+        vm.startPrank(beaconManager);
+
+        multiMintBeacon.setAssetWhitelist(address(USDC), true);
+        multiMintBeacon.setAssetWhitelist(address(PYUSD), true);
+
+        vm.stopPrank();
 
         // Set USDC asset cap to max
         vm.prank(assetCapManager);
@@ -105,6 +115,25 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         vm.prank(alice);
         swapFacility.swap(address(USDC), address(multiMint), AMOUNT, alice);
+    }
+
+    function testIntegration_setAssetCap_assetNotWhitelisted() public {
+        MockERC20 newAsset = new MockERC20("New Asset", "NEW", 6);
+
+        // Not whitelisted on the MultiMint beacon — enabling it as collateral reverts.
+        vm.expectRevert(abi.encodeWithSelector(IMultiMint.AssetNotWhitelisted.selector, address(newAsset)));
+
+        vm.prank(assetCapManager);
+        multiMint.setAssetCap(address(newAsset), type(uint256).max);
+
+        // Once the beacon manager whitelists it globally, it can be enabled.
+        vm.prank(beaconManager);
+        multiMintBeacon.setAssetWhitelist(address(newAsset), true);
+
+        vm.prank(assetCapManager);
+        multiMint.setAssetCap(address(newAsset), type(uint256).max);
+
+        assertTrue(multiMint.isAllowedAsset(address(newAsset)));
     }
 
     /* ============ wrapAsset ============ */
