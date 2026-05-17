@@ -78,8 +78,8 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
         routerAwareExtension = new MockRouterAwareExtension(address(pyusdx), address(swapFacility));
 
         // Register mock extensions by default
-        factory.registerExtension(address(extensionA), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
-        factory.registerExtension(address(routerAwareExtension), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(address(extensionA), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(address(routerAwareExtension), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
     }
 
     function _setupSwapIn(address user, uint256 amount) internal {
@@ -184,7 +184,7 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
     function test_reentrancy_blocked() public {
         MockReentrantExtension reentrantExtension = new MockReentrantExtension(address(pyusdx), address(swapFacility));
 
-        factory.registerExtension(address(reentrantExtension), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(address(reentrantExtension), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         _setupSwapIn(alice, AMOUNT);
 

@@ -513,7 +513,7 @@ contract MultiMintIntegrationTests is IntegrationForkTest {
 
         // Revoke extension
         vm.prank(factoryManager);
-        factory.setExtensionType(address(multiMint), IExtensionFactory.ExtensionType.NONE);
+        factory.registerExtension(address(multiMint), IExtensionFactory.ExtensionType.NONE);
 
         assertFalse(swapFacility.isApprovedExtension(address(multiMint)));
 

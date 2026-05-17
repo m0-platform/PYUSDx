@@ -431,9 +431,9 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         assertEq(uint8(factory.getExtensionType(multiMintProxy)), uint8(IExtensionFactory.ExtensionType.MULTI_MINT));
     }
 
-    /* ============ setExtensionType Tests ============ */
+    /* ============ registerExtension Tests ============ */
 
-    function test_setExtensionType() public {
+    function test_registerExtension() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
@@ -454,13 +454,13 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionFactory.ExtensionType.NONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.NONE);
+        factory.registerExtension(proxy, IExtensionFactory.ExtensionType.NONE);
 
         assertFalse(factory.isApprovedExtension(proxy));
         assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.NONE));
     }
 
-    function test_setExtensionType_reactivate() public {
+    function test_registerExtension_reactivate() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
@@ -475,7 +475,7 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         (address proxy, ) = factory.deployYieldToOne(string("yto-reactivate-test"), params);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.NONE);
+        factory.registerExtension(proxy, IExtensionFactory.ExtensionType.NONE);
 
         assertFalse(factory.isApprovedExtension(proxy));
 
@@ -483,13 +483,13 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         assertTrue(factory.isApprovedExtension(proxy));
         assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
     }
 
-    function test_setExtensionType_idempotent() public {
+    function test_registerExtension_idempotent() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
@@ -505,31 +505,31 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
 
         // Already YIELD_TO_ONE, should not emit event
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(proxy, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
 
         assertTrue(factory.isApprovedExtension(proxy));
     }
 
-    function test_setExtensionType_zeroExtension() public {
+    function test_registerExtension_zeroExtension() public {
         vm.expectRevert(IExtensionFactory.ZeroExtension.selector);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(address(0), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(address(0), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
     }
 
-    function test_setExtensionType_invalidExtension() public {
+    function test_registerExtension_invalidExtension() public {
         // Setting NONE on unregistered address is idempotent (no-op)
         vm.prank(factoryManager);
-        factory.setExtensionType(alice, IExtensionFactory.ExtensionType.NONE);
+        factory.registerExtension(alice, IExtensionFactory.ExtensionType.NONE);
 
         // Setting non-NONE on an invalid address reverts (EOA has no code)
         vm.expectRevert();
 
         vm.prank(factoryManager);
-        factory.setExtensionType(alice, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.registerExtension(alice, IExtensionFactory.ExtensionType.YIELD_TO_ONE);
     }
 
-    function test_setExtensionType_notManager() public {
+    function test_registerExtension_notManager() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
@@ -552,10 +552,10 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         );
 
         vm.prank(alice);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.NONE);
+        factory.registerExtension(proxy, IExtensionFactory.ExtensionType.NONE);
     }
 
-    function test_setExtensionType_alreadyRegistered() public {
+    function test_registerExtension_alreadyRegistered() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
@@ -572,12 +572,12 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         vm.expectRevert(IExtensionFactory.ExtensionAlreadyRegistered.selector);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.MULTI_MINT);
+        factory.registerExtension(proxy, IExtensionFactory.ExtensionType.MULTI_MINT);
 
         assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.YIELD_TO_ONE));
     }
 
-    function test_setExtensionType_changeTypeViaRevoke() public {
+    function test_registerExtension_changeTypeViaRevoke() public {
         IExtensionFactory.YieldToOneParams memory params = IExtensionFactory.YieldToOneParams({
             name: YTO_NAME,
             symbol: YTO_SYMBOL,
@@ -595,13 +595,13 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
         emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionFactory.ExtensionType.NONE);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.NONE);
+        factory.registerExtension(proxy, IExtensionFactory.ExtensionType.NONE);
 
         vm.expectEmit();
         emit IExtensionFactory.ExtensionTypeSet(proxy, IExtensionFactory.ExtensionType.MULTI_MINT);
 
         vm.prank(factoryManager);
-        factory.setExtensionType(proxy, IExtensionFactory.ExtensionType.MULTI_MINT);
+        factory.registerExtension(proxy, IExtensionFactory.ExtensionType.MULTI_MINT);
 
         assertEq(uint8(factory.getExtensionType(proxy)), uint8(IExtensionFactory.ExtensionType.MULTI_MINT));
         assertTrue(factory.isApprovedExtension(proxy));

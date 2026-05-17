@@ -15,10 +15,11 @@ contract ExtensionFactoryHarness is ExtensionFactory {
         address multiMintBeacon_
     ) ExtensionFactory(pyusdx_, swapFacility_, yieldToOneBeacon_, multiMintBeacon_) {}
 
-    /// @notice Exposes internal _registerExtension for testing
+    /// @notice Exposes internal _setExtensionType for testing, bypassing the role check
+    ///         and validation in `registerExtension`.
     /// @param proxy The address of the extension proxy
     /// @param extensionType The type of the extension
-    function registerExtension(address proxy, IExtensionFactory.ExtensionType extensionType) external {
-        _registerExtension(proxy, extensionType);
+    function setExtensionType(address proxy, IExtensionFactory.ExtensionType extensionType) external {
+        _setExtensionType(proxy, extensionType);
     }
 }
