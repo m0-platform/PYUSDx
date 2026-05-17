@@ -153,7 +153,7 @@ interface IExtensionFactory {
 
     /* ============ Admin Functions ============ */
 
-    /// @notice Sets the extension type for a given extension address. Setting to NONE revokes approval.
+    /// @notice Registers an extension under a given type. Setting to NONE revokes approval.
     /// @dev    MUST only be callable by an address with the `FACTORY_MANAGER_ROLE` role.
     ///         Validates the extension via `_revertIfInvalidExtension` when setting to a non-NONE type.
     ///         Reverts with `ExtensionAlreadyRegistered` when the extension is already registered
@@ -161,5 +161,5 @@ interface IExtensionFactory {
     ///         The extension must be unregistered (set to NONE) before being re-registered at a new type.
     /// @param  extension     The address of the extension.
     /// @param  extensionType The extension type to assign (NONE to revoke).
-    function setExtensionType(address extension, ExtensionType extensionType) external;
+    function registerExtension(address extension, ExtensionType extensionType) external;
 }

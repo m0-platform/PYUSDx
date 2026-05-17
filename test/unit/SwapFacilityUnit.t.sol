@@ -89,9 +89,9 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         multiMintExtension = new MockMultiMint(address(pyusdx), address(swapFacility), makeAddr("yieldRecipient"));
 
         // Register mock extensions by default
-        factory.registerExtension(address(extensionA), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
-        factory.registerExtension(address(extensionB), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
-        factory.registerExtension(address(multiMintExtension), IExtensionFactory.ExtensionType.MULTI_MINT);
+        factory.setExtensionType(address(extensionA), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(address(extensionB), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(address(multiMintExtension), IExtensionFactory.ExtensionType.MULTI_MINT);
 
         // Allow mockUSDC in multiMintExtension
         multiMintExtension.setAllowedAsset(address(mockUSDC), true);
@@ -152,7 +152,7 @@ contract SwapFacilityUnitTests is PYUSDXBaseUnitTest {
         assertFalse(swapFacility.isApprovedExtension(address(fresh)));
 
         // After registration, it should be approved
-        factory.registerExtension(address(fresh), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
+        factory.setExtensionType(address(fresh), IExtensionFactory.ExtensionType.YIELD_TO_ONE);
         assertTrue(swapFacility.isApprovedExtension(address(fresh)));
     }
 

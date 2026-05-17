@@ -383,7 +383,7 @@ contract YieldToOneIntegrationTests is IntegrationForkTest {
 
         // Revoke the extension
         vm.prank(factoryManager);
-        factory.setExtensionType(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
+        factory.registerExtension(address(yieldToOne), IExtensionFactory.ExtensionType.NONE);
 
         assertFalse(swapFacility.isApprovedExtension(address(yieldToOne)));
 
