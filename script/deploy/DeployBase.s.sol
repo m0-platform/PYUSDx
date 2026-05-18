@@ -98,8 +98,8 @@ contract DeployBase is DeployHelpers, ScriptBase {
             abi.encodeWithSelector(
                 IssuerGateway.initialize.selector,
                 config.admin,
-                config.issuer,
-                config.minter,
+                config.operator,
+                config.executor,
                 config.mintDelay,
                 config.mintTTL
             ),
@@ -232,6 +232,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
             issuerGatewayConfig,
             swapFacilityConfig,
             factoryConfig,
+            portalConfig,
             deployment
         );
         _deployPortalStack(deployer, portalConfig, layerZeroBridgeAdapterConfig, deployment);
@@ -243,49 +244,13 @@ contract DeployBase is DeployHelpers, ScriptBase {
         IssuerGatewayConfig memory issuerGatewayConfig,
         SwapFacilityConfig memory swapFacilityConfig,
         FactoryConfig memory factoryConfig,
+        PortalConfig memory portalConfig,
         CoreDeployments memory deployment
     ) internal {
-        // 1. Pre-compute CREATE3 addresses needed for PYUSDX + IssuerGateway phase
-        address predictedPYUSDX = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDX"));
-        address predictedIssuerGateway = _getCreate3Address(deployer, _computeSalt(deployer, "IssuerGateway"));
-
-        console.log("Predicted PYUSDX proxy:            ", predictedPYUSDX);
-        console.log("Predicted IssuerGateway proxy:     ", predictedIssuerGateway);
-
-        // 2. Deploy PYUSDX with deployer as transient admin/rateLimitManager for role bootstrapping
-        address targetAdmin = pyusdxConfig.admin;
-        address targetRateManager = pyusdxConfig.rateManager;
-
-        pyusdxConfig.admin = deployer;
-        pyusdxConfig.rateManager = deployer;
-
-        (deployment.pyusdxProxy, deployment.pyusdxProxyAdmin, deployment.pyusdxImplementation) = _deployPYUSDX(
-            deployer,
-            predictedIssuerGateway,
-            pyusdxConfig
-        );
-
-        require(deployment.pyusdxProxy == predictedPYUSDX, "PYUSDX proxy address mismatch");
-
-        // 3. Deploy IssuerGateway (implementation needs actual PYUSDX proxy address)
-        (
-            deployment.issuerGatewayProxy,
-            deployment.issuerGatewayProxyAdmin,
-            deployment.issuerGatewayImplementation
-        ) = _deployIssuerGateway(deployer, deployment.pyusdxProxy, issuerGatewayConfig);
-
-        require(deployment.issuerGatewayProxy == predictedIssuerGateway, "IssuerGateway proxy address mismatch");
-
-        // 4. Configure rate limits and transfer roles to target holders
-        _bootstrapPYUSDXRoles(
-            deployer,
-            deployment.pyusdxProxy,
-            deployment.issuerGatewayProxy,
-            pyusdxConfig.earnerManager,
-            targetAdmin,
-            targetRateManager,
-            issuerGatewayConfig
-        );
+        // Phase 1: PYUSDX + IssuerGateway + role bootstrap. Extracted into its own
+        // function so its locals release before the SwapFacility/Factory phase below
+        // (otherwise this function exceeds Solidity's stack-depth limit).
+        _deployPYUSDXAndIssuerGateway(deployer, pyusdxConfig, issuerGatewayConfig, portalConfig, deployment);
 
         // 5. Pre-compute remaining CREATE3 addresses
         address predictedSwapFacility = _getCreate3Address(deployer, _computeSalt(deployer, "SwapFacility"));
@@ -348,28 +313,138 @@ contract DeployBase is DeployHelpers, ScriptBase {
         require(deployment.factoryProxy == predictedFactory, "Factory proxy address mismatch");
     }
 
-    /// @dev Configures rate limits and transfers admin/rate-manager roles
-    ///      from the deployer to the target holders, then renounces the deployer's roles.
+    function _deployPYUSDXAndIssuerGateway(
+        address deployer,
+        PYUSDXConfig memory pyusdxConfig,
+        IssuerGatewayConfig memory issuerGatewayConfig,
+        PortalConfig memory portalConfig,
+        CoreDeployments memory deployment
+    ) internal {
+        // 1. Pre-compute CREATE3 addresses needed for PYUSDX + IssuerGateway phase
+        address predictedPYUSDX = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDX"));
+        address predictedIssuerGateway = _getCreate3Address(deployer, _computeSalt(deployer, "IssuerGateway"));
+
+        console.log("Predicted PYUSDX proxy:            ", predictedPYUSDX);
+        console.log("Predicted IssuerGateway proxy:     ", predictedIssuerGateway);
+
+        // 2. Deploy PYUSDX with deployer as transient admin/rateLimitManager for role bootstrapping
+        address targetAdmin = pyusdxConfig.admin;
+        address targetRateManager = pyusdxConfig.rateManager;
+
+        pyusdxConfig.admin = deployer;
+        pyusdxConfig.rateManager = deployer;
+
+        (deployment.pyusdxProxy, deployment.pyusdxProxyAdmin, deployment.pyusdxImplementation) = _deployPYUSDX(
+            deployer,
+            predictedIssuerGateway,
+            pyusdxConfig
+        );
+
+        require(deployment.pyusdxProxy == predictedPYUSDX, "PYUSDX proxy address mismatch");
+
+        // 3. Deploy IssuerGateway (implementation needs actual PYUSDX proxy address)
+        (
+            deployment.issuerGatewayProxy,
+            deployment.issuerGatewayProxyAdmin,
+            deployment.issuerGatewayImplementation
+        ) = _deployIssuerGateway(deployer, deployment.pyusdxProxy, issuerGatewayConfig);
+
+        require(deployment.issuerGatewayProxy == predictedIssuerGateway, "IssuerGateway proxy address mismatch");
+
+        // 4. Configure rate limits and transfer roles to target holders.
+        //    Portal is granted ISSUER_ROLE + rate limit at its predicted CREATE3 address,
+        //    while the deployer still holds DEFAULT_ADMIN_ROLE / RATE_LIMIT_MANAGER_ROLE.
+        //    Portal needs both to mint on receiveMessage and burn on sendToken (cross-chain).
+        _bootstrapPYUSDXRoles(
+            deployer,
+            deployment.pyusdxProxy,
+            _buildIssuerBootstrap(
+                deployer,
+                deployment.issuerGatewayProxy,
+                pyusdxConfig.earnerManager,
+                issuerGatewayConfig,
+                portalConfig
+            ),
+            targetAdmin,
+            targetRateManager
+        );
+    }
+
+    /// @dev Extracted into its own function to keep _deployPYUSDXAndIssuerGateway
+    ///      under the legacy pipeline's stack-depth limit.
+    function _buildIssuerBootstrap(
+        address deployer,
+        address issuerGatewayProxy,
+        address earnerManager,
+        IssuerGatewayConfig memory issuerGatewayConfig,
+        PortalConfig memory portalConfig
+    ) internal view returns (IssuerBootstrap memory) {
+        return
+            IssuerBootstrap({
+                issuerGatewayProxy: issuerGatewayProxy,
+                portalProxy: _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDXPortal")),
+                earnerManager: earnerManager,
+                issuerGatewayCapacity: issuerGatewayConfig.rateLimitCapacity,
+                issuerGatewayRefill: issuerGatewayConfig.rateLimitRefillPerSecond,
+                portalCapacity: portalConfig.rateLimitCapacity,
+                portalRefill: portalConfig.rateLimitRefillPerSecond
+            });
+    }
+
+    /// @dev Bundle of issuers + their rate-limit caps that the deployer configures on PYUSDX
+    ///      before renouncing its transient admin/rate-manager roles. Grouped into a struct
+    ///      to keep the bootstrap function under Solidity's stack-depth limit.
+    struct IssuerBootstrap {
+        address issuerGatewayProxy;
+        address portalProxy; // predicted CREATE3 address — Portal not yet deployed
+        address earnerManager;
+        uint128 issuerGatewayCapacity;
+        uint128 issuerGatewayRefill;
+        uint128 portalCapacity;
+        uint128 portalRefill;
+    }
+
+    /// @dev Configures rate limits, grants ISSUER_ROLE to the Portal so it can mint/burn
+    ///      for cross-chain transfers, and transfers admin/rate-manager roles from the
+    ///      deployer to the target holders, then renounces the deployer's roles.
+    ///      Granting Portal at its predicted CREATE3 address (before it's deployed) is fine —
+    ///      AccessControl just stores in a mapping, and the rate-limit bucket is keyed by
+    ///      address regardless of deployment status.
     function _bootstrapPYUSDXRoles(
         address deployer,
         address pyusdxProxy,
-        address issuerGatewayProxy,
-        address earnerManager,
+        IssuerBootstrap memory issuers,
         address targetAdmin,
-        address targetRateManager,
-        IssuerGatewayConfig memory issuerGatewayConfig
+        address targetRateManager
     ) internal {
         // Configure rate limit for the IssuerGateway (deployer holds RATE_LIMIT_MANAGER_ROLE)
         IRateLimiter(pyusdxProxy).setRateLimit(
-            issuerGatewayProxy,
-            issuerGatewayConfig.rateLimitCapacity,
-            issuerGatewayConfig.rateLimitRefillPerSecond,
+            issuers.issuerGatewayProxy,
+            issuers.issuerGatewayCapacity,
+            issuers.issuerGatewayRefill,
             true
         );
 
-        // TODO: figure out the appropriate cap at deployment
-        // Configure rate limit for the earnerManager — distributeReward() flows through _mint
-        IRateLimiter(pyusdxProxy).setRateLimit(earnerManager, type(uint128).max, 0, true);
+        // Configure rate limit for the Portal — sendToken/receiveMessage flow through PYUSDX burn/mint.
+        // Without this, mint reverts with RateLimitNotConfigured(portal) and the destination
+        // chain executor's simulation reverts before delivering the cross-chain message.
+        IRateLimiter(pyusdxProxy).setRateLimit(issuers.portalProxy, issuers.portalCapacity, issuers.portalRefill, true);
+
+        // Configure rate limit for the earnerManager — distributeReward() flows through _mint.
+        // Allows ~$10M/day in PYUSDX yield distributions (PYUSDX has 6 decimals).
+        // Capacity = one day of mint headroom; refill replenishes the bucket every 24h.
+        uint128 earnerDailyCap = 10_000_000e6;
+        IRateLimiter(pyusdxProxy).setRateLimit(
+            issuers.earnerManager,
+            earnerDailyCap,
+            earnerDailyCap / uint128(1 days),
+            true
+        );
+
+        // Grant ISSUER_ROLE to Portal so it can burn (sendToken) and mint (receiveMessage)
+        // for cross-chain transfers. Listed in roles.md alongside IssuerGateway as the only
+        // two contracts that should hold ISSUER_ROLE on PYUSDX.
+        IAccessControl(pyusdxProxy).grantRole(PYUSDX(pyusdxProxy).ISSUER_ROLE(), issuers.portalProxy);
 
         // Transfer roles to target holders
         bytes32 rateLimitManagerRole = IRateLimiter(pyusdxProxy).RATE_LIMIT_MANAGER_ROLE();

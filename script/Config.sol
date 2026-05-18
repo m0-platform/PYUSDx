@@ -17,8 +17,8 @@ contract Config {
 
     struct IssuerGatewayConfig {
         address admin;
-        address issuer;
-        address minter;
+        address operator;
+        address executor;
         uint32 mintDelay;
         uint32 mintTTL;
         uint128 rateLimitCapacity;
@@ -61,6 +61,8 @@ contract Config {
         address pauser;
         address operator;
         address fallbackRecipient;
+        uint128 rateLimitCapacity;
+        uint128 rateLimitRefillPerSecond;
     }
 
     struct LayerZeroBridgeAdapterConfig {
