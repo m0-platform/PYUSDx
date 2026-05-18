@@ -124,7 +124,7 @@ contract ExtensionFactory is
 
         proxy = _deployCreate3BeaconProxy(yieldToOneBeacon, initData, _computeExtensionSalt(msg.sender, extensionName));
 
-        _registerExtension(proxy, ExtensionType.YIELD_TO_ONE);
+        _setExtensionType(proxy, ExtensionType.YIELD_TO_ONE);
 
         emit ExtensionDeployed(ExtensionType.YIELD_TO_ONE, proxy, implementation, msg.sender);
     }
@@ -153,13 +153,13 @@ contract ExtensionFactory is
 
         proxy = _deployCreate3BeaconProxy(multiMintBeacon, initData, _computeExtensionSalt(msg.sender, extensionName));
 
-        _registerExtension(proxy, ExtensionType.MULTI_MINT);
+        _setExtensionType(proxy, ExtensionType.MULTI_MINT);
 
         emit ExtensionDeployed(ExtensionType.MULTI_MINT, proxy, implementation, msg.sender);
     }
 
     /// @inheritdoc IExtensionFactory
-    function setExtensionType(
+    function registerExtension(
         address extension,
         ExtensionType extensionType
     ) external override onlyRole(FACTORY_MANAGER_ROLE) {
@@ -208,10 +208,10 @@ contract ExtensionFactory is
 
     /* ============ Internal Interactive Functions ============ */
 
-    /// @dev   Registers an extension in the factory.
+    /// @dev   Writes the extension type for `proxy` directly, without role or validation checks.
     /// @param proxy         The address of the proxy.
     /// @param extensionType The type of the extension.
-    function _registerExtension(address proxy, ExtensionType extensionType) internal {
+    function _setExtensionType(address proxy, ExtensionType extensionType) internal {
         _getExtensionFactoryStorage().extensionTypes[proxy] = extensionType;
     }
 
