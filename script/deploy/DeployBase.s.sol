@@ -53,8 +53,18 @@ contract DeployBase is DeployHelpers, ScriptBase {
 
     /* ============ Individual Deploy Functions ============ */
 
+    /// @dev `proxyInitialOwner` becomes the final `ProxyAdmin.owner()` (upgrade authority) and is
+    ///      never transferred afterward. `transientTokenAdmin` and `transientRateManager` receive
+    ///      `DEFAULT_ADMIN_ROLE` / `RATE_LIMIT_MANAGER_ROLE` on the PYUSDX token at initialize time
+    ///      so the role bootstrap can grant ISSUER_ROLE + rate limits; the bootstrap then transfers
+    ///      these roles to their final holders and renounces. Decoupling these three parameters
+    ///      prevents the rewriting of `config.admin` from accidentally bleeding the deployer into
+    ///      ProxyAdmin ownership.
     function _deployPYUSDX(
         address deployer,
+        address proxyInitialOwner,
+        address transientTokenAdmin,
+        address transientRateManager,
         address issuerGatewayProxy,
         PYUSDXConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
@@ -62,19 +72,19 @@ contract DeployBase is DeployHelpers, ScriptBase {
 
         proxy = _deployCreate3TransparentProxy(
             implementation,
-            config.admin,
+            proxyInitialOwner,
             abi.encodeCall(
                 PYUSDX.initialize,
                 (
                     IPYUSDX.InitializeParams({
                         name: config.name,
                         symbol: config.symbol,
-                        admin: config.admin,
+                        admin: transientTokenAdmin,
                         pauser: config.pauser,
                         freezeManager: config.freezeManager,
                         forcedTransferManager: config.forcedTransferManager,
                         earnerManager: config.earnerManager,
-                        rateLimitManager: config.rateManager,
+                        rateLimitManager: transientRateManager,
                         issuer: issuerGatewayProxy
                     })
                 )
@@ -361,15 +371,16 @@ contract DeployBase is DeployHelpers, ScriptBase {
         console.log("Predicted PYUSDX proxy:            ", predictedPYUSDX);
         console.log("Predicted IssuerGateway proxy:     ", predictedIssuerGateway);
 
-        // Deploy PYUSDX with deployer as transient admin/rate-manager.
-        // Original target addresses are returned for the bootstrap to use later.
+        // Deploy PYUSDX. Proxy initialOwner is the final target admin (set once, never transferred);
+        // the deployer holds DEFAULT_ADMIN_ROLE / RATE_LIMIT_MANAGER_ROLE transiently so the deferred
+        // bootstrap can grant ISSUER_ROLE + rate limits and then transfer roles to their final holders.
         targetAdmin = pyusdxConfig.admin;
         targetRateManager = pyusdxConfig.rateManager;
 
-        pyusdxConfig.admin = deployer;
-        pyusdxConfig.rateManager = deployer;
-
         (deployment.pyusdxProxy, deployment.pyusdxProxyAdmin, deployment.pyusdxImplementation) = _deployPYUSDX(
+            deployer,
+            pyusdxConfig.admin,
+            deployer,
             deployer,
             predictedIssuerGateway,
             pyusdxConfig
