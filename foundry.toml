@@ -1,5 +1,6 @@
 [profile.default]
 evm_version = "cancun"
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
 gas_reports = ["*"]
 gas_reports_ignore = []
 ignored_error_codes = []
