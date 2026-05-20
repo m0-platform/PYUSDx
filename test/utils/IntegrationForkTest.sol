@@ -84,8 +84,8 @@ abstract contract IntegrationForkTest is BaseForkTest {
             }),
             Config.IssuerGatewayConfig({
                 admin: admin,
-                issuer: operator,
-                minter: executor,
+                operator: operator,
+                executor: executor,
                 mintDelay: MINT_DELAY,
                 mintTTL: MINT_TTL,
                 rateLimitCapacity: type(uint128).max,
@@ -97,7 +97,9 @@ abstract contract IntegrationForkTest is BaseForkTest {
                 admin: admin,
                 pauser: pauser,
                 operator: operator,
-                fallbackRecipient: fallbackRecipient
+                fallbackRecipient: fallbackRecipient,
+                rateLimitCapacity: type(uint128).max,
+                rateLimitRefillPerSecond: 0
             }),
             Config.LayerZeroBridgeAdapterConfig({ lzEndpoint: LZ_ENDPOINT, admin: admin, operator: operator })
         );

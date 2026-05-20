@@ -68,6 +68,8 @@ contract DeployAll is DeployBase {
     function _loadPYUSDXConfig() private view returns (PYUSDXConfig memory config) {
         config.name = vm.envString("PYUSDX_NAME");
         config.symbol = vm.envString("PYUSDX_SYMBOL");
+        require(bytes(config.name).length != 0, "PYUSDX_NAME must be set");
+        require(bytes(config.symbol).length != 0, "PYUSDX_SYMBOL must be set");
         config.admin = vm.envAddress("PYUSDX_ADMIN");
         config.pauser = vm.envAddress("PYUSDX_PAUSER");
         config.freezeManager = vm.envAddress("PYUSDX_FREEZE_MANAGER");
@@ -78,8 +80,8 @@ contract DeployAll is DeployBase {
 
     function _loadIssuerGatewayConfig() private view returns (IssuerGatewayConfig memory config) {
         config.admin = vm.envAddress("ISSUER_GATEWAY_ADMIN");
-        config.issuer = vm.envAddress("ISSUER_GATEWAY_ISSUER");
-        config.minter = vm.envAddress("ISSUER_GATEWAY_MINTER");
+        config.operator = vm.envAddress("ISSUER_GATEWAY_OPERATOR");
+        config.executor = vm.envAddress("ISSUER_GATEWAY_EXECUTOR");
         config.mintDelay = uint32(vm.envUint("ISSUER_GATEWAY_MINT_DELAY"));
         config.mintTTL = uint32(vm.envUint("ISSUER_GATEWAY_MINT_TTL"));
         config.rateLimitCapacity = uint128(vm.envUint("ISSUER_GATEWAY_RATE_LIMIT_CAPACITY"));
@@ -101,6 +103,9 @@ contract DeployAll is DeployBase {
         config.pauser = vm.envAddress("PORTAL_PAUSER");
         config.operator = vm.envAddress("PORTAL_OPERATOR");
         config.fallbackRecipient = vm.envAddress("PORTAL_FALLBACK_RECIPIENT");
+        require(config.fallbackRecipient != address(0), "PORTAL_FALLBACK_RECIPIENT must be set");
+        config.rateLimitCapacity = uint128(vm.envUint("PORTAL_RATE_LIMIT_CAPACITY"));
+        config.rateLimitRefillPerSecond = uint128(vm.envUint("PORTAL_RATE_LIMIT_REFILL"));
     }
 
     function _loadLayerZeroBridgeAdapterConfig() private view returns (LayerZeroBridgeAdapterConfig memory config) {
