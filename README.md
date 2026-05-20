@@ -137,14 +137,6 @@ Protocol specification PDFs are available in the `docs/` directory.
 npm run build
 ```
 
-### One-time setup
-
-The deploy script writes per-chain address records to `deployments/{chainId}.json`. Create the directory once before the first deploy on a fresh checkout:
-
-```bash
-mkdir -p deployments
-```
-
 ### Deploy locally
 
 Start a local Anvil node, then deploy:

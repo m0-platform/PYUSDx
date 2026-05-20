@@ -61,6 +61,8 @@ contract ScriptBase is Script, Config {
     }
 
     function _writeDeployment(uint256 chainId_, string memory key_, address value_) internal {
+        vm.createDir(string.concat(vm.projectRoot(), "/deployments"), true);
+
         string memory root = "";
 
         Deployments memory deployments_ = vm.isFile(_deployOutputPath(chainId_))
