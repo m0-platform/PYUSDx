@@ -81,7 +81,7 @@ contract ExtensionBeaconProxyTest is BaseTest {
     }
 
     function test_constructor_revertOnNonContractImplementation() public {
-        MockExtensionBeacon mockBeacon = new MockExtensionBeacon();
+        MockExtensionBeacon mockBeacon = new MockExtensionBeacon(address(0), address(0));
         address eoa = makeAddr("eoa");
         mockBeacon.setImplementation(eoa);
 

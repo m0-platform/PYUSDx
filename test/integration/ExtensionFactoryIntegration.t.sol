@@ -13,6 +13,8 @@ import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
+import { MockExtensionBeacon } from "../mock/MockExtensionBeacon.sol";
+
 contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     string public constant EXTENSION_NAME_YTO = "YTO-001";
     string public constant EXTENSION_NAME_MM = "MM-001";
@@ -35,13 +37,37 @@ contract ExtensionFactoryIntegrationTest is IntegrationForkTest {
     }
 
     function test_constructor_zeroYTOBeacon() public {
-        vm.expectRevert(IExtensionFactory.ZeroYieldToOneBeacon.selector);
+        vm.expectRevert(IExtensionFactory.ZeroBeacon.selector);
         new ExtensionFactory(address(pyusdx), address(swapFacility), address(0), address(multiMintBeacon));
     }
 
     function test_constructor_zeroMMBeacon() public {
-        vm.expectRevert(IExtensionFactory.ZeroMultiMintBeacon.selector);
+        vm.expectRevert(IExtensionFactory.ZeroBeacon.selector);
         new ExtensionFactory(address(pyusdx), address(swapFacility), address(yieldToOneBeacon), address(0));
+    }
+
+    function test_constructor_sameBeacon() public {
+        vm.expectRevert(IExtensionFactory.SameBeacon.selector);
+        new ExtensionFactory(
+            address(pyusdx),
+            address(swapFacility),
+            address(yieldToOneBeacon),
+            address(yieldToOneBeacon)
+        );
+    }
+
+    function test_constructor_beaconWrongPyusdx() public {
+        address wrongBeacon = address(new MockExtensionBeacon(makeAddr("wrongPyusdx"), address(swapFacility)));
+
+        vm.expectRevert(IExtensionFactory.InvalidBeacon.selector);
+        new ExtensionFactory(address(pyusdx), address(swapFacility), wrongBeacon, address(multiMintBeacon));
+    }
+
+    function test_constructor_beaconWrongSwapFacility() public {
+        address wrongBeacon = address(new MockExtensionBeacon(address(pyusdx), makeAddr("wrongSwapFacility")));
+
+        vm.expectRevert(IExtensionFactory.InvalidBeacon.selector);
+        new ExtensionFactory(address(pyusdx), address(swapFacility), wrongBeacon, address(multiMintBeacon));
     }
 
     function test_initialize_zeroAdmin() public {

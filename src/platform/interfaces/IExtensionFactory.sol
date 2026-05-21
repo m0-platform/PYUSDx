@@ -76,17 +76,20 @@ interface IExtensionFactory {
     /// @notice Thrown if PYUSDX address does not match the one in SwapFacility.
     error PYUSDXMismatch();
 
+    /// @notice Thrown if a beacon address is 0x0.
+    error ZeroBeacon();
+
+    /// @notice Thrown if a beacon is invalid (e.g. wrong pyusdx/swapFacility wiring).
+    error InvalidBeacon();
+
+    /// @notice Thrown if the YieldToOne and MultiMint beacons share the same address.
+    error SameBeacon();
+
     /// @notice Thrown if the extension is 0x0.
     error ZeroExtension();
 
     /// @notice Thrown if the extension address is invalid (e.g. wrong pyusdx/swapFacility wiring).
     error InvalidExtension();
-
-    /// @notice Thrown if the YieldToOne beacon address is 0x0.
-    error ZeroYieldToOneBeacon();
-
-    /// @notice Thrown if the MultiMint beacon address is 0x0.
-    error ZeroMultiMintBeacon();
 
     /// @notice Thrown when attempting to change a registered extension's type to a different non-NONE type.
     error ExtensionAlreadyRegistered();
