@@ -141,4 +141,33 @@ contract DeployIntegrationTests is IntegrationForkTest {
         assertEq(pyusdx.balanceOf(alice), amount);
         assertEq(yto.balanceOf(alice), 0);
     }
+
+    /* ============ ProxyAdmin Ownership Tests ============ */
+
+    /// @notice Regression: every proxy's ProxyAdmin must be owned by the configured target admin,
+    ///         never by the transient deployer. Catches a prior bug where the PYUSDX bootstrap
+    ///         pattern rewrote `pyusdxConfig.admin = deployer` to take `DEFAULT_ADMIN_ROLE`
+    ///         transiently, and the deployer leaked into `ProxyAdmin.owner()` as a side effect.
+    function test_coreDeployment_proxyAdminsOwnedByTargetAdmin() public view {
+        address[8] memory proxyAdmins = [
+            _coreDeployments.pyusdxProxyAdmin,
+            _coreDeployments.issuerGatewayProxyAdmin,
+            _coreDeployments.swapFacilityProxyAdmin,
+            _coreDeployments.factoryProxyAdmin,
+            _coreDeployments.portalProxyAdmin,
+            _coreDeployments.layerZeroBridgeAdapterProxyAdmin,
+            _coreDeployments.yieldToOneBeaconProxyAdmin,
+            _coreDeployments.multiMintBeaconProxyAdmin
+        ];
+
+        for (uint256 i = 0; i < proxyAdmins.length; i++) {
+            assertEq(IOwnable(proxyAdmins[i]).owner(), admin);
+            assertTrue(IOwnable(proxyAdmins[i]).owner() != address(coreDeployer));
+        }
+    }
+}
+
+/// @dev Minimal interface for ProxyAdmin's ownership read; ProxyAdmin inherits OpenZeppelin Ownable.
+interface IOwnable {
+    function owner() external view returns (address);
 }
