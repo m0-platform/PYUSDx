@@ -17,12 +17,12 @@ abstract contract IssuerGatewayStorageLayout {
     }
 
     struct MintProposal {
-        uint40 createdAt; // ──╮ Timestamp when the proposal was created, good for 100+ years.
-        uint40 activeAt; //    │ Snapshotted timestamp when the proposal becomes executable.
-        uint40 expiresAt; // ──╯ Snapshotted timestamp when the proposal expires.
-        address minter; //       Address that proposed the mint.
-        address recipient; //    Address that will receive the minted tokens.
-        uint256 amount; //       Amount of PYUSDX to mint.
+        address minter; // ───╮ Address that proposed the mint.
+        uint40 createdAt; //  │ Timestamp when the proposal was created, good for 100+ years.
+        uint40 activeAt; // ──╯ Snapshotted timestamp when the proposal becomes executable.
+        address recipient; // ╮ Address that will receive the minted tokens.
+        uint40 expiresAt; // ─╯ Snapshotted timestamp when the proposal expires.
+        uint256 amount; //      Amount of PYUSDX to mint.
     }
 
     // keccak256(abi.encode(uint256(keccak256("M0.storage.IssuerGateway")) - 1)) & ~bytes32(uint256(0xff))
