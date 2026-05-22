@@ -39,6 +39,10 @@ interface IRateLimiter {
 
     /// @notice Sets/removes issuer mint rate-limit configuration.
     /// @dev    MUST only be callable by RATE_LIMIT_MANAGER_ROLE.
+    /// @dev    Reconfiguring a live bucket never increases the available amount: the time-adjusted
+    ///         remaining amount is carried over and clamped to the new capacity. Lowering capacity
+    ///         clamps remaining down, and a non-refilling bucket cannot regain it via reconfiguration.
+    ///         A full reset is only possible by removing the bucket (enabled=false) and re-creating it.
     /// @param  issuer          Address of the issuer.
     /// @param  capacity        Maximum bucket capacity.
     /// @param  refillPerSecond Refill rate per second. Set to 0 for a one-time mint cap with no refill.

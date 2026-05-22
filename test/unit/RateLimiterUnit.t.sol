@@ -105,7 +105,7 @@ contract RateLimiterTests is BaseTest {
         assertEq(limiter.getRemainingAmount(issuer), 30e6);
     }
 
-    function test_setRateLimit_shrinkThenRestoreWithZeroRefillResetsRemaining() public {
+    function test_setRateLimit_shrinkThenRestoreWithZeroRefillKeepsRemaining() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 10e6, 0, true);
 
@@ -117,40 +117,57 @@ contract RateLimiterTests is BaseTest {
 
         assertEq(limiter.getRemainingAmount(issuer), 5e6);
 
-        // Restore: remaining tracks the restored capacity, not the prior clamped value.
+        // Restore: a non-refilling bucket cannot regain tokens via reconfiguration; remaining stays clamped.
+        // Refilling to full requires removal + re-setup (a fresh bucket).
         vm.prank(manager);
         limiter.setRateLimit(issuer, 10e6, 0, true);
 
-        assertEq(limiter.getRemainingAmount(issuer), 10e6);
+        assertEq(limiter.getRemainingAmount(issuer), 5e6);
     }
 
-    function test_setRateLimit_switchToZeroRefillResetsRemaining() public {
+    function test_setRateLimit_switchRefillRatePreservesRemaining() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10e6, true);
 
         limiter.enforceRateLimit(issuer, 50e6);
         assertEq(limiter.getRemainingAmount(issuer), 50e6);
 
-        // Switching refillPerSecond to 0 resets remaining to capacity regardless of prior consumption.
+        // Switching the refill rate carries over the current remaining in either direction; it never
+        // snaps to capacity nor grants instant allowance.
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 0, true);
 
-        assertEq(limiter.getRemainingAmount(issuer), 100e6);
-    }
-
-    function test_setRateLimit_switchFromZeroRefillPreservesRemaining() public {
-        vm.prank(manager);
-        limiter.setRateLimit(issuer, 100e6, 0, true);
-
-        limiter.enforceRateLimit(issuer, 50e6);
         assertEq(limiter.getRemainingAmount(issuer), 50e6);
 
-        // Switching to a non-zero refill rate keeps the prior remaining; the reset is asymmetric
-        // and only fires when the new refillPerSecond is 0.
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 10e6, true);
 
         assertEq(limiter.getRemainingAmount(issuer), 50e6);
+    }
+
+    function test_setRateLimit_drainedBucketNotRefilledByZeroRefillToggle() public {
+        // A drained bucket must not be instantly refilled by toggling
+        // refillPerSecond to 0 and back. Re-arming to full requires removal + re-setup.
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 100e6, 1, true);
+
+        limiter.enforceRateLimit(issuer, 100e6);
+        assertEq(limiter.getRemainingAmount(issuer), 0);
+
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 100e6, 0, true);
+
+        assertEq(limiter.getRemainingAmount(issuer), 0);
+
+        vm.prank(manager);
+        limiter.setRateLimit(issuer, 100e6, 1, true);
+
+        assertEq(limiter.getRemainingAmount(issuer), 0);
+
+        // Natural refill resumes from the carried-over remaining (0), at the configured rate.
+        vm.warp(block.timestamp + 40e6);
+
+        assertEq(limiter.getRemainingAmount(issuer), 40e6);
     }
 
     function test_setRateLimit_disableThenReenableGivesFreshBucket() public {
@@ -244,27 +261,19 @@ contract RateLimiterTests is BaseTest {
         assertEq(limiter.getRemainingAmount(issuer), 70e6);
     }
 
-    function test_getRemainingAmount_withRefill() public {
+    function test_getRemainingAmount_refill() public {
         vm.prank(manager);
         limiter.setRateLimit(issuer, 100e6, 5e6, true); // 5e6 per second
 
-        limiter.enforceRateLimit(issuer, 50e6);
-        assertEq(limiter.getRemainingAmount(issuer), 50e6);
+        limiter.enforceRateLimit(issuer, 80e6);
+        assertEq(limiter.getRemainingAmount(issuer), 20e6);
 
-        // 10 seconds pass, refill = 10 * 5e6 = 50e6
-        vm.warp(block.timestamp + 10);
-        assertEq(limiter.getRemainingAmount(issuer), 100e6); // Capped at capacity
-    }
+        // Partial refill: 20e6 + 5*5e6 = 45e6, below capacity.
+        vm.warp(block.timestamp + 5);
+        assertEq(limiter.getRemainingAmount(issuer), 45e6);
 
-    function test_getRemainingAmount_refillCapsAtCapacity() public {
-        vm.prank(manager);
-        limiter.setRateLimit(issuer, 100e6, 1000e6, true); // 1000e6 per second
-
-        limiter.enforceRateLimit(issuer, 99e6);
-        assertEq(limiter.getRemainingAmount(issuer), 1e6);
-
-        // 1 second passes, would refill 1000, but capped at 100
-        vm.warp(block.timestamp + 1);
+        // Further refill would exceed capacity, capped at 100e6.
+        vm.warp(block.timestamp + 100);
         assertEq(limiter.getRemainingAmount(issuer), 100e6);
     }
 
