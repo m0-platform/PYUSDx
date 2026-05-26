@@ -110,6 +110,7 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, 
         StorageSlot.getAddressSlot(_BEACON_SLOT).value = address(0);
         StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value = implementation;
 
+        emit IERC1967.BeaconUpgraded(address(0));
         emit IERC1967.Upgraded(implementation);
     }
 
@@ -125,6 +126,7 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, 
         StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value = address(0);
         StorageSlot.getAddressSlot(_BEACON_SLOT).value = beacon;
 
+        emit IERC1967.Upgraded(address(0));
         emit IERC1967.BeaconUpgraded(beacon);
     }
 

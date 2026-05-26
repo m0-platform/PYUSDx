@@ -220,6 +220,9 @@ contract ExtensionBeaconProxyTest is BaseTest {
 
         // Pin to v1
         vm.expectEmit();
+        emit IERC1967.BeaconUpgraded(address(0));
+
+        vm.expectEmit();
         emit IERC1967.Upgraded(address(ytoImpl));
 
         vm.prank(versionManager);
@@ -277,6 +280,9 @@ contract ExtensionBeaconProxyTest is BaseTest {
 
         // Re-pin directly to v2
         vm.expectEmit();
+        emit IERC1967.BeaconUpgraded(address(0));
+
+        vm.expectEmit();
         emit IERC1967.Upgraded(address(v2Impl));
 
         vm.prank(versionManager);
@@ -305,6 +311,9 @@ contract ExtensionBeaconProxyTest is BaseTest {
         assertEq(ExtensionHarness(address(proxy)).harnessVersion(), 1);
 
         // Unpin
+        vm.expectEmit();
+        emit IERC1967.Upgraded(address(0));
+
         vm.expectEmit();
         emit IERC1967.BeaconUpgraded(address(beacon));
 
