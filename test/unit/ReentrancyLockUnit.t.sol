@@ -55,8 +55,8 @@ contract ReentrancyLockUnitTests is PYUSDXBaseUnitTest {
         );
 
         // Deploy mock beacons (unit tests use mocks, not real extensions)
-        MockExtensionBeacon mockYTOBeacon = new MockExtensionBeacon();
-        MockExtensionBeacon mockMMBeacon = new MockExtensionBeacon();
+        MockExtensionBeacon mockYTOBeacon = new MockExtensionBeacon(address(pyusdx), address(swapFacility));
+        MockExtensionBeacon mockMMBeacon = new MockExtensionBeacon(address(pyusdx), address(swapFacility));
 
         // Deploy factory with actual SwapFacility address
         factory = ExtensionFactoryHarness(

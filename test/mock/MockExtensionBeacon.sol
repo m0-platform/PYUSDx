@@ -9,6 +9,13 @@ contract MockExtensionBeacon is IExtensionBeacon {
     mapping(uint256 => address) private _implementations;
     uint256 private _latestVersion;
     address private _latestImpl;
+    address private immutable _pyusdx;
+    address private immutable _swapFacility;
+
+    constructor(address pyusdx_, address swapFacility_) {
+        _pyusdx = pyusdx_;
+        _swapFacility = swapFacility_;
+    }
 
     function setImplementation(address implementation_) external {
         _latestVersion++;
@@ -35,12 +42,12 @@ contract MockExtensionBeacon is IExtensionBeacon {
         return 1;
     }
 
-    function pyusdx() external pure returns (address) {
-        return address(0);
+    function pyusdx() external view returns (address) {
+        return _pyusdx;
     }
 
-    function swapFacility() external pure returns (address) {
-        return address(0);
+    function swapFacility() external view returns (address) {
+        return _swapFacility;
     }
 
     function BEACON_MANAGER_ROLE() external pure returns (bytes32) {

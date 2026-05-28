@@ -80,8 +80,13 @@ contract ExtensionFactory is
         if ((pyusdx = pyusdx_) == address(0)) revert ZeroPYUSDX();
         if ((swapFacility = swapFacility_) == address(0)) revert ZeroSwapFacility();
         if (pyusdx != ISwapFacility(swapFacility).pyusdx()) revert PYUSDXMismatch();
-        if ((yieldToOneBeacon = yieldToOneBeacon_) == address(0)) revert ZeroYieldToOneBeacon();
-        if ((multiMintBeacon = multiMintBeacon_) == address(0)) revert ZeroMultiMintBeacon();
+
+        _revertIfInvalidBeacon(yieldToOneBeacon_);
+        _revertIfInvalidBeacon(multiMintBeacon_);
+        if (yieldToOneBeacon_ == multiMintBeacon_) revert SameBeacon();
+
+        yieldToOneBeacon = yieldToOneBeacon_;
+        multiMintBeacon = multiMintBeacon_;
     }
 
     /* ============ Initializer ============ */
@@ -247,6 +252,15 @@ contract ExtensionFactory is
     /// @param admin The admin address to check.
     function _revertIfZeroAdmin(address admin) internal pure {
         if (admin == address(0)) revert ZeroAdmin();
+    }
+
+    /// @dev   Reverts if the beacon address is zero or wired to wrong pyusdx/swapFacility.
+    /// @param beacon The beacon address to validate.
+    function _revertIfInvalidBeacon(address beacon) internal view {
+        if (beacon == address(0)) revert ZeroBeacon();
+
+        if (IExtensionBeacon(beacon).pyusdx() != pyusdx || IExtensionBeacon(beacon).swapFacility() != swapFacility)
+            revert InvalidBeacon();
     }
 
     /// @dev   Reverts if the extension address is zero or wired to wrong pyusdx/swapFacility.
