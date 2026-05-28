@@ -80,7 +80,9 @@ abstract contract IntegrationForkTest is BaseForkTest {
                 freezeManager: freezeManager,
                 forcedTransferManager: forcedTransferManager,
                 earnerManager: earnerManager,
-                rateManager: rateManager
+                rateManager: rateManager,
+                earnerManagerRateLimitCapacity: type(uint128).max,
+                earnerManagerRateLimitRefillPerSecond: 0
             }),
             Config.IssuerGatewayConfig({
                 admin: admin,

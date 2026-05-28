@@ -41,6 +41,7 @@ etherscan_api_key = "${ETHERSCAN_API_KEY}"
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}", url = "${MAINNET_VERIFIER_URL}" }
+arbitrum = { key = "${ETHERSCAN_API_KEY}", url = "${ARBITRUM_VERIFIER_URL}" }
 
 sepolia = { key = "${ETHERSCAN_API_KEY}", url = "${SEPOLIA_VERIFIER_URL}" }
 

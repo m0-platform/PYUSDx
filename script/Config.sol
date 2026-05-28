@@ -13,6 +13,8 @@ contract Config {
         address forcedTransferManager;
         address earnerManager;
         address rateManager;
+        uint128 earnerManagerRateLimitCapacity;
+        uint128 earnerManagerRateLimitRefillPerSecond;
     }
 
     struct IssuerGatewayConfig {
