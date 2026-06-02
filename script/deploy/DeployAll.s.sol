@@ -8,6 +8,7 @@ import { DeployBase } from "./DeployBase.s.sol";
 contract DeployAll is DeployBase {
     function run() public {
         address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
+        console.log("Deployer:", deployer);
 
         PYUSDXConfig memory pyusdxConfig = _loadPYUSDXConfig();
         IssuerGatewayConfig memory issuerGatewayConfig = _loadIssuerGatewayConfig();

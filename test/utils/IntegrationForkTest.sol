@@ -71,40 +71,7 @@ abstract contract IntegrationForkTest is BaseForkTest {
     function _deployCoreStack() internal {
         coreDeployer = new CoreDeployer();
 
-        DeployBase.CoreDeployments memory deployments_ = coreDeployer.deployCore(
-            Config.PYUSDXConfig({
-                name: "PayPal USD Yield",
-                symbol: "PYUSDX",
-                admin: admin,
-                pauser: pauser,
-                freezeManager: freezeManager,
-                forcedTransferManager: forcedTransferManager,
-                earnerManager: earnerManager,
-                rateManager: rateManager,
-                earnerManagerRateLimitCapacity: type(uint128).max,
-                earnerManagerRateLimitRefillPerSecond: 0
-            }),
-            Config.IssuerGatewayConfig({
-                admin: admin,
-                operator: operator,
-                executor: executor,
-                mintDelay: MINT_DELAY,
-                mintTTL: MINT_TTL,
-                rateLimitCapacity: type(uint128).max,
-                rateLimitRefillPerSecond: 0
-            }),
-            Config.SwapFacilityConfig({ admin: admin, pauser: pauser }),
-            Config.FactoryConfig({ admin: admin, factoryManager: factoryManager }),
-            Config.PortalConfig({
-                admin: admin,
-                pauser: pauser,
-                operator: operator,
-                fallbackRecipient: fallbackRecipient,
-                rateLimitCapacity: type(uint128).max,
-                rateLimitRefillPerSecond: 0
-            }),
-            Config.LayerZeroBridgeAdapterConfig({ lzEndpoint: LZ_ENDPOINT, admin: admin, operator: operator })
-        );
+        DeployBase.CoreDeployments memory deployments_ = _deployCoreStackWith(coreDeployer, admin, rateManager);
 
         pyusdx = PYUSDX(deployments_.pyusdxProxy);
         issuerGateway = IssuerGateway(deployments_.issuerGatewayProxy);
@@ -115,6 +82,50 @@ abstract contract IntegrationForkTest is BaseForkTest {
         portal = Portal(deployments_.portalProxy);
         layerZeroBridgeAdapter = LayerZeroBridgeAdapter(deployments_.layerZeroBridgeAdapterProxy);
         _coreDeployments = deployments_;
+    }
+
+    /// @dev Deploys a full core stack via the given deployer, overriding the PYUSDX admin and rate
+    ///      manager so tests can exercise the case where the deployer is also a target role holder.
+    function _deployCoreStackWith(
+        CoreDeployer deployer_,
+        address pyusdxAdmin_,
+        address pyusdxRateManager_
+    ) internal returns (DeployBase.CoreDeployments memory) {
+        return
+            deployer_.deployCore(
+                Config.PYUSDXConfig({
+                    name: "PayPal USD Yield",
+                    symbol: "PYUSDX",
+                    admin: pyusdxAdmin_,
+                    pauser: pauser,
+                    freezeManager: freezeManager,
+                    forcedTransferManager: forcedTransferManager,
+                    earnerManager: earnerManager,
+                    rateManager: pyusdxRateManager_,
+                    earnerManagerRateLimitCapacity: type(uint128).max,
+                    earnerManagerRateLimitRefillPerSecond: 0
+                }),
+                Config.IssuerGatewayConfig({
+                    admin: admin,
+                    operator: operator,
+                    executor: executor,
+                    mintDelay: MINT_DELAY,
+                    mintTTL: MINT_TTL,
+                    rateLimitCapacity: type(uint128).max,
+                    rateLimitRefillPerSecond: 0
+                }),
+                Config.SwapFacilityConfig({ admin: admin, pauser: pauser }),
+                Config.FactoryConfig({ admin: admin, factoryManager: factoryManager }),
+                Config.PortalConfig({
+                    admin: admin,
+                    pauser: pauser,
+                    operator: operator,
+                    fallbackRecipient: fallbackRecipient,
+                    rateLimitCapacity: type(uint128).max,
+                    rateLimitRefillPerSecond: 0
+                }),
+                Config.LayerZeroBridgeAdapterConfig({ lzEndpoint: LZ_ENDPOINT, admin: admin, operator: operator })
+            );
     }
 
     /// @dev Helper to mint PYUSDX through the time-delay mechanism

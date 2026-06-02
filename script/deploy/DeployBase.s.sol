@@ -106,7 +106,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
                 config.mintDelay,
                 config.mintTTL
             ),
-            _computeSalt(deployer, "IssuerGateway")
+            _computeSalt(deployer, "PYUSDXIssuerGateway")
         );
 
         proxyAdmin = Upgrades.getAdminAddress(proxy);
@@ -124,7 +124,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
             implementation,
             config.admin,
             abi.encodeWithSelector(SwapFacility.initialize.selector, config.admin, config.pauser),
-            _computeSalt(deployer, "SwapFacility")
+            _computeSalt(deployer, "PYUSDXSwapFacility")
         );
 
         proxyAdmin = Upgrades.getAdminAddress(proxy);
@@ -274,7 +274,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
             deployment
         );
 
-        address predictedSwapFacility = _getCreate3Address(deployer, _computeSalt(deployer, "SwapFacility"));
+        address predictedSwapFacility = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDXSwapFacility"));
         address predictedFactory = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDXExtensionFactory"));
 
         console.log("Predicted SwapFacility proxy:      ", predictedSwapFacility);
@@ -337,7 +337,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
         CoreDeployments memory deployment
     ) internal returns (address targetAdmin, address targetRateManager) {
         address predictedPYUSDX = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDX"));
-        address predictedIssuerGateway = _getCreate3Address(deployer, _computeSalt(deployer, "IssuerGateway"));
+        address predictedIssuerGateway = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDXIssuerGateway"));
 
         console.log("Predicted PYUSDX proxy:            ", predictedPYUSDX);
         console.log("Predicted IssuerGateway proxy:     ", predictedIssuerGateway);
@@ -412,11 +412,19 @@ contract DeployBase is DeployHelpers, ScriptBase {
         bytes32 rateLimitManagerRole = IRateLimiter(pyusdxProxy).RATE_LIMIT_MANAGER_ROLE();
         bytes32 defaultAdminRole = 0x00;
 
-        IAccessControl(pyusdxProxy).grantRole(rateLimitManagerRole, targetRateManager);
-        IAccessControl(pyusdxProxy).grantRole(defaultAdminRole, targetAdmin);
+        // The deployer already holds both roles from initialization.
+        // Only transfer a role to its target holder when that holder is not the deployer:
+        // grant it to the target, then renounce the deployer's copy.
+        // The rate-manager block runs first so the deployer retains DEFAULT_ADMIN_ROLE through both grants.
+        if (deployer != targetRateManager) {
+            IAccessControl(pyusdxProxy).grantRole(rateLimitManagerRole, targetRateManager);
+            IAccessControl(pyusdxProxy).renounceRole(rateLimitManagerRole, deployer);
+        }
 
-        IAccessControl(pyusdxProxy).renounceRole(rateLimitManagerRole, deployer);
-        IAccessControl(pyusdxProxy).renounceRole(defaultAdminRole, deployer);
+        if (deployer != targetAdmin) {
+            IAccessControl(pyusdxProxy).grantRole(defaultAdminRole, targetAdmin);
+            IAccessControl(pyusdxProxy).renounceRole(defaultAdminRole, deployer);
+        }
     }
 
     function _deployPortalStack(

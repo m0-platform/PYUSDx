@@ -3,10 +3,13 @@ pragma solidity 0.8.34;
 
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 
+import { DeployBase } from "../../script/deploy/DeployBase.s.sol";
+
 import { IExtensionFactory } from "../../src/platform/interfaces/IExtensionFactory.sol";
+import { PYUSDX } from "../../src/PYUSDX.sol";
 import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 
-import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
+import { CoreDeployer, IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
 
 /// @title DeployIntegrationTests
 /// @notice Validates the deploy scripts produce a fully wired, functional PYUSDX stack
@@ -39,6 +42,20 @@ contract DeployIntegrationTests is IntegrationForkTest {
         // Deployer's transient roles must be renounced after deployment
         assertFalse(pyusdx.hasRole(pyusdx.DEFAULT_ADMIN_ROLE(), address(coreDeployer)));
         assertFalse(pyusdx.hasRole(pyusdx.RATE_LIMIT_MANAGER_ROLE(), address(coreDeployer)));
+    }
+
+    /// @notice Regression: when the deployer is also the configured admin and rate manager, the
+    ///         transient-role renounce must not strip those roles. Otherwise the grant-then-renounce
+    ///         sequence nets to zero holders, bricking admin and rate-manager control on PYUSDX.
+    function test_coreDeployment_deployerIsTargetAdmin_retainsRoles() public {
+        CoreDeployer selfDeployer = new CoreDeployer();
+        address self = address(selfDeployer);
+
+        DeployBase.CoreDeployments memory deployments_ = _deployCoreStackWith(selfDeployer, self, self);
+        PYUSDX deployed = PYUSDX(deployments_.pyusdxProxy);
+
+        assertTrue(deployed.hasRole(deployed.DEFAULT_ADMIN_ROLE(), self));
+        assertTrue(deployed.hasRole(deployed.RATE_LIMIT_MANAGER_ROLE(), self));
     }
 
     function test_coreDeployment_issuerGatewayRoles() public view {
