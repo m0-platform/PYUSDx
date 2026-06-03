@@ -5,9 +5,17 @@
 # dapp deps
 update:; forge update
 
+# Uses the 1Password CLI to inject secrets referenced in .env into the forge process.
+# In .env, set secret values as 1Password references, e.g. PRIVATE_KEY="op://vault/item/field".
+# `op run` injects every .env var, so the scripts read them (PRIVATE_KEY, PYUSDX_*, etc.) directly via vm.env*.
+OP_RUN := op run --env-file=".env" --
+
 # Deployment helpers
+# CHAIN selects the foundry rpc_endpoints alias (localhost/mainnet/arbitrum/sepolia), resolved from
+# the matching *_RPC_URL env var that `op run` injects.
+# The non-secret config vars are listed explicitly so it's clear which env vars the deploy consumes;
+# PRIVATE_KEY (and the RPC URL) are the only secrets and are injected by `op run`.
 deploy:
-	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) \
 	PYUSDX_NAME=$(PYUSDX_NAME) PYUSDX_SYMBOL=$(PYUSDX_SYMBOL) \
 	PYUSDX_ADMIN=$(PYUSDX_ADMIN) PYUSDX_PAUSER=$(PYUSDX_PAUSER) \
 	PYUSDX_FREEZE_MANAGER=$(PYUSDX_FREEZE_MANAGER) PYUSDX_FORCED_TRANSFER_MANAGER=$(PYUSDX_FORCED_TRANSFER_MANAGER) \
@@ -27,85 +35,106 @@ deploy:
 	LAYER_ZERO_ENDPOINT=$(LAYER_ZERO_ENDPOINT) \
 	LAYER_ZERO_BRIDGE_ADAPTER_ADMIN=$(LAYER_ZERO_BRIDGE_ADAPTER_ADMIN) \
 	LAYER_ZERO_BRIDGE_ADAPTER_OPERATOR=$(LAYER_ZERO_BRIDGE_ADAPTER_OPERATOR) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/deploy/DeployAll.s.sol:DeployAll \
-	--rpc-url $(RPC_URL) \
-	--private-key $(PRIVATE_KEY) \
+	--rpc-url $(CHAIN) \
 	--skip test --slow --non-interactive --broadcast --verify
 
-deploy-local: RPC_URL=$(LOCALHOST_RPC_URL)
+deploy-local: CHAIN=localhost
 deploy-local: deploy
 
-deploy-mainnet: RPC_URL=$(MAINNET_RPC_URL)
+deploy-mainnet: CHAIN=mainnet
 deploy-mainnet: deploy
 
-deploy-arbitrum: RPC_URL=$(ARBITRUM_RPC_URL)
+deploy-arbitrum: CHAIN=arbitrum
 deploy-arbitrum: deploy
 
-deploy-sepolia: RPC_URL=$(SEPOLIA_RPC_URL)
+deploy-sepolia: CHAIN=sepolia
 deploy-sepolia: deploy
 
 # Portal configuration helpers
-# PEERS is a Solidity uint32[] literal of remote chain IDs, e.g. PEERS='[42161]'.
-configure-portal: PEERS ?= []
+# PEERS is a Solidity uint32[] literal of remote chain IDs. It defaults to an empty array and is set
+# by the per-network targets below; override on the CLI with PEERS='[...]'.
+PEERS ?= []
+
 configure-portal:
-	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/configure/ConfigurePortal.s.sol:ConfigurePortal \
 	--sig "run(uint32[])" $(PEERS) \
-	--rpc-url $(RPC_URL) \
-	--private-key $(PRIVATE_KEY) \
+	--rpc-url $(CHAIN) \
 	--skip test --slow --non-interactive --broadcast
 
-configure-portal-local: PEERS ?= [42161]
-configure-portal-local: RPC_URL=$(LOCALHOST_RPC_URL)
+configure-portal-local: PEERS = [42161]
+configure-portal-local: CHAIN=localhost
 configure-portal-local: configure-portal
 
-configure-portal-mainnet: PEERS ?= [42161]
-configure-portal-mainnet: RPC_URL=$(MAINNET_RPC_URL)
+configure-portal-mainnet: PEERS = [42161]
+configure-portal-mainnet: CHAIN=mainnet
 configure-portal-mainnet: configure-portal
 
-configure-portal-arbitrum: PEERS ?= [1]
-configure-portal-arbitrum: RPC_URL=$(ARBITRUM_RPC_URL)
+configure-portal-arbitrum: PEERS = [1]
+configure-portal-arbitrum: CHAIN=arbitrum
 configure-portal-arbitrum: configure-portal
 
 # LayerZero ULN/DVN security config. Signer must be the adapter's LayerZero delegate.
-configure-lz-adapter: PEERS ?= []
 configure-lz-adapter:
-	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/configure/ConfigureLayerZero.s.sol:ConfigureLayerZero \
 	--sig "run(uint32[])" $(PEERS) \
-	--rpc-url $(RPC_URL) \
-	--private-key $(PRIVATE_KEY) \
+	--rpc-url $(CHAIN) \
 	--skip test --slow --non-interactive --broadcast
 
-configure-lz-adapter-local: PEERS ?= [42161]
-configure-lz-adapter-local: RPC_URL=$(LOCALHOST_RPC_URL)
+configure-lz-adapter-local: PEERS = [42161]
+configure-lz-adapter-local: CHAIN=localhost
 configure-lz-adapter-local: configure-lz-adapter
 
-configure-lz-adapter-mainnet: PEERS ?= [42161]
-configure-lz-adapter-mainnet: RPC_URL=$(MAINNET_RPC_URL)
+configure-lz-adapter-mainnet: PEERS = [42161]
+configure-lz-adapter-mainnet: CHAIN=mainnet
 configure-lz-adapter-mainnet: configure-lz-adapter
 
-configure-lz-adapter-arbitrum: PEERS ?= [1]
-configure-lz-adapter-arbitrum: RPC_URL=$(ARBITRUM_RPC_URL)
+configure-lz-adapter-arbitrum: PEERS = [1]
+configure-lz-adapter-arbitrum: CHAIN=arbitrum
 configure-lz-adapter-arbitrum: configure-lz-adapter
 
 # Safe multisig propose variants: write a Safe Transaction Builder batch to safe/<chainid>-*.json
 # (no broadcast). Import the file into the Safe UI to execute via the multisig.
-propose-configure-portal: PEERS ?= []
 propose-configure-portal:
-	FOUNDRY_PROFILE=production \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/configure/ProposeConfigurePortal.s.sol:ProposeConfigurePortal \
 	--sig "run(uint32[])" $(PEERS) \
-	--rpc-url $(RPC_URL) \
+	--rpc-url $(CHAIN) \
 	--skip test --non-interactive
 
-propose-configure-lz-adapter: PEERS ?= []
+propose-configure-portal-local: PEERS = [42161]
+propose-configure-portal-local: CHAIN=localhost
+propose-configure-portal-local: propose-configure-portal
+
+propose-configure-portal-mainnet: PEERS = [42161]
+propose-configure-portal-mainnet: CHAIN=mainnet
+propose-configure-portal-mainnet: propose-configure-portal
+
+propose-configure-portal-arbitrum: PEERS = [1]
+propose-configure-portal-arbitrum: CHAIN=arbitrum
+propose-configure-portal-arbitrum: propose-configure-portal
+
 propose-configure-lz-adapter:
-	FOUNDRY_PROFILE=production \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/configure/ProposeConfigureLayerZero.s.sol:ProposeConfigureLayerZero \
 	--sig "run(uint32[])" $(PEERS) \
-	--rpc-url $(RPC_URL) \
+	--rpc-url $(CHAIN) \
 	--skip test --non-interactive
+
+propose-configure-lz-adapter-local: PEERS = [42161]
+propose-configure-lz-adapter-local: CHAIN=localhost
+propose-configure-lz-adapter-local: propose-configure-lz-adapter
+
+propose-configure-lz-adapter-mainnet: PEERS = [42161]
+propose-configure-lz-adapter-mainnet: CHAIN=mainnet
+propose-configure-lz-adapter-mainnet: propose-configure-lz-adapter
+
+propose-configure-lz-adapter-arbitrum: PEERS = [1]
+propose-configure-lz-adapter-arbitrum: CHAIN=arbitrum
+propose-configure-lz-adapter-arbitrum: propose-configure-lz-adapter
 
 # Run slither
 slither :; FOUNDRY_PROFILE=production forge build --build-info --skip '*/test/**' --skip '*/script/**' --force && slither --compile-force-framework foundry --ignore-compile --sarif results.sarif --config-file slither.config.json .
