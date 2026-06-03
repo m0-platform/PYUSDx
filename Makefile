@@ -44,6 +44,69 @@ deploy-arbitrum: deploy
 deploy-sepolia: RPC_URL=$(SEPOLIA_RPC_URL)
 deploy-sepolia: deploy
 
+# Portal configuration helpers
+# PEERS is a Solidity uint32[] literal of remote chain IDs, e.g. PEERS='[42161]'.
+configure-portal: PEERS ?= []
+configure-portal:
+	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) \
+	forge script script/configure/ConfigurePortal.s.sol:ConfigurePortal \
+	--sig "run(uint32[])" $(PEERS) \
+	--rpc-url $(RPC_URL) \
+	--private-key $(PRIVATE_KEY) \
+	--skip test --slow --non-interactive --broadcast
+
+configure-portal-local: PEERS ?= [42161]
+configure-portal-local: RPC_URL=$(LOCALHOST_RPC_URL)
+configure-portal-local: configure-portal
+
+configure-portal-mainnet: PEERS ?= [42161]
+configure-portal-mainnet: RPC_URL=$(MAINNET_RPC_URL)
+configure-portal-mainnet: configure-portal
+
+configure-portal-arbitrum: PEERS ?= [1]
+configure-portal-arbitrum: RPC_URL=$(ARBITRUM_RPC_URL)
+configure-portal-arbitrum: configure-portal
+
+# LayerZero ULN/DVN security config. Signer must be the adapter's LayerZero delegate.
+configure-lz-adapter: PEERS ?= []
+configure-lz-adapter:
+	FOUNDRY_PROFILE=production PRIVATE_KEY=$(PRIVATE_KEY) \
+	forge script script/configure/ConfigureLayerZero.s.sol:ConfigureLayerZero \
+	--sig "run(uint32[])" $(PEERS) \
+	--rpc-url $(RPC_URL) \
+	--private-key $(PRIVATE_KEY) \
+	--skip test --slow --non-interactive --broadcast
+
+configure-lz-adapter-local: PEERS ?= [42161]
+configure-lz-adapter-local: RPC_URL=$(LOCALHOST_RPC_URL)
+configure-lz-adapter-local: configure-lz-adapter
+
+configure-lz-adapter-mainnet: PEERS ?= [42161]
+configure-lz-adapter-mainnet: RPC_URL=$(MAINNET_RPC_URL)
+configure-lz-adapter-mainnet: configure-lz-adapter
+
+configure-lz-adapter-arbitrum: PEERS ?= [1]
+configure-lz-adapter-arbitrum: RPC_URL=$(ARBITRUM_RPC_URL)
+configure-lz-adapter-arbitrum: configure-lz-adapter
+
+# Safe multisig propose variants: write a Safe Transaction Builder batch to safe/<chainid>-*.json
+# (no broadcast). Import the file into the Safe UI to execute via the multisig.
+propose-configure-portal: PEERS ?= []
+propose-configure-portal:
+	FOUNDRY_PROFILE=production \
+	forge script script/configure/ProposeConfigurePortal.s.sol:ProposeConfigurePortal \
+	--sig "run(uint32[])" $(PEERS) \
+	--rpc-url $(RPC_URL) \
+	--skip test --non-interactive
+
+propose-configure-lz-adapter: PEERS ?= []
+propose-configure-lz-adapter:
+	FOUNDRY_PROFILE=production \
+	forge script script/configure/ProposeConfigureLayerZero.s.sol:ProposeConfigureLayerZero \
+	--sig "run(uint32[])" $(PEERS) \
+	--rpc-url $(RPC_URL) \
+	--skip test --non-interactive
+
 # Run slither
 slither :; FOUNDRY_PROFILE=production forge build --build-info --skip '*/test/**' --skip '*/script/**' --force && slither --compile-force-framework foundry --ignore-compile --sarif results.sarif --config-file slither.config.json .
 
