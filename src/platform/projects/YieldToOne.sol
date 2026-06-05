@@ -21,7 +21,7 @@ abstract contract YieldToOneStorageLayout {
     bytes32 private constant _YIELD_TO_ONE_STORAGE_LOCATION =
         0xdeb0f77528a555c599f306cdb984f1f31ca08f014cad1aa7b02fa3fece5e2e00;
 
-    function _getYieldToOneStorage() internal pure returns (YieldToOneStorage storage $) {
+    function _getYieldToOneStorage() internal pure virtual returns (YieldToOneStorage storage $) {
         bytes32 location = _YIELD_TO_ONE_STORAGE_LOCATION;
         assembly {
             $.slot := location
