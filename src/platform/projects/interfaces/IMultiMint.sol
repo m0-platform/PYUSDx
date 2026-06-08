@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.34;
 
+import { IArrayErrors } from "evm-m-extensions/src/interfaces/IArrayErrors.sol";
 import { IYieldToOne } from "./IYieldToOne.sol";
 
-interface IMultiMint is IYieldToOne {
+interface IMultiMint is IYieldToOne, IArrayErrors {
     /* ============ Events ============ */
 
     /// @notice Emitted when asset cap is set.
@@ -34,9 +35,6 @@ interface IMultiMint is IYieldToOne {
 
     /// @notice Emitted in initializer if Asset Cap Manager is 0x0.
     error ZeroAssetCapManager();
-
-    /// @notice Reverts when batch input arrays have differing lengths.
-    error ArrayLengthMismatch();
 
     /// @notice Emitted if the asset cap is reached.
     /// @param  asset Address of the asset.

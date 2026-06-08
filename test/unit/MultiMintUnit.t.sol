@@ -10,6 +10,7 @@ import { MockIssuerGateway } from "../mock/MockIssuerGateway.sol";
 import { MockSwapFacility } from "../mock/MockSwapFacility.sol";
 import { MultiMint } from "../../src/platform/projects/MultiMint.sol";
 import { IMultiMint } from "../../src/platform/projects/interfaces/IMultiMint.sol";
+import { IArrayErrors } from "../../lib/evm-m-extensions/src/interfaces/IArrayErrors.sol";
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IExtension } from "../../src/platform/interfaces/IExtension.sol";
@@ -1148,7 +1149,7 @@ contract MultiMintTest is BaseTest {
         bool[] memory statuses = new bool[](1);
         statuses[0] = true;
 
-        vm.expectRevert(IMultiMint.ArrayLengthMismatch.selector);
+        vm.expectRevert(IArrayErrors.ArrayLengthMismatch.selector);
 
         vm.prank(assetCapManager);
         extension.setReplaceAssetWhitelistCaller(accounts, statuses);

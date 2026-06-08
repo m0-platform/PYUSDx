@@ -4,6 +4,7 @@ pragma solidity 0.8.34;
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 import { IForcedTransferable } from "../../lib/evm-m-extensions/src/components/forcedTransferable/IForcedTransferable.sol";
+import { IArrayErrors } from "../../lib/evm-m-extensions/src/interfaces/IArrayErrors.sol";
 import { IPYUSDX } from "../../src/IPYUSDX.sol";
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
@@ -3299,7 +3300,7 @@ contract PYUSDXUnitTests is PYUSDXBaseUnitTest {
 
     function test_setAccountInfo_batch_revert_arrayLengthMismatch() public {
         vm.prank(earnerManager);
-        vm.expectRevert(IForcedTransferable.ArrayLengthMismatch.selector);
+        vm.expectRevert(IArrayErrors.ArrayLengthMismatch.selector);
         pyusdx.setAccountInfo(new address[](2), new uint16[](1), new uint16[](2), new address[](2));
     }
 

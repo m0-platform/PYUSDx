@@ -4,4 +4,4 @@
 	branch = v1
 [submodule "lib/evm-m-extensions"]
 	path = lib/evm-m-extensions
-	url = https://github.com/m0-foundation/evm-m-extensions
+	url = https://github.com/m0-platform/evm-m-extensions
