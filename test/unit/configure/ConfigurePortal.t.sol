@@ -9,10 +9,11 @@ import { IBridgeAdapter } from "../../../src/portal/interfaces/IBridgeAdapter.so
 import { IPortal } from "../../../src/portal/interfaces/IPortal.sol";
 
 import { Chains } from "../../../script/config/Chains.sol";
-import { LayerZeroConfig } from "../../../script/config/LayerZeroConfig.sol";
+import { LayerZeroBridgeAdapterNotDeployed, LayerZeroConfig } from "../../../script/config/LayerZeroConfig.sol";
 import { RouteConfig } from "../../../script/config/RouteConfig.sol";
 import { Transaction } from "../../../script/libraries/TransactionHelper.sol";
 
+import { PeerAdapterNotDeployed, PortalNotDeployed } from "../../../script/configure/ConfigurePortalBase.sol";
 import { ConfigurePortalHarness } from "../../harness/ConfigurePortalHarness.sol";
 
 contract ConfigurePortalTest is Test {
@@ -69,11 +70,27 @@ contract ConfigurePortalTest is Test {
         assertEq(txs[4].data, abi.encodeCall(IPortal.setDefaultBridgeAdapter, (Chains.ARBITRUM, localAdapter)));
     }
 
-    function test_configurePeers_skipsPeerWithoutDeployedAdapter() external view {
-        // No adapter registered for the peer -> peer is skipped, no transactions emitted.
-        Transaction[] memory txs = harness.configurePeers(portal, localAdapter, _peers(Chains.ARBITRUM));
+    function test_configurePeers_peerAdapterNotDeployed() external {
+        // No adapter registered for the peer -> reverts instead of silently skipping.
+        vm.expectRevert(abi.encodeWithSelector(PeerAdapterNotDeployed.selector, Chains.ARBITRUM));
 
-        assertEq(txs.length, 0);
+        harness.configurePeers(portal, localAdapter, _peers(Chains.ARBITRUM));
+    }
+
+    function test_configurePeers_portalNotDeployed() external {
+        harness.setPeerAdapter(Chains.ARBITRUM, arbitrumAdapter);
+
+        vm.expectRevert(abi.encodeWithSelector(PortalNotDeployed.selector, uint32(block.chainid)));
+
+        harness.configurePeers(address(0), localAdapter, _peers(Chains.ARBITRUM));
+    }
+
+    function test_configurePeers_localAdapterNotDeployed() external {
+        harness.setPeerAdapter(Chains.ARBITRUM, arbitrumAdapter);
+
+        vm.expectRevert(abi.encodeWithSelector(LayerZeroBridgeAdapterNotDeployed.selector, uint32(block.chainid)));
+
+        harness.configurePeers(portal, address(0), _peers(Chains.ARBITRUM));
     }
 
     function test_configurePeers_buildsForMultiplePeers() external {

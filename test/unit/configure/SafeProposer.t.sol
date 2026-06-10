@@ -5,6 +5,7 @@ import { Test } from "../../../lib/forge-std/src/Test.sol";
 
 import { Transaction } from "../../../script/libraries/TransactionHelper.sol";
 
+import { EmptyTransactionBatch } from "../../../script/configure/SafeProposerBase.sol";
 import { SafeProposerHarness } from "../../harness/SafeProposerHarness.sol";
 
 contract SafeProposerTest is Test {
@@ -12,6 +13,14 @@ contract SafeProposerTest is Test {
 
     function setUp() external {
         harness = new SafeProposerHarness();
+    }
+
+    function test_writeSafeBatch_emptyTransactions() external {
+        Transaction[] memory transactions = new Transaction[](0);
+
+        vm.expectRevert(EmptyTransactionBatch.selector);
+
+        harness.writeSafeBatch("unit-test", transactions);
     }
 
     function test_writeSafeBatch_writesImportableJson() external {

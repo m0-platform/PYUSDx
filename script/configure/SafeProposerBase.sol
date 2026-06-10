@@ -6,6 +6,10 @@ import { console } from "../../lib/forge-std/src/console.sol";
 import { Transaction } from "../libraries/TransactionHelper.sol";
 import { ScriptBase } from "../ScriptBase.s.sol";
 
+/// @notice Thrown when a Safe batch would be written with no transactions, which would otherwise
+///         report success for work that was never proposed.
+error EmptyTransactionBatch();
+
 /// @title  SafeProposerBase
 /// @notice Serializes a `Transaction[]` into a Safe Transaction Builder batch JSON that a signer
 ///         imports into the Safe UI. Used by the `Propose*` configuration scripts so the wiring can
@@ -13,6 +17,8 @@ import { ScriptBase } from "../ScriptBase.s.sol";
 /// @dev    Output is written to `safe/<chainid>-<name>.json` (allowed by `fs_permissions`).
 abstract contract SafeProposerBase is ScriptBase {
     function _writeSafeBatch(string memory name, Transaction[] memory transactions) internal {
+        if (transactions.length == 0) revert EmptyTransactionBatch();
+
         string memory dir = string.concat(vm.projectRoot(), "/safe");
         vm.createDir(dir, true);
 

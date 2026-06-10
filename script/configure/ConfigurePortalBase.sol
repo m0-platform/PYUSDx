@@ -6,10 +6,16 @@ import { TypeConverter } from "../../lib/evm-m-extensions/lib/common/src/libs/Ty
 import { IBridgeAdapter } from "../../src/portal/interfaces/IBridgeAdapter.sol";
 import { IPortal } from "../../src/portal/interfaces/IPortal.sol";
 
-import { LayerZeroConfig } from "../config/LayerZeroConfig.sol";
+import { LayerZeroBridgeAdapterNotDeployed, LayerZeroConfig } from "../config/LayerZeroConfig.sol";
 import { RouteConfig } from "../config/RouteConfig.sol";
 import { Transaction } from "../libraries/TransactionHelper.sol";
 import { ScriptBase } from "../ScriptBase.s.sol";
+
+/// @notice Thrown when the Portal on the active chain carries a zero address in its deployment record.
+error PortalNotDeployed(uint32 chainId);
+
+/// @notice Thrown when a peer chain's bridge adapter is missing from its deployment record.
+error PeerAdapterNotDeployed(uint32 peerChainId);
 
 /// @title  ConfigurePortalBase
 /// @notice Builds the Portal + LayerZeroBridgeAdapter wiring transactions for a list of peer chains.
@@ -32,25 +38,20 @@ abstract contract ConfigurePortalBase is ScriptBase {
         address localAdapter,
         uint32[] memory peerChainIds
     ) internal view returns (Transaction[] memory transactions) {
+        if (portal == address(0)) revert PortalNotDeployed(uint32(block.chainid));
+        if (localAdapter == address(0)) revert LayerZeroBridgeAdapterNotDeployed(uint32(block.chainid));
+
         uint256 peersCount = peerChainIds.length;
 
-        // Resolve peer adapters once and count the peers that are actually deployed.
-        address[] memory peerAdapters = new address[](peersCount);
-        uint256 validCount;
-
-        for (uint256 i; i < peersCount; ++i) {
-            peerAdapters[i] = _getPeerAdapter(peerChainIds[i]);
-            if (peerAdapters[i] != address(0)) ++validCount;
-        }
-
-        transactions = new Transaction[](validCount * _TXS_PER_PEER);
+        transactions = new Transaction[](peersCount * _TXS_PER_PEER);
         uint256 txCount;
 
         for (uint256 i; i < peersCount; ++i) {
-            address peerAdapter = peerAdapters[i];
-            if (peerAdapter == address(0)) continue;
-
             uint32 peerChainId = peerChainIds[i];
+
+            address peerAdapter = _getPeerAdapter(peerChainId);
+            if (peerAdapter == address(0)) revert PeerAdapterNotDeployed(peerChainId);
+
             uint256 endpointId = LayerZeroConfig.getLayerZeroEndpointId(peerChainId);
             uint256 gasLimit = RouteConfig.getPayloadGasLimit(peerChainId);
 
