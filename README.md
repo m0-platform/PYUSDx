@@ -129,7 +129,9 @@ npm run doc           # http://localhost:4000
 
 Protocol specification PDFs are available in the `docs/` directory.
 
-## Deployment
+## Deployment & Operations
+
+Operational scripts in `script/` are driven through the `Makefile`. Secrets are injected at run time with the [1Password CLI](https://developer.1password.com/docs/cli/) via `op run --env-file=".env"`, so `.env` can store secret values as `op://` references (e.g. `PRIVATE_KEY="op://vault/item/field"`). Each command selects a network through the `CHAIN` variable, which resolves to a `[rpc_endpoints]` alias in `foundry.toml` (`localhost` / `mainnet` / `arbitrum` / `sepolia`) and its matching `*_RPC_URL`.
 
 ### Build (production)
 
@@ -137,22 +139,60 @@ Protocol specification PDFs are available in the `docs/` directory.
 npm run build
 ```
 
-### Deploy locally
+### Deploy
 
-Start a local Anvil node, then deploy:
-
-```bash
-anvil
-npm run deploy-local
-```
-
-### Deploy to Sepolia
+Deploys the full core stack (PYUSDX, IssuerGateway, SwapFacility, ExtensionBeacon/Factory, Portal, LayerZeroBridgeAdapter) via `script/deploy/DeployAll.s.sol`, reading role and config addresses from `.env`. Artifacts are written to `deployments/<chainId>.json`, which the configure and bridge commands consume.
 
 ```bash
-npm run deploy-sepolia
+anvil                 # local only, in a separate shell
+make deploy-local     # or: npm run deploy-local
+make deploy-mainnet
+make deploy-arbitrum
+make deploy-sepolia   # or: npm run deploy-sepolia
 ```
 
-Deployment scripts are in `script/deploy/`. `DeployAll.s.sol` orchestrates the full deployment of PYUSDX, IssuerGateway, SwapFacility, ExtensionBeacon, and ExtensionFactory with their proxy infrastructure. Separate scripts exist for deploying individual extensions (`DeployYieldToOne.s.sol`, `DeployMultiMint.s.sol`).
+Individual extensions can be deployed with `DeployYieldToOne.s.sol` / `DeployMultiMint.s.sol`.
+
+### Configure the Portal
+
+Wires each peer chain on the Portal and LayerZeroBridgeAdapter (peer adapter, bridge chain id, supported/default adapter, payload gas limit). The signer must hold `OPERATOR_ROLE` on the Portal and the adapter. `PEERS` is a Solidity `uint32[]` of remote chain IDs; it defaults per target and can be overridden with `PEERS='[...]'`.
+
+```bash
+make configure-portal-mainnet     # wires Arbitrum (42161) as a peer
+make configure-portal-arbitrum    # wires Ethereum (1) as a peer
+make configure-portal-local
+```
+
+### Configure LayerZero security
+
+Applies the LayerZero V2 ULN/DVN `setConfig` for each peer route. The signer must be the adapter's LayerZero delegate.
+
+```bash
+make configure-lz-adapter-mainnet
+make configure-lz-adapter-arbitrum
+make configure-lz-adapter-local
+```
+
+### Propose via Safe multisig
+
+When the Portal/adapter roles are held by a multisig, the `propose-*` variants write a Safe Transaction Builder batch to `safe/<chainId>-*.json` (no broadcast) for import into the Safe UI.
+
+```bash
+make propose-configure-portal-mainnet
+make propose-configure-portal-arbitrum
+make propose-configure-lz-adapter-mainnet
+make propose-configure-lz-adapter-arbitrum
+```
+
+### Bridge PYUSDX cross-chain
+
+Bridges PYUSDX through the Portal using the default bridge adapter (`script/execute/Bridge.s.sol`). `AMOUNT` is in base units (6 decimals); `RECIPIENT` is optional and defaults to the signer. The signer must hold the PYUSDX being bridged and enough native gas for the LayerZero fee, which is quoted automatically.
+
+```bash
+make bridge-mainnet-to-arbitrum AMOUNT=1000000
+make bridge-arbitrum-to-mainnet AMOUNT=1000000 RECIPIENT=0x1111111111111111111111111111111111111111
+make bridge-local-to-arbitrum   AMOUNT=1000000
+```
 
 ## CI
 

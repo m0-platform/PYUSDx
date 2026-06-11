@@ -136,6 +136,32 @@ propose-configure-lz-adapter-arbitrum: PEERS = [1]
 propose-configure-lz-adapter-arbitrum: CHAIN=arbitrum
 propose-configure-lz-adapter-arbitrum: propose-configure-lz-adapter
 
+# Bridge PYUSDX cross-chain via the PYUSDX Portal (default bridge adapter).
+# DESTINATION_CHAIN_ID is the target chain ID (set by the per-network targets below).
+# AMOUNT is the PYUSDX amount in base units (6 decimals); pass it on the CLI, e.g. AMOUNT=1000000.
+# RECIPIENT is the destination recipient; the zero-address default routes to the signer.
+# The signer (PRIVATE_KEY) must hold the PYUSDX and enough native gas for the bridge fee.
+RECIPIENT ?= 0x0000000000000000000000000000000000000000
+
+bridge:
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/execute/Bridge.s.sol:Bridge \
+	--sig "run(uint32,uint256,address)" $(DESTINATION_CHAIN_ID) $(AMOUNT) $(RECIPIENT) \
+	--rpc-url $(CHAIN) \
+	--skip test --slow --non-interactive --broadcast
+
+bridge-local: DESTINATION_CHAIN_ID=42161
+bridge-local: CHAIN=localhost
+bridge-local: bridge
+
+bridge-mainnet-to-arbitrum: DESTINATION_CHAIN_ID=42161
+bridge-mainnet-to-arbitrum: CHAIN=mainnet
+bridge-mainnet-to-arbitrum: bridge
+
+bridge-arbitrum-to-mainnet: DESTINATION_CHAIN_ID=1
+bridge-arbitrum-to-mainnet: CHAIN=arbitrum
+bridge-arbitrum-to-mainnet: bridge
+
 # Run slither
 slither :; FOUNDRY_PROFILE=production forge build --build-info --skip '*/test/**' --skip '*/script/**' --force && slither --compile-force-framework foundry --ignore-compile --sarif results.sarif --config-file slither.config.json .
 
