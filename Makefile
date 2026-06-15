@@ -52,6 +52,9 @@ deploy-arbitrum: deploy
 deploy-sepolia: CHAIN=sepolia
 deploy-sepolia: deploy
 
+deploy-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+deploy-arbitrum-sepolia: deploy
+
 # Portal configuration helpers
 # PEERS is a Solidity uint32[] literal of remote chain IDs. It defaults to an empty array and is set
 # by the per-network targets below; override on the CLI with PEERS='[...]'.
@@ -76,6 +79,14 @@ configure-portal-arbitrum: PEERS = [1]
 configure-portal-arbitrum: CHAIN=arbitrum
 configure-portal-arbitrum: configure-portal
 
+configure-portal-sepolia: PEERS = [421614]
+configure-portal-sepolia: CHAIN=sepolia
+configure-portal-sepolia: configure-portal
+
+configure-portal-arbitrum-sepolia: PEERS = [11155111]
+configure-portal-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+configure-portal-arbitrum-sepolia: configure-portal
+
 # LayerZero ULN/DVN security config. Signer must be the adapter's LayerZero delegate.
 configure-lz-adapter:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
@@ -95,6 +106,14 @@ configure-lz-adapter-mainnet: configure-lz-adapter
 configure-lz-adapter-arbitrum: PEERS = [1]
 configure-lz-adapter-arbitrum: CHAIN=arbitrum
 configure-lz-adapter-arbitrum: configure-lz-adapter
+
+configure-lz-adapter-sepolia: PEERS = [421614]
+configure-lz-adapter-sepolia: CHAIN=sepolia
+configure-lz-adapter-sepolia: configure-lz-adapter
+
+configure-lz-adapter-arbitrum-sepolia: PEERS = [11155111]
+configure-lz-adapter-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+configure-lz-adapter-arbitrum-sepolia: configure-lz-adapter
 
 # Safe multisig propose variants: write a Safe Transaction Builder batch to safe/<chainid>-*.json
 # (no broadcast). Import the file into the Safe UI to execute via the multisig.
@@ -161,6 +180,14 @@ bridge-mainnet-to-arbitrum: bridge
 bridge-arbitrum-to-mainnet: DESTINATION_CHAIN_ID=1
 bridge-arbitrum-to-mainnet: CHAIN=arbitrum
 bridge-arbitrum-to-mainnet: bridge
+
+bridge-sepolia-to-arbitrum-sepolia: DESTINATION_CHAIN_ID=421614
+bridge-sepolia-to-arbitrum-sepolia: CHAIN=sepolia
+bridge-sepolia-to-arbitrum-sepolia: bridge
+
+bridge-arbitrum-sepolia-to-sepolia: DESTINATION_CHAIN_ID=11155111
+bridge-arbitrum-sepolia-to-sepolia: CHAIN=arbitrum-sepolia
+bridge-arbitrum-sepolia-to-sepolia: bridge
 
 # Run slither
 slither :; FOUNDRY_PROFILE=production forge build --build-info --skip '*/test/**' --skip '*/script/**' --force && slither --compile-force-framework foundry --ignore-compile --sarif results.sarif --config-file slither.config.json .

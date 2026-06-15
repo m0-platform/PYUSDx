@@ -40,6 +40,7 @@ mainnet = "${MAINNET_RPC_URL}"
 arbitrum = "${ARBITRUM_RPC_URL}"
 
 sepolia = "${SEPOLIA_RPC_URL}"
+arbitrum-sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
 
 etherscan_api_key = "${ETHERSCAN_API_KEY}"
 
@@ -48,5 +49,6 @@ mainnet = { key = "${ETHERSCAN_API_KEY}", url = "${MAINNET_VERIFIER_URL}" }
 arbitrum = { key = "${ETHERSCAN_API_KEY}", url = "${ARBITRUM_VERIFIER_URL}" }
 
 sepolia = { key = "${ETHERSCAN_API_KEY}", url = "${SEPOLIA_VERIFIER_URL}" }
+arbitrum-sepolia = { key = "${ETHERSCAN_API_KEY}", url = "${ARBITRUM_SEPOLIA_VERIFIER_URL}" }
 
 # See more config options at https://github.com/foundry-rs/foundry/tree/master/crates/config

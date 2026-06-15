@@ -114,11 +114,28 @@ contract ConfigurePortalTest is Test {
     function test_getLayerZeroEndpointId() external view {
         assertEq(harness.getLayerZeroEndpointId(Chains.ETHEREUM), 30101);
         assertEq(harness.getLayerZeroEndpointId(Chains.ARBITRUM), 30110);
+        assertEq(harness.getLayerZeroEndpointId(Chains.SEPOLIA), 40161);
+        assertEq(harness.getLayerZeroEndpointId(Chains.ARBITRUM_SEPOLIA), 40231);
     }
 
     function test_getLayerZeroEndpointId_unsupportedChain() external {
         vm.expectRevert(abi.encodeWithSelector(Chains.UnsupportedChain.selector, uint32(999)));
 
         harness.getLayerZeroEndpointId(999);
+    }
+
+    /* ============ getPayloadGasLimit ============ */
+
+    function test_getPayloadGasLimit() external view {
+        assertEq(harness.getPayloadGasLimit(Chains.ETHEREUM), 500_000);
+        assertEq(harness.getPayloadGasLimit(Chains.ARBITRUM), 500_000);
+        assertEq(harness.getPayloadGasLimit(Chains.SEPOLIA), 500_000);
+        assertEq(harness.getPayloadGasLimit(Chains.ARBITRUM_SEPOLIA), 500_000);
+    }
+
+    function test_getPayloadGasLimit_unsupportedChain() external {
+        vm.expectRevert(abi.encodeWithSelector(Chains.UnsupportedChain.selector, uint32(999)));
+
+        harness.getPayloadGasLimit(999);
     }
 }

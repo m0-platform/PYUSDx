@@ -30,6 +30,8 @@ library LayerZeroConfig {
     function getLayerZeroEndpointId(uint32 chainId) internal pure returns (uint32) {
         if (chainId == Chains.ETHEREUM) return 30101;
         if (chainId == Chains.ARBITRUM) return 30110;
+        if (chainId == Chains.SEPOLIA) return 40161;
+        if (chainId == Chains.ARBITRUM_SEPOLIA) return 40231;
 
         revert Chains.UnsupportedChain(chainId);
     }
@@ -46,6 +48,8 @@ library LayerZeroConfig {
     function getLayerZeroLabsDVN(uint32 chainId) internal pure returns (address) {
         if (chainId == Chains.ETHEREUM) return 0x589dEDbD617e0CBcB916A9223F4d1300c294236b;
         if (chainId == Chains.ARBITRUM) return 0x2f55C492897526677C5B68fb199ea31E2c126416;
+        if (chainId == Chains.SEPOLIA) return 0x8eebf8b423B73bFCa51a1Db4B7354AA0bFCA9193;
+        if (chainId == Chains.ARBITRUM_SEPOLIA) return 0x53f488E93b4f1b60E8E83aa374dBe1780A1EE8a8;
 
         revert Chains.UnsupportedChain(chainId);
     }
@@ -83,6 +87,11 @@ abstract contract LayerZeroUlnConfig {
     uint64 internal constant _ETHEREUM_CONFIRMATIONS = 15;
     uint64 internal constant _ARBITRUM_CONFIRMATIONS = 20;
 
+    /// @dev Source-chain block confirmations per side of the Sepolia <-> Arbitrum Sepolia testnet route.
+    ///      Mirrors the mainnet Ethereum=15 / Arbitrum=20 split.
+    uint64 internal constant _SEPOLIA_CONFIRMATIONS = 15;
+    uint64 internal constant _ARBITRUM_SEPOLIA_CONFIRMATIONS = 20;
+
     mapping(uint32 currentChainId => mapping(uint32 remoteChainId => UlnConfig)) private _sendUlnConfig;
     mapping(uint32 currentChainId => mapping(uint32 remoteChainId => UlnConfig)) private _receiveUlnConfig;
 
@@ -106,10 +115,18 @@ abstract contract LayerZeroUlnConfig {
         if (config.confirmations == 0) revert UnsupportedReceiveRoute(currentChainId, remoteChainId);
     }
 
+    /// @dev Populates the per-route ULN config registry for every supported route. The registry is
+    ///      chain-agnostic: all routes are loaded regardless of the active chain, and the script
+    ///      selects the live route via `block.chainid` at the call site.
+    function _initUlnConfigs() private {
+        _initMainnetUlnConfigs();
+        _initTestnetUlnConfigs();
+    }
+
     /// @dev Populates the per-route ULN config registry for Ethereum <-> Arbitrum, pinning the
     ///      LayerZero default security stack: required DVNs = [LayerZero Labs, Google], no optional
     ///      DVNs. Confirmations match the on-chain defaults (Ethereum source = 15, Arbitrum source = 20).
-    function _initUlnConfigs() private {
+    function _initMainnetUlnConfigs() private {
         address[] memory noOptional = new address[](0);
 
         // Ethereum side (LayerZeroBridgeAdapter on Ethereum).
@@ -129,8 +146,65 @@ abstract contract LayerZeroUlnConfig {
 
         // Arbitrum -> Ethereum send: source = Arbitrum.
         _setSendUlnConfig(Chains.ARBITRUM, Chains.ETHEREUM, _ARBITRUM_CONFIRMATIONS, arbRequired, noOptional, 0);
+
         // Ethereum -> Arbitrum receive: source = Ethereum.
         _setReceiveUlnConfig(Chains.ARBITRUM, Chains.ETHEREUM, _ETHEREUM_CONFIRMATIONS, arbRequired, noOptional, 0);
+    }
+
+    /// @dev Populates the per-route ULN config registry for the Sepolia <-> Arbitrum Sepolia testnet
+    ///      route. Arbitrum Sepolia has no Google DVN, so the required set is [LayerZero Labs] only on
+    ///      both sides. Confirmations mirror the mainnet split (Sepolia source = 15, Arbitrum Sepolia
+    ///      source = 20).
+    function _initTestnetUlnConfigs() private {
+        address[] memory noOptional = new address[](0);
+
+        // Sepolia side (LayerZeroBridgeAdapter on Sepolia).
+        address[] memory sepoliaRequired = new address[](1);
+        sepoliaRequired[0] = LayerZeroConfig.getLayerZeroLabsDVN(Chains.SEPOLIA);
+
+        // Sepolia -> Arbitrum Sepolia send: source = Sepolia.
+        _setSendUlnConfig(
+            Chains.SEPOLIA,
+            Chains.ARBITRUM_SEPOLIA,
+            _SEPOLIA_CONFIRMATIONS,
+            sepoliaRequired,
+            noOptional,
+            0
+        );
+
+        // Arbitrum Sepolia -> Sepolia receive: source = Arbitrum Sepolia.
+        _setReceiveUlnConfig(
+            Chains.SEPOLIA,
+            Chains.ARBITRUM_SEPOLIA,
+            _ARBITRUM_SEPOLIA_CONFIRMATIONS,
+            sepoliaRequired,
+            noOptional,
+            0
+        );
+
+        // Arbitrum Sepolia side (LayerZeroBridgeAdapter on Arbitrum Sepolia).
+        address[] memory arbSepoliaRequired = new address[](1);
+        arbSepoliaRequired[0] = LayerZeroConfig.getLayerZeroLabsDVN(Chains.ARBITRUM_SEPOLIA);
+
+        // Arbitrum Sepolia -> Sepolia send: source = Arbitrum Sepolia.
+        _setSendUlnConfig(
+            Chains.ARBITRUM_SEPOLIA,
+            Chains.SEPOLIA,
+            _ARBITRUM_SEPOLIA_CONFIRMATIONS,
+            arbSepoliaRequired,
+            noOptional,
+            0
+        );
+
+        // Sepolia -> Arbitrum Sepolia receive: source = Sepolia.
+        _setReceiveUlnConfig(
+            Chains.ARBITRUM_SEPOLIA,
+            Chains.SEPOLIA,
+            _SEPOLIA_CONFIRMATIONS,
+            arbSepoliaRequired,
+            noOptional,
+            0
+        );
     }
 
     function _setSendUlnConfig(
