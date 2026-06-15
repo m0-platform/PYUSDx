@@ -19,7 +19,8 @@ abstract contract BaseForkTest is BaseIntegrationTest {
     uint256 internal mainnetFork;
 
     function setUp() public virtual override {
-        mainnetFork = vm.createSelectFork("mainnet");
+        // Fork at block 25,245,030 before the PYUSD whale transferred out all their PYUSD
+        mainnetFork = vm.createSelectFork("mainnet", 25245030);
         super.setUp();
     }
 

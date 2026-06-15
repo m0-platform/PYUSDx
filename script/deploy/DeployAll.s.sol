@@ -7,7 +7,8 @@ import { DeployBase } from "./DeployBase.s.sol";
 
 contract DeployAll is DeployBase {
     function run() public {
-        address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
+        address deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
+        console.log("Deployer:", deployer);
 
         PYUSDXConfig memory pyusdxConfig = _loadPYUSDXConfig();
         IssuerGatewayConfig memory issuerGatewayConfig = _loadIssuerGatewayConfig();
@@ -67,8 +68,8 @@ contract DeployAll is DeployBase {
 
     function _loadPYUSDXConfig() private view returns (PYUSDXConfig memory config) {
         config.name = vm.envString("PYUSDX_NAME");
-        config.symbol = vm.envString("PYUSDX_SYMBOL");
         require(bytes(config.name).length != 0, "PYUSDX_NAME must be set");
+        config.symbol = vm.envString("PYUSDX_SYMBOL");
         require(bytes(config.symbol).length != 0, "PYUSDX_SYMBOL must be set");
         config.admin = vm.envAddress("PYUSDX_ADMIN");
         config.pauser = vm.envAddress("PYUSDX_PAUSER");
@@ -76,6 +77,8 @@ contract DeployAll is DeployBase {
         config.forcedTransferManager = vm.envAddress("PYUSDX_FORCED_TRANSFER_MANAGER");
         config.earnerManager = vm.envAddress("PYUSDX_EARNER_MANAGER");
         config.rateManager = vm.envAddress("PYUSDX_RATE_MANAGER");
+        config.earnerManagerRateLimitCapacity = uint128(vm.envUint("PYUSDX_EARNER_MANAGER_RATE_LIMIT_CAPACITY"));
+        config.earnerManagerRateLimitRefillPerSecond = uint128(vm.envUint("PYUSDX_EARNER_MANAGER_RATE_LIMIT_REFILL"));
     }
 
     function _loadIssuerGatewayConfig() private view returns (IssuerGatewayConfig memory config) {

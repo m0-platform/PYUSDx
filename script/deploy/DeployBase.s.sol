@@ -53,18 +53,11 @@ contract DeployBase is DeployHelpers, ScriptBase {
 
     /* ============ Individual Deploy Functions ============ */
 
-    /// @dev `proxyInitialOwner` becomes the final `ProxyAdmin.owner()` (upgrade authority) and is
-    ///      never transferred afterward. `transientTokenAdmin` and `transientRateManager` receive
-    ///      `DEFAULT_ADMIN_ROLE` / `RATE_LIMIT_MANAGER_ROLE` on the PYUSDX token at initialize time
-    ///      so the role bootstrap can grant ISSUER_ROLE + rate limits; the bootstrap then transfers
-    ///      these roles to their final holders and renounces. Decoupling these three parameters
-    ///      prevents the rewriting of `config.admin` from accidentally bleeding the deployer into
-    ///      ProxyAdmin ownership.
     function _deployPYUSDX(
         address deployer,
         address proxyInitialOwner,
-        address transientTokenAdmin,
-        address transientRateManager,
+        address admin,
+        address rateLimitManager,
         address issuerGatewayProxy,
         PYUSDXConfig memory config
     ) internal returns (address proxy, address proxyAdmin, address implementation) {
@@ -79,12 +72,12 @@ contract DeployBase is DeployHelpers, ScriptBase {
                     IPYUSDX.InitializeParams({
                         name: config.name,
                         symbol: config.symbol,
-                        admin: transientTokenAdmin,
+                        admin: admin,
                         pauser: config.pauser,
                         freezeManager: config.freezeManager,
                         forcedTransferManager: config.forcedTransferManager,
                         earnerManager: config.earnerManager,
-                        rateLimitManager: transientRateManager,
+                        rateLimitManager: rateLimitManager,
                         issuer: issuerGatewayProxy
                     })
                 )
@@ -113,7 +106,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
                 config.mintDelay,
                 config.mintTTL
             ),
-            _computeSalt(deployer, "IssuerGateway")
+            _computeSalt(deployer, "PYUSDXIssuerGateway")
         );
 
         proxyAdmin = Upgrades.getAdminAddress(proxy);
@@ -131,7 +124,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
             implementation,
             config.admin,
             abi.encodeWithSelector(SwapFacility.initialize.selector, config.admin, config.pauser),
-            _computeSalt(deployer, "SwapFacility")
+            _computeSalt(deployer, "PYUSDXSwapFacility")
         );
 
         proxyAdmin = Upgrades.getAdminAddress(proxy);
@@ -225,7 +218,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
         proxyAdmin = Upgrades.getAdminAddress(proxy);
     }
 
-    /* ============ Core Stack Orchestrator ============ */
+    /* ============ Core Deployment Orchestrator ============ */
 
     function _deployCore(
         address deployer,
@@ -244,39 +237,23 @@ contract DeployBase is DeployHelpers, ScriptBase {
             factoryConfig,
             deployment
         );
+
         _deployPortalStack(deployer, portalConfig, layerZeroBridgeAdapterConfig, deployment);
 
-        // Bootstrap roles + rate limits using actual deployed addresses.
-        _finalizePYUSDXBootstrap(
-            deployer,
-            pyusdxConfig,
-            issuerGatewayConfig,
-            portalConfig,
-            deployment,
-            targetAdmin,
-            targetRateManager
-        );
-    }
-
-    function _finalizePYUSDXBootstrap(
-        address deployer,
-        PYUSDXConfig memory pyusdxConfig,
-        IssuerGatewayConfig memory issuerGatewayConfig,
-        PortalConfig memory portalConfig,
-        CoreDeployments memory deployment,
-        address targetAdmin,
-        address targetRateManager
-    ) internal {
-        _bootstrapPYUSDXRoles(
+        _configurePYUSDXRoles(
             deployer,
             deployment.pyusdxProxy,
-            _buildIssuerBootstrap(
-                deployment.issuerGatewayProxy,
-                deployment.portalProxy,
-                pyusdxConfig.earnerManager,
-                issuerGatewayConfig,
-                portalConfig
-            ),
+            IssuerSetup({
+                issuerGatewayProxy: deployment.issuerGatewayProxy,
+                portalProxy: deployment.portalProxy,
+                earnerManager: pyusdxConfig.earnerManager,
+                issuerGatewayCapacity: issuerGatewayConfig.rateLimitCapacity,
+                issuerGatewayRefill: issuerGatewayConfig.rateLimitRefillPerSecond,
+                portalCapacity: portalConfig.rateLimitCapacity,
+                portalRefill: portalConfig.rateLimitRefillPerSecond,
+                earnerManagerCapacity: pyusdxConfig.earnerManagerRateLimitCapacity,
+                earnerManagerRefill: pyusdxConfig.earnerManagerRateLimitRefillPerSecond
+            }),
             targetAdmin,
             targetRateManager
         );
@@ -290,7 +267,6 @@ contract DeployBase is DeployHelpers, ScriptBase {
         FactoryConfig memory factoryConfig,
         CoreDeployments memory deployment
     ) internal returns (address targetAdmin, address targetRateManager) {
-        // Phase 1: PYUSDX + IssuerGateway. Bootstrap runs in `_deployCore`.
         (targetAdmin, targetRateManager) = _deployPYUSDXAndIssuerGateway(
             deployer,
             pyusdxConfig,
@@ -298,14 +274,12 @@ contract DeployBase is DeployHelpers, ScriptBase {
             deployment
         );
 
-        // Pre-compute remaining CREATE3 addresses
-        address predictedSwapFacility = _getCreate3Address(deployer, _computeSalt(deployer, "SwapFacility"));
+        address predictedSwapFacility = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDXSwapFacility"));
         address predictedFactory = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDXExtensionFactory"));
 
         console.log("Predicted SwapFacility proxy:      ", predictedSwapFacility);
         console.log("Predicted Factory proxy:           ", predictedFactory);
 
-        // Deploy SwapFacility
         (
             deployment.swapFacilityProxy,
             deployment.swapFacilityProxyAdmin,
@@ -314,11 +288,9 @@ contract DeployBase is DeployHelpers, ScriptBase {
 
         require(deployment.swapFacilityProxy == predictedSwapFacility, "SwapFacility proxy address mismatch");
 
-        // Deploy extension implementations
         address yieldToOneImpl = address(new YieldToOne(deployment.pyusdxProxy, deployment.swapFacilityProxy));
         address multiMintImpl = address(new MultiMint(deployment.pyusdxProxy, deployment.swapFacilityProxy));
 
-        // Deploy ExtensionBeacons (YieldToOne + MultiMint)
         (
             deployment.yieldToOneBeaconProxy,
             deployment.yieldToOneBeaconProxyAdmin,
@@ -345,7 +317,7 @@ contract DeployBase is DeployHelpers, ScriptBase {
             factoryConfig
         );
 
-        // Deploy Factory (SwapFacility must already exist — constructor validates it)
+        // NOTE: SwapFacility must already exist — constructor validates it
         (deployment.factoryProxy, deployment.factoryProxyAdmin, deployment.factoryImplementation) = _deployFactory(
             deployer,
             deployment.pyusdxProxy,
@@ -364,16 +336,15 @@ contract DeployBase is DeployHelpers, ScriptBase {
         IssuerGatewayConfig memory issuerGatewayConfig,
         CoreDeployments memory deployment
     ) internal returns (address targetAdmin, address targetRateManager) {
-        // Pre-compute CREATE3 addresses for PYUSDX + IssuerGateway
         address predictedPYUSDX = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDX"));
-        address predictedIssuerGateway = _getCreate3Address(deployer, _computeSalt(deployer, "IssuerGateway"));
+        address predictedIssuerGateway = _getCreate3Address(deployer, _computeSalt(deployer, "PYUSDXIssuerGateway"));
 
         console.log("Predicted PYUSDX proxy:            ", predictedPYUSDX);
         console.log("Predicted IssuerGateway proxy:     ", predictedIssuerGateway);
 
-        // Deploy PYUSDX. Proxy initialOwner is the final target admin (set once, never transferred);
-        // the deployer holds DEFAULT_ADMIN_ROLE / RATE_LIMIT_MANAGER_ROLE transiently so the deferred
-        // bootstrap can grant ISSUER_ROLE + rate limits and then transfer roles to their final holders.
+        // The deployer holds DEFAULT_ADMIN_ROLE and RATE_LIMIT_MANAGER_ROLE during the deploy process
+        // to grant the various roles and rate limits, then renounces them at the end.
+        // `pyusdxConfig.admin` and `pyusdxConfig.rateManager` are the final holders of these roles.
         targetAdmin = pyusdxConfig.admin;
         targetRateManager = pyusdxConfig.rateManager;
 
@@ -388,7 +359,6 @@ contract DeployBase is DeployHelpers, ScriptBase {
 
         require(deployment.pyusdxProxy == predictedPYUSDX, "PYUSDX proxy address mismatch");
 
-        // Deploy IssuerGateway
         (
             deployment.issuerGatewayProxy,
             deployment.issuerGatewayProxyAdmin,
@@ -398,28 +368,8 @@ contract DeployBase is DeployHelpers, ScriptBase {
         require(deployment.issuerGatewayProxy == predictedIssuerGateway, "IssuerGateway proxy address mismatch");
     }
 
-    function _buildIssuerBootstrap(
-        address issuerGatewayProxy,
-        address portalProxy,
-        address earnerManager,
-        IssuerGatewayConfig memory issuerGatewayConfig,
-        PortalConfig memory portalConfig
-    ) internal pure returns (IssuerBootstrap memory) {
-        return
-            IssuerBootstrap({
-                issuerGatewayProxy: issuerGatewayProxy,
-                portalProxy: portalProxy,
-                earnerManager: earnerManager,
-                issuerGatewayCapacity: issuerGatewayConfig.rateLimitCapacity,
-                issuerGatewayRefill: issuerGatewayConfig.rateLimitRefillPerSecond,
-                portalCapacity: portalConfig.rateLimitCapacity,
-                portalRefill: portalConfig.rateLimitRefillPerSecond
-            });
-    }
-
-    /// @dev Bundle of issuers + their rate-limit caps that the deployer configures on PYUSDX
-    ///      before renouncing its transient admin/rate-manager roles.
-    struct IssuerBootstrap {
+    /// @dev Addresses + rate-limit parameters for issuers configured during deployment.
+    struct IssuerSetup {
         address issuerGatewayProxy;
         address portalProxy;
         address earnerManager;
@@ -427,19 +377,20 @@ contract DeployBase is DeployHelpers, ScriptBase {
         uint128 issuerGatewayRefill;
         uint128 portalCapacity;
         uint128 portalRefill;
+        uint128 earnerManagerCapacity;
+        uint128 earnerManagerRefill;
     }
 
     /// @dev Configures rate limits, grants ISSUER_ROLE to the Portal, transfers admin
     ///      and rate-manager roles to their target holders, and renounces the deployer's
     ///      transient roles.
-    function _bootstrapPYUSDXRoles(
+    function _configurePYUSDXRoles(
         address deployer,
         address pyusdxProxy,
-        IssuerBootstrap memory issuers,
+        IssuerSetup memory issuers,
         address targetAdmin,
         address targetRateManager
     ) internal {
-        // IssuerGateway rate limit
         IRateLimiter(pyusdxProxy).setRateLimit(
             issuers.issuerGatewayProxy,
             issuers.issuerGatewayCapacity,
@@ -447,31 +398,33 @@ contract DeployBase is DeployHelpers, ScriptBase {
             true
         );
 
-        // Portal rate limit (required for sendToken / receiveMessage)
         IRateLimiter(pyusdxProxy).setRateLimit(issuers.portalProxy, issuers.portalCapacity, issuers.portalRefill, true);
 
-        // earnerManager rate limit (daily cap, refilled evenly across 24h)
-        uint128 earnerDailyCap = 10_000_000e6;
         IRateLimiter(pyusdxProxy).setRateLimit(
             issuers.earnerManager,
-            earnerDailyCap,
-            earnerDailyCap / uint128(1 days),
+            issuers.earnerManagerCapacity,
+            issuers.earnerManagerRefill,
             true
         );
 
-        // Grant ISSUER_ROLE so Portal can burn (sendToken) and mint (receiveMessage)
         IAccessControl(pyusdxProxy).grantRole(PYUSDX(pyusdxProxy).ISSUER_ROLE(), issuers.portalProxy);
 
-        // Transfer roles to target holders
         bytes32 rateLimitManagerRole = IRateLimiter(pyusdxProxy).RATE_LIMIT_MANAGER_ROLE();
         bytes32 defaultAdminRole = 0x00;
 
-        IAccessControl(pyusdxProxy).grantRole(rateLimitManagerRole, targetRateManager);
-        IAccessControl(pyusdxProxy).grantRole(defaultAdminRole, targetAdmin);
+        // The deployer already holds both roles from initialization.
+        // Only transfer a role to its target holder when that holder is not the deployer:
+        // grant it to the target, then renounce the deployer's copy.
+        // The rate-manager block runs first so the deployer retains DEFAULT_ADMIN_ROLE through both grants.
+        if (deployer != targetRateManager) {
+            IAccessControl(pyusdxProxy).grantRole(rateLimitManagerRole, targetRateManager);
+            IAccessControl(pyusdxProxy).renounceRole(rateLimitManagerRole, deployer);
+        }
 
-        // Renounce deployer's transient roles
-        IAccessControl(pyusdxProxy).renounceRole(rateLimitManagerRole, deployer);
-        IAccessControl(pyusdxProxy).renounceRole(defaultAdminRole, deployer);
+        if (deployer != targetAdmin) {
+            IAccessControl(pyusdxProxy).grantRole(defaultAdminRole, targetAdmin);
+            IAccessControl(pyusdxProxy).renounceRole(defaultAdminRole, deployer);
+        }
     }
 
     function _deployPortalStack(
@@ -489,7 +442,6 @@ contract DeployBase is DeployHelpers, ScriptBase {
         console.log("Predicted Portal proxy:            ", predictedPortal);
         console.log("Predicted LayerZeroBridgeAdapter:  ", predictedLayerZeroBridgeAdapter);
 
-        // Deploy Portal
         (deployment.portalProxy, deployment.portalProxyAdmin, deployment.portalImplementation) = _deployPortal(
             deployer,
             deployment.pyusdxProxy,
@@ -499,7 +451,6 @@ contract DeployBase is DeployHelpers, ScriptBase {
 
         require(deployment.portalProxy == predictedPortal, "Portal proxy address mismatch");
 
-        // Deploy LayerZeroBridgeAdapter
         (
             deployment.layerZeroBridgeAdapterProxy,
             deployment.layerZeroBridgeAdapterProxyAdmin,
