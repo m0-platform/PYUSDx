@@ -55,6 +55,21 @@ deploy-sepolia: deploy
 deploy-arbitrum-sepolia: CHAIN=arbitrum-sepolia
 deploy-arbitrum-sepolia: deploy
 
+# Testnet faucet (periphery, non-upgradeable). Reads the PYUSDX address from deployments/<chainid>.json,
+# falling back to the PYUSDX env var. Pre-fund the deployed faucet with PYUSDX so it has a balance to dispense.
+deploy-faucet:
+	PYUSDX=$(PYUSDX) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/periphery/DeployPYUSDXFaucet.s.sol:DeployPYUSDXFaucet \
+	--rpc-url $(CHAIN) \
+	--skip test --slow --non-interactive --broadcast --verify
+
+deploy-faucet-sepolia: CHAIN=sepolia
+deploy-faucet-sepolia: deploy-faucet
+
+deploy-faucet-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+deploy-faucet-arbitrum-sepolia: deploy-faucet
+
 # Portal configuration helpers
 # PEERS is a Solidity uint32[] literal of remote chain IDs. It defaults to an empty array and is set
 # by the per-network targets below; override on the CLI with PEERS='[...]'.
