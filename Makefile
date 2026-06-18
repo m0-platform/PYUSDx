@@ -55,6 +55,60 @@ deploy-sepolia: deploy
 deploy-arbitrum-sepolia: CHAIN=arbitrum-sepolia
 deploy-arbitrum-sepolia: deploy
 
+# Extension deploys (via the ExtensionFactory). Both read the factory address from
+# deployments/<chainid>.json, falling back to the EXTENSION_FACTORY env var.
+EXTENSION_ENV = \
+	EXTENSION_NAME=$(EXTENSION_NAME) EXTENSION_TOKEN_NAME=$(EXTENSION_TOKEN_NAME) \
+	EXTENSION_TOKEN_SYMBOL=$(EXTENSION_TOKEN_SYMBOL) YIELD_RECIPIENT=$(YIELD_RECIPIENT) \
+	ADMIN=$(ADMIN) FREEZE_MANAGER=$(FREEZE_MANAGER) PAUSER=$(PAUSER) \
+	YIELD_RECIPIENT_MANAGER=$(YIELD_RECIPIENT_MANAGER) VERSION_MANAGER=$(VERSION_MANAGER) \
+	EXTENSION_FACTORY=$(EXTENSION_FACTORY)
+
+deploy-yield-to-one:
+	$(EXTENSION_ENV) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/deploy/DeployYieldToOne.s.sol:DeployYieldToOne \
+	--rpc-url $(CHAIN) \
+	--skip test --slow --non-interactive --broadcast --verify
+
+deploy-yield-to-one-local: CHAIN=localhost
+deploy-yield-to-one-local: deploy-yield-to-one
+
+deploy-yield-to-one-mainnet: CHAIN=mainnet
+deploy-yield-to-one-mainnet: deploy-yield-to-one
+
+deploy-yield-to-one-arbitrum: CHAIN=arbitrum
+deploy-yield-to-one-arbitrum: deploy-yield-to-one
+
+deploy-yield-to-one-sepolia: CHAIN=sepolia
+deploy-yield-to-one-sepolia: deploy-yield-to-one
+
+deploy-yield-to-one-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+deploy-yield-to-one-arbitrum-sepolia: deploy-yield-to-one
+
+# MultiMint additionally needs the asset cap manager (ASSET_CAP_MANAGER).
+deploy-multi-mint:
+	$(EXTENSION_ENV) ASSET_CAP_MANAGER=$(ASSET_CAP_MANAGER) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/deploy/DeployMultiMint.s.sol:DeployMultiMint \
+	--rpc-url $(CHAIN) \
+	--skip test --slow --non-interactive --broadcast --verify
+
+deploy-multi-mint-local: CHAIN=localhost
+deploy-multi-mint-local: deploy-multi-mint
+
+deploy-multi-mint-mainnet: CHAIN=mainnet
+deploy-multi-mint-mainnet: deploy-multi-mint
+
+deploy-multi-mint-arbitrum: CHAIN=arbitrum
+deploy-multi-mint-arbitrum: deploy-multi-mint
+
+deploy-multi-mint-sepolia: CHAIN=sepolia
+deploy-multi-mint-sepolia: deploy-multi-mint
+
+deploy-multi-mint-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+deploy-multi-mint-arbitrum-sepolia: deploy-multi-mint
+
 # Testnet faucet (periphery, non-upgradeable). Reads the PYUSDX address from deployments/<chainid>.json,
 # falling back to the PYUSDX env var. Pre-fund the deployed faucet with PYUSDX so it has a balance to dispense.
 deploy-faucet:
