@@ -52,6 +52,78 @@ deploy-arbitrum: deploy
 deploy-sepolia: CHAIN=sepolia
 deploy-sepolia: deploy
 
+deploy-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+deploy-arbitrum-sepolia: deploy
+
+# Extension deploys (via the ExtensionFactory). Both read the factory address from
+# deployments/<chainid>.json, falling back to the EXTENSION_FACTORY env var.
+EXTENSION_ENV = \
+	EXTENSION_NAME=$(EXTENSION_NAME) EXTENSION_TOKEN_NAME=$(EXTENSION_TOKEN_NAME) \
+	EXTENSION_TOKEN_SYMBOL=$(EXTENSION_TOKEN_SYMBOL) YIELD_RECIPIENT=$(YIELD_RECIPIENT) \
+	ADMIN=$(ADMIN) FREEZE_MANAGER=$(FREEZE_MANAGER) PAUSER=$(PAUSER) \
+	YIELD_RECIPIENT_MANAGER=$(YIELD_RECIPIENT_MANAGER) VERSION_MANAGER=$(VERSION_MANAGER) \
+	EXTENSION_FACTORY=$(EXTENSION_FACTORY)
+
+deploy-yield-to-one:
+	$(EXTENSION_ENV) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/deploy/DeployYieldToOne.s.sol:DeployYieldToOne \
+	--rpc-url $(CHAIN) \
+	--skip test --slow --non-interactive --broadcast --verify
+
+deploy-yield-to-one-local: CHAIN=localhost
+deploy-yield-to-one-local: deploy-yield-to-one
+
+deploy-yield-to-one-mainnet: CHAIN=mainnet
+deploy-yield-to-one-mainnet: deploy-yield-to-one
+
+deploy-yield-to-one-arbitrum: CHAIN=arbitrum
+deploy-yield-to-one-arbitrum: deploy-yield-to-one
+
+deploy-yield-to-one-sepolia: CHAIN=sepolia
+deploy-yield-to-one-sepolia: deploy-yield-to-one
+
+deploy-yield-to-one-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+deploy-yield-to-one-arbitrum-sepolia: deploy-yield-to-one
+
+# MultiMint additionally needs the asset cap manager (ASSET_CAP_MANAGER).
+deploy-multi-mint:
+	$(EXTENSION_ENV) ASSET_CAP_MANAGER=$(ASSET_CAP_MANAGER) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/deploy/DeployMultiMint.s.sol:DeployMultiMint \
+	--rpc-url $(CHAIN) \
+	--skip test --slow --non-interactive --broadcast --verify
+
+deploy-multi-mint-local: CHAIN=localhost
+deploy-multi-mint-local: deploy-multi-mint
+
+deploy-multi-mint-mainnet: CHAIN=mainnet
+deploy-multi-mint-mainnet: deploy-multi-mint
+
+deploy-multi-mint-arbitrum: CHAIN=arbitrum
+deploy-multi-mint-arbitrum: deploy-multi-mint
+
+deploy-multi-mint-sepolia: CHAIN=sepolia
+deploy-multi-mint-sepolia: deploy-multi-mint
+
+deploy-multi-mint-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+deploy-multi-mint-arbitrum-sepolia: deploy-multi-mint
+
+# Testnet faucet (periphery, non-upgradeable). Reads the PYUSDX address from deployments/<chainid>.json,
+# falling back to the PYUSDX env var. Pre-fund the deployed faucet with PYUSDX so it has a balance to dispense.
+deploy-faucet:
+	PYUSDX=$(PYUSDX) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/periphery/DeployPYUSDXFaucet.s.sol:DeployPYUSDXFaucet \
+	--rpc-url $(CHAIN) \
+	--skip test --slow --non-interactive --broadcast --verify
+
+deploy-faucet-sepolia: CHAIN=sepolia
+deploy-faucet-sepolia: deploy-faucet
+
+deploy-faucet-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+deploy-faucet-arbitrum-sepolia: deploy-faucet
+
 # Portal configuration helpers
 # PEERS is a Solidity uint32[] literal of remote chain IDs. It defaults to an empty array and is set
 # by the per-network targets below; override on the CLI with PEERS='[...]'.
@@ -76,6 +148,14 @@ configure-portal-arbitrum: PEERS = [1]
 configure-portal-arbitrum: CHAIN=arbitrum
 configure-portal-arbitrum: configure-portal
 
+configure-portal-sepolia: PEERS = [421614]
+configure-portal-sepolia: CHAIN=sepolia
+configure-portal-sepolia: configure-portal
+
+configure-portal-arbitrum-sepolia: PEERS = [11155111]
+configure-portal-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+configure-portal-arbitrum-sepolia: configure-portal
+
 # LayerZero ULN/DVN security config. Signer must be the adapter's LayerZero delegate.
 configure-lz-adapter:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
@@ -95,6 +175,14 @@ configure-lz-adapter-mainnet: configure-lz-adapter
 configure-lz-adapter-arbitrum: PEERS = [1]
 configure-lz-adapter-arbitrum: CHAIN=arbitrum
 configure-lz-adapter-arbitrum: configure-lz-adapter
+
+configure-lz-adapter-sepolia: PEERS = [421614]
+configure-lz-adapter-sepolia: CHAIN=sepolia
+configure-lz-adapter-sepolia: configure-lz-adapter
+
+configure-lz-adapter-arbitrum-sepolia: PEERS = [11155111]
+configure-lz-adapter-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+configure-lz-adapter-arbitrum-sepolia: configure-lz-adapter
 
 # Safe multisig propose variants: write a Safe Transaction Builder batch to safe/<chainid>-*.json
 # (no broadcast). Import the file into the Safe UI to execute via the multisig.
@@ -161,6 +249,14 @@ bridge-mainnet-to-arbitrum: bridge
 bridge-arbitrum-to-mainnet: DESTINATION_CHAIN_ID=1
 bridge-arbitrum-to-mainnet: CHAIN=arbitrum
 bridge-arbitrum-to-mainnet: bridge
+
+bridge-sepolia-to-arbitrum-sepolia: DESTINATION_CHAIN_ID=421614
+bridge-sepolia-to-arbitrum-sepolia: CHAIN=sepolia
+bridge-sepolia-to-arbitrum-sepolia: bridge
+
+bridge-arbitrum-sepolia-to-sepolia: DESTINATION_CHAIN_ID=11155111
+bridge-arbitrum-sepolia-to-sepolia: CHAIN=arbitrum-sepolia
+bridge-arbitrum-sepolia-to-sepolia: bridge
 
 # Run slither
 slither :; FOUNDRY_PROFILE=production forge build --build-info --skip '*/test/**' --skip '*/script/**' --force && slither --compile-force-framework foundry --ignore-compile --sarif results.sarif --config-file slither.config.json .

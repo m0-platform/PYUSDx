@@ -77,6 +77,47 @@ contract ConfigureLayerZeroTest is Test {
         assertEq(config.requiredDVNs[1], LayerZeroConfig.getGoogleDVN(dvnChain));
     }
 
+    /* ============ getSendUlnConfig / getReceiveUlnConfig (testnet) ============ */
+
+    function test_sendUlnConfig_sepoliaToArbitrumSepolia() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.SEPOLIA, Chains.ARBITRUM_SEPOLIA);
+
+        assertEq(config.confirmations, 15); // source = Sepolia
+        _assertSingleDVNStack(config, Chains.SEPOLIA);
+    }
+
+    function test_receiveUlnConfig_sepoliaFromArbitrumSepolia() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.SEPOLIA, Chains.ARBITRUM_SEPOLIA);
+
+        assertEq(config.confirmations, 20); // source = Arbitrum Sepolia
+        _assertSingleDVNStack(config, Chains.SEPOLIA);
+    }
+
+    function test_sendUlnConfig_arbitrumSepoliaToSepolia() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.ARBITRUM_SEPOLIA, Chains.SEPOLIA);
+
+        assertEq(config.confirmations, 20); // source = Arbitrum Sepolia
+        _assertSingleDVNStack(config, Chains.ARBITRUM_SEPOLIA);
+    }
+
+    function test_receiveUlnConfig_arbitrumSepoliaFromSepolia() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.ARBITRUM_SEPOLIA, Chains.SEPOLIA);
+
+        assertEq(config.confirmations, 15); // source = Sepolia
+        _assertSingleDVNStack(config, Chains.ARBITRUM_SEPOLIA);
+    }
+
+    /// @dev Asserts the testnet DVN stack: required = [LayerZero Labs] only (Arbitrum Sepolia has no
+    ///      Google DVN), and no optional DVNs (expressed via NIL_DVN_COUNT).
+    function _assertSingleDVNStack(UlnConfig memory config, uint32 dvnChain) internal view {
+        assertEq(config.requiredDVNCount, 1);
+        assertEq(config.optionalDVNCount, 255); // NIL_DVN_COUNT — no optional DVNs
+        assertEq(config.optionalDVNThreshold, 0);
+        assertEq(config.optionalDVNs.length, 0);
+        assertEq(config.requiredDVNs.length, 1);
+        assertEq(config.requiredDVNs[0], LayerZeroConfig.getLayerZeroLabsDVN(dvnChain));
+    }
+
     /* ============ _buildTransactions ============ */
 
     function test_buildTransactions_buildsSendAndReceiveSetConfig() external view {

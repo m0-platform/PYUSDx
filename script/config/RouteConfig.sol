@@ -19,6 +19,8 @@ library RouteConfig {
     function getPayloadGasLimit(uint32 destinationChainId) internal pure returns (uint256) {
         if (destinationChainId == Chains.ETHEREUM) return DEFAULT_PAYLOAD_GAS_LIMIT;
         if (destinationChainId == Chains.ARBITRUM) return DEFAULT_PAYLOAD_GAS_LIMIT;
+        if (destinationChainId == Chains.SEPOLIA) return DEFAULT_PAYLOAD_GAS_LIMIT;
+        if (destinationChainId == Chains.ARBITRUM_SEPOLIA) return DEFAULT_PAYLOAD_GAS_LIMIT;
 
         revert Chains.UnsupportedChain(destinationChainId);
     }
