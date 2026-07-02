@@ -1,11 +1,11 @@
 {
   "lib/evm-m-extensions": {
-    "rev": "7fe2bee0aa6128f0aa8fafa17be541224a4a12ce"
+    "rev": "551c8406aade7e00e9ee27ae0f69b1fbb4cfcbcf"
   },
   "lib/forge-std": {
     "branch": {
       "name": "v1",
-      "rev": "620536fa5277db4e3fd46772d5cbc1ea0696fb43"
+      "rev": "bf647bd6046f2f7da30d0c2bf435e5c76a780c1b"
     }
   }
 }

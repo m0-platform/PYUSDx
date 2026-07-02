@@ -31,7 +31,7 @@ abstract contract MultiMintStorageLayout {
     bytes32 private constant _MULTI_MINT_STORAGE_LOCATION =
         0x57e19e611dcbdde2876919e2fe591d15cb50f046f296d11a2b28e0b3b8b3f900;
 
-    function _getMultiMintStorage() internal pure returns (MultiMintStorage storage $) {
+    function _getMultiMintStorage() internal pure virtual returns (MultiMintStorage storage $) {
         bytes32 location = _MULTI_MINT_STORAGE_LOCATION;
         assembly {
             $.slot := location

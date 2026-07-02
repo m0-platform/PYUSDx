@@ -98,7 +98,7 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, 
     }
 
     /// @inheritdoc IExtension
-    function pinVersion(uint256 version) external onlyRole(VERSION_MANAGER_ROLE) {
+    function pinVersion(uint256 version) external virtual onlyRole(VERSION_MANAGER_ROLE) {
         if (version == 0) revert ZeroVersion();
 
         address beacon = StorageSlot.getAddressSlot(_ORIGIN_BEACON_SLOT).value;
@@ -115,7 +115,7 @@ abstract contract Extension is IExtension, ERC20ExtendedUpgradeable, Freezable, 
     }
 
     /// @inheritdoc IExtension
-    function unpinVersion() external onlyRole(VERSION_MANAGER_ROLE) {
+    function unpinVersion() external virtual onlyRole(VERSION_MANAGER_ROLE) {
         if (StorageSlot.getAddressSlot(_IMPLEMENTATION_SLOT).value == address(0)) revert NotPinned();
 
         address beacon = StorageSlot.getAddressSlot(_ORIGIN_BEACON_SLOT).value;
