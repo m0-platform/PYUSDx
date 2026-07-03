@@ -10,8 +10,14 @@ contract MockBridgeAdapter is IBridgeAdapter {
     address public portal;
     uint256 public quoteValue;
 
+    mapping(uint256 bridgeChainId => uint32 internalChainId) internal internalChainIds;
+
     function setPortal(address portal_) external {
         portal = portal_;
+    }
+
+    function setChainId(uint256 bridgeChainId, uint32 chainId) external {
+        internalChainIds[bridgeChainId] = chainId;
     }
 
     function sendMessage(
@@ -37,8 +43,8 @@ contract MockBridgeAdapter is IBridgeAdapter {
         return 0;
     }
 
-    function getChainId(uint256 bridgeChainId) external pure returns (uint32) {
-        return 0;
+    function getChainId(uint256 bridgeChainId) external view returns (uint32) {
+        return internalChainIds[bridgeChainId];
     }
 
     function setPeer(uint32 destinationChainId, bytes32 destinationPeer) external {
