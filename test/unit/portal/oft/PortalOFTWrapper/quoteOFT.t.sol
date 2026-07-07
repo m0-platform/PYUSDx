@@ -65,6 +65,22 @@ contract QuoteOFTUnitTest is PortalOFTWrapperUnitTestBase {
         wrapper.quoteOFT(sendParam);
     }
 
+    function test_quoteOFT_revertsIfComposeMsg() external {
+        SendParam memory sendParam = _sendParam(AMOUNT, AMOUNT);
+        sendParam.composeMsg = hex"01";
+
+        vm.expectRevert(IPortalOFTWrapper.ComposeMsgUnsupported.selector);
+        wrapper.quoteOFT(sendParam);
+    }
+
+    function test_quoteOFT_revertsIfOftCmd() external {
+        SendParam memory sendParam = _sendParam(AMOUNT, AMOUNT);
+        sendParam.oftCmd = hex"01";
+
+        vm.expectRevert(IPortalOFTWrapper.OFTCmdUnsupported.selector);
+        wrapper.quoteOFT(sendParam);
+    }
+
     function test_quoteOFT_revertsIfUnsupportedEid() external {
         SendParam memory sendParam = _sendParam(AMOUNT, AMOUNT);
         sendParam.dstEid = 1;

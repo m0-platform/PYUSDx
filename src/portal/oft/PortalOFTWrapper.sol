@@ -113,9 +113,12 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
     ///         full send amount is pulled from the caller.
     ///      Tokens held by the wrapper are spendable by the next `send` caller, so they must only
     ///      be pushed here within the sending transaction — never transferred in advance.
-    ///      `sendParam.extraOptions`, `sendParam.composeMsg` and `sendParam.oftCmd` are ignored
-    ///      (Stargate always sends them empty): destination execution is configured by the
-    ///      Portal's payload gas limits.
+    ///      `sendParam.extraOptions` is ignored: destination execution is configured by the
+    ///      Portal's payload gas limits, and delivery can be retried with more gas if needed.
+    ///      `sendParam.composeMsg` and `sendParam.oftCmd` are rejected rather than ignored:
+    ///      the Portal path cannot execute them on the destination, and silently dropping a
+    ///      compose message could strand funds on a composer recipient. Stargate always sends
+    ///      all three empty.
     ///      `fee.nativeFee` is ignored in favor of `msg.value`; the excess over the actual bridge
     ///      fee is returned to `refundAddress` by the LayerZero Endpoint.
     function send(
@@ -125,6 +128,7 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
     ) external payable returns (MessagingReceipt memory receipt, OFTReceipt memory oftReceipt) {
         if (fee.lzTokenFee != 0) revert LayerZeroTokenUnsupported();
 
+        _revertIfUnsupportedSendParam(sendParam);
         _revertIfInvalidAmount(sendParam);
 
         uint256 amount = sendParam.amountLD;
@@ -213,6 +217,7 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
         view
         returns (OFTLimit memory oftLimit, OFTFeeDetail[] memory oftFeeDetails, OFTReceipt memory oftReceipt)
     {
+        _revertIfUnsupportedSendParam(sendParam);
         _revertIfInvalidAmount(sendParam);
         _getDestinationTokenOrRevert(sendParam.dstEid);
         _getChainIdOrRevert(sendParam.dstEid);
@@ -229,6 +234,7 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
     function quoteSend(SendParam calldata sendParam, bool payInLzToken) external view returns (MessagingFee memory) {
         if (payInLzToken) revert LayerZeroTokenUnsupported();
 
+        _revertIfUnsupportedSendParam(sendParam);
         _revertIfInvalidAmount(sendParam);
         _getDestinationTokenOrRevert(sendParam.dstEid);
         uint32 destinationChainId = _getChainIdOrRevert(sendParam.dstEid);
@@ -269,5 +275,14 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
         if (sendParam.amountLD < sendParam.minAmountLD) {
             revert SlippageExceeded(sendParam.amountLD, sendParam.minAmountLD);
         }
+    }
+
+    /// @dev Rejects send parameters whose semantics the Portal path cannot honor. A compose
+    ///      message or OFT command accepted here would be silently dropped on the destination,
+    ///      so fail loudly instead. Applied to quotes and sends alike, so quotes never accept
+    ///      parameters that `send` would reject.
+    function _revertIfUnsupportedSendParam(SendParam calldata sendParam) internal pure {
+        if (sendParam.composeMsg.length != 0) revert ComposeMsgUnsupported();
+        if (sendParam.oftCmd.length != 0) revert OFTCmdUnsupported();
     }
 }

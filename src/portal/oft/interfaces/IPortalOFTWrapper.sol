@@ -50,6 +50,16 @@ interface IPortalOFTWrapper is IOFT {
     ///         which is unsupported since the Portal quotes and pays native fees only.
     error LayerZeroTokenUnsupported();
 
+    /// @notice Thrown when the caller supplies a compose message. The Portal path executes a
+    ///         plain token transfer on the destination, so `lzCompose` would never be invoked;
+    ///         accepting the message would silently drop its semantics and could strand funds
+    ///         on a composer recipient.
+    error ComposeMsgUnsupported();
+
+    /// @notice Thrown when the caller supplies an OFT command, which has no meaning on the
+    ///         Portal path and would otherwise be silently ignored.
+    error OFTCmdUnsupported();
+
     /* ============ Interactive Functions ============ */
 
     /// @notice Initializes the Proxy's storage.

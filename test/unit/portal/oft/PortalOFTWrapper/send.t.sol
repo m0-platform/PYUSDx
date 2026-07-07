@@ -257,6 +257,24 @@ contract SendUnitTest is PortalOFTWrapperUnitTestBase {
         );
     }
 
+    function test_send_revertsIfComposeMsg() external {
+        SendParam memory sendParam = _sendParam(AMOUNT, AMOUNT);
+        sendParam.composeMsg = hex"01";
+
+        vm.expectRevert(IPortalOFTWrapper.ComposeMsgUnsupported.selector);
+        vm.prank(user);
+        wrapper.send{ value: FEE }(sendParam, MessagingFee({ nativeFee: FEE, lzTokenFee: 0 }), user);
+    }
+
+    function test_send_revertsIfOftCmd() external {
+        SendParam memory sendParam = _sendParam(AMOUNT, AMOUNT);
+        sendParam.oftCmd = hex"01";
+
+        vm.expectRevert(IPortalOFTWrapper.OFTCmdUnsupported.selector);
+        vm.prank(user);
+        wrapper.send{ value: FEE }(sendParam, MessagingFee({ nativeFee: FEE, lzTokenFee: 0 }), user);
+    }
+
     function test_send_revertsIfLzTokenFee() external {
         vm.expectRevert(IPortalOFTWrapper.LayerZeroTokenUnsupported.selector);
         vm.prank(user);
