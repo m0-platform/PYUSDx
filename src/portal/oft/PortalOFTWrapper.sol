@@ -157,7 +157,8 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
 
         // NOTE: The Portal is bridge-agnostic and returns its own message ID rather than
         //       LayerZero-specific identifiers, so `guid` carries the Portal message ID
-        //       and `nonce` is not populated.
+        //       and `nonce` is not populated. `fee.nativeFee` reports `msg.value`, which may
+        //       exceed the fee actually paid; the excess is refunded to `refundAddress`.
         receipt = MessagingReceipt({
             guid: messageId,
             nonce: 0,
@@ -198,6 +199,12 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
     /// @inheritdoc IOFT
     function oftVersion() external pure returns (bytes4 interfaceId, uint64 version) {
         return (type(IOFT).interfaceId, 1);
+    }
+
+    /// @inheritdoc AccessControlUpgradeable
+    /// @dev Also reports the IOFT interface so OFT-aware tooling can detect the wrapper via ERC-165.
+    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
+        return interfaceId == type(IOFT).interfaceId || super.supportsInterface(interfaceId);
     }
 
     /// @inheritdoc IOFT

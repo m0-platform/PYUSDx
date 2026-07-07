@@ -16,6 +16,13 @@ contract ViewsUnitTest is PortalOFTWrapperUnitTestBase {
         assertEq(version, 1);
     }
 
+    function test_supportsInterface() external view {
+        assertTrue(wrapper.supportsInterface(type(IOFT).interfaceId));
+        // ERC-165 itself, inherited from AccessControlUpgradeable.
+        assertTrue(wrapper.supportsInterface(0x01ffc9a7));
+        assertFalse(wrapper.supportsInterface(0xffffffff));
+    }
+
     function test_approvalRequired() external view {
         // `false` as required by the LayerZero Value Transfer API flow: the send amount is
         // pre-pushed into the wrapper by the LayerZero TransferDelegate before `send`.
