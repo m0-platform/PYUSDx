@@ -224,9 +224,12 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
         _getDestinationTokenOrRevert(sendParam.dstEid);
         _getChainIdOrRevert(sendParam.dstEid);
 
-        // The Portal rejects zero-amount sends (`ZeroAmount`), so the true minimum is 1;
-        // the maximum is bound by the uint128 amount encoding of the Portal's payload.
-        oftLimit = OFTLimit({ minAmountLD: 1, maxAmountLD: type(uint128).max });
+        // The Portal rejects zero-amount sends (`ZeroAmount`), so the true minimum is 1.
+        // The Portal's payload encodes amounts as uint128, but the advertised maximum follows
+        // the OFT convention instead: canonical OFT tooling converts amounts to shared decimals
+        // typed as uint64 (see OFTCore._toSD), and with shared decimals equal to local decimals
+        // that ceiling is uint64.max in local units. Advertising more could overflow integrators.
+        oftLimit = OFTLimit({ minAmountLD: 1, maxAmountLD: type(uint64).max });
         oftFeeDetails = new OFTFeeDetail[](0);
         oftReceipt = OFTReceipt({ amountSentLD: sendParam.amountLD, amountReceivedLD: sendParam.amountLD });
     }

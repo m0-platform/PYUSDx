@@ -17,7 +17,8 @@ contract QuoteOFTUnitTest is PortalOFTWrapperUnitTestBase {
 
         // The Portal rejects zero-amount sends, so the advertised minimum is 1.
         assertEq(oftLimit.minAmountLD, 1);
-        assertEq(oftLimit.maxAmountLD, type(uint128).max);
+        // The advertised maximum follows the OFT uint64 shared-decimals convention.
+        assertEq(oftLimit.maxAmountLD, type(uint64).max);
         assertEq(oftFeeDetails.length, 0);
         assertEq(oftReceipt.amountSentLD, AMOUNT);
         assertEq(oftReceipt.amountReceivedLD, AMOUNT);
@@ -35,7 +36,7 @@ contract QuoteOFTUnitTest is PortalOFTWrapperUnitTestBase {
             _sendParam(AMOUNT, AMOUNT)
         );
 
-        assertEq(oftLimit.maxAmountLD, type(uint128).max);
+        assertEq(oftLimit.maxAmountLD, type(uint64).max);
         assertEq(oftReceipt.amountSentLD, AMOUNT);
         assertEq(oftReceipt.amountReceivedLD, AMOUNT);
     }
