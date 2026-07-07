@@ -222,8 +222,8 @@ contract SendUnitTest is PortalOFTWrapperUnitTestBase {
     }
 
     function test_send_partiallyPreFundedBalance() external {
-        // A partial balance doesn't count: unless the wrapper holds the full send amount,
-        // the full send amount is pulled from the caller and the partial balance stays put.
+        // A partial balance is consumed toward the send and only the shortfall is pulled from
+        // the caller, so the wrapper never retains a claimable balance after a send.
         uint256 preFunded = AMOUNT / 4;
 
         vm.startPrank(user);
@@ -233,8 +233,8 @@ contract SendUnitTest is PortalOFTWrapperUnitTestBase {
         wrapper.send{ value: FEE }(_sendParam(AMOUNT, AMOUNT), MessagingFee({ nativeFee: FEE, lzTokenFee: 0 }), user);
         vm.stopPrank();
 
-        assertEq(pyusdx.balanceOf(address(wrapper)), preFunded);
-        assertEq(pyusdx.allowance(user, address(wrapper)), 0);
+        assertEq(pyusdx.balanceOf(address(wrapper)), 0);
+        assertEq(pyusdx.allowance(user, address(wrapper)), preFunded);
     }
 
     function test_send_revertsIfAmountExceedsUint128() external {

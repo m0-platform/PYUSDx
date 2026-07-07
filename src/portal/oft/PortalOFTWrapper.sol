@@ -136,9 +136,11 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
         uint32 destinationChainId = _getChainIdOrRevert(sendParam.dstEid);
 
         // Ensure the send amount is available in the wrapper: on the Stargate fee path it was
-        // pre-pushed by TransferDelegate; otherwise pull the full amount from the caller.
-        if (IERC20(token).balanceOf(address(this)) < amount) {
-            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        // pre-pushed by TransferDelegate; otherwise pull the shortfall from the caller, so any
+        // balance already resting in the wrapper is consumed rather than left claimable.
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        if (balance < amount) {
+            IERC20(token).safeTransferFrom(msg.sender, address(this), amount - balance);
         }
 
         IERC20(token).forceApprove(portal, amount);
