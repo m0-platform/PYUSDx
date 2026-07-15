@@ -27,6 +27,12 @@ contract RemoveDestinationTokenUnitTest is PortalOFTWrapperUnitTestBase {
         assertEq(vm.getRecordedLogs().length, 0);
     }
 
+    function test_removeDestinationToken_revertsIfZeroDestinationEid() external {
+        vm.expectRevert(IPortalOFTWrapper.ZeroDestinationEid.selector);
+        vm.prank(operator);
+        wrapper.removeDestinationToken(0);
+    }
+
     function test_removeDestinationToken_revertsIfNotOperator() external {
         vm.expectRevert(
             abi.encodeWithSelector(

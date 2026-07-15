@@ -179,6 +179,7 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
 
     /// @inheritdoc IPortalOFTWrapper
     function removeDestinationToken(uint32 destinationEid) external onlyRole(OPERATOR_ROLE) {
+        if (destinationEid == 0) revert ZeroDestinationEid();
         PortalOFTWrapperStorageStruct storage $ = _getPortalOFTWrapperStorageLocation();
 
         if ($.destinationToken[destinationEid] == bytes32(0)) return;
