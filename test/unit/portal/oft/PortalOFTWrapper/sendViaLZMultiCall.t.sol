@@ -2,6 +2,7 @@
 pragma solidity 0.8.34;
 
 import { TypeConverter } from "../../../../../lib/evm-m-extensions/lib/common/src/libs/TypeConverter.sol";
+import { IERC20 } from "../../../../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { MessagingFee } from "../../../../../src/portal/bridgeAdapters/layerZero/interfaces/ILayerZeroEndpointV2.sol";
 import { IOFT, SendParam } from "../../../../../src/portal/oft/interfaces/IOFT.sol";
@@ -14,9 +15,10 @@ import { PortalOFTWrapperUnitTestBase } from "./PortalOFTWrapperUnitTestBase.sol
 
 /// @notice Models the production LayerZero Value Transfer API sequence: the user approves the
 ///         token to the single-purpose TransferDelegate only, then a single LZMultiCall
-///         transaction pre-pushes the send amount into the wrapper and invokes `send`, so at
-///         `send` the caller is the multicall contract (not the user or token owner) and the
-///         wrapper already holds the tokens. Both steps roll back together on failure.
+///         transaction moves the send amount from the user into the multicall contract, approves
+///         the wrapper (as instructed by `approvalRequired()`), and invokes `send`, so at `send`
+///         the caller is the multicall contract (not the user or token owner) and the wrapper
+///         pulls the amount from it. All steps roll back together on failure.
 contract SendViaLZMultiCallUnitTest is PortalOFTWrapperUnitTestBase {
     using TypeConverter for address;
 
@@ -41,16 +43,21 @@ contract SendViaLZMultiCallUnitTest is PortalOFTWrapperUnitTestBase {
     }
 
     function _multicallCalls(SendParam memory sendParam) internal view returns (MockLZMultiCall.Call[] memory calls) {
-        calls = new MockLZMultiCall.Call[](2);
+        calls = new MockLZMultiCall.Call[](3);
         calls[0] = MockLZMultiCall.Call({
             target: address(transferDelegate),
             value: 0,
             data: abi.encodeCall(
                 MockTransferDelegate.delegateTransferFrom,
-                (address(pyusdx), user, address(wrapper), AMOUNT)
+                (address(pyusdx), user, address(lzMultiCall), AMOUNT)
             )
         });
         calls[1] = MockLZMultiCall.Call({
+            target: address(pyusdx),
+            value: 0,
+            data: abi.encodeCall(IERC20.approve, (address(wrapper), AMOUNT))
+        });
+        calls[2] = MockLZMultiCall.Call({
             target: address(wrapper),
             value: FEE,
             data: abi.encodeCall(
@@ -65,8 +72,8 @@ contract SendViaLZMultiCallUnitTest is PortalOFTWrapperUnitTestBase {
 
         uint256 initialSupply = pyusdx.totalSupply();
 
-        // At `send`, msg.sender is the multicall contract, which holds no tokens and has no
-        // allowance: the wrapper must consume its pre-pushed balance and pull nothing.
+        // At `send`, msg.sender is the multicall contract, which holds the user's tokens and
+        // has approved the wrapper: the full amount is pulled from the multicall contract.
         vm.expectEmit();
         emit IOFT.OFTSent(_getMessageId(), DESTINATION_EID, address(lzMultiCall), AMOUNT, AMOUNT);
 
@@ -78,7 +85,8 @@ contract SendViaLZMultiCallUnitTest is PortalOFTWrapperUnitTestBase {
         assertEq(pyusdx.balanceOf(address(lzMultiCall)), 0);
         assertEq(pyusdx.totalSupply(), initialSupply - AMOUNT);
 
-        // The delegate allowance was consumed; the wrapper was never approved by anyone.
+        // Both allowances were consumed in full: the user's on the delegate and the multicall
+        // contract's on the wrapper. The user never approved the wrapper.
         assertEq(pyusdx.allowance(user, address(transferDelegate)), 0);
         assertEq(pyusdx.allowance(user, address(wrapper)), 0);
         assertEq(pyusdx.allowance(address(lzMultiCall), address(wrapper)), 0);
@@ -88,20 +96,24 @@ contract SendViaLZMultiCallUnitTest is PortalOFTWrapperUnitTestBase {
     }
 
     function test_send_viaLZMultiCall_rollsBackAtomically() external {
-        // Make the `send` leg fail after the delegate has pre-pushed the tokens.
+        // Make the `send` leg fail after the delegate has moved the tokens and the wrapper
+        // has been approved.
         vm.prank(operator);
         wrapper.removeDestinationToken(DESTINATION_EID);
 
         MockLZMultiCall.Call[] memory calls = _multicallCalls(_sendParam(AMOUNT, AMOUNT));
 
-        // The multicall bubbles the wrapper's revert, unwinding the pre-push with it.
+        // The multicall bubbles the wrapper's revert, unwinding the transfer and approval with it.
         vm.expectRevert(abi.encodeWithSelector(IPortalOFTWrapper.UnsupportedDestinationEid.selector, DESTINATION_EID));
         vm.prank(user);
         lzMultiCall.multicall{ value: FEE }(calls);
 
-        // Nothing moved: balance and delegate allowance are fully intact.
+        // Nothing moved: balances and the delegate allowance are fully intact, and the
+        // multicall contract's approval on the wrapper never survives the transaction.
         assertEq(pyusdx.balanceOf(user), 100e6);
         assertEq(pyusdx.balanceOf(address(wrapper)), 0);
+        assertEq(pyusdx.balanceOf(address(lzMultiCall)), 0);
         assertEq(pyusdx.allowance(user, address(transferDelegate)), AMOUNT);
+        assertEq(pyusdx.allowance(address(lzMultiCall), address(wrapper)), 0);
     }
 }

@@ -2,8 +2,9 @@
 pragma solidity 0.8.34;
 
 /// @notice Models LayerZero's LZMultiCall: executes arbitrary calls atomically, so the
-///         TransferDelegate pre-push and the OFT `send` happen in one transaction and
-///         roll back together. In production the OFT sees this contract as `msg.sender`.
+///         TransferDelegate transfer, the OFT approval and the OFT `send` happen in one
+///         transaction and roll back together. In production the OFT sees this contract
+///         as `msg.sender` and pulls the send amount from it.
 contract MockLZMultiCall {
     struct Call {
         address target;

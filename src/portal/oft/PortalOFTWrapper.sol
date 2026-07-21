@@ -105,14 +105,14 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
     /// @inheritdoc IOFT
     /// @dev Forwards the send to `Portal.sendToken`, which burns the token on the source chain
     ///      and dispatches the message through the pinned LayerZero bridge adapter.
-    ///      Supports both LayerZero Value Transfer API call sequences:
-    ///      1. Fee path: the user approves the token to the LayerZero `TransferDelegate`, which moves
-    ///         the send amount into this wrapper before `LZMultiCall` invokes `send`. The wrapper
-    ///         already holds the tokens and nothing is pulled from the caller.
-    ///      2. Direct path: the caller approves this wrapper and calls `send` directly; the
-    ///         full send amount is pulled from the caller.
-    ///      Tokens held by the wrapper are spendable by the next `send` caller, so they must only
-    ///      be pushed here within the sending transaction — never transferred in advance.
+    ///      The send amount is always pulled from the caller, so the caller must have approved
+    ///      this wrapper (see `approvalRequired`). This holds on both call sequences:
+    ///      1. LayerZero Value Transfer API fee path: the `TransferDelegate` moves the send amount
+    ///         from the user into `LZMultiCall`, which approves this wrapper and invokes `send`,
+    ///         so the amount is pulled from `LZMultiCall`.
+    ///      2. Direct path: the caller approves this wrapper and calls `send` directly.
+    ///      Tokens transferred to the wrapper outside of `send` are not credited toward a send;
+    ///      there is no rescue function, so recovering them would require a contract upgrade.
     ///      `sendParam.extraOptions`, `sendParam.composeMsg` and `sendParam.oftCmd` are ignored
     ///      (Stargate always sends them empty): destination execution is configured by the
     ///      Portal's payload gas limits.
@@ -131,11 +131,9 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
         bytes32 destinationToken = _getDestinationTokenOrRevert(sendParam.dstEid);
         uint32 destinationChainId = _getChainIdOrRevert(sendParam.dstEid);
 
-        // Ensure the send amount is available in the wrapper: on the Stargate fee path it was
-        // pre-pushed by TransferDelegate; otherwise pull the full amount from the caller.
-        if (IERC20(token).balanceOf(address(this)) < amount) {
-            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        }
+        // Pull the full send amount from the caller: the user on the direct path, or
+        // `LZMultiCall` holding the user's tokens on the Value Transfer API fee path.
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
         IERC20(token).forceApprove(portal, amount);
 
@@ -196,12 +194,11 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
     }
 
     /// @inheritdoc IOFT
-    /// @dev Returns `false` as required by Stargate flow: the send amount is
-    ///      moved into the wrapper by the LayerZero `TransferDelegate` before `send` is invoked, so
-    ///      no ERC-20 allowance on this wrapper is needed. Direct callers not using Stargate must
-    ///      still approve this wrapper, since `send` pulls the send amount from the caller.
+    /// @dev Returns `true` since `send` pulls the send amount from the caller via `transferFrom`.
+    ///      On the LayerZero Value Transfer API fee path this flag instructs `LZMultiCall`, which
+    ///      holds the user's tokens, to approve this wrapper before invoking `send`.
     function approvalRequired() external pure returns (bool) {
-        return false;
+        return true;
     }
 
     /// @inheritdoc IOFT

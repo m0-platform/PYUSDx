@@ -206,35 +206,32 @@ contract SendUnitTest is PortalOFTWrapperUnitTestBase {
         wrapper.send{ value: FEE }(_sendParam(AMOUNT, AMOUNT), MessagingFee({ nativeFee: FEE, lzTokenFee: 0 }), user);
     }
 
-    function test_send_preFundedBalance() external {
-        // LayerZero Value Transfer API flow: TransferDelegate pushes tokens into the wrapper before
-        // `send`, so nothing is pulled from the caller and no allowance is needed.
-        vm.prank(user);
-        pyusdx.transfer(address(wrapper), AMOUNT);
-
-        uint256 balanceAfterTransfer = pyusdx.balanceOf(user);
-
-        vm.prank(user);
-        wrapper.send{ value: FEE }(_sendParam(AMOUNT, AMOUNT), MessagingFee({ nativeFee: FEE, lzTokenFee: 0 }), user);
-
-        assertEq(pyusdx.balanceOf(user), balanceAfterTransfer);
-        assertEq(pyusdx.balanceOf(address(wrapper)), 0);
-    }
-
-    function test_send_partiallyPreFundedBalance() external {
-        // A partial balance doesn't count: unless the wrapper holds the full send amount,
-        // the full send amount is pulled from the caller and the partial balance stays put.
-        uint256 preFunded = AMOUNT / 4;
+    function test_send_ignoresWrapperBalance() external {
+        // The full send amount is always pulled from the caller: tokens already held by the
+        // wrapper are never credited toward a send.
+        uint256 stranded = AMOUNT / 4;
 
         vm.startPrank(user);
-        pyusdx.transfer(address(wrapper), preFunded);
+        pyusdx.transfer(address(wrapper), stranded);
         pyusdx.approve(address(wrapper), AMOUNT);
 
         wrapper.send{ value: FEE }(_sendParam(AMOUNT, AMOUNT), MessagingFee({ nativeFee: FEE, lzTokenFee: 0 }), user);
         vm.stopPrank();
 
-        assertEq(pyusdx.balanceOf(address(wrapper)), preFunded);
+        assertEq(pyusdx.balanceOf(address(wrapper)), stranded);
         assertEq(pyusdx.allowance(user, address(wrapper)), 0);
+    }
+
+    function test_send_revertsIfPreFundedWithoutAllowance() external {
+        // Pre-pushing tokens into the wrapper does not fund a send: the amount is pulled from
+        // the caller, so a caller without an allowance reverts even when the wrapper holds the
+        // full send amount.
+        vm.prank(user);
+        pyusdx.transfer(address(wrapper), AMOUNT);
+
+        vm.expectRevert();
+        vm.prank(user);
+        wrapper.send{ value: FEE }(_sendParam(AMOUNT, AMOUNT), MessagingFee({ nativeFee: FEE, lzTokenFee: 0 }), user);
     }
 
     function test_send_revertsIfAmountExceedsUint128() external {

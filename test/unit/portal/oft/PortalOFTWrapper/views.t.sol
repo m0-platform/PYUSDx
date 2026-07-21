@@ -17,9 +17,9 @@ contract ViewsUnitTest is PortalOFTWrapperUnitTestBase {
     }
 
     function test_approvalRequired() external view {
-        // `false` as required by the LayerZero Value Transfer API flow: the send amount is
-        // pre-pushed into the wrapper by the LayerZero TransferDelegate before `send`.
-        assertFalse(wrapper.approvalRequired());
+        // `true` since `send` pulls the send amount from the caller: on the LayerZero Value
+        // Transfer API fee path this instructs LZMultiCall to approve the wrapper before `send`.
+        assertTrue(wrapper.approvalRequired());
     }
 
     function test_getDestinationToken() external view {
