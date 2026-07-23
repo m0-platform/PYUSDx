@@ -254,6 +254,34 @@ contract SendUnitTest is PortalOFTWrapperUnitTestBase {
         );
     }
 
+    function test_send_allowsOverpayingNativeFee() external {
+        // Integrators may pass more than the declared fee to buffer against fee movement;
+        // the full `msg.value` is forwarded and the excess over the actual bridge fee is
+        // refunded to `refundAddress` by the LayerZero Endpoint.
+        vm.startPrank(user);
+        pyusdx.approve(address(wrapper), AMOUNT);
+
+        (MessagingReceipt memory receipt, ) = wrapper.send{ value: FEE * 2 }(
+            _sendParam(AMOUNT, AMOUNT),
+            MessagingFee({ nativeFee: FEE, lzTokenFee: 0 }),
+            user
+        );
+        vm.stopPrank();
+
+        assertEq(receipt.fee.nativeFee, FEE * 2);
+        assertEq(address(bridgeAdapter).balance, FEE * 2);
+    }
+
+    function test_send_revertsIfNotEnoughNative() external {
+        vm.expectRevert(abi.encodeWithSelector(IPortalOFTWrapper.NotEnoughNative.selector, FEE - 1));
+        vm.prank(user);
+        wrapper.send{ value: FEE - 1 }(
+            _sendParam(AMOUNT, AMOUNT),
+            MessagingFee({ nativeFee: FEE, lzTokenFee: 0 }),
+            user
+        );
+    }
+
     function test_send_revertsIfLzTokenFee() external {
         vm.expectRevert(IPortalOFTWrapper.LayerZeroTokenUnsupported.selector);
         vm.prank(user);

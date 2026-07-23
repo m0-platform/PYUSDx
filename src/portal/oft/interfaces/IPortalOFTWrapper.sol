@@ -50,6 +50,11 @@ interface IPortalOFTWrapper is IOFT {
     ///         which is unsupported since the Portal quotes and pays native fees only.
     error LayerZeroTokenUnsupported();
 
+    /// @notice Thrown when the passed `msg.value` does not cover the declared `fee.nativeFee`.
+    /// @dev    Mirrors the canonical OFT's `NotEnoughNative` error, including its selector.
+    /// @param  msgValue The native value passed to the call.
+    error NotEnoughNative(uint256 msgValue);
+
     /* ============ Interactive Functions ============ */
 
     /// @notice Initializes the Proxy's storage.

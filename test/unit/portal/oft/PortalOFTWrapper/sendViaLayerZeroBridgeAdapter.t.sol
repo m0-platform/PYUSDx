@@ -98,12 +98,14 @@ contract SendViaLayerZeroBridgeAdapterUnitTest is PortalOFTWrapperUnitTestBase {
         vm.startPrank(user);
         pyusdx.approve(address(layerZeroWrapper), AMOUNT);
 
+        // The declared fee matches `msg.value`, so the wrapper's own fee check passes and the
+        // underpayment is caught by the endpoint itself.
         vm.expectRevert(
             abi.encodeWithSelector(MockLayerZeroEndpoint.InsufficientFee.selector, ENDPOINT_FEE, ENDPOINT_FEE - 1)
         );
         layerZeroWrapper.send{ value: ENDPOINT_FEE - 1 }(
             _sendParam(AMOUNT, AMOUNT),
-            MessagingFee({ nativeFee: ENDPOINT_FEE, lzTokenFee: 0 }),
+            MessagingFee({ nativeFee: ENDPOINT_FEE - 1, lzTokenFee: 0 }),
             user
         );
         vm.stopPrank();

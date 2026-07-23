@@ -116,14 +116,17 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
     ///      `sendParam.extraOptions`, `sendParam.composeMsg` and `sendParam.oftCmd` are ignored
     ///      (Stargate always sends them empty): destination execution is configured by the
     ///      Portal's payload gas limits.
-    ///      `fee.nativeFee` is ignored in favor of `msg.value`; the excess over the actual bridge
-    ///      fee is returned to `refundAddress` by the LayerZero Endpoint.
+    ///      `msg.value` must cover the declared `fee.nativeFee` and is forwarded in full,
+    ///      mirroring the LayerZero Endpoint's fee handling: callers may pass more than the
+    ///      quoted, and the excess over the actual bridge fee is returned to `refundAddress`
+    ///      by the LayerZero Endpoint.
     function send(
         SendParam calldata sendParam,
         MessagingFee calldata fee,
         address refundAddress
     ) external payable returns (MessagingReceipt memory receipt, OFTReceipt memory oftReceipt) {
         if (fee.lzTokenFee != 0) revert LayerZeroTokenUnsupported();
+        if (msg.value < fee.nativeFee) revert NotEnoughNative(msg.value);
 
         _revertIfInvalidAmount(sendParam);
 
