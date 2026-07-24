@@ -62,16 +62,20 @@ contract PortalOFTWrapper is PortalOFTWrapperStorageLayout, AccessControlUpgrade
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @inheritdoc IPortalOFTWrapper
+    /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable portal;
 
     /// @inheritdoc IPortalOFTWrapper
+    /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable layerZeroBridgeAdapter;
 
     /// @inheritdoc IOFT
+    /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable token;
 
     /// @inheritdoc IOFT
     /// @dev The Portal path is 1:1 with no dust conversion, so shared decimals equal local decimals.
+    /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     uint8 public immutable sharedDecimals;
 
     /// @notice Constructs the Implementation contract
