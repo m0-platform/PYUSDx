@@ -74,6 +74,11 @@ abstract contract BridgeAdapter is IBridgeAdapter, BridgeAdapterStorageLayout, A
     }
 
     /// @inheritdoc IBridgeAdapter
+    /// @dev Maintains the 1-1 chain ID mapping. Any chain that loses its existing pair as a side
+    ///      effect — the reassigned chain and the orphaned chain — also has its peer cleared, so
+    ///      a stale peer can never be combined with an updated bridge chain ID: sends to that
+    ///      chain revert with `UnsupportedChain` until the operator re-asserts the peer via
+    ///      `setPeer`. A fresh assignment leaves the chain's peer untouched.
     function setBridgeChainId(uint32 chainId, uint256 bridgeChainId) external onlyRole(OPERATOR_ROLE) {
         _revertIfZeroChain(chainId);
         _revertIfZeroBridgeChain(bridgeChainId);
@@ -87,6 +92,7 @@ abstract contract BridgeAdapter is IBridgeAdapter, BridgeAdapterStorageLayout, A
         if (oldInternalChainId != 0 && oldInternalChainId != chainId) {
             delete $.internalToBridgeChainId[oldInternalChainId];
             emit BridgeChainIdRemoved(oldInternalChainId, bridgeChainId);
+            _removePeer($, oldInternalChainId);
         }
 
         // Clean up old reverse mapping if this internal chain was mapped to a different bridge chain
@@ -94,12 +100,22 @@ abstract contract BridgeAdapter is IBridgeAdapter, BridgeAdapterStorageLayout, A
         if (oldBridgeChainId != 0 && oldBridgeChainId != bridgeChainId) {
             delete $.bridgeToInternalChainId[oldBridgeChainId];
             emit BridgeChainIdRemoved(chainId, oldBridgeChainId);
+            _removePeer($, chainId);
         }
 
         $.internalToBridgeChainId[chainId] = bridgeChainId;
         $.bridgeToInternalChainId[bridgeChainId] = chainId;
 
         emit BridgeChainIdSet(chainId, bridgeChainId);
+    }
+
+    /// @dev Clears the peer of a chain whose `(chainId, bridgeChainId)` pair was removed by
+    ///      `setBridgeChainId`, emitting `PeerSet` with a zero peer.
+    function _removePeer(BridgeAdapterStorageStruct storage $, uint32 chainId) private {
+        if ($.remotePeer[chainId] == bytes32(0)) return;
+
+        delete $.remotePeer[chainId];
+        emit PeerSet(chainId, bytes32(0));
     }
 
     /* ============ View/Pure Functions ============ */
