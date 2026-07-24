@@ -72,4 +72,9 @@ contract Config {
         address admin;
         address operator;
     }
+
+    struct PortalOFTWrapperConfig {
+        address admin;
+        address operator;
+    }
 }
