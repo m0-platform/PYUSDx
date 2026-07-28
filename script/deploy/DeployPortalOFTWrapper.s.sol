@@ -10,13 +10,18 @@ import { DeployBase } from "./DeployBase.s.sol";
 contract DeployPortalOFTWrapper is DeployBase {
     function run() public {
         address deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
-        console.log("Deployer:", deployer);
+        console.log("Deployer:                        ", deployer);
 
         address portal = _getPortal();
         address layerZeroBridgeAdapter = _getLayerZeroBridgeAdapter();
 
-        // The token the wrapper represents: PYUSDX or a PYUSDX Extension.
-        address token = vm.envAddress("PORTAL_OFT_WRAPPER_TOKEN");
+        // The token the wrapper represents: a PYUSDX Extension set via PORTAL_OFT_WRAPPER_TOKEN,
+        // or PYUSDX itself (from deployments/<chainid>.json, falling back to the PYUSDX env var)
+        // when the variable is unset or empty. Read as a string and parsed explicitly so a
+        // malformed address reverts instead of silently deploying the PYUSDX wrapper.
+        address pyusdx = _getPYUSDX();
+        string memory tokenValue = vm.envOr("PORTAL_OFT_WRAPPER_TOKEN", string(""));
+        address token = bytes(tokenValue).length == 0 ? pyusdx : vm.parseAddress(tokenValue);
         string memory tokenSymbol = IERC20Metadata(token).symbol();
 
         PortalOFTWrapperConfig memory config = PortalOFTWrapperConfig({
@@ -42,8 +47,14 @@ contract DeployPortalOFTWrapper is DeployBase {
         console.log("PortalOFTWrapper Proxy:          ", proxy);
         console.log("PortalOFTWrapper ProxyAdmin:     ", proxyAdmin);
         console.log("PortalOFTWrapper Implementation: ", implementation);
+        console.log("PortalOFTWrapper Admin:          ", config.admin);
+        console.log("PortalOFTWrapper Operator:       ", config.operator);
         console.log("================================================================================");
 
-        _writeDeployment(block.chainid, string.concat("portalOFTWrapper_", tokenSymbol), proxy);
+        _writeDeployment(
+            block.chainid,
+            token == pyusdx ? "pyusdxPortalOFTWrapper" : string.concat(tokenSymbol, "PortalOFTWrapper"),
+            proxy
+        );
     }
 }

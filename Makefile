@@ -109,6 +109,15 @@ deploy-multi-mint-sepolia: deploy-multi-mint
 deploy-multi-mint-arbitrum-sepolia: CHAIN=arbitrum-sepolia
 deploy-multi-mint-arbitrum-sepolia: deploy-multi-mint
 
+# Usage: make deploy-portal-oft-wrapper CHAIN=mainnet
+deploy-portal-oft-wrapper:
+	PORTAL_OFT_WRAPPER_ADMIN=$(PORTAL_OFT_WRAPPER_ADMIN) \
+	PORTAL_OFT_WRAPPER_OPERATOR=$(PORTAL_OFT_WRAPPER_OPERATOR) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/deploy/DeployPortalOFTWrapper.s.sol:DeployPortalOFTWrapper \
+	--rpc-url $(CHAIN) \
+	--skip test --slow --non-interactive --broadcast --verify
+
 # Testnet faucet (periphery, non-upgradeable). Reads the PYUSDX address from deployments/<chainid>.json,
 # falling back to the PYUSDX env var. Pre-fund the deployed faucet with PYUSDX so it has a balance to dispense.
 deploy-faucet:
