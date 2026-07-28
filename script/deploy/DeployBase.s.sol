@@ -20,6 +20,7 @@ import { YieldToOne } from "../../src/platform/projects/YieldToOne.sol";
 import { SwapFacility } from "../../src/swap/SwapFacility.sol";
 import { Portal } from "../../src/portal/Portal.sol";
 import { LayerZeroBridgeAdapter } from "../../src/portal/bridgeAdapters/layerZero/LayerZeroBridgeAdapter.sol";
+import { PortalOFTWrapper } from "../../src/portal/oft/PortalOFTWrapper.sol";
 
 import { ScriptBase } from "../ScriptBase.s.sol";
 
@@ -213,6 +214,27 @@ contract DeployBase is DeployHelpers, ScriptBase {
             config.admin,
             abi.encodeWithSelector(LayerZeroBridgeAdapter.initialize.selector, config.admin, config.operator),
             _computeSalt(deployer, "PYUSDXLayerZeroBridgeAdapter")
+        );
+
+        proxyAdmin = Upgrades.getAdminAddress(proxy);
+    }
+
+    function _deployPortalOFTWrapper(
+        address deployer,
+        address portalProxy,
+        address token,
+        address layerZeroBridgeAdapterProxy,
+        string memory saltSuffix,
+        PortalOFTWrapperConfig memory config
+    ) internal returns (address proxy, address proxyAdmin, address implementation) {
+        implementation = address(new PortalOFTWrapper(portalProxy, token, layerZeroBridgeAdapterProxy));
+
+        // One wrapper instance exists per token, so the salt carries a per-token suffix.
+        proxy = _deployCreate3TransparentProxy(
+            implementation,
+            config.admin,
+            abi.encodeWithSelector(PortalOFTWrapper.initialize.selector, config.admin, config.operator),
+            _computeSalt(deployer, string.concat("PYUSDXPortalOFTWrapper", saltSuffix))
         );
 
         proxyAdmin = Upgrades.getAdminAddress(proxy);

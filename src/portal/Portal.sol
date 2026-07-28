@@ -65,9 +65,11 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @inheritdoc IPortal
+    /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable pyusdx;
 
     /// @inheritdoc IPortal
+    /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable swapFacility;
 
     /// @dev Modifier to make a function callable only when sending messages is not paused.

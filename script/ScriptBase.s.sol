@@ -15,6 +15,7 @@ contract ScriptBase is Script, Config {
         address layerZeroBridgeAdapter;
         address portal;
         address pyusdx;
+        address pyusdxPortalOFTWrapper;
         address swapFacility;
     }
 
@@ -75,6 +76,7 @@ contract ScriptBase is Script, Config {
                 address(0),
                 address(0),
                 address(0),
+                address(0),
                 address(0)
             );
 
@@ -84,7 +86,8 @@ contract ScriptBase is Script, Config {
             keccak256(bytes(key_)) != keccak256(bytes("swapFacility")) &&
             keccak256(bytes(key_)) != keccak256(bytes("extensionFactory")) &&
             keccak256(bytes(key_)) != keccak256(bytes("layerZeroBridgeAdapter")) &&
-            keccak256(bytes(key_)) != keccak256(bytes("portal"))
+            keccak256(bytes(key_)) != keccak256(bytes("portal")) &&
+            keccak256(bytes(key_)) != keccak256(bytes("pyusdxPortalOFTWrapper"))
         ) {
             deployments_ = _setExtensionDeployment(deployments_, key_, value_);
         }
@@ -125,6 +128,12 @@ contract ScriptBase is Script, Config {
             keccak256(bytes(key_)) == keccak256("portal") ? value_ : deployments_.portal
         );
 
+        vm.serializeAddress(
+            root,
+            "pyusdxPortalOFTWrapper",
+            keccak256(bytes(key_)) == keccak256("pyusdxPortalOFTWrapper") ? value_ : deployments_.pyusdxPortalOFTWrapper
+        );
+
         vm.serializeString(root, "extensionNames", deployments_.extensionNames);
 
         vm.writeJson(
@@ -140,6 +149,7 @@ contract ScriptBase is Script, Config {
                     new address[](0),
                     address(0),
                     new string[](0),
+                    address(0),
                     address(0),
                     address(0),
                     address(0),
@@ -204,6 +214,15 @@ contract ScriptBase is Script, Config {
             return vm.envAddress("PORTAL");
         } else {
             return deployments_.portal;
+        }
+    }
+
+    function _getPYUSDXPortalOFTWrapper() internal view returns (address) {
+        Deployments memory deployments_ = _readDeployment(block.chainid);
+        if (deployments_.pyusdxPortalOFTWrapper == address(0)) {
+            return vm.envAddress("PYUSDX_PORTAL_OFT_WRAPPER");
+        } else {
+            return deployments_.pyusdxPortalOFTWrapper;
         }
     }
 }
