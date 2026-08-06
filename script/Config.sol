@@ -56,6 +56,12 @@ contract Config {
         address freezeManager;
         address pauser;
         address yieldRecipientManager;
+        address versionManager;
+        address[] assets;
+        /// @dev Denominated in each asset's decimals.
+        uint256[] assetCaps;
+        /// @dev Empty means everyone may call `replaceAsset`.
+        address[] replaceAssetWhitelist;
     }
 
     struct PortalConfig {

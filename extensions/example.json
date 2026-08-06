@@ -1,0 +1,27 @@
+{
+  "extensionName": "example",
+  "tokenName": "Example USD",
+  "tokenSymbol": "exUSD",
+  "roles": {
+    "admin": "0x0000000000000000000000000000000000000001",
+    "assetCapManager": "0x0000000000000000000000000000000000000002",
+    "freezeManager": "0x0000000000000000000000000000000000000003",
+    "pauser": "0x0000000000000000000000000000000000000004",
+    "versionManager": "0x0000000000000000000000000000000000000005",
+    "yieldRecipient": "0x0000000000000000000000000000000000000006",
+    "yieldRecipientManager": "0x0000000000000000000000000000000000000007"
+  },
+  "assets": [
+    {
+      "symbol": "USDC",
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "cap": 100000000000000
+    },
+    {
+      "symbol": "PYUSD",
+      "address": "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8",
+      "cap": 50000000000000
+    }
+  ],
+  "replaceAssetWhitelist": []
+}

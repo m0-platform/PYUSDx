@@ -99,9 +99,11 @@ deploy-yield-to-one-sepolia: deploy-yield-to-one
 deploy-yield-to-one-arbitrum-sepolia: CHAIN=arbitrum-sepolia
 deploy-yield-to-one-arbitrum-sepolia: deploy-yield-to-one
 
-# MultiMint additionally needs the asset cap manager (ASSET_CAP_MANAGER).
+# MultiMint config comes from extensions/<chainid>/$(EXTENSION_NAME).json (schema:
+# extensions/README.md); EXTENSION_CONFIG optionally overrides the path.
 deploy-multi-mint:
-	$(EXTENSION_ENV) ASSET_CAP_MANAGER=$(ASSET_CAP_MANAGER) \
+	EXTENSION_NAME=$(EXTENSION_NAME) EXTENSION_FACTORY=$(EXTENSION_FACTORY) \
+	$(if $(EXTENSION_CONFIG),EXTENSION_CONFIG=$(EXTENSION_CONFIG)) \
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/deploy/DeployMultiMint.s.sol:DeployMultiMint \
 	--rpc-url $(CHAIN) \
@@ -130,6 +132,32 @@ deploy-portal-oft-wrapper:
 	forge script script/deploy/DeployPortalOFTWrapper.s.sol:DeployPortalOFTWrapper \
 	--rpc-url $(CHAIN) \
 	--skip test --slow --non-interactive $(BROADCAST_FLAGS)
+
+# Register/update a collateral type on a deployed MultiMint extension by setting its asset cap.
+# A non-zero ASSET_CAP registers ASSET as allowed collateral (enables wrap/replaceAsset); 0 disables it.
+# The MultiMint address resolves from deployments/<chainid>.json by EXTENSION_NAME, or set MULTI_MINT directly.
+# ASSET_CAP is denominated in ASSET's decimals. The signer (PRIVATE_KEY) must hold ASSET_CAP_MANAGER_ROLE.
+configure-multi-mint-asset-cap:
+	EXTENSION_NAME=$(EXTENSION_NAME) MULTI_MINT=$(MULTI_MINT) ASSET=$(ASSET) ASSET_CAP=$(ASSET_CAP) \
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/configure/ConfigureMultiMintAssetCap.s.sol:ConfigureMultiMintAssetCap \
+	--rpc-url $(CHAIN) \
+	--skip test --slow --non-interactive --broadcast
+
+configure-multi-mint-asset-cap-local: CHAIN=localhost
+configure-multi-mint-asset-cap-local: configure-multi-mint-asset-cap
+
+configure-multi-mint-asset-cap-mainnet: CHAIN=mainnet
+configure-multi-mint-asset-cap-mainnet: configure-multi-mint-asset-cap
+
+configure-multi-mint-asset-cap-arbitrum: CHAIN=arbitrum
+configure-multi-mint-asset-cap-arbitrum: configure-multi-mint-asset-cap
+
+configure-multi-mint-asset-cap-sepolia: CHAIN=sepolia
+configure-multi-mint-asset-cap-sepolia: configure-multi-mint-asset-cap
+
+configure-multi-mint-asset-cap-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+configure-multi-mint-asset-cap-arbitrum-sepolia: configure-multi-mint-asset-cap
 
 # Testnet faucet (periphery, non-upgradeable). Reads the PYUSDX address from deployments/<chainid>.json,
 # falling back to the PYUSDX env var. Pre-fund the deployed faucet with PYUSDX so it has a balance to dispense.
