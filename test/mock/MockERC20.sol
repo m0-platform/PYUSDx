@@ -21,4 +21,11 @@ contract MockERC20 is ERC20 {
     function burn(address to, uint256 amount) external {
         _burn(to, amount);
     }
+
+    /// @dev Mimics the `IERC20Extended` bytes-signature permit: validates the deadline and grants
+    ///      the allowance without verifying the signature itself.
+    function permit(address owner, address spender, uint256 value, uint256 deadline, bytes memory) external {
+        require(block.timestamp <= deadline, "MockERC20: expired permit");
+        _approve(owner, spender, value);
+    }
 }

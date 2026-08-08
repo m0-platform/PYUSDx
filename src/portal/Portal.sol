@@ -6,6 +6,7 @@ import { TypeConverter } from "../../lib/evm-m-extensions/lib/common/src/libs/Ty
 import { IERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import { IERC20Extended } from "../../lib/evm-m-extensions/lib/common/src/interfaces/IERC20Extended.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
 
 import { IBridgeAdapter } from "./interfaces/IBridgeAdapter.sol";
@@ -151,6 +152,57 @@ contract Portal is PortalStorageLayout, AccessControlUpgradeable, ReentrancyLock
         bytes32 refundAddress,
         address bridgeAdapter
     ) external payable whenSendNotPaused whenNotLocked returns (bytes32 messageId) {
+        return
+            _sendToken(
+                amount,
+                sourceToken,
+                destinationChainId,
+                destinationToken,
+                recipient,
+                refundAddress,
+                bridgeAdapter
+            );
+    }
+
+    /// @inheritdoc IPortal
+    function sendTokenWithPermit(
+        uint256 amount,
+        address sourceToken,
+        uint32 destinationChainId,
+        bytes32 destinationToken,
+        bytes32 recipient,
+        bytes32 refundAddress,
+        uint256 deadline,
+        bytes calldata signature
+    ) external payable whenSendNotPaused whenNotLocked returns (bytes32 messageId) {
+        try IERC20Extended(sourceToken).permit(msg.sender, address(this), amount, deadline, signature) {} catch {}
+
+        return
+            _sendToken(
+                amount,
+                sourceToken,
+                destinationChainId,
+                destinationToken,
+                recipient,
+                refundAddress,
+                defaultBridgeAdapter(destinationChainId)
+            );
+    }
+
+    /// @inheritdoc IPortal
+    function sendTokenWithPermit(
+        uint256 amount,
+        address sourceToken,
+        uint32 destinationChainId,
+        bytes32 destinationToken,
+        bytes32 recipient,
+        bytes32 refundAddress,
+        address bridgeAdapter,
+        uint256 deadline,
+        bytes calldata signature
+    ) external payable whenSendNotPaused whenNotLocked returns (bytes32 messageId) {
+        try IERC20Extended(sourceToken).permit(msg.sender, address(this), amount, deadline, signature) {} catch {}
+
         return
             _sendToken(
                 amount,
