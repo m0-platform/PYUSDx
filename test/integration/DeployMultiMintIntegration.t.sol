@@ -182,10 +182,10 @@ contract DeployMultiMintIntegrationTests is IntegrationForkTest {
     /* ============ JSON Config Tests ============ */
 
     function _exampleJson() internal view returns (string memory) {
-        return vm.readFile(string.concat(vm.projectRoot(), "/extensions/example.json"));
+        return vm.readFile(string.concat(vm.projectRoot(), "/deploymentConfigs/example.json"));
     }
 
-    /// @notice Keeps `extensions/example.json` in sync with the schema the script expects.
+    /// @notice Keeps `deploymentConfigs/example.json` in sync with the schema the script expects.
     function test_parseConfig_exampleTemplate() public view {
         Config.MultiMintConfig memory config_ = scriptDeployer.parseMultiMintConfig(_exampleJson(), "example");
 

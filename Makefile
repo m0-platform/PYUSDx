@@ -99,8 +99,8 @@ deploy-yield-to-one-sepolia: deploy-yield-to-one
 deploy-yield-to-one-arbitrum-sepolia: CHAIN=arbitrum-sepolia
 deploy-yield-to-one-arbitrum-sepolia: deploy-yield-to-one
 
-# MultiMint config comes from extensions/<chainid>/$(EXTENSION_NAME).json (schema:
-# extensions/README.md); EXTENSION_CONFIG optionally overrides the path.
+# MultiMint config comes from deploymentConfigs/<chainid>/$(EXTENSION_NAME).json (schema:
+# deploymentConfigs/README.md); EXTENSION_CONFIG optionally overrides the path.
 deploy-multi-mint:
 	EXTENSION_NAME="$(EXTENSION_NAME)" EXTENSION_FACTORY=$(EXTENSION_FACTORY) \
 	$(if $(EXTENSION_CONFIG),EXTENSION_CONFIG="$(EXTENSION_CONFIG)") \

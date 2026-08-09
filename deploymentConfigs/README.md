@@ -4,7 +4,7 @@ Per-extension deployment configuration for MultiMint extensions, one JSON file p
 per chain:
 
 ```
-extensions/<chainid>/<extension-name>.json
+deploymentConfigs/<chainid>/<extension-name>.json
 ```
 
 `<extension-name>` is the internal handle passed to the deploy script as `EXTENSION_NAME`. It
@@ -25,7 +25,7 @@ cap that will go on chain is in this one document.
 
 1. Collect the client's role addresses and initial collateral list (assets + caps) in their
    deployment request.
-2. Add `extensions/<chainid>/<name>.json` and open a PR for review.
+2. Add `deploymentConfigs/<chainid>/<name>.json` and open a PR for review.
 3. After merge, deploy:
 
    ```bash

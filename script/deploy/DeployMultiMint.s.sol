@@ -22,8 +22,8 @@ import { DeployBase } from "./DeployBase.s.sol";
 /// @notice Deploys a MultiMint extension via the ExtensionFactory, sets the initial asset caps in
 ///         the same run (the deployer transiently holds DEFAULT_ADMIN_ROLE and
 ///         ASSET_CAP_MANAGER_ROLE, then hands both to their final holders), and verifies the result.
-/// @dev    Config is read from `extensions/<chainid>/<EXTENSION_NAME>.json` (schema in
-///         extensions/README.md), overridable via EXTENSION_CONFIG.
+/// @dev    Config is read from `deploymentConfigs/<chainid>/<EXTENSION_NAME>.json` (schema in
+///         deploymentConfigs/README.md), overridable via EXTENSION_CONFIG.
 contract DeployMultiMint is DeployBase {
     function run() public {
         address deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
@@ -59,13 +59,23 @@ contract DeployMultiMint is DeployBase {
         return
             vm.envOr(
                 "EXTENSION_CONFIG",
-                string.concat(vm.projectRoot(), "/extensions/", vm.toString(block.chainid), "/", extensionName, ".json")
+                string.concat(
+                    vm.projectRoot(),
+                    "/deploymentConfigs/",
+                    vm.toString(block.chainid),
+                    "/",
+                    extensionName,
+                    ".json"
+                )
             );
     }
 
     function _readMultiMintConfig(string memory extensionName) internal view returns (MultiMintConfig memory) {
         string memory path = _multiMintConfigPath(extensionName);
-        require(vm.isFile(path), string.concat("missing extension config file (see extensions/README.md): ", path));
+        require(
+            vm.isFile(path),
+            string.concat("missing extension config file (see deploymentConfigs/README.md): ", path)
+        );
 
         console.log("Config file:", path);
 

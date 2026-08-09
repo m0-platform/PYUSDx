@@ -163,7 +163,7 @@ make deploy-sepolia   # or: npm run deploy-sepolia
 make deploy-monad-testnet
 ```
 
-Individual extensions have their own targets. `EXTENSION_NAME` is the internal handle recorded in `deployments/<chainId>.json`; MultiMint additionally reads roles and asset caps from `extensions/<chainId>/<EXTENSION_NAME>.json` ([schema](extensions/README.md)).
+Individual extensions have their own targets. `EXTENSION_NAME` is the internal handle recorded in `deployments/<chainId>.json`; MultiMint additionally reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json` ([schema](deploymentConfigs/README.md)).
 
 ```bash
 make deploy-yield-to-one-mainnet EXTENSION_NAME="<name>"
