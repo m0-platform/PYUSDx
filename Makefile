@@ -102,8 +102,8 @@ deploy-yield-to-one-arbitrum-sepolia: deploy-yield-to-one
 # MultiMint config comes from extensions/<chainid>/$(EXTENSION_NAME).json (schema:
 # extensions/README.md); EXTENSION_CONFIG optionally overrides the path.
 deploy-multi-mint:
-	EXTENSION_NAME=$(EXTENSION_NAME) EXTENSION_FACTORY=$(EXTENSION_FACTORY) \
-	$(if $(EXTENSION_CONFIG),EXTENSION_CONFIG=$(EXTENSION_CONFIG)) \
+	EXTENSION_NAME="$(EXTENSION_NAME)" EXTENSION_FACTORY=$(EXTENSION_FACTORY) \
+	$(if $(EXTENSION_CONFIG),EXTENSION_CONFIG="$(EXTENSION_CONFIG)") \
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/deploy/DeployMultiMint.s.sol:DeployMultiMint \
 	--rpc-url $(CHAIN) \
@@ -138,7 +138,7 @@ deploy-portal-oft-wrapper:
 # The MultiMint address resolves from deployments/<chainid>.json by EXTENSION_NAME, or set MULTI_MINT directly.
 # ASSET_CAP is denominated in ASSET's decimals. The signer (PRIVATE_KEY) must hold ASSET_CAP_MANAGER_ROLE.
 configure-multi-mint-asset-cap:
-	EXTENSION_NAME=$(EXTENSION_NAME) MULTI_MINT=$(MULTI_MINT) ASSET=$(ASSET) ASSET_CAP=$(ASSET_CAP) \
+	EXTENSION_NAME="$(EXTENSION_NAME)" MULTI_MINT=$(MULTI_MINT) ASSET=$(ASSET) ASSET_CAP=$(ASSET_CAP) \
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/configure/ConfigureMultiMintAssetCap.s.sol:ConfigureMultiMintAssetCap \
 	--rpc-url $(CHAIN) \

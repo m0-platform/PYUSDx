@@ -3,6 +3,7 @@ pragma solidity 0.8.34;
 
 import { console } from "../../lib/forge-std/src/console.sol";
 
+import { AccessControlUpgradeable } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import { IERC20Metadata } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IFreezable } from "../../lib/evm-m-extensions/src/components/freezable/IFreezable.sol";
@@ -112,6 +113,14 @@ contract DeployMultiMint is DeployBase {
     }
 
     function _validateMultiMintConfig(MultiMintConfig memory config) internal pure {
+        require(config.admin != address(0), "zero admin address");
+        require(config.assetCapManager != address(0), "zero asset cap manager address");
+        require(config.freezeManager != address(0), "zero freeze manager address");
+        require(config.pauser != address(0), "zero pauser address");
+        require(config.versionManager != address(0), "zero version manager address");
+        require(config.yieldRecipient != address(0), "zero yield recipient address");
+        require(config.yieldRecipientManager != address(0), "zero yield recipient manager address");
+
         require(config.assets.length != 0, "ASSETS must list at least one collateral asset");
         require(config.assets.length == config.assetCaps.length, "ASSETS and ASSET_CAPS length mismatch");
 
@@ -157,7 +166,7 @@ contract DeployMultiMint is DeployBase {
         }
 
         bytes32 assetCapManagerRole = IMultiMint(proxy).ASSET_CAP_MANAGER_ROLE();
-        bytes32 defaultAdminRole = 0x00;
+        bytes32 defaultAdminRole = AccessControlUpgradeable(proxy).DEFAULT_ADMIN_ROLE();
 
         // Asset-cap-manager handoff runs first so the deployer retains DEFAULT_ADMIN_ROLE through both grants.
         if (deployer != config.assetCapManager) {
@@ -202,7 +211,7 @@ contract DeployMultiMint is DeployBase {
         }
 
         bytes32 assetCapManagerRole = IMultiMint(proxy).ASSET_CAP_MANAGER_ROLE();
-        bytes32 defaultAdminRole = 0x00;
+        bytes32 defaultAdminRole = AccessControlUpgradeable(proxy).DEFAULT_ADMIN_ROLE();
 
         require(IAccessControl(proxy).hasRole(defaultAdminRole, config.admin), "admin does not hold role");
         require(

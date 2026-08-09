@@ -266,4 +266,60 @@ contract DeployMultiMintIntegrationTests is IntegrationForkTest {
         vm.expectRevert(bytes("duplicate asset"));
         scriptDeployer.validateMultiMintConfig(config_);
     }
+
+    function test_validateConfig_revertsOnZeroAdmin() public {
+        Config.MultiMintConfig memory config_ = _defaultConfig();
+        config_.admin = address(0);
+
+        vm.expectRevert(bytes("zero admin address"));
+        scriptDeployer.validateMultiMintConfig(config_);
+    }
+
+    function test_validateConfig_revertsOnZeroAssetCapManager() public {
+        Config.MultiMintConfig memory config_ = _defaultConfig();
+        config_.assetCapManager = address(0);
+
+        vm.expectRevert(bytes("zero asset cap manager address"));
+        scriptDeployer.validateMultiMintConfig(config_);
+    }
+
+    function test_validateConfig_revertsOnZeroFreezeManager() public {
+        Config.MultiMintConfig memory config_ = _defaultConfig();
+        config_.freezeManager = address(0);
+
+        vm.expectRevert(bytes("zero freeze manager address"));
+        scriptDeployer.validateMultiMintConfig(config_);
+    }
+
+    function test_validateConfig_revertsOnZeroPauser() public {
+        Config.MultiMintConfig memory config_ = _defaultConfig();
+        config_.pauser = address(0);
+
+        vm.expectRevert(bytes("zero pauser address"));
+        scriptDeployer.validateMultiMintConfig(config_);
+    }
+
+    function test_validateConfig_revertsOnZeroVersionManager() public {
+        Config.MultiMintConfig memory config_ = _defaultConfig();
+        config_.versionManager = address(0);
+
+        vm.expectRevert(bytes("zero version manager address"));
+        scriptDeployer.validateMultiMintConfig(config_);
+    }
+
+    function test_validateConfig_revertsOnZeroYieldRecipient() public {
+        Config.MultiMintConfig memory config_ = _defaultConfig();
+        config_.yieldRecipient = address(0);
+
+        vm.expectRevert(bytes("zero yield recipient address"));
+        scriptDeployer.validateMultiMintConfig(config_);
+    }
+
+    function test_validateConfig_revertsOnZeroYieldRecipientManager() public {
+        Config.MultiMintConfig memory config_ = _defaultConfig();
+        config_.yieldRecipientManager = address(0);
+
+        vm.expectRevert(bytes("zero yield recipient manager address"));
+        scriptDeployer.validateMultiMintConfig(config_);
+    }
 }

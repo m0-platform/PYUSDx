@@ -10,8 +10,13 @@ extensions/<chainid>/<extension-name>.json
 `<extension-name>` is the internal handle passed to the deploy script as `EXTENSION_NAME`. It
 seeds the CREATE3 salt (so it determines the deployed address, deterministically per
 deployer + name) and is the key under which the address is recorded in
-`deployments/<chainid>.json`. It is **not** the on-chain ERC20 name/symbol. Keep it lowercase
-and unique per chain.
+`deployments/<chainid>.json`. It is **not** the on-chain ERC20 name/symbol.
+
+The handle must be unique per chain and is used **verbatim** — casing and whitespace are part
+of the salt, so `concusd` and `Concrete USD` are different extensions at different addresses.
+Match the handle already recorded in `deployments/<chainid>.json` when redeploying or
+configuring an existing extension; chain 1 uses `Concrete USD`. Quote any handle containing
+spaces on the command line (`EXTENSION_NAME="Concrete USD"`).
 
 Committing the file and reviewing it in a PR **is** the deployment review: every address and
 cap that will go on chain is in this one document.
@@ -24,7 +29,7 @@ cap that will go on chain is in this one document.
 3. After merge, deploy:
 
    ```bash
-   make deploy-multi-mint-mainnet EXTENSION_NAME=<name>
+   make deploy-multi-mint-mainnet EXTENSION_NAME="<name>"
    ```
 
    The script sets the initial asset caps atomically in the deploy run — the extension is
