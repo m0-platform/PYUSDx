@@ -163,38 +163,15 @@ make deploy-sepolia   # or: npm run deploy-sepolia
 make deploy-monad-testnet
 ```
 
-### Deploy a YieldToOne extension
-
-Deploys a single YieldToOne extension via `script/deploy/DeployYieldToOne.s.sol`, reading role addresses from `.env`. `EXTENSION_NAME` is the internal handle that seeds the CREATE3 salt and keys the address in `deployments/<chainId>.json`.
+Individual extensions have their own targets. `EXTENSION_NAME` is the internal handle recorded in `deployments/<chainId>.json`; MultiMint additionally reads roles and asset caps from `extensions/<chainId>/<EXTENSION_NAME>.json` ([schema](extensions/README.md)).
 
 ```bash
 make deploy-yield-to-one-mainnet EXTENSION_NAME="<name>"
-make deploy-yield-to-one-arbitrum EXTENSION_NAME="<name>"
-make deploy-yield-to-one-sepolia EXTENSION_NAME="<name>"
-make deploy-yield-to-one-local EXTENSION_NAME="<name>"
-```
-
-### Deploy a MultiMint extension
-
-Deploys a single MultiMint extension via `script/deploy/DeployMultiMint.s.sol` and registers its initial collateral assets in the same run, so the extension is immediately usable. Roles, token metadata and asset caps come from a committed config file at `extensions/<chainId>/<EXTENSION_NAME>.json` — see [`extensions/README.md`](extensions/README.md) for the schema. `EXTENSION_CONFIG` optionally overrides the path.
-
-```bash
 make deploy-multi-mint-mainnet EXTENSION_NAME="<name>"
-make deploy-multi-mint-arbitrum EXTENSION_NAME="<name>"
-make deploy-multi-mint-sepolia EXTENSION_NAME="<name>"
-make deploy-multi-mint-local EXTENSION_NAME="<name>"
-```
-
-### Configure MultiMint asset caps
-
-Registers, updates or disables a collateral type on an already deployed MultiMint extension. A non-zero `ASSET_CAP` allows `ASSET` as collateral; `0` disables it. `ASSET_CAP` is denominated in `ASSET`'s decimals. The extension address resolves from `deployments/<chainId>.json` by `EXTENSION_NAME`, or set `MULTI_MINT` directly. The signer must hold `ASSET_CAP_MANAGER_ROLE`.
-
-```bash
 make configure-multi-mint-asset-cap-mainnet EXTENSION_NAME="<name>" ASSET=<address> ASSET_CAP=<amount>
-make configure-multi-mint-asset-cap-arbitrum EXTENSION_NAME="<name>" ASSET=<address> ASSET_CAP=<amount>
-make configure-multi-mint-asset-cap-sepolia EXTENSION_NAME="<name>" ASSET=<address> ASSET_CAP=<amount>
-make configure-multi-mint-asset-cap-local EXTENSION_NAME="<name>" ASSET=<address> ASSET_CAP=<amount>
 ```
+
+Swap `-mainnet` for `-arbitrum`, `-sepolia` or `-local`.
 
 ### Configure the Portal
 
