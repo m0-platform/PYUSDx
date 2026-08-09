@@ -11,7 +11,7 @@ import { ScriptBase } from "../ScriptBase.s.sol";
 /// @notice Sets (registers/updates/disables) the asset cap for a collateral type on a MultiMint extension.
 /// @dev    Setting a non-zero cap registers `ASSET` as an allowed collateral backing the MultiMint token
 ///         (`isAllowedAsset` becomes true) and enables `wrap`/`replaceAsset` for it. Setting the cap to 0
-///         disables both for that asset; existing backing remains unwrappable to PYUSDX.
+///         disables both for that asset; existing backing remains able to be unwrapped to PYUSDX.
 ///         The signer (PRIVATE_KEY) MUST hold ASSET_CAP_MANAGER_ROLE on the MultiMint extension.
 ///
 ///         The MultiMint address is resolved from deployments/<chainid>.json by EXTENSION_NAME, or
