@@ -67,13 +67,9 @@ contract DeployMultiMintIntegrationTests is IntegrationForkTest {
     /* ============ Helpers ============ */
 
     function _defaultConfig() internal view returns (Config.MultiMintConfig memory) {
-        address[] memory assets_ = new address[](2);
-        assets_[0] = address(USDC);
-        assets_[1] = address(PYUSD);
-
-        uint256[] memory assetCaps_ = new uint256[](2);
-        assetCaps_[0] = USDC_CAP;
-        assetCaps_[1] = PYUSD_CAP;
+        Config.AssetCapConfig[] memory assets_ = new Config.AssetCapConfig[](2);
+        assets_[0] = Config.AssetCapConfig({ asset: address(USDC), cap: USDC_CAP });
+        assets_[1] = Config.AssetCapConfig({ asset: address(PYUSD), cap: PYUSD_CAP });
 
         address[] memory whitelist_ = new address[](1);
         whitelist_[0] = solver;
@@ -90,7 +86,6 @@ contract DeployMultiMintIntegrationTests is IntegrationForkTest {
                 yieldRecipientManager: yieldRecipientManager,
                 versionManager: versionManager,
                 assets: assets_,
-                assetCaps: assetCaps_,
                 replaceAssetWhitelist: whitelist_
             });
     }
@@ -205,10 +200,10 @@ contract DeployMultiMintIntegrationTests is IntegrationForkTest {
         assertEq(config_.yieldRecipientManager, address(7));
 
         assertEq(config_.assets.length, 2);
-        assertEq(config_.assets[0], address(USDC));
-        assertEq(config_.assetCaps[0], 100_000_000e6);
-        assertEq(config_.assets[1], address(PYUSD));
-        assertEq(config_.assetCaps[1], 50_000_000e6);
+        assertEq(config_.assets[0].asset, address(USDC));
+        assertEq(config_.assets[0].cap, 100_000_000e6);
+        assertEq(config_.assets[1].asset, address(PYUSD));
+        assertEq(config_.assets[1].cap, 50_000_000e6);
 
         assertEq(config_.replaceAssetWhitelist.length, 0);
     }
@@ -235,25 +230,23 @@ contract DeployMultiMintIntegrationTests is IntegrationForkTest {
 
     function test_validateConfig_revertsOnEmptyAssets() public {
         Config.MultiMintConfig memory config_ = _defaultConfig();
-        config_.assets = new address[](0);
-        config_.assetCaps = new uint256[](0);
+        config_.assets = new Config.AssetCapConfig[](0);
 
         vm.expectRevert(bytes("ASSETS must list at least one collateral asset"));
         scriptDeployer.validateMultiMintConfig(config_);
     }
 
-    function test_validateConfig_revertsOnLengthMismatch() public {
+    function test_validateConfig_revertsOnZeroAsset() public {
         Config.MultiMintConfig memory config_ = _defaultConfig();
-        config_.assetCaps = new uint256[](1);
-        config_.assetCaps[0] = USDC_CAP;
+        config_.assets[1].asset = address(0);
 
-        vm.expectRevert(bytes("ASSETS and ASSET_CAPS length mismatch"));
+        vm.expectRevert(bytes("zero asset address"));
         scriptDeployer.validateMultiMintConfig(config_);
     }
 
     function test_validateConfig_revertsOnZeroCap() public {
         Config.MultiMintConfig memory config_ = _defaultConfig();
-        config_.assetCaps[1] = 0;
+        config_.assets[1].cap = 0;
 
         vm.expectRevert(bytes("zero asset cap: a zero cap disables the asset"));
         scriptDeployer.validateMultiMintConfig(config_);
@@ -261,7 +254,7 @@ contract DeployMultiMintIntegrationTests is IntegrationForkTest {
 
     function test_validateConfig_revertsOnDuplicateAsset() public {
         Config.MultiMintConfig memory config_ = _defaultConfig();
-        config_.assets[1] = address(USDC);
+        config_.assets[1].asset = address(USDC);
 
         vm.expectRevert(bytes("duplicate asset"));
         scriptDeployer.validateMultiMintConfig(config_);

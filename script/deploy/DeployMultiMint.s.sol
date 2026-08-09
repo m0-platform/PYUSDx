@@ -45,7 +45,7 @@ contract DeployMultiMint is DeployBase {
         console.log("MultiMint Proxy:         ", proxy);
 
         for (uint256 i; i < config.assets.length; ++i) {
-            console.log("Asset allowed:", config.assets[i], "cap:", config.assetCaps[i]);
+            console.log("Asset allowed:", config.assets[i].asset, "cap:", config.assets[i].cap);
         }
 
         console.log("");
@@ -96,13 +96,14 @@ contract DeployMultiMint is DeployBase {
             ++assetCount;
         }
 
-        config.assets = new address[](assetCount);
-        config.assetCaps = new uint256[](assetCount);
+        config.assets = new AssetCapConfig[](assetCount);
 
         for (uint256 i; i < assetCount; ++i) {
             string memory prefix = string.concat(".assets[", vm.toString(i), "]");
-            config.assets[i] = vm.parseJsonAddress(json, string.concat(prefix, ".address"));
-            config.assetCaps[i] = vm.parseJsonUint(json, string.concat(prefix, ".cap"));
+            config.assets[i] = AssetCapConfig({
+                asset: vm.parseJsonAddress(json, string.concat(prefix, ".address")),
+                cap: vm.parseJsonUint(json, string.concat(prefix, ".cap"))
+            });
         }
 
         config.replaceAssetWhitelist = vm.keyExistsJson(json, ".replaceAssetWhitelist")
@@ -122,14 +123,13 @@ contract DeployMultiMint is DeployBase {
         require(config.yieldRecipientManager != address(0), "zero yield recipient manager address");
 
         require(config.assets.length != 0, "ASSETS must list at least one collateral asset");
-        require(config.assets.length == config.assetCaps.length, "ASSETS and ASSET_CAPS length mismatch");
 
         for (uint256 i; i < config.assets.length; ++i) {
-            require(config.assets[i] != address(0), "zero asset address");
-            require(config.assetCaps[i] != 0, "zero asset cap: a zero cap disables the asset");
+            require(config.assets[i].asset != address(0), "zero asset address");
+            require(config.assets[i].cap != 0, "zero asset cap: a zero cap disables the asset");
 
             for (uint256 j = i + 1; j < config.assets.length; ++j) {
-                require(config.assets[i] != config.assets[j], "duplicate asset");
+                require(config.assets[i].asset != config.assets[j].asset, "duplicate asset");
             }
         }
     }
@@ -158,7 +158,7 @@ contract DeployMultiMint is DeployBase {
         );
 
         for (uint256 i; i < config.assets.length; ++i) {
-            IMultiMint(proxy).setAssetCap(config.assets[i], config.assetCaps[i]);
+            IMultiMint(proxy).setAssetCap(config.assets[i].asset, config.assets[i].cap);
         }
 
         for (uint256 i; i < config.replaceAssetWhitelist.length; ++i) {
@@ -202,10 +202,12 @@ contract DeployMultiMint is DeployBase {
         );
 
         for (uint256 i; i < config.assets.length; ++i) {
-            require(IMultiMint(proxy).isAllowedAsset(config.assets[i]), "asset not allowed");
-            require(IMultiMint(proxy).assetCap(config.assets[i]) == config.assetCaps[i], "asset cap mismatch");
+            address asset = config.assets[i].asset;
+
+            require(IMultiMint(proxy).isAllowedAsset(asset), "asset not allowed");
+            require(IMultiMint(proxy).assetCap(asset) == config.assets[i].cap, "asset cap mismatch");
             require(
-                IMultiMint(proxy).assetDecimals(config.assets[i]) == IERC20Metadata(config.assets[i]).decimals(),
+                IMultiMint(proxy).assetDecimals(asset) == IERC20Metadata(asset).decimals(),
                 "asset decimals not recorded"
             );
         }

@@ -47,6 +47,12 @@ contract Config {
         address pauser;
     }
 
+    struct AssetCapConfig {
+        address asset;
+        /// @dev Denominated in the asset's decimals.
+        uint256 cap;
+    }
+
     struct MultiMintConfig {
         string name;
         string symbol;
@@ -57,9 +63,7 @@ contract Config {
         address pauser;
         address yieldRecipientManager;
         address versionManager;
-        address[] assets;
-        /// @dev Denominated in each asset's decimals.
-        uint256[] assetCaps;
+        AssetCapConfig[] assets;
         /// @dev Empty means everyone may call `replaceAsset`.
         address[] replaceAssetWhitelist;
     }
