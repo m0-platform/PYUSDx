@@ -140,10 +140,10 @@ contract ScriptBase is Script, Config {
         // NOTE: we only want to write the deployments if it's not a dry run,
         // i.e. the transaction is actually broadcast.
         if (!vm.isContext(VmSafe.ForgeContext.ScriptDryRun)) {
-          vm.writeJson(
-              vm.serializeAddress(root, "extensionAddresses", deployments_.extensionAddresses),
-              _deployOutputPath(chainId_)
-          );
+            vm.writeJson(
+                vm.serializeAddress(root, "extensionAddresses", deployments_.extensionAddresses),
+                _deployOutputPath(chainId_)
+            );
         }
     }
 
