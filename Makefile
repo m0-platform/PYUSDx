@@ -10,6 +10,13 @@ update:; forge update
 # `op run` injects every .env var, so the scripts read them (PRIVATE_KEY, PYUSDX_*, etc.) directly via vm.env*.
 OP_RUN := op run --env-file=".env" --
 
+# Conditionally set broadcast and verify flags
+ifeq ($(DRY_RUN),true)
+	BROADCAST_FLAGS =
+else
+	BROADCAST_FLAGS = --broadcast --verify
+endif
+
 # Deployment helpers
 # CHAIN selects the foundry rpc_endpoints alias (localhost/mainnet/arbitrum/sepolia), resolved from
 # the matching *_RPC_URL env var that `op run` injects.
@@ -38,7 +45,7 @@ deploy:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/deploy/DeployAll.s.sol:DeployAll \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast --verify
+	--skip test --slow --non-interactive $(BROADCAST_FLAGS)
 
 deploy-local: CHAIN=localhost
 deploy-local: deploy
@@ -58,7 +65,7 @@ deploy-arbitrum-sepolia: deploy
 # Extension deploys (via the ExtensionFactory). Both read the factory address from
 # deployments/<chainid>.json, falling back to the EXTENSION_FACTORY env var.
 EXTENSION_ENV = \
-	EXTENSION_NAME=$(EXTENSION_NAME) EXTENSION_TOKEN_NAME=$(EXTENSION_TOKEN_NAME) \
+	EXTENSION_NAME="$(EXTENSION_NAME)" EXTENSION_TOKEN_NAME="$(EXTENSION_TOKEN_NAME)" \
 	EXTENSION_TOKEN_SYMBOL=$(EXTENSION_TOKEN_SYMBOL) YIELD_RECIPIENT=$(YIELD_RECIPIENT) \
 	ADMIN=$(ADMIN) FREEZE_MANAGER=$(FREEZE_MANAGER) PAUSER=$(PAUSER) \
 	YIELD_RECIPIENT_MANAGER=$(YIELD_RECIPIENT_MANAGER) VERSION_MANAGER=$(VERSION_MANAGER) \
@@ -69,7 +76,7 @@ deploy-yield-to-one:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/deploy/DeployYieldToOne.s.sol:DeployYieldToOne \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast --verify
+	--skip test --slow --non-interactive $(BROADCAST_FLAGS)
 
 deploy-yield-to-one-local: CHAIN=localhost
 deploy-yield-to-one-local: deploy-yield-to-one
@@ -92,7 +99,7 @@ deploy-multi-mint:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/deploy/DeployMultiMint.s.sol:DeployMultiMint \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast --verify
+	--skip test --slow --non-interactive $(BROADCAST_FLAGS)
 
 deploy-multi-mint-local: CHAIN=localhost
 deploy-multi-mint-local: deploy-multi-mint
@@ -116,7 +123,7 @@ deploy-portal-oft-wrapper:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/deploy/DeployPortalOFTWrapper.s.sol:DeployPortalOFTWrapper \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast --verify
+	--skip test --slow --non-interactive $(BROADCAST_FLAGS)
 
 # Testnet faucet (periphery, non-upgradeable). Reads the PYUSDX address from deployments/<chainid>.json,
 # falling back to the PYUSDX env var. Pre-fund the deployed faucet with PYUSDX so it has a balance to dispense.
@@ -125,7 +132,7 @@ deploy-faucet:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/periphery/DeployPYUSDXFaucet.s.sol:DeployPYUSDXFaucet \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast --verify
+	--skip test --slow --non-interactive $(BROADCAST_FLAGS)
 
 deploy-faucet-sepolia: CHAIN=sepolia
 deploy-faucet-sepolia: deploy-faucet

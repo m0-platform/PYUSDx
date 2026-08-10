@@ -4,6 +4,7 @@ pragma solidity ^0.8.34;
 import { Config } from "./Config.sol";
 
 import { Script } from "../lib/forge-std/src/Script.sol";
+import { VmSafe } from "../lib/forge-std/src/Vm.sol";
 
 contract ScriptBase is Script, Config {
     /// @dev Fields MUST be in alphabetical order
@@ -136,10 +137,14 @@ contract ScriptBase is Script, Config {
 
         vm.serializeString(root, "extensionNames", deployments_.extensionNames);
 
-        vm.writeJson(
-            vm.serializeAddress(root, "extensionAddresses", deployments_.extensionAddresses),
-            _deployOutputPath(chainId_)
-        );
+        // NOTE: we only want to write the deployments if it's not a dry run,
+        // i.e. the transaction is actually broadcast.
+        if (!vm.isContext(VmSafe.ForgeContext.ScriptDryRun)) {
+            vm.writeJson(
+                vm.serializeAddress(root, "extensionAddresses", deployments_.extensionAddresses),
+                _deployOutputPath(chainId_)
+            );
+        }
     }
 
     function _readDeployment(uint256 chainId_) internal view returns (Deployments memory) {
