@@ -32,6 +32,9 @@ library LayerZeroConfig {
         if (chainId == Chains.ARBITRUM) return 30110;
         if (chainId == Chains.SEPOLIA) return 40161;
         if (chainId == Chains.ARBITRUM_SEPOLIA) return 40231;
+        // Live monad2-testnet EID, not the stale monad-testnet 40204.
+        if (chainId == Chains.MONAD_TESTNET) return 40442;
+        if (chainId == Chains.MONAD_MAINNET) return 30390;
 
         revert Chains.UnsupportedChain(chainId);
     }
@@ -50,6 +53,8 @@ library LayerZeroConfig {
         if (chainId == Chains.ARBITRUM) return 0x2f55C492897526677C5B68fb199ea31E2c126416;
         if (chainId == Chains.SEPOLIA) return 0x8eebf8b423B73bFCa51a1Db4B7354AA0bFCA9193;
         if (chainId == Chains.ARBITRUM_SEPOLIA) return 0x53f488E93b4f1b60E8E83aa374dBe1780A1EE8a8;
+        if (chainId == Chains.MONAD_TESTNET) return 0xa78A78a13074eD93aD447a26Ec57121f29E8feC2;
+        if (chainId == Chains.MONAD_MAINNET) return 0x282b3386571f7f794450d5789911a9804FA346b4;
 
         revert Chains.UnsupportedChain(chainId);
     }
@@ -58,6 +63,16 @@ library LayerZeroConfig {
     function getGoogleDVN(uint32 chainId) internal pure returns (address) {
         if (chainId == Chains.ETHEREUM) return 0xD56e4eAb23cb81f43168F9F45211Eb027b9aC7cc;
         if (chainId == Chains.ARBITRUM) return 0xD56e4eAb23cb81f43168F9F45211Eb027b9aC7cc;
+
+        revert Chains.UnsupportedChain(chainId);
+    }
+
+    /// @notice Returns the Nethermind DVN address for a chain.
+    /// @dev    Second required DVN for Monad mainnet routes, since Monad mainnet has no Google DVN.
+    function getNethermindDVN(uint32 chainId) internal pure returns (address) {
+        if (chainId == Chains.ETHEREUM) return 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5;
+        if (chainId == Chains.ARBITRUM) return 0xa7b5189bcA84Cd304D8553977c7C614329750d99;
+        if (chainId == Chains.MONAD_MAINNET) return 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7;
 
         revert Chains.UnsupportedChain(chainId);
     }
@@ -92,6 +107,12 @@ abstract contract LayerZeroUlnConfig {
     uint64 internal constant _SEPOLIA_CONFIRMATIONS = 15;
     uint64 internal constant _ARBITRUM_SEPOLIA_CONFIRMATIONS = 20;
 
+    /// @dev Matches LayerZero's live on-chain default for the Monad testnet source side.
+    uint64 internal constant _MONAD_TESTNET_CONFIRMATIONS = 2;
+
+    /// @dev Matches LayerZero's live on-chain default for the Monad mainnet source side.
+    uint64 internal constant _MONAD_MAINNET_CONFIRMATIONS = 4;
+
     mapping(uint32 currentChainId => mapping(uint32 remoteChainId => UlnConfig)) private _sendUlnConfig;
     mapping(uint32 currentChainId => mapping(uint32 remoteChainId => UlnConfig)) private _receiveUlnConfig;
 
@@ -120,6 +141,7 @@ abstract contract LayerZeroUlnConfig {
     ///      selects the live route via `block.chainid` at the call site.
     function _initUlnConfigs() private {
         _initMainnetUlnConfigs();
+        _initMonadMainnetUlnConfigs();
         _initTestnetUlnConfigs();
     }
 
@@ -149,6 +171,49 @@ abstract contract LayerZeroUlnConfig {
 
         // Ethereum -> Arbitrum receive: source = Ethereum.
         _setReceiveUlnConfig(Chains.ARBITRUM, Chains.ETHEREUM, _ETHEREUM_CONFIRMATIONS, arbRequired, noOptional, 0);
+    }
+
+    /// @dev Populates the per-route ULN config registry for Monad mainnet <-> Ethereum and
+    ///      Monad mainnet <-> Arbitrum. Monad mainnet has no Google DVN, so the required set is
+    ///      [LayerZero Labs, Nethermind] on every side. Confirmations use each chain's on-chain
+    ///      default (Ethereum = 15, Arbitrum = 20, Monad = 4).
+    function _initMonadMainnetUlnConfigs() private {
+        address[] memory noOptional = new address[](0);
+
+        // Monad side (LayerZeroBridgeAdapter on Monad mainnet).
+        address[] memory monadRequired = new address[](2);
+        monadRequired[0] = LayerZeroConfig.getLayerZeroLabsDVN(Chains.MONAD_MAINNET);
+        monadRequired[1] = LayerZeroConfig.getNethermindDVN(Chains.MONAD_MAINNET);
+
+        // Ethereum side.
+        address[] memory ethRequired = new address[](2);
+        ethRequired[0] = LayerZeroConfig.getLayerZeroLabsDVN(Chains.ETHEREUM);
+        ethRequired[1] = LayerZeroConfig.getNethermindDVN(Chains.ETHEREUM);
+
+        // Arbitrum side.
+        address[] memory arbRequired = new address[](2);
+        arbRequired[0] = LayerZeroConfig.getLayerZeroLabsDVN(Chains.ARBITRUM);
+        arbRequired[1] = LayerZeroConfig.getNethermindDVN(Chains.ARBITRUM);
+
+        // ---- Monad mainnet <-> Ethereum ----
+        // Monad -> Ethereum send: source = Monad.
+        _setSendUlnConfig(Chains.MONAD_MAINNET, Chains.ETHEREUM, _MONAD_MAINNET_CONFIRMATIONS, monadRequired, noOptional, 0);
+        // Ethereum -> Monad receive: source = Ethereum.
+        _setReceiveUlnConfig(Chains.MONAD_MAINNET, Chains.ETHEREUM, _ETHEREUM_CONFIRMATIONS, monadRequired, noOptional, 0);
+        // Ethereum -> Monad send: source = Ethereum.
+        _setSendUlnConfig(Chains.ETHEREUM, Chains.MONAD_MAINNET, _ETHEREUM_CONFIRMATIONS, ethRequired, noOptional, 0);
+        // Monad -> Ethereum receive: source = Monad.
+        _setReceiveUlnConfig(Chains.ETHEREUM, Chains.MONAD_MAINNET, _MONAD_MAINNET_CONFIRMATIONS, ethRequired, noOptional, 0);
+
+        // ---- Monad mainnet <-> Arbitrum ----
+        // Monad -> Arbitrum send: source = Monad.
+        _setSendUlnConfig(Chains.MONAD_MAINNET, Chains.ARBITRUM, _MONAD_MAINNET_CONFIRMATIONS, monadRequired, noOptional, 0);
+        // Arbitrum -> Monad receive: source = Arbitrum.
+        _setReceiveUlnConfig(Chains.MONAD_MAINNET, Chains.ARBITRUM, _ARBITRUM_CONFIRMATIONS, monadRequired, noOptional, 0);
+        // Arbitrum -> Monad send: source = Arbitrum.
+        _setSendUlnConfig(Chains.ARBITRUM, Chains.MONAD_MAINNET, _ARBITRUM_CONFIRMATIONS, arbRequired, noOptional, 0);
+        // Monad -> Arbitrum receive: source = Monad.
+        _setReceiveUlnConfig(Chains.ARBITRUM, Chains.MONAD_MAINNET, _MONAD_MAINNET_CONFIRMATIONS, arbRequired, noOptional, 0);
     }
 
     /// @dev Populates the per-route ULN config registry for the Sepolia <-> Arbitrum Sepolia testnet
@@ -202,6 +267,38 @@ abstract contract LayerZeroUlnConfig {
             Chains.SEPOLIA,
             _SEPOLIA_CONFIRMATIONS,
             arbSepoliaRequired,
+            noOptional,
+            0
+        );
+
+        // Monad testnet has no Google DVN, so the required set is [LayerZero Labs] only.
+        address[] memory monadRequired = new address[](1);
+        monadRequired[0] = LayerZeroConfig.getLayerZeroLabsDVN(Chains.MONAD_TESTNET);
+
+        // Monad side (LayerZeroBridgeAdapter on Monad testnet).
+        // Monad -> Sepolia send: source = Monad testnet.
+        _setSendUlnConfig(
+            Chains.MONAD_TESTNET,
+            Chains.SEPOLIA,
+            _MONAD_TESTNET_CONFIRMATIONS,
+            monadRequired,
+            noOptional,
+            0
+        );
+
+        // Sepolia -> Monad receive: source = Sepolia.
+        _setReceiveUlnConfig(Chains.MONAD_TESTNET, Chains.SEPOLIA, _SEPOLIA_CONFIRMATIONS, monadRequired, noOptional, 0);
+
+        // Sepolia side (LayerZeroBridgeAdapter on Sepolia).
+        // Sepolia -> Monad send: source = Sepolia.
+        _setSendUlnConfig(Chains.SEPOLIA, Chains.MONAD_TESTNET, _SEPOLIA_CONFIRMATIONS, sepoliaRequired, noOptional, 0);
+
+        // Monad -> Sepolia receive: source = Monad testnet.
+        _setReceiveUlnConfig(
+            Chains.SEPOLIA,
+            Chains.MONAD_TESTNET,
+            _MONAD_TESTNET_CONFIRMATIONS,
+            sepoliaRequired,
             noOptional,
             0
         );

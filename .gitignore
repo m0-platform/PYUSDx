@@ -19,6 +19,11 @@ docs/
 
 # Dotenv file
 .env
+.env.monad-mainnet
+.env.spike
+
+# Throwaway LayerZero DVN delivery spike (not for production)
+spike/
 
 # Mac OS files
 .DS_Store

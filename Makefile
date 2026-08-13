@@ -55,6 +55,18 @@ deploy-sepolia: deploy
 deploy-arbitrum-sepolia: CHAIN=arbitrum-sepolia
 deploy-arbitrum-sepolia: deploy
 
+deploy-monad-testnet: CHAIN=monad-testnet
+deploy-monad-testnet: deploy
+
+# Monad mainnet (143) core deploy. Self-contained: reads all config from .env.monad-mainnet
+# (deployer, roles, LZ endpoint) so it does not collide with the testnet .env values.
+# Deploys the full ecosystem including Portal + adapter, but leaves them unwired (no configure step).
+deploy-monad:
+	FOUNDRY_PROFILE=production op run --env-file=".env.monad-mainnet" -- \
+	forge script script/deploy/DeployAll.s.sol:DeployAll \
+	--rpc-url monad \
+	--skip test --slow --non-interactive --broadcast --verify
+
 # Extension deploys (via the ExtensionFactory). Both read the factory address from
 # deployments/<chainid>.json, falling back to the EXTENSION_FACTORY env var.
 EXTENSION_ENV = \
@@ -140,21 +152,32 @@ configure-portal-local: PEERS = [42161]
 configure-portal-local: CHAIN=localhost
 configure-portal-local: configure-portal
 
-configure-portal-mainnet: PEERS = [42161]
+# Includes Monad mainnet (143) as a reciprocal peer.
+configure-portal-mainnet: PEERS = [42161,143]
 configure-portal-mainnet: CHAIN=mainnet
 configure-portal-mainnet: configure-portal
 
-configure-portal-arbitrum: PEERS = [1]
+# Includes Monad mainnet (143) as a reciprocal peer.
+configure-portal-arbitrum: PEERS = [1,143]
 configure-portal-arbitrum: CHAIN=arbitrum
 configure-portal-arbitrum: configure-portal
 
-configure-portal-sepolia: PEERS = [421614]
+configure-portal-monad: PEERS = [1,42161]
+configure-portal-monad: CHAIN=monad
+configure-portal-monad: configure-portal
+
+# Includes Monad testnet (10143) as a reciprocal peer.
+configure-portal-sepolia: PEERS = [421614,10143]
 configure-portal-sepolia: CHAIN=sepolia
 configure-portal-sepolia: configure-portal
 
 configure-portal-arbitrum-sepolia: PEERS = [11155111]
 configure-portal-arbitrum-sepolia: CHAIN=arbitrum-sepolia
 configure-portal-arbitrum-sepolia: configure-portal
+
+configure-portal-monad-testnet: PEERS = [11155111]
+configure-portal-monad-testnet: CHAIN=monad-testnet
+configure-portal-monad-testnet: configure-portal
 
 # LayerZero ULN/DVN security config. Signer must be the adapter's LayerZero delegate.
 configure-lz-adapter:
@@ -168,21 +191,32 @@ configure-lz-adapter-local: PEERS = [42161]
 configure-lz-adapter-local: CHAIN=localhost
 configure-lz-adapter-local: configure-lz-adapter
 
-configure-lz-adapter-mainnet: PEERS = [42161]
+# Includes Monad mainnet (143) as a reciprocal peer.
+configure-lz-adapter-mainnet: PEERS = [42161,143]
 configure-lz-adapter-mainnet: CHAIN=mainnet
 configure-lz-adapter-mainnet: configure-lz-adapter
 
-configure-lz-adapter-arbitrum: PEERS = [1]
+# Includes Monad mainnet (143) as a reciprocal peer.
+configure-lz-adapter-arbitrum: PEERS = [1,143]
 configure-lz-adapter-arbitrum: CHAIN=arbitrum
 configure-lz-adapter-arbitrum: configure-lz-adapter
 
-configure-lz-adapter-sepolia: PEERS = [421614]
+configure-lz-adapter-monad: PEERS = [1,42161]
+configure-lz-adapter-monad: CHAIN=monad
+configure-lz-adapter-monad: configure-lz-adapter
+
+# Includes Monad testnet (10143) as a reciprocal peer.
+configure-lz-adapter-sepolia: PEERS = [421614,10143]
 configure-lz-adapter-sepolia: CHAIN=sepolia
 configure-lz-adapter-sepolia: configure-lz-adapter
 
 configure-lz-adapter-arbitrum-sepolia: PEERS = [11155111]
 configure-lz-adapter-arbitrum-sepolia: CHAIN=arbitrum-sepolia
 configure-lz-adapter-arbitrum-sepolia: configure-lz-adapter
+
+configure-lz-adapter-monad-testnet: PEERS = [11155111]
+configure-lz-adapter-monad-testnet: CHAIN=monad-testnet
+configure-lz-adapter-monad-testnet: configure-lz-adapter
 
 # Safe multisig propose variants: write a Safe Transaction Builder batch to safe/<chainid>-*.json
 # (no broadcast). Import the file into the Safe UI to execute via the multisig.
@@ -197,11 +231,11 @@ propose-configure-portal-local: PEERS = [42161]
 propose-configure-portal-local: CHAIN=localhost
 propose-configure-portal-local: propose-configure-portal
 
-propose-configure-portal-mainnet: PEERS = [42161]
+propose-configure-portal-mainnet: PEERS = [42161,143]
 propose-configure-portal-mainnet: CHAIN=mainnet
 propose-configure-portal-mainnet: propose-configure-portal
 
-propose-configure-portal-arbitrum: PEERS = [1]
+propose-configure-portal-arbitrum: PEERS = [1,143]
 propose-configure-portal-arbitrum: CHAIN=arbitrum
 propose-configure-portal-arbitrum: propose-configure-portal
 
@@ -216,11 +250,11 @@ propose-configure-lz-adapter-local: PEERS = [42161]
 propose-configure-lz-adapter-local: CHAIN=localhost
 propose-configure-lz-adapter-local: propose-configure-lz-adapter
 
-propose-configure-lz-adapter-mainnet: PEERS = [42161]
+propose-configure-lz-adapter-mainnet: PEERS = [42161,143]
 propose-configure-lz-adapter-mainnet: CHAIN=mainnet
 propose-configure-lz-adapter-mainnet: propose-configure-lz-adapter
 
-propose-configure-lz-adapter-arbitrum: PEERS = [1]
+propose-configure-lz-adapter-arbitrum: PEERS = [1,143]
 propose-configure-lz-adapter-arbitrum: CHAIN=arbitrum
 propose-configure-lz-adapter-arbitrum: propose-configure-lz-adapter
 
@@ -257,6 +291,14 @@ bridge-sepolia-to-arbitrum-sepolia: bridge
 bridge-arbitrum-sepolia-to-sepolia: DESTINATION_CHAIN_ID=11155111
 bridge-arbitrum-sepolia-to-sepolia: CHAIN=arbitrum-sepolia
 bridge-arbitrum-sepolia-to-sepolia: bridge
+
+bridge-sepolia-to-monad-testnet: DESTINATION_CHAIN_ID=10143
+bridge-sepolia-to-monad-testnet: CHAIN=sepolia
+bridge-sepolia-to-monad-testnet: bridge
+
+bridge-monad-testnet-to-sepolia: DESTINATION_CHAIN_ID=11155111
+bridge-monad-testnet-to-sepolia: CHAIN=monad-testnet
+bridge-monad-testnet-to-sepolia: bridge
 
 # Run slither
 slither :; FOUNDRY_PROFILE=production forge build --build-info --skip '*/test/**' --skip '*/script/**' --force && slither --compile-force-framework foundry --ignore-compile --sarif results.sarif --config-file slither.config.json .
