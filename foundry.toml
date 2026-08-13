@@ -38,17 +38,22 @@ depth = 250
 localhost = "${LOCALHOST_RPC_URL}"
 mainnet = "${MAINNET_RPC_URL}"
 arbitrum = "${ARBITRUM_RPC_URL}"
+monad = "${MONAD_RPC_URL}"
 
 sepolia = "${SEPOLIA_RPC_URL}"
 arbitrum-sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
+monad-testnet = "${MONAD_TESTNET_RPC_URL}"
 
 etherscan_api_key = "${ETHERSCAN_API_KEY}"
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}", url = "${MAINNET_VERIFIER_URL}" }
 arbitrum = { key = "${ETHERSCAN_API_KEY}", url = "${ARBITRUM_VERIFIER_URL}" }
+# `chain` is set explicitly because foundry's chain registry does not map the `monad` alias.
+monad = { key = "${ETHERSCAN_API_KEY}", url = "${MONAD_VERIFIER_URL}", chain = 143 }
 
 sepolia = { key = "${ETHERSCAN_API_KEY}", url = "${SEPOLIA_VERIFIER_URL}" }
 arbitrum-sepolia = { key = "${ETHERSCAN_API_KEY}", url = "${ARBITRUM_SEPOLIA_VERIFIER_URL}" }
+monad-testnet = { key = "${ETHERSCAN_API_KEY}", url = "${MONAD_TESTNET_VERIFIER_URL}", chain = 10143 }
 
 # See more config options at https://github.com/foundry-rs/foundry/tree/master/crates/config
