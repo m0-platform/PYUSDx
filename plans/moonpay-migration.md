@@ -185,7 +185,7 @@ On **IssuerGateway** `0x693CC330…`:
 ## Checkpoint — verify before anything irreversible
 
 ```
-python3 script/ops/verify_migration.py $CHAIN --pre-renounce
+python3 script/ops/verify_moonpay_migration.py $CHAIN --pre-renounce
 ```
 
 Must report `0 failed`. **Do not proceed to phase B until it does.** This is the
@@ -208,7 +208,7 @@ second argument; OpenZeppelin rejects renouncing on behalf of anyone else.
 ## Final verification
 
 ```
-python3 script/ops/verify_migration.py $CHAIN
+python3 script/ops/verify_moonpay_migration.py $CHAIN
 ```
 
 Must report `0 failed`. Archive the output as the handover record.
@@ -236,7 +236,7 @@ this runbook was written. Re-run it after any edit to the sequence.
   them is far easier now than after handing over gateway admin. The verifier
   currently asserts the existing shared-holder state; update
   `EXPECTED_BUCKETS`-adjacent role expectations in
-  `script/ops/verify_migration.py` if this changes.
+  `script/ops/verify_moonpay_migration.py` if this changes.
 - **`.env` drift.** It carries `PYUSDX_EARNER_MANAGER_RATE_LIMIT_CAPACITY` /
   `_REFILL` and `PYUSDX_RATE_MANAGER`, but the deployed token exposes
   `RATE_LIMIT_MANAGER_ROLE` and no earner-manager role. Reconcile before trusting

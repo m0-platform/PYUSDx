@@ -1,35 +1,47 @@
 #!/usr/bin/env bash
 #
-# Rehearses the role migration for a given chain against a local fork.
+# Rehearses a migration runbook for a given chain against a local fork.
 #
-# The command sequence is not duplicated here: it is extracted from the numbered
-# tables in plans/role-migration.md and executed in order, so the
-# rehearsal always tests the runbook you are actually going to follow. If the two
-# ever disagree, this script is wrong by construction rather than silently stale.
+# Nothing about the migration is duplicated here. The script reads the runbook and
+# derives everything from it:
+#   - the shell preamble (addresses, role hashes) from its first ```bash block
+#   - the ordered commands from the numbered tables
+#   - the phase A/B boundary from the `## Phase B` heading
+#   - the verifier to run from the script/ops/verify_*.py path it mentions
+#   - optional multisig steps from a ```rehearsal block under `## Phase C`
+# If script and runbook ever disagree, this script is wrong by construction rather
+# than silently stale.
 #
-# Forks the target chain into anvil and impersonates the M0 deployer, so nothing
-# touches the real chain and no key is ever used. Because signing is bypassed,
-# this validates ordering, arguments and completeness -- not wallet access.
+# Forks the target chain into anvil and impersonates the signers, so nothing touches
+# the real chain and no key is ever used. Because signing is bypassed, this validates
+# ordering, arguments and completeness -- not wallet access.
 #
-# Usage: script/ops/rehearse_migration.sh <chain> [fork_block]
+# Usage: script/ops/rehearse_migration.sh <runbook> <chain> [fork_block]
+#          runbook    e.g. plans/m0-migration.md | plans/moonpay-migration.md
 #          chain      mainnet | arbitrum | monad
-#          fork_block optional; fork at this height instead of latest. Required now
-#                     that every chain is migrated -- from current state the replay
-#                     reverts, since M0 has renounced. Use a pre-migration height:
+#          fork_block optional; fork at this height instead of latest. Needed for a
+#                     runbook whose migration is already executed on that chain --
+#                     from current state the replay reverts. Pre-migration heights:
 #                     monad 95700000, arbitrum 495000000 (approx), mainnet 25740000.
 #
-# A clean run ends in "Migration state verified." at both the checkpoint and the
-# final state.
+# A clean run ends in a verifier pass at both the checkpoint and the final state.
 
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 [ -f .env ] && set -a && . ./.env && set +a
 
-CHAIN="${1:-}"
-FORK_BLOCK="${2:-}"
-if [ -z "$CHAIN" ]; then
-    echo "usage: $0 <chain>   # mainnet | arbitrum | monad" >&2
+RUNBOOK="${1:-}"
+CHAIN="${2:-}"
+FORK_BLOCK="${3:-}"
+
+if [ -z "$RUNBOOK" ] || [ -z "$CHAIN" ]; then
+    echo "usage: $0 <runbook> <chain> [fork_block]" >&2
+    echo "  e.g. $0 plans/m0-migration.md mainnet" >&2
+    exit 2
+fi
+if [ ! -f "$RUNBOOK" ]; then
+    echo "No such runbook: ${RUNBOOK}" >&2
     exit 2
 fi
 
@@ -45,33 +57,27 @@ if [ -z "$FORK_URL" ]; then
     exit 2
 fi
 
-RUNBOOK=plans/role-migration.md
 PORT=8546
 FORK_RPC="http://127.0.0.1:${PORT}"
 CMD_FILE=$(mktemp)
+PREAMBLE_FILE=$(mktemp)
+PHASE_C_FILE=$(mktemp)
 
 cleanup() {
     [ -n "${ANVIL_PID:-}" ] && kill "$ANVIL_PID" 2>/dev/null || true
-    rm -f "$CMD_FILE"
+    rm -f "$CMD_FILE" "$PREAMBLE_FILE" "$PHASE_C_FILE"
 }
 trap cleanup EXIT
 
-# Runbook preamble, mirrored. Only $SEND differs: impersonation instead of a signer.
-PYUSDX=0xeBDB0942cE16386Ab90718C7BD10C91CDb66b14d
-GATEWAY=0x693CC3305342B02AC1549B509a704ff944Cd9499
-PYUSDX_PROXY_ADMIN=0xb8A874137df3d4B0f19490Eb06CfBE6B6D35E581
-GATEWAY_PROXY_ADMIN=0x63dF2057C740D6369a003E040a7abDF40a2D82fD
-M0=0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB
-MOONPAY=0x314160525f5eA6677D3908112fF9Bd885F3BB78e
-ADMIN=0x0000000000000000000000000000000000000000000000000000000000000000
-PAUSER=$(cast keccak PAUSER_ROLE)
-FREEZE=$(cast keccak FREEZE_MANAGER_ROLE)
-FORCED=$(cast keccak FORCED_TRANSFER_MANAGER_ROLE)
-RATELIMIT=$(cast keccak RATE_LIMIT_MANAGER_ROLE)
-SEND=(--rpc-url "$FORK_RPC" --from "$M0" --unlocked)
+# --- derive everything from the runbook -------------------------------------
+
+# Preamble: first ```bash block. Drop the lines the rehearsal must control itself --
+# `cd`, the chain selection, and the signer array.
+awk '/^```bash/ {f=1; next} f && /^```/ {exit} f' "$RUNBOOK" \
+    | grep -vE '^(cd |CHAIN=|SEND=)' > "$PREAMBLE_FILE"
 
 # Numbered table rows only; prose elsewhere contains a `cast send ... $SEND` placeholder.
-# Patterns tolerate prettier's column padding (`| 1   |`), which the pre-commit hook applies.
+# Patterns tolerate prettier's column padding (`| 1   |`), applied by the pre-commit hook.
 grep -E '^\| *[0-9]+ *\|' "$RUNBOOK" | grep -oE '`cast send [^`]+`' | tr -d '`' > "$CMD_FILE"
 STEP_COUNT=$(wc -l < "$CMD_FILE" | tr -d ' ')
 
@@ -80,11 +86,27 @@ if [ "$STEP_COUNT" -eq 0 ]; then
     exit 1
 fi
 
-# Phase A ends with the last step before the irreversible section.
 PHASE_A_END=$(awk '/^## Phase B/ {exit} /^\| *[0-9]+ *\|/ {n=$2} END {print n}' "$RUNBOOK")
 
-echo "==> ${STEP_COUNT} steps extracted from ${RUNBOOK} (phase A ends at step ${PHASE_A_END})"
+VERIFIER=$(grep -oE 'script/ops/verify_[a-z0-9_]+\.py' "$RUNBOOK" | head -1)
+if [ -z "$VERIFIER" ] || [ ! -f "$VERIFIER" ]; then
+    echo "Could not resolve a verifier from ${RUNBOOK} (found: '${VERIFIER}')" >&2
+    exit 1
+fi
+
+# Optional multisig steps. On the real chain these are Safe transactions; on the fork
+# we impersonate the Safe, which is why they live in a rehearsal-only block.
+awk '/^## Phase C/ {f=1} f && /^```rehearsal/ {g=1; next} g && /^```/ {exit} g' \
+    "$RUNBOOK" > "$PHASE_C_FILE"
+PHASE_C_COUNT=$(grep -c . "$PHASE_C_FILE" || true)
+
+# --- set up the fork --------------------------------------------------------
+
+echo "==> runbook  ${RUNBOOK}"
+echo "==> ${STEP_COUNT} steps, phase A ends at ${PHASE_A_END}, verifier ${VERIFIER}"
+[ "$PHASE_C_COUNT" -gt 0 ] && echo "==> ${PHASE_C_COUNT} phase C step(s) to run as the multisig"
 echo "==> forking ${CHAIN}${FORK_BLOCK:+ @ block ${FORK_BLOCK}} into anvil on port ${PORT}"
+
 ANVIL_ARGS=(--fork-url "$FORK_URL" --port "$PORT" --auto-impersonate --silent)
 [ -n "$FORK_BLOCK" ] && ANVIL_ARGS+=(--fork-block-number "$FORK_BLOCK")
 anvil "${ANVIL_ARGS[@]}" &
@@ -95,8 +117,22 @@ for _ in $(seq 1 30); do
     sleep 1
 done
 
-# The impersonated admin needs gas on the fork.
+# shellcheck disable=SC1090
+source "$PREAMBLE_FILE"
+
+if [ -z "${M0:-}" ]; then
+    echo "Runbook preamble did not define \$M0; cannot choose a sender." >&2
+    exit 1
+fi
+
+SEND=(--rpc-url "$FORK_RPC" --from "$M0" --unlocked)
+SEND_MS=(--rpc-url "$FORK_RPC" --from "${MS:-$M0}" --unlocked)
+
+# Impersonated senders need gas on the fork.
 cast rpc anvil_setBalance "$M0" 0xde0b6b3a7640000 --rpc-url "$FORK_RPC" >/dev/null
+[ -n "${MS:-}" ] && cast rpc anvil_setBalance "$MS" 0xde0b6b3a7640000 --rpc-url "$FORK_RPC" >/dev/null
+
+# --- replay -----------------------------------------------------------------
 
 step=0
 while IFS= read -r cmd; do
@@ -107,12 +143,22 @@ while IFS= read -r cmd; do
     if [ "$step" -eq "$PHASE_A_END" ]; then
         echo
         echo "==> checkpoint: verifying pre-renounce state"
-        python3 script/ops/verify_migration.py "$FORK_RPC" --pre-renounce
+        python3 "$VERIFIER" "$FORK_RPC" --pre-renounce
         echo
         echo "==> phase B: irreversible steps"
     fi
 done < "$CMD_FILE"
 
+if [ "$PHASE_C_COUNT" -gt 0 ]; then
+    echo
+    echo "==> phase C: executed as the multisig (a Safe transaction on the real chain)"
+    while IFS= read -r cmd; do
+        [ -z "$cmd" ] && continue
+        echo "  [ms] ${cmd}"
+        eval "$cmd" >/dev/null || { echo "  phase C step FAILED" >&2; exit 1; }
+    done < "$PHASE_C_FILE"
+fi
+
 echo
 echo "==> verifying final state"
-python3 script/ops/verify_migration.py "$FORK_RPC"
+python3 "$VERIFIER" "$FORK_RPC"

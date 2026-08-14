@@ -5,8 +5,8 @@ Asserts the complete expected end state on a given chain. Performs no writes and
 signs nothing: every call is an `eth_call` or `eth_getLogs` issued through `cast`.
 
 Usage:
-    script/ops/verify_migration.py <rpc>              # final state, post-renounce
-    script/ops/verify_migration.py <rpc> --pre-renounce
+    script/ops/verify_moonpay_migration.py <rpc>              # final state, post-renounce
+    script/ops/verify_moonpay_migration.py <rpc> --pre-renounce
 
 `<rpc>` is a foundry rpc alias from foundry.toml (e.g. `arbitrum`, `mainnet`) or a
 raw URL (e.g. http://127.0.0.1:8545 when verifying a fork rehearsal).
