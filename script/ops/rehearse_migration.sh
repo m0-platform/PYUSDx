@@ -11,7 +11,12 @@
 # touches the real chain and no key is ever used. Because signing is bypassed,
 # this validates ordering, arguments and completeness -- not wallet access.
 #
-# Usage: script/ops/rehearse_migration.sh <chain>   # mainnet | arbitrum | monad
+# Usage: script/ops/rehearse_migration.sh <chain> [fork_block]
+#          chain      mainnet | arbitrum | monad
+#          fork_block optional; fork at this height instead of latest. Required now
+#                     that every chain is migrated -- from current state the replay
+#                     reverts, since M0 has renounced. Use a pre-migration height:
+#                     monad 95700000, arbitrum 495000000 (approx), mainnet 25740000.
 #
 # A clean run ends in "Migration state verified." at both the checkpoint and the
 # final state.
@@ -22,6 +27,7 @@ cd "$(dirname "$0")/../.."
 [ -f .env ] && set -a && . ./.env && set +a
 
 CHAIN="${1:-}"
+FORK_BLOCK="${2:-}"
 if [ -z "$CHAIN" ]; then
     echo "usage: $0 <chain>   # mainnet | arbitrum | monad" >&2
     exit 2
@@ -65,7 +71,8 @@ RATELIMIT=$(cast keccak RATE_LIMIT_MANAGER_ROLE)
 SEND=(--rpc-url "$FORK_RPC" --from "$M0" --unlocked)
 
 # Numbered table rows only; prose elsewhere contains a `cast send ... $SEND` placeholder.
-grep -E '^\| [0-9]+ \|' "$RUNBOOK" | grep -oE '`cast send [^`]+`' | tr -d '`' > "$CMD_FILE"
+# Patterns tolerate prettier's column padding (`| 1   |`), which the pre-commit hook applies.
+grep -E '^\| *[0-9]+ *\|' "$RUNBOOK" | grep -oE '`cast send [^`]+`' | tr -d '`' > "$CMD_FILE"
 STEP_COUNT=$(wc -l < "$CMD_FILE" | tr -d ' ')
 
 if [ "$STEP_COUNT" -eq 0 ]; then
@@ -74,11 +81,13 @@ if [ "$STEP_COUNT" -eq 0 ]; then
 fi
 
 # Phase A ends with the last step before the irreversible section.
-PHASE_A_END=$(awk '/^## Phase B/ {exit} /^\| [0-9]+ \|/ {n=$2} END {print n}' "$RUNBOOK")
+PHASE_A_END=$(awk '/^## Phase B/ {exit} /^\| *[0-9]+ *\|/ {n=$2} END {print n}' "$RUNBOOK")
 
 echo "==> ${STEP_COUNT} steps extracted from ${RUNBOOK} (phase A ends at step ${PHASE_A_END})"
-echo "==> forking ${CHAIN} into anvil on port ${PORT}"
-anvil --fork-url "$FORK_URL" --port "$PORT" --auto-impersonate --silent &
+echo "==> forking ${CHAIN}${FORK_BLOCK:+ @ block ${FORK_BLOCK}} into anvil on port ${PORT}"
+ANVIL_ARGS=(--fork-url "$FORK_URL" --port "$PORT" --auto-impersonate --silent)
+[ -n "$FORK_BLOCK" ] && ANVIL_ARGS+=(--fork-block-number "$FORK_BLOCK")
+anvil "${ANVIL_ARGS[@]}" &
 ANVIL_PID=$!
 
 for _ in $(seq 1 30); do

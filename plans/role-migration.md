@@ -8,33 +8,27 @@ CREATE3 deploys), so the only per-chain variable is the RPC alias.
 | -------------------- | ---------- | ---------------------------------------------------------------- |
 | Ethereum mainnet (1) | `mainnet`  | done — **earner-manager bucket still missing**, MoonPay must fix |
 | Arbitrum One (42161) | `arbitrum` | done — verified 34/34                                            |
-| Monad (143)          | `monad`    | pending — **prerequisites below not yet met**                    |
+| Monad (143)          | `monad`    | done — verified 34/34                                            |
+
+All three chains have been migrated; this runbook is retained as the procedure for
+any future chain and as the record of how these were done.
 
 Execution is step-by-step via `cast`, one transaction at a time. Verification is
 automated.
 
-## Prerequisites for Monad
+## Before running on a new chain
 
-The `monad` alias does **not** exist on `main`. Both of these come from PR #89
-(`liq-587-monad-deployment`), which is still open:
-
-- `foundry.toml` → `[rpc_endpoints] monad = "${MONAD_RPC_URL}"`
-- `.env` → `MONAD_RPC_URL` (only `.env.example` is in the PR; the real value is
-  yours to supply)
-
-Until that branch is checked out or merged and `MONAD_RPC_URL` is set, `CHAIN=monad`
-resolves to nothing and every command below fails. As a fallback `CHAIN` may hold a
-raw URL instead of an alias — `cast --rpc-url` accepts either — but prefer the alias
-so no endpoint is pasted into the shell.
-
-Two further Monad-specific cautions:
-
-- **PR #89 is unmerged.** The contracts are live but the deployment record is not on
-  `main`. Handing over admin on a configuration that has not landed is a sequencing
-  decision, not a technical blocker.
-- **Do not verify against the public `rpc.monad.xyz`.** It caps `eth_getLogs` at a
-  100-block range, which disables the holder-set checks; the verifier reports them as
-  `SKIP` and exits 2 rather than passing. Use an endpoint without that cap.
+- **Add the RPC alias.** `foundry.toml` needs `[rpc_endpoints] <chain> =
+"${<CHAIN>_RPC_URL}"` and `.env` needs the matching value. `CHAIN` may hold a raw
+  URL instead, since `cast --rpc-url` accepts either, but prefer the alias so no
+  endpoint is pasted into the shell. A missing alias fails confusingly: `cast` treats
+  the name as a file path and reports `No such file or directory`.
+- **Land the deployment record first.** Handing over admin on a configuration whose
+  deployment PR has not merged is a sequencing decision worth making deliberately.
+- **Use an RPC that allows a full-range `eth_getLogs`.** Public endpoints often cap
+  the block span — `rpc.monad.xyz` caps it at 100 — which disables the verifier's
+  holder-set checks. It reports them as `SKIP` and exits 2 rather than passing, so a
+  capped endpoint cannot be mistaken for a clean run.
 
 ## Addresses
 
