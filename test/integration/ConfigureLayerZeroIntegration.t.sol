@@ -20,6 +20,7 @@ interface IUln302Like {
 ///         to prove the encoding and DVN/confirmation values are applied exactly as intended.
 contract ConfigureLayerZeroIntegrationTests is IntegrationForkTest {
     uint32 internal constant _ARBITRUM_EID = 30110;
+    uint32 internal constant _MONAD_EID = 30390;
 
     ConfigureLayerZeroHarness internal configurer;
 
@@ -33,13 +34,22 @@ contract ConfigureLayerZeroIntegrationTests is IntegrationForkTest {
         peers[0] = Chains.ARBITRUM;
     }
 
+    function _monadPeer() internal pure returns (uint32[] memory peers) {
+        peers = new uint32[](1);
+        peers[0] = Chains.MONAD;
+    }
+
     function _applyConfig() internal {
+        _applyConfig(_arbitrumPeer());
+    }
+
+    function _applyConfig(uint32[] memory peers) internal {
         // The adapter sets the operator as its LayerZero delegate at initialization, so the operator
         // is authorized to call endpoint.setConfig.
         Transaction[] memory transactions = configurer.buildTransactions(
             Chains.ETHEREUM,
             address(layerZeroBridgeAdapter),
-            _arbitrumPeer()
+            peers
         );
 
         for (uint256 i; i < transactions.length; ++i) {
@@ -86,5 +96,48 @@ contract ConfigureLayerZeroIntegrationTests is IntegrationForkTest {
         // ULN302 returns required DVNs sorted ascending; LayerZero Labs (0x589d..) < Google (0xD56e..).
         assertEq(applied.requiredDVNs[0], LayerZeroConfig.getLayerZeroLabsDVN(dvnChain));
         assertEq(applied.requiredDVNs[1], LayerZeroConfig.getGoogleDVN(dvnChain));
+    }
+
+    /* ============ Monad route ============ */
+
+    function test_configureLayerZero_appliesMonadSendUlnConfig() public {
+        _applyConfig(_monadPeer());
+
+        address adapter = address(layerZeroBridgeAdapter);
+        address endpoint = layerZeroBridgeAdapter.endpoint();
+        address sendLib = ILayerZeroEndpointV2Like(endpoint).getSendLibrary(adapter, _MONAD_EID);
+
+        UlnConfig memory applied = IUln302Like(sendLib).getUlnConfig(adapter, _MONAD_EID);
+
+        assertEq(applied.confirmations, 15); // source = Ethereum
+        _assertAppliedNethermindDVNStack(applied, Chains.ETHEREUM);
+    }
+
+    function test_configureLayerZero_appliesMonadReceiveUlnConfig() public {
+        _applyConfig(_monadPeer());
+
+        address adapter = address(layerZeroBridgeAdapter);
+        address endpoint = layerZeroBridgeAdapter.endpoint();
+        (address receiveLib, ) = ILayerZeroEndpointV2Like(endpoint).getReceiveLibrary(adapter, _MONAD_EID);
+
+        UlnConfig memory applied = IUln302Like(receiveLib).getUlnConfig(adapter, _MONAD_EID);
+
+        assertEq(applied.confirmations, 4); // source = Monad
+        _assertAppliedNethermindDVNStack(applied, Chains.ETHEREUM);
+    }
+
+    /// @dev Asserts the applied (effective) Monad DVN stack read back from ULN302: required =
+    ///      [LayerZero Labs, Nethermind] (sorted ascending), no optional DVNs. Nethermind stands in
+    ///      for Google, which runs no DVN on Monad.
+    function _assertAppliedNethermindDVNStack(UlnConfig memory applied, uint32 dvnChain) internal view {
+        assertEq(applied.requiredDVNCount, 2);
+        // Effective config: NIL_DVN_COUNT (255) we set is normalized by ULN302 to "no optional DVNs".
+        assertEq(applied.optionalDVNCount, 0);
+        assertEq(applied.optionalDVNThreshold, 0);
+        assertEq(applied.optionalDVNs.length, 0);
+        assertEq(applied.requiredDVNs.length, 2);
+        // ULN302 returns required DVNs sorted ascending; LayerZero Labs (0x589d..) < Nethermind (0xa59B..).
+        assertEq(applied.requiredDVNs[0], LayerZeroConfig.getLayerZeroLabsDVN(dvnChain));
+        assertEq(applied.requiredDVNs[1], LayerZeroConfig.getNethermindDVN(dvnChain));
     }
 }

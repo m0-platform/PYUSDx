@@ -77,6 +77,77 @@ contract ConfigureLayerZeroTest is Test {
         assertEq(config.requiredDVNs[1], LayerZeroConfig.getGoogleDVN(dvnChain));
     }
 
+    /* ============ getSendUlnConfig / getReceiveUlnConfig (Monad) ============ */
+
+    function test_sendUlnConfig_monadToEthereum() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.MONAD, Chains.ETHEREUM);
+
+        assertEq(config.confirmations, 4); // source = Monad
+        _assertNethermindDVNStack(config, Chains.MONAD);
+    }
+
+    function test_receiveUlnConfig_monadFromEthereum() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.MONAD, Chains.ETHEREUM);
+
+        assertEq(config.confirmations, 15); // source = Ethereum
+        _assertNethermindDVNStack(config, Chains.MONAD);
+    }
+
+    function test_sendUlnConfig_ethereumToMonad() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.ETHEREUM, Chains.MONAD);
+
+        assertEq(config.confirmations, 15); // source = Ethereum
+        _assertNethermindDVNStack(config, Chains.ETHEREUM);
+    }
+
+    function test_receiveUlnConfig_ethereumFromMonad() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.ETHEREUM, Chains.MONAD);
+
+        assertEq(config.confirmations, 4); // source = Monad
+        _assertNethermindDVNStack(config, Chains.ETHEREUM);
+    }
+
+    function test_sendUlnConfig_monadToArbitrum() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.MONAD, Chains.ARBITRUM);
+
+        assertEq(config.confirmations, 4); // source = Monad
+        _assertNethermindDVNStack(config, Chains.MONAD);
+    }
+
+    function test_receiveUlnConfig_monadFromArbitrum() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.MONAD, Chains.ARBITRUM);
+
+        assertEq(config.confirmations, 20); // source = Arbitrum
+        _assertNethermindDVNStack(config, Chains.MONAD);
+    }
+
+    function test_sendUlnConfig_arbitrumToMonad() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.ARBITRUM, Chains.MONAD);
+
+        assertEq(config.confirmations, 20); // source = Arbitrum
+        _assertNethermindDVNStack(config, Chains.ARBITRUM);
+    }
+
+    function test_receiveUlnConfig_arbitrumFromMonad() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.ARBITRUM, Chains.MONAD);
+
+        assertEq(config.confirmations, 4); // source = Monad
+        _assertNethermindDVNStack(config, Chains.ARBITRUM);
+    }
+
+    /// @dev Asserts the Monad DVN stack: required = [LayerZero Labs, Nethermind] (sorted ascending on
+    ///      every Monad-route chain), and no optional DVNs (expressed via NIL_DVN_COUNT). Nethermind
+    ///      stands in for Google, which runs no DVN on Monad.
+    function _assertNethermindDVNStack(UlnConfig memory config, uint32 dvnChain) internal view {
+        assertEq(config.requiredDVNCount, 2);
+        assertEq(config.optionalDVNCount, 255); // NIL_DVN_COUNT — no optional DVNs
+        assertEq(config.optionalDVNThreshold, 0);
+        assertEq(config.optionalDVNs.length, 0);
+        assertEq(config.requiredDVNs.length, 2);
+        assertEq(config.requiredDVNs[0], LayerZeroConfig.getLayerZeroLabsDVN(dvnChain));
+        assertEq(config.requiredDVNs[1], LayerZeroConfig.getNethermindDVN(dvnChain));
+    }
+
     /* ============ getSendUlnConfig / getReceiveUlnConfig (testnet) ============ */
 
     function test_sendUlnConfig_sepoliaToArbitrumSepolia() external view {
@@ -116,6 +187,36 @@ contract ConfigureLayerZeroTest is Test {
         assertEq(config.optionalDVNs.length, 0);
         assertEq(config.requiredDVNs.length, 1);
         assertEq(config.requiredDVNs[0], LayerZeroConfig.getLayerZeroLabsDVN(dvnChain));
+    }
+
+    /* ============ getSendUlnConfig / getReceiveUlnConfig (Monad testnet) ============ */
+
+    function test_sendUlnConfig_monadTestnetToSepolia() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.MONAD_TESTNET, Chains.SEPOLIA);
+
+        assertEq(config.confirmations, 2); // source = Monad testnet
+        _assertSingleDVNStack(config, Chains.MONAD_TESTNET);
+    }
+
+    function test_receiveUlnConfig_monadTestnetFromSepolia() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.MONAD_TESTNET, Chains.SEPOLIA);
+
+        assertEq(config.confirmations, 15); // source = Sepolia
+        _assertSingleDVNStack(config, Chains.MONAD_TESTNET);
+    }
+
+    function test_sendUlnConfig_sepoliaToMonadTestnet() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.SEPOLIA, Chains.MONAD_TESTNET);
+
+        assertEq(config.confirmations, 15); // source = Sepolia
+        _assertSingleDVNStack(config, Chains.SEPOLIA);
+    }
+
+    function test_receiveUlnConfig_sepoliaFromMonadTestnet() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.SEPOLIA, Chains.MONAD_TESTNET);
+
+        assertEq(config.confirmations, 2); // source = Monad testnet
+        _assertSingleDVNStack(config, Chains.SEPOLIA);
     }
 
     /* ============ _buildTransactions ============ */
