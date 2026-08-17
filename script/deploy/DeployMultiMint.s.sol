@@ -121,6 +121,7 @@ contract DeployMultiMint is DeployBase {
             : new address[](0);
 
         _validateMultiMintConfig(config);
+        _validateAssetContracts(config);
     }
 
     function _validateMultiMintConfig(MultiMintConfig memory config) internal pure {
@@ -141,6 +142,20 @@ contract DeployMultiMint is DeployBase {
             for (uint256 j = i + 1; j < config.assets.length; ++j) {
                 require(config.assets[i].asset != config.assets[j].asset, "duplicate asset");
             }
+        }
+    }
+
+    /// @dev Collateral can be any whitelisted ERC-20, not just a 6-decimal PYUSDX extension, so
+    ///      caps are only meaningful once read against the asset's own decimals.
+    function _validateAssetContracts(MultiMintConfig memory config) internal view {
+        for (uint256 i; i < config.assets.length; ++i) {
+            address asset = config.assets[i].asset;
+            require(asset.code.length != 0, "asset is not a contract");
+
+            uint256 decimals = IERC20Metadata(asset).decimals();
+            require(config.assets[i].cap >= 10 ** decimals, "asset cap is below one whole token");
+
+            console.log("Asset:", asset, "decimals:", decimals);
         }
     }
 
