@@ -163,7 +163,15 @@ make deploy-sepolia   # or: npm run deploy-sepolia
 make deploy-monad-testnet
 ```
 
-Individual extensions can be deployed with `DeployYieldToOne.s.sol` / `DeployMultiMint.s.sol`.
+Individual extensions have their own targets. `EXTENSION_NAME` is the internal handle recorded in `deployments/<chainId>.json`; MultiMint additionally reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json` ([schema](deploymentConfigs/README.md)).
+
+```bash
+make deploy-yield-to-one-mainnet EXTENSION_NAME="<name>"
+make deploy-multi-mint-mainnet EXTENSION_NAME="<name>"
+make configure-multi-mint-asset-cap-mainnet EXTENSION_NAME="<name>" ASSET=<address> ASSET_CAP=<amount>
+```
+
+Swap `-mainnet` for `-arbitrum`, `-sepolia` or `-local`.
 
 ### Configure the Portal
 
