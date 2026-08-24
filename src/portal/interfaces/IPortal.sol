@@ -285,9 +285,14 @@ interface IPortal {
     ) external payable returns (bytes32 messageId);
 
     /// @notice Transfers PYUSDX or PYUSDX Extension to the destination chain using the default bridge adapter,
-    ///         approving the transfer via an EIP-2612 permit signature.
+    ///         approving the transfer via a permit signature.
     /// @dev    If wrapping on the destination fails, the recipient will receive PYUSDX token.
-    ///         Permit failures are swallowed so a front-run permit cannot block the transfer.
+    ///         If the permit fails (e.g. it was front-run), the failure is swallowed and the transfer
+    ///         proceeds using the existing allowance.
+    ///         The permit is executed via M0's non-standard `permit(address,address,uint256,uint256,bytes)` overload,
+    ///         not the canonical EIP-2612 `permit(address,address,uint256,uint256,uint8,bytes32,bytes32)`.
+    ///         To grant allowance through this function, the source token must implement this overload
+    ///         (PYUSDX and PYUSDX Extensions do).
     /// @param  amount             The amount of tokens to transfer.
     /// @param  sourceToken        The address of the token (PYUSDX or PYUSDX Extension) on the source chain.
     /// @param  destinationChainId The ID of the destination chain.
@@ -295,8 +300,9 @@ interface IPortal {
     /// @param  recipient          The account to receive tokens.
     /// @param  refundAddress      The address to receive excess native gas on the source chain.
     /// @param  deadline           The last timestamp where the signature is still valid.
-    /// @param  signature          The permit signature: a 65-byte ECDSA signature, or an ERC-1271
-    ///                            contract signature.
+    /// @param  signature          The signature of the EIP-2612 permit digest: either a 65-byte ECDSA signature
+    ///                            encoded as `abi.encodePacked(r, s, v)`, or an ERC-1271 contract signature
+    ///                            validated against the same digest.
     /// @return messageId          The unique identifier of the message sent.
     function sendTokenWithPermit(
         uint256 amount,
@@ -310,9 +316,14 @@ interface IPortal {
     ) external payable returns (bytes32 messageId);
 
     /// @notice Transfers PYUSDX or PYUSDX Extension to the destination chain using the specified bridge adapter,
-    ///         approving the transfer via an EIP-2612 permit signature.
+    ///         approving the transfer via a permit signature.
     /// @dev    If wrapping on the destination fails, the recipient will receive PYUSDX token.
-    ///         Permit failures are swallowed so a front-run permit cannot block the transfer.
+    ///         If the permit fails (e.g. it was front-run), the failure is swallowed and the transfer
+    ///         proceeds using the existing allowance.
+    ///         The permit is executed via M0's non-standard `permit(address,address,uint256,uint256,bytes)` overload,
+    ///         not the canonical EIP-2612 `permit(address,address,uint256,uint256,uint8,bytes32,bytes32)`.
+    ///         To grant allowance through this function, the source token must implement this overload
+    ///         (PYUSDX and PYUSDX Extensions do).
     /// @param  amount             The amount of tokens to transfer.
     /// @param  sourceToken        The address of the token (PYUSDX or PYUSDX Extension) on the source chain.
     /// @param  destinationChainId The ID of the destination chain.
@@ -321,8 +332,9 @@ interface IPortal {
     /// @param  refundAddress      The address to receive excess native gas on the source chain.
     /// @param  bridgeAdapter      The address of the bridge adapter to use.
     /// @param  deadline           The last timestamp where the signature is still valid.
-    /// @param  signature          The permit signature: a 65-byte ECDSA signature, or an ERC-1271
-    ///                            contract signature.
+    /// @param  signature          The signature of the EIP-2612 permit digest: either a 65-byte ECDSA signature
+    ///                            encoded as `abi.encodePacked(r, s, v)`, or an ERC-1271 contract signature
+    ///                            validated against the same digest.
     /// @return messageId          The unique identifier of the message sent.
     function sendTokenWithPermit(
         uint256 amount,
