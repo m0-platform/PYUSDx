@@ -1,10 +1,12 @@
 {
   "extensionAddresses": [
-    "0xD9F044AE7c1A5b5567FA293DE58e8DE547C9da77"
+    "0xD9F044AE7c1A5b5567FA293DE58e8DE547C9da77",
+    "0xc93a2933E1B2c348291f3d94F7f15cff6cAD78D6"
   ],
   "extensionFactory": "0x25c8aFfC5a63D8E047c12918C0438ABA5aA09c2A",
   "extensionNames": [
-    "Concrete USD"
+    "Concrete USD",
+    "capUSD0"
   ],
   "issuerGateway": "0x693CC3305342B02AC1549B509a704ff944Cd9499",
   "layerZeroBridgeAdapter": "0xEfF09B0C726789F4C123397C04F5Ed4a9A20070D",

@@ -1,0 +1,23 @@
+{
+  "extensionName": "capUSD0",
+  "tokenName": "capUSD0",
+  "tokenSymbol": "cUSD0",
+  "roles": {
+    "admin": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "assetCapManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "freezeManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "pauser": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "versionManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "yieldRecipient": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "yieldRecipientManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"
+  },
+  "assets": [
+    {
+      "symbol": "USDC",
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "cap": 100000000000000
+    }
+  ],
+  "replaceAssetWhitelist": []
+}
+
