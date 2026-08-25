@@ -1,7 +1,7 @@
 {
   "extensionName": "capUSD0",
   "tokenName": "capUSD0",
-	"tokenSymbol": "cUSD0",
+  "tokenSymbol": "cUSD0",
   "roles": {
     "admin": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
     "assetCapManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
