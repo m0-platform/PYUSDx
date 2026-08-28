@@ -35,6 +35,7 @@ library LayerZeroConfig {
         if (chainId == Chains.ARBITRUM_SEPOLIA) return 40231;
         // The live `monad2-testnet` EID, not the deprecated `monad-testnet` 40204.
         if (chainId == Chains.MONAD_TESTNET) return 40442;
+        if (chainId == Chains.BASE_SEPOLIA) return 40245;
 
         revert Chains.UnsupportedChain(chainId);
     }
@@ -55,6 +56,7 @@ library LayerZeroConfig {
         if (chainId == Chains.SEPOLIA) return 0x8eebf8b423B73bFCa51a1Db4B7354AA0bFCA9193;
         if (chainId == Chains.ARBITRUM_SEPOLIA) return 0x53f488E93b4f1b60E8E83aa374dBe1780A1EE8a8;
         if (chainId == Chains.MONAD_TESTNET) return 0xa78A78a13074eD93aD447a26Ec57121f29E8feC2;
+        if (chainId == Chains.BASE_SEPOLIA) return 0xe1a12515F9AB2764b887bF60B923Ca494EBbB2d6;
 
         revert Chains.UnsupportedChain(chainId);
     }
@@ -114,6 +116,10 @@ abstract contract LayerZeroUlnConfig {
     /// @dev Source-chain block confirmations for Monad testnet. Matches LayerZero's live on-chain default.
     uint64 internal constant _MONAD_TESTNET_CONFIRMATIONS = 2;
 
+    /// @dev Source-chain block confirmations for Base Sepolia. Matches LayerZero's live on-chain default,
+    ///      read off Base Sepolia's SendUln302 for the Sepolia route.
+    uint64 internal constant _BASE_SEPOLIA_CONFIRMATIONS = 2;
+
     mapping(uint32 currentChainId => mapping(uint32 remoteChainId => UlnConfig)) private _sendUlnConfig;
     mapping(uint32 currentChainId => mapping(uint32 remoteChainId => UlnConfig)) private _receiveUlnConfig;
 
@@ -145,6 +151,7 @@ abstract contract LayerZeroUlnConfig {
         _initMonadUlnConfigs();
         _initTestnetUlnConfigs();
         _initMonadTestnetUlnConfigs();
+        _initBaseSepoliaUlnConfigs();
     }
 
     /// @dev Populates the per-route ULN config registry for Ethereum <-> Arbitrum, pinning the
@@ -317,6 +324,55 @@ abstract contract LayerZeroUlnConfig {
             Chains.SEPOLIA,
             Chains.MONAD_TESTNET,
             _MONAD_TESTNET_CONFIRMATIONS,
+            sepoliaRequired,
+            noOptional,
+            0
+        );
+    }
+
+    /// @dev Populates the per-route ULN config registry for the Sepolia <-> Base Sepolia testnet route.
+    ///      Base Sepolia has no Google DVN, so the required set is [LayerZero Labs] only on both sides,
+    ///      matching the Sepolia <-> Arbitrum Sepolia and Sepolia <-> Monad testnet routes. Confirmations
+    ///      use each chain's own value (Sepolia = 15, Base Sepolia = 2).
+    function _initBaseSepoliaUlnConfigs() private {
+        address[] memory noOptional = new address[](0);
+
+        // Base Sepolia side (LayerZeroBridgeAdapter on Base Sepolia).
+        address[] memory baseSepoliaRequired = new address[](1);
+        baseSepoliaRequired[0] = LayerZeroConfig.getLayerZeroLabsDVN(Chains.BASE_SEPOLIA);
+
+        // Base Sepolia -> Sepolia send: source = Base Sepolia.
+        _setSendUlnConfig(
+            Chains.BASE_SEPOLIA,
+            Chains.SEPOLIA,
+            _BASE_SEPOLIA_CONFIRMATIONS,
+            baseSepoliaRequired,
+            noOptional,
+            0
+        );
+
+        // Sepolia -> Base Sepolia receive: source = Sepolia.
+        _setReceiveUlnConfig(
+            Chains.BASE_SEPOLIA,
+            Chains.SEPOLIA,
+            _SEPOLIA_CONFIRMATIONS,
+            baseSepoliaRequired,
+            noOptional,
+            0
+        );
+
+        // Sepolia side (LayerZeroBridgeAdapter on Sepolia).
+        address[] memory sepoliaRequired = new address[](1);
+        sepoliaRequired[0] = LayerZeroConfig.getLayerZeroLabsDVN(Chains.SEPOLIA);
+
+        // Sepolia -> Base Sepolia send: source = Sepolia.
+        _setSendUlnConfig(Chains.SEPOLIA, Chains.BASE_SEPOLIA, _SEPOLIA_CONFIRMATIONS, sepoliaRequired, noOptional, 0);
+
+        // Base Sepolia -> Sepolia receive: source = Base Sepolia.
+        _setReceiveUlnConfig(
+            Chains.SEPOLIA,
+            Chains.BASE_SEPOLIA,
+            _BASE_SEPOLIA_CONFIRMATIONS,
             sepoliaRequired,
             noOptional,
             0

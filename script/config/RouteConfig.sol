@@ -23,6 +23,7 @@ library RouteConfig {
         if (destinationChainId == Chains.SEPOLIA) return DEFAULT_PAYLOAD_GAS_LIMIT;
         if (destinationChainId == Chains.ARBITRUM_SEPOLIA) return DEFAULT_PAYLOAD_GAS_LIMIT;
         if (destinationChainId == Chains.MONAD_TESTNET) return DEFAULT_PAYLOAD_GAS_LIMIT;
+        if (destinationChainId == Chains.BASE_SEPOLIA) return DEFAULT_PAYLOAD_GAS_LIMIT;
 
         revert Chains.UnsupportedChain(destinationChainId);
     }

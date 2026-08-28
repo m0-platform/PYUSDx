@@ -141,6 +141,7 @@ Operational scripts in `script/` are driven through the `Makefile`. Secrets are 
 | Sepolia       | `sepolia`          | `11155111` | `40161`       |
 | Arb. Sepolia  | `arbitrum-sepolia` | `421614`   | `40231`       |
 | Monad testnet | `monad-testnet`    | `10143`    | `40442`       |
+| Base Sepolia  | `base-sepolia`     | `84532`    | `40245`       |
 | Anvil         | `localhost`        | `31337`    | —             |
 
 ### Build (production)
@@ -161,6 +162,7 @@ make deploy-arbitrum
 make deploy-monad
 make deploy-sepolia   # or: npm run deploy-sepolia
 make deploy-monad-testnet
+make deploy-base-sepolia
 ```
 
 Individual extensions have their own targets. `EXTENSION_NAME` is the internal handle recorded in `deployments/<chainId>.json`; MultiMint additionally reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json` ([schema](deploymentConfigs/README.md)).

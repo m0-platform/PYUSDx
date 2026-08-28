@@ -219,6 +219,36 @@ contract ConfigureLayerZeroTest is Test {
         _assertSingleDVNStack(config, Chains.SEPOLIA);
     }
 
+    /* ============ getSendUlnConfig / getReceiveUlnConfig (Base Sepolia) ============ */
+
+    function test_sendUlnConfig_baseSepoliaToSepolia() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.BASE_SEPOLIA, Chains.SEPOLIA);
+
+        assertEq(config.confirmations, 2); // source = Base Sepolia
+        _assertSingleDVNStack(config, Chains.BASE_SEPOLIA);
+    }
+
+    function test_receiveUlnConfig_baseSepoliaFromSepolia() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.BASE_SEPOLIA, Chains.SEPOLIA);
+
+        assertEq(config.confirmations, 15); // source = Sepolia
+        _assertSingleDVNStack(config, Chains.BASE_SEPOLIA);
+    }
+
+    function test_sendUlnConfig_sepoliaToBaseSepolia() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.SEPOLIA, Chains.BASE_SEPOLIA);
+
+        assertEq(config.confirmations, 15); // source = Sepolia
+        _assertSingleDVNStack(config, Chains.SEPOLIA);
+    }
+
+    function test_receiveUlnConfig_sepoliaFromBaseSepolia() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.SEPOLIA, Chains.BASE_SEPOLIA);
+
+        assertEq(config.confirmations, 2); // source = Base Sepolia
+        _assertSingleDVNStack(config, Chains.SEPOLIA);
+    }
+
     /* ============ _buildTransactions ============ */
 
     function test_buildTransactions_buildsSendAndReceiveSetConfig() external view {
