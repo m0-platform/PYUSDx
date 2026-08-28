@@ -19,6 +19,12 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          # Pinned: 1.8.0 probes the RPC with `anvil_nodeInfo` to determine the network family,
+          # which Alchemy answers with HTTP 400 rather than a JSON-RPC error, so every
+          # `vm.createSelectFork` in test/integration fails at setUp(). Unpin once that is fixed
+          # upstream. Leaving this unset lets a foundry release break CI with no repo change.
+          version: v1.7.1
 
       - name: Install lcov
         uses: hrishikesh-kadam/setup-lcov@v1
