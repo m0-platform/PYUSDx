@@ -133,6 +133,8 @@ Protocol specification PDFs are available in the `docs/` directory.
 
 Operational scripts in `script/` are driven through the `Makefile`. Secrets are injected at run time with the [1Password CLI](https://developer.1password.com/docs/cli/) via `op run --env-file=".env"`, so `.env` can store secret values as `op://` references (e.g. `PRIVATE_KEY="op://vault/item/field"`). Each command selects a network through the `CHAIN` variable, which resolves to a `[rpc_endpoints]` alias in `foundry.toml` and its matching `*_RPC_URL`.
 
+Any deploy, configure or bridge command accepts `DRY_RUN=true`, which simulates against the target chain and sends nothing (e.g. `make configure-portal-sepolia DRY_RUN=true`). The `propose-*` targets never broadcast: they write a Safe batch to `safe/<chainId>-*.json`.
+
 | Network       | `CHAIN` alias      | Chain ID   | LayerZero EID |
 | ------------- | ------------------ | ---------- | ------------- |
 | Ethereum      | `mainnet`          | `1`        | `30101`       |

@@ -10,11 +10,15 @@ update:; forge update
 # `op run` injects every .env var, so the scripts read them (PRIVATE_KEY, PYUSDX_*, etc.) directly via vm.env*.
 OP_RUN := op run --env-file=".env" --
 
-# Conditionally set broadcast and verify flags
+# Conditionally set broadcast and verify flags. DRY_RUN=true simulates without sending anything.
+# BROADCAST_FLAGS is for targets that deploy contracts (they also verify on the explorer).
+# EXECUTE_FLAGS is for targets that only send transactions -- there is nothing to verify.
 ifeq ($(DRY_RUN),true)
 	BROADCAST_FLAGS =
+	EXECUTE_FLAGS =
 else
 	BROADCAST_FLAGS = --broadcast --verify
+	EXECUTE_FLAGS = --broadcast
 endif
 
 # Deployment helpers
@@ -145,7 +149,7 @@ configure-multi-mint-asset-cap:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/configure/ConfigureMultiMintAssetCap.s.sol:ConfigureMultiMintAssetCap \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast
+	--skip test --slow --non-interactive $(EXECUTE_FLAGS)
 
 configure-multi-mint-asset-cap-local: CHAIN=localhost
 configure-multi-mint-asset-cap-local: configure-multi-mint-asset-cap
@@ -190,7 +194,7 @@ configure-portal:
 	forge script script/configure/ConfigurePortal.s.sol:ConfigurePortal \
 	--sig "run(uint32[])" $(PEERS) \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast
+	--skip test --slow --non-interactive $(EXECUTE_FLAGS)
 
 configure-portal-local: PEERS = [42161]
 configure-portal-local: CHAIN=localhost
@@ -230,7 +234,7 @@ configure-lz-adapter:
 	forge script script/configure/ConfigureLayerZero.s.sol:ConfigureLayerZero \
 	--sig "run(uint32[])" $(PEERS) \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast
+	--skip test --slow --non-interactive $(EXECUTE_FLAGS)
 
 configure-lz-adapter-local: PEERS = [42161]
 configure-lz-adapter-local: CHAIN=localhost
@@ -324,7 +328,7 @@ bridge:
 	forge script script/execute/Bridge.s.sol:Bridge \
 	--sig "run(uint32,uint256,address)" $(DESTINATION_CHAIN_ID) $(AMOUNT) $(RECIPIENT) \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast
+	--skip test --slow --non-interactive $(EXECUTE_FLAGS)
 
 bridge-local: DESTINATION_CHAIN_ID=42161
 bridge-local: CHAIN=localhost
