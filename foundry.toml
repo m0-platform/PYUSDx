@@ -40,6 +40,7 @@ localhost = "${LOCALHOST_RPC_URL}"
 mainnet = "${MAINNET_RPC_URL}"
 arbitrum = "${ARBITRUM_RPC_URL}"
 monad = "${MONAD_RPC_URL}"
+base = "${BASE_RPC_URL}"
 
 sepolia = "${SEPOLIA_RPC_URL}"
 arbitrum-sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
@@ -53,6 +54,7 @@ mainnet = { key = "${ETHERSCAN_API_KEY}", url = "${MAINNET_VERIFIER_URL}" }
 arbitrum = { key = "${ETHERSCAN_API_KEY}", url = "${ARBITRUM_VERIFIER_URL}" }
 # `chain` is set explicitly because foundry's chain registry does not map the `monad` alias.
 monad = { key = "${ETHERSCAN_API_KEY}", url = "${MONAD_VERIFIER_URL}", chain = 143 }
+base = { key = "${ETHERSCAN_API_KEY}", url = "${BASE_VERIFIER_URL}", chain = 8453 }
 
 sepolia = { key = "${ETHERSCAN_API_KEY}", url = "${SEPOLIA_VERIFIER_URL}" }
 arbitrum-sepolia = { key = "${ETHERSCAN_API_KEY}", url = "${ARBITRUM_SEPOLIA_VERIFIER_URL}" }

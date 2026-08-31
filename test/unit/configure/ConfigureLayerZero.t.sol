@@ -148,6 +148,36 @@ contract ConfigureLayerZeroTest is Test {
         assertEq(config.requiredDVNs[1], LayerZeroConfig.getNethermindDVN(dvnChain));
     }
 
+    /* ============ getSendUlnConfig / getReceiveUlnConfig (Base) ============ */
+
+    function test_sendUlnConfig_baseToEthereum() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.BASE, Chains.ETHEREUM);
+
+        assertEq(config.confirmations, 10); // source = Base
+        _assertDefaultDVNStack(config, Chains.BASE);
+    }
+
+    function test_receiveUlnConfig_baseFromEthereum() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.BASE, Chains.ETHEREUM);
+
+        assertEq(config.confirmations, 15); // source = Ethereum
+        _assertDefaultDVNStack(config, Chains.BASE);
+    }
+
+    function test_sendUlnConfig_ethereumToBase() external view {
+        UlnConfig memory config = harness.sendUlnConfig(Chains.ETHEREUM, Chains.BASE);
+
+        assertEq(config.confirmations, 15); // source = Ethereum
+        _assertDefaultDVNStack(config, Chains.ETHEREUM);
+    }
+
+    function test_receiveUlnConfig_ethereumFromBase() external view {
+        UlnConfig memory config = harness.receiveUlnConfig(Chains.ETHEREUM, Chains.BASE);
+
+        assertEq(config.confirmations, 10); // source = Base
+        _assertDefaultDVNStack(config, Chains.ETHEREUM);
+    }
+
     /* ============ getSendUlnConfig / getReceiveUlnConfig (testnet) ============ */
 
     function test_sendUlnConfig_sepoliaToArbitrumSepolia() external view {

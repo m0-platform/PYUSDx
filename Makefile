@@ -63,6 +63,9 @@ deploy-arbitrum: deploy
 deploy-monad: CHAIN=monad
 deploy-monad: deploy
 
+deploy-base: CHAIN=base
+deploy-base: deploy
+
 deploy-sepolia: CHAIN=sepolia
 deploy-sepolia: deploy
 
@@ -200,7 +203,7 @@ configure-portal-local: PEERS = [42161]
 configure-portal-local: CHAIN=localhost
 configure-portal-local: configure-portal
 
-configure-portal-mainnet: PEERS = [42161,143]
+configure-portal-mainnet: PEERS = [42161,143,8453]
 configure-portal-mainnet: CHAIN=mainnet
 configure-portal-mainnet: configure-portal
 
@@ -211,6 +214,10 @@ configure-portal-arbitrum: configure-portal
 configure-portal-monad: PEERS = [1,42161]
 configure-portal-monad: CHAIN=monad
 configure-portal-monad: configure-portal
+
+configure-portal-base: PEERS = [1]
+configure-portal-base: CHAIN=base
+configure-portal-base: configure-portal
 
 configure-portal-sepolia: PEERS = [421614,10143,84532]
 configure-portal-sepolia: CHAIN=sepolia
@@ -240,7 +247,7 @@ configure-lz-adapter-local: PEERS = [42161]
 configure-lz-adapter-local: CHAIN=localhost
 configure-lz-adapter-local: configure-lz-adapter
 
-configure-lz-adapter-mainnet: PEERS = [42161,143]
+configure-lz-adapter-mainnet: PEERS = [42161,143,8453]
 configure-lz-adapter-mainnet: CHAIN=mainnet
 configure-lz-adapter-mainnet: configure-lz-adapter
 
@@ -251,6 +258,10 @@ configure-lz-adapter-arbitrum: configure-lz-adapter
 configure-lz-adapter-monad: PEERS = [1,42161]
 configure-lz-adapter-monad: CHAIN=monad
 configure-lz-adapter-monad: configure-lz-adapter
+
+configure-lz-adapter-base: PEERS = [1]
+configure-lz-adapter-base: CHAIN=base
+configure-lz-adapter-base: configure-lz-adapter
 
 configure-lz-adapter-sepolia: PEERS = [421614,10143,84532]
 configure-lz-adapter-sepolia: CHAIN=sepolia
@@ -281,7 +292,7 @@ propose-configure-portal-local: PEERS = [42161]
 propose-configure-portal-local: CHAIN=localhost
 propose-configure-portal-local: propose-configure-portal
 
-propose-configure-portal-mainnet: PEERS = [42161,143]
+propose-configure-portal-mainnet: PEERS = [42161,143,8453]
 propose-configure-portal-mainnet: CHAIN=mainnet
 propose-configure-portal-mainnet: propose-configure-portal
 
@@ -292,6 +303,10 @@ propose-configure-portal-arbitrum: propose-configure-portal
 propose-configure-portal-monad: PEERS = [1,42161]
 propose-configure-portal-monad: CHAIN=monad
 propose-configure-portal-monad: propose-configure-portal
+
+propose-configure-portal-base: PEERS = [1]
+propose-configure-portal-base: CHAIN=base
+propose-configure-portal-base: propose-configure-portal
 
 propose-configure-lz-adapter:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
@@ -304,7 +319,7 @@ propose-configure-lz-adapter-local: PEERS = [42161]
 propose-configure-lz-adapter-local: CHAIN=localhost
 propose-configure-lz-adapter-local: propose-configure-lz-adapter
 
-propose-configure-lz-adapter-mainnet: PEERS = [42161,143]
+propose-configure-lz-adapter-mainnet: PEERS = [42161,143,8453]
 propose-configure-lz-adapter-mainnet: CHAIN=mainnet
 propose-configure-lz-adapter-mainnet: propose-configure-lz-adapter
 
@@ -315,6 +330,10 @@ propose-configure-lz-adapter-arbitrum: propose-configure-lz-adapter
 propose-configure-lz-adapter-monad: PEERS = [1,42161]
 propose-configure-lz-adapter-monad: CHAIN=monad
 propose-configure-lz-adapter-monad: propose-configure-lz-adapter
+
+propose-configure-lz-adapter-base: PEERS = [1]
+propose-configure-lz-adapter-base: CHAIN=base
+propose-configure-lz-adapter-base: propose-configure-lz-adapter
 
 # Bridge PYUSDX cross-chain via the PYUSDX Portal (default bridge adapter).
 # DESTINATION_CHAIN_ID is the target chain ID (set by the per-network targets below).
@@ -349,6 +368,14 @@ bridge-mainnet-to-monad: bridge
 bridge-monad-to-mainnet: DESTINATION_CHAIN_ID=1
 bridge-monad-to-mainnet: CHAIN=monad
 bridge-monad-to-mainnet: bridge
+
+bridge-mainnet-to-base: DESTINATION_CHAIN_ID=8453
+bridge-mainnet-to-base: CHAIN=mainnet
+bridge-mainnet-to-base: bridge
+
+bridge-base-to-mainnet: DESTINATION_CHAIN_ID=1
+bridge-base-to-mainnet: CHAIN=base
+bridge-base-to-mainnet: bridge
 
 bridge-arbitrum-to-monad: DESTINATION_CHAIN_ID=143
 bridge-arbitrum-to-monad: CHAIN=arbitrum

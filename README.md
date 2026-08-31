@@ -140,6 +140,7 @@ Any deploy, configure or bridge command accepts `DRY_RUN=true`, which simulates 
 | Ethereum      | `mainnet`          | `1`        | `30101`       |
 | Arbitrum      | `arbitrum`         | `42161`    | `30110`       |
 | Monad         | `monad`            | `143`      | `30390`       |
+| Base          | `base`             | `8453`     | `30184`       |
 | Sepolia       | `sepolia`          | `11155111` | `40161`       |
 | Arb. Sepolia  | `arbitrum-sepolia` | `421614`   | `40231`       |
 | Monad testnet | `monad-testnet`    | `10143`    | `40442`       |
@@ -162,6 +163,7 @@ make deploy-local     # or: npm run deploy-local
 make deploy-mainnet
 make deploy-arbitrum
 make deploy-monad
+make deploy-base
 make deploy-sepolia   # or: npm run deploy-sepolia
 make deploy-monad-testnet
 make deploy-base-sepolia
@@ -182,9 +184,10 @@ Swap `-mainnet` for `-arbitrum`, `-sepolia` or `-local`.
 Wires each peer chain on the Portal and LayerZeroBridgeAdapter (peer adapter, bridge chain id, supported/default adapter, payload gas limit). The signer must hold `OPERATOR_ROLE` on the Portal and the adapter. `PEERS` is a Solidity `uint32[]` of remote chain IDs; it defaults per target and can be overridden with `PEERS='[...]'`.
 
 ```bash
-make configure-portal-mainnet     # wires Arbitrum (42161) + Monad (143) as peers
+make configure-portal-mainnet     # wires Arbitrum (42161) + Monad (143) + Base (8453) as peers
 make configure-portal-arbitrum    # wires Ethereum (1) + Monad (143) as peers
 make configure-portal-monad       # wires Ethereum (1) + Arbitrum (42161) as peers
+make configure-portal-base        # wires Ethereum (1) as peer
 make configure-portal-local
 ```
 
@@ -194,12 +197,13 @@ Peering is reciprocal: adding a chain means re-running the configure target on e
 
 Applies the LayerZero V2 ULN/DVN `setConfig` for each peer route. The signer must be the adapter's LayerZero delegate.
 
-Routes between Ethereum and Arbitrum pin the LayerZero default stack of `[LayerZero Labs, Google]`. Google runs no DVN on Monad, so every Monad route uses `[LayerZero Labs, Nethermind]` instead; testnet routes use `[LayerZero Labs]` alone.
+Routes between Ethereum, Arbitrum and Base pin the LayerZero default stack of `[LayerZero Labs, Google]`. Google runs no DVN on Monad, so every Monad route uses `[LayerZero Labs, Nethermind]` instead; testnet routes use `[LayerZero Labs]` alone.
 
 ```bash
 make configure-lz-adapter-mainnet
 make configure-lz-adapter-arbitrum
 make configure-lz-adapter-monad
+make configure-lz-adapter-base
 make configure-lz-adapter-local
 ```
 
@@ -211,9 +215,11 @@ When the Portal/adapter roles are held by a multisig, the `propose-*` variants w
 make propose-configure-portal-mainnet
 make propose-configure-portal-arbitrum
 make propose-configure-portal-monad
+make propose-configure-portal-base
 make propose-configure-lz-adapter-mainnet
 make propose-configure-lz-adapter-arbitrum
 make propose-configure-lz-adapter-monad
+make propose-configure-lz-adapter-base
 ```
 
 ### Bridge PYUSDX cross-chain
@@ -225,6 +231,8 @@ make bridge-mainnet-to-arbitrum AMOUNT=1000000
 make bridge-arbitrum-to-mainnet AMOUNT=1000000 RECIPIENT=0x1111111111111111111111111111111111111111
 make bridge-mainnet-to-monad    AMOUNT=1000000
 make bridge-monad-to-mainnet    AMOUNT=1000000
+make bridge-mainnet-to-base     AMOUNT=1000000
+make bridge-base-to-mainnet     AMOUNT=1000000
 make bridge-local-to-arbitrum   AMOUNT=1000000
 ```
 
