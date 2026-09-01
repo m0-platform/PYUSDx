@@ -1,7 +1,7 @@
 ###############################################################################
 # Security Pipeline — PYUSDX
 #
-# Powered by m0-foundation/m0-pipelines (centralised reusable workflows).
+# Powered by m0-platform/m0-pipelines (centralised reusable workflows).
 #
 # Active scans:
 #   - secret-scan   Gitleaks — detects committed secrets / leaked credentials
@@ -26,5 +26,5 @@ jobs:
   secret-scan:
     permissions:
       contents: read
-    uses: m0-foundation/m0-pipelines/.github/workflows/secret-scan.yml@7b0ecb706569403ca84215cb840fbafbe8ef156f
+    uses: m0-platform/m0-pipelines/.github/workflows/secret-scan.yml@main
     # .gitleaks.toml + .gitleaksignore at repo root are picked up automatically
