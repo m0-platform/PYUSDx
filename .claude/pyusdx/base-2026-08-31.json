@@ -1,0 +1,301 @@
+{
+  "chain": "Base",
+  "chain_id": 8453,
+  "chain_alias": "base",
+  "chain_constant": "BASE",
+  "chain_pascal": "Base",
+  "lz_chain_key": "base",
+  "deployment_type": "pyusdx-chain",
+  "template": "pyusdx-chain-deployment.md",
+  "repo": {
+    "path": "/Users/uyoyou.uwuseba/Work/PYUSDX",
+    "head": "252913c",
+    "branch": "feat/base-mainnet",
+    "accessible": true,
+    "anchors": "unproven (HEAD 252913c != provenance 721b812)",
+    "anchors_provenance": "721b812",
+    "rebased_onto": "origin/main 84a4ee5 (PR #92 squash-merged)"
+  },
+  "peers": {
+    "1": {
+      "configure_portal": "pending",
+      "configure_lz": "pending"
+    }
+  },
+  "layerzero": {
+    "lz_eid": 30184,
+    "lz_endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+    "endpoint_eid_verified_onchain": 30184,
+    "send_uln_302": "0xb5320B0B3a13cC860893E2Bd79FCd7e13484Dda2",
+    "receive_uln_302": "0xc70AB6f32772f59fBfc23889Caf4Ba3376C84bAf",
+    "lz_labs_dvn": "0x9e059a54699a285714207b43B055483E78FAac25",
+    "second_dvn_getter": "getGoogleDVN",
+    "second_dvn_address": "0xD56e4eAb23cb81f43168F9F45211Eb027b9aC7cc",
+    "confirmations_base_source": 10,
+    "confirmations_ethereum_source": 15,
+    "peer_eids": {
+      "1": 30101
+    }
+  },
+  "checks": {
+    "createx_deployed": true,
+    "chain_id_verified": true,
+    "deployer": "0xf2F1AcbE0Ba726fEE8d75f3E32900526874740bB",
+    "deploy_precedent_deployer_in_all_roles": true,
+    "deployer_balance_base_eth": "0.049021558030151375",
+    "deployer_nonce_base": 233,
+    "create3_addresses_empty_on_base": true,
+    "endpoint_eid_verified": 30184
+  },
+  "intake_url": null,
+  "deployment_doc_url": "https://app.notion.com/p/3ce858df176a81b899c7ff1386f48647",
+  "created_at": "2026-08-31",
+  "status": "pr_open_awaiting_review_then_part4",
+  "current_step": "Part 4 \u2014 deploy, awaiting operator go-ahead",
+  "deployed_addresses": {},
+  "env": {
+    "preflight_passed": false,
+    "checked_at": "2026-08-31",
+    "result": "OK - 34 variables present and well-formed"
+  },
+  "record": {
+    "row_url": null,
+    "written_at": null
+  },
+  "sites": {
+    "P1": "present",
+    "P2": "present",
+    "P3": "present",
+    "P4": "present",
+    "P5": "present",
+    "P6": "present",
+    "P7a": "present",
+    "P7b": "present",
+    "P8": "present",
+    "P9": "present",
+    "P10": "present",
+    "P11": "present",
+    "P12": "present",
+    "P13a": "present",
+    "P13b": "present",
+    "P14a": "present",
+    "P14b": "present",
+    "P15a": "present",
+    "P15b": "present",
+    "P16": "present",
+    "P17": "present",
+    "P18": "present",
+    "P19": "present",
+    "P20": "pending",
+    "P21": "pending"
+  },
+  "steps": [],
+  "flags": {
+    "safe_operator": true,
+    "is_mainnet": true,
+    "oft_wrapper": false,
+    "new_dvn_getter": false,
+    "extension": false
+  },
+  "prerequisites_confirmed": {
+    "createx": true,
+    "deployer": true,
+    "lz_chain_key": true,
+    "lz_endpoint": true,
+    "second_dvn": true,
+    "operator": "pending",
+    "deploy_env": true
+  },
+  "blockers": [
+    "1Password not signed in (\"account is not signed in\") -- op run cannot resolve PRIVATE_KEY or BASE_RPC_URL. Interactive; only the operator can clear it."
+  ],
+  "unverifiable": [],
+  "env_finding": {
+    "canonical_block_lines": "36-45",
+    "canonical_block_state": "6 address values EMPTY, both rate limits 0, name/symbol wrong case (PYUSDX vs on-chain PYUSDx)",
+    "override_block_lines": "125-134",
+    "override_block_state": "fully populated; all 6 roles = deployer 0xf2F1AcbE0Ba726fEE8d75f3E32900526874740bB; rate limits nonzero; name/symbol = PYUSDx (matches on-chain)",
+    "resolution": "consolidate override values into canonical block, remove duplicate block; do NOT simply delete override",
+    "precedent": "all 7 chains initialized with deployer in all 6 role slots; 3 mainnets since migrated away; Base Sepolia has not"
+  },
+  "commit": "252913c",
+  "tests": {
+    "forge_build": "pass (exit 0)",
+    "unit_ConfigureLayerZero": "28/28 pass, incl. 4 new Base cases",
+    "make_tests": "706 pass / 10 fail -- all 10 are setUp() fork failures, one per integration suite, caused by unresolved op:// RPC URLs. make tests does not run under op run. Pre-existing: 10 integration suites existed before this change.",
+    "make_integration": "BLOCKED -- 1Password CLI returned \"authorization timeout\"; needs interactive unlock"
+  },
+  "cleared_blockers": [
+    "deployer gas: 0.049 ETH on Base, ample for DeployAll",
+    "operator roles: decided -- deployer in all six slots, per precedent on all 7 chains",
+    "PR #92: 53542fc is already an ancestor of feat/base-mainnet, so configure/bridge honour DRY_RUN on this branch. #92 merging matters for main, not for this branch."
+  ],
+  "part4": {
+    "dry_run": "PASSED 2026-08-31",
+    "predicted_addresses_match_shared_create3_set": true,
+    "addresses_cross_checked_against": "deployments/1.json",
+    "gas_estimate_eth": "0.000478992745480995",
+    "deployer_balance_eth": "0.049021558030151375",
+    "gas_headroom": "102x",
+    "targets_empty_on_base": true,
+    "dry_run_artifacts": "broadcast/DeployAll.s.sol/8453/dry-run/ only; no tracked file changed",
+    "broadcast": "NOT EXECUTED \u2014 operator selected \"Stop and save state\" at the live-transaction gate"
+  },
+  "config_verified_against_ethereum_mainnet": {
+    "issuer_gateway_rate_limit": "25000000000000 / 12500000000 \u2014 match",
+    "portal_rate_limit": "10000000000000 / 5000000000 \u2014 match",
+    "earner_manager_rate_limit": "5000000000000 / 2500000000 \u2014 match",
+    "mint_delay": "300 \u2014 match",
+    "mint_ttl": "10800 \u2014 match",
+    "note": "the .env block labelled \"Mirrors Sepolia\" in fact carries Ethereum mainnet values"
+  },
+  "resume_from": "Part 4 \u2014 run `make deploy-base` behind the live-transaction gate. Re-run the \u00a71.5.3 preflight and the dry run first; .env is untracked and may have changed.",
+  "pr": {
+    "pushed": true,
+    "url": "https://github.com/m0-platform/PYUSDx/pull/94",
+    "number": 94,
+    "base": "main",
+    "head": "feat/base-mainnet",
+    "commit": "252913c",
+    "note": "config-only; deployment artifacts to be added after Part 4"
+  },
+  "deployment_doc_title": "Base PYUSDX Deployment \u2014 2026-09-01",
+  "step_manifest": {
+    "steps": [
+      {
+        "id": "1.0.1",
+        "part": 1,
+        "title": "Create a branch off `main` in `PYUSDx`",
+        "step_type": "setup"
+      },
+      {
+        "id": "1.5.2.1",
+        "part": 1.5,
+        "title": "Fill all 34 in your `.env`. Three are per-chain, twelve are copied unchanged, nineteen are role holders:",
+        "step_type": "setup"
+      },
+      {
+        "id": "4.2",
+        "part": 4,
+        "title": "Simulate first:",
+        "step_type": "simulation"
+      },
+      {
+        "id": "4.6",
+        "part": 4,
+        "title": "Broadcast:",
+        "step_type": "deployment"
+      },
+      {
+        "id": "4.12",
+        "part": 4,
+        "title": "Create the Base row in [PYUSDX Deployments by Chain](https://app.notion.com/p/3c9858df176a811a9985f0ca8ec54111)",
+        "step_type": "record"
+      },
+      {
+        "id": "5.1.1",
+        "part": 5,
+        "title": "Wire every peer from the new chain:",
+        "step_type": "configuration"
+      },
+      {
+        "id": "5.2.1",
+        "part": 5,
+        "title": "Run `make configure-portal-mainnet` once per peer in Ethereum (1), with `8453` already in its `PEERS`",
+        "step_type": "configuration"
+      },
+      {
+        "id": "5.3.1",
+        "part": 5,
+        "title": "Build the batch instead of broadcasting:",
+        "step_type": "propose"
+      },
+      {
+        "id": "6.1.1",
+        "part": 6,
+        "title": "Apply the ULN config from the new chain:",
+        "step_type": "configuration"
+      },
+      {
+        "id": "6.2.1",
+        "part": 6,
+        "title": "Run `make configure-lz-adapter-mainnet` once per peer in Ethereum (1)",
+        "step_type": "configuration"
+      },
+      {
+        "id": "7.2",
+        "part": 7,
+        "title": "Bridge out of Base:",
+        "step_type": "bridge"
+      },
+      {
+        "id": "7.3",
+        "part": 7,
+        "title": "Bridge into Base:",
+        "step_type": "bridge"
+      },
+      {
+        "id": "8.7",
+        "part": 8,
+        "title": "Open the PR with a deployed-address table and the peer routes wired",
+        "step_type": "pr"
+      }
+    ],
+    "prerequisites": [
+      {
+        "name": "createx",
+        "label": "CreateX"
+      },
+      {
+        "name": "deployer",
+        "label": "Deployer"
+      },
+      {
+        "name": "lz_chain_key",
+        "label": "LZ chain key"
+      },
+      {
+        "name": "lz_endpoint",
+        "label": "Endpoint and EID"
+      },
+      {
+        "name": "second_dvn",
+        "label": "Second required DVN"
+      },
+      {
+        "name": "operator",
+        "label": "Role holders"
+      },
+      {
+        "name": "deploy_env",
+        "label": "Every role holder and rate limit"
+      }
+    ]
+  },
+  "deployment_doc_canonical": true,
+  "deployment_doc_note": "Rendered by contract-deployer doc-generator. Sole runbook of record for Base mainnet. The earlier hand-written page 3cd858df\u2026 is being deleted by the operator; its run-log content (env defects, dry-run result, PR) was migrated into this page as a Deployment Record.",
+  "deployment_doc_progress": {
+    "verified_at": "2026-09-01",
+    "checkboxes_total": 114,
+    "ticked": 66,
+    "unticked": 48,
+    "per_section": {
+      "Prerequisites": "16/1",
+      "Part 1": "10/0",
+      "Part 1.5": "12/0",
+      "Part 2": "5/0",
+      "Part 3": "19/1",
+      "Part 4": "4/12",
+      "Part 5": "0/9",
+      "Part 6": "0/7",
+      "Part 7": "0/8",
+      "Part 8": "0/10"
+    },
+    "open_items": [
+      "Prerequisites: Role holders \u2014 operator sign-off",
+      "Part 3: make integration \u2014 never completed (op run gap)",
+      "Part 4: GET SIGN OFF and Broadcast onward \u2014 nothing broadcast"
+    ],
+    "hygiene": "0 HTML comments, 0 PREREQ_CONFIRM, 0 STEP_TYPE, 0 SITE: on the page"
+  }
+}
