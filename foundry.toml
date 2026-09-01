@@ -44,6 +44,7 @@ monad = "${MONAD_RPC_URL}"
 sepolia = "${SEPOLIA_RPC_URL}"
 arbitrum-sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
 monad-testnet = "${MONAD_TESTNET_RPC_URL}"
+base-sepolia = "${BASE_SEPOLIA_RPC_URL}"
 
 etherscan_api_key = "${ETHERSCAN_API_KEY}"
 
@@ -56,5 +57,6 @@ monad = { key = "${ETHERSCAN_API_KEY}", url = "${MONAD_VERIFIER_URL}", chain = 1
 sepolia = { key = "${ETHERSCAN_API_KEY}", url = "${SEPOLIA_VERIFIER_URL}" }
 arbitrum-sepolia = { key = "${ETHERSCAN_API_KEY}", url = "${ARBITRUM_SEPOLIA_VERIFIER_URL}" }
 monad-testnet = { key = "${ETHERSCAN_API_KEY}", url = "${MONAD_TESTNET_VERIFIER_URL}", chain = 10143 }
+base-sepolia = { key = "${ETHERSCAN_API_KEY}", url = "${BASE_SEPOLIA_VERIFIER_URL}", chain = 84532 }
 
 # See more config options at https://github.com/foundry-rs/foundry/tree/master/crates/config

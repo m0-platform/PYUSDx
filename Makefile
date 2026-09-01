@@ -10,11 +10,15 @@ update:; forge update
 # `op run` injects every .env var, so the scripts read them (PRIVATE_KEY, PYUSDX_*, etc.) directly via vm.env*.
 OP_RUN := op run --env-file=".env" --
 
-# Conditionally set broadcast and verify flags
+# Conditionally set broadcast and verify flags. DRY_RUN=true simulates without sending anything.
+# BROADCAST_FLAGS is for targets that deploy contracts (they also verify on the explorer).
+# EXECUTE_FLAGS is for targets that only send transactions -- there is nothing to verify.
 ifeq ($(DRY_RUN),true)
 	BROADCAST_FLAGS =
+	EXECUTE_FLAGS =
 else
 	BROADCAST_FLAGS = --broadcast --verify
+	EXECUTE_FLAGS = --broadcast
 endif
 
 # Deployment helpers
@@ -67,6 +71,9 @@ deploy-arbitrum-sepolia: deploy
 
 deploy-monad-testnet: CHAIN=monad-testnet
 deploy-monad-testnet: deploy
+
+deploy-base-sepolia: CHAIN=base-sepolia
+deploy-base-sepolia: deploy
 
 # Extension deploys (via the ExtensionFactory). Both read the factory address from
 # deployments/<chainid>.json, falling back to the EXTENSION_FACTORY env var.
@@ -142,7 +149,7 @@ configure-multi-mint-asset-cap:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/configure/ConfigureMultiMintAssetCap.s.sol:ConfigureMultiMintAssetCap \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast
+	--skip test --slow --non-interactive $(EXECUTE_FLAGS)
 
 configure-multi-mint-asset-cap-local: CHAIN=localhost
 configure-multi-mint-asset-cap-local: configure-multi-mint-asset-cap
@@ -174,6 +181,9 @@ deploy-faucet-sepolia: deploy-faucet
 deploy-faucet-arbitrum-sepolia: CHAIN=arbitrum-sepolia
 deploy-faucet-arbitrum-sepolia: deploy-faucet
 
+deploy-faucet-base-sepolia: CHAIN=base-sepolia
+deploy-faucet-base-sepolia: deploy-faucet
+
 # Portal configuration helpers
 # PEERS is a Solidity uint32[] literal of remote chain IDs. It defaults to an empty array and is set
 # by the per-network targets below; override on the CLI with PEERS='[...]'.
@@ -184,7 +194,7 @@ configure-portal:
 	forge script script/configure/ConfigurePortal.s.sol:ConfigurePortal \
 	--sig "run(uint32[])" $(PEERS) \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast
+	--skip test --slow --non-interactive $(EXECUTE_FLAGS)
 
 configure-portal-local: PEERS = [42161]
 configure-portal-local: CHAIN=localhost
@@ -202,7 +212,7 @@ configure-portal-monad: PEERS = [1,42161]
 configure-portal-monad: CHAIN=monad
 configure-portal-monad: configure-portal
 
-configure-portal-sepolia: PEERS = [421614,10143]
+configure-portal-sepolia: PEERS = [421614,10143,84532]
 configure-portal-sepolia: CHAIN=sepolia
 configure-portal-sepolia: configure-portal
 
@@ -214,13 +224,17 @@ configure-portal-monad-testnet: PEERS = [11155111]
 configure-portal-monad-testnet: CHAIN=monad-testnet
 configure-portal-monad-testnet: configure-portal
 
+configure-portal-base-sepolia: PEERS = [11155111]
+configure-portal-base-sepolia: CHAIN=base-sepolia
+configure-portal-base-sepolia: configure-portal
+
 # LayerZero ULN/DVN security config. Signer must be the adapter's LayerZero delegate.
 configure-lz-adapter:
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/configure/ConfigureLayerZero.s.sol:ConfigureLayerZero \
 	--sig "run(uint32[])" $(PEERS) \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast
+	--skip test --slow --non-interactive $(EXECUTE_FLAGS)
 
 configure-lz-adapter-local: PEERS = [42161]
 configure-lz-adapter-local: CHAIN=localhost
@@ -238,7 +252,7 @@ configure-lz-adapter-monad: PEERS = [1,42161]
 configure-lz-adapter-monad: CHAIN=monad
 configure-lz-adapter-monad: configure-lz-adapter
 
-configure-lz-adapter-sepolia: PEERS = [421614,10143]
+configure-lz-adapter-sepolia: PEERS = [421614,10143,84532]
 configure-lz-adapter-sepolia: CHAIN=sepolia
 configure-lz-adapter-sepolia: configure-lz-adapter
 
@@ -249,6 +263,10 @@ configure-lz-adapter-arbitrum-sepolia: configure-lz-adapter
 configure-lz-adapter-monad-testnet: PEERS = [11155111]
 configure-lz-adapter-monad-testnet: CHAIN=monad-testnet
 configure-lz-adapter-monad-testnet: configure-lz-adapter
+
+configure-lz-adapter-base-sepolia: PEERS = [11155111]
+configure-lz-adapter-base-sepolia: CHAIN=base-sepolia
+configure-lz-adapter-base-sepolia: configure-lz-adapter
 
 # Safe multisig propose variants: write a Safe Transaction Builder batch to safe/<chainid>-*.json
 # (no broadcast). Import the file into the Safe UI to execute via the multisig.
@@ -310,7 +328,7 @@ bridge:
 	forge script script/execute/Bridge.s.sol:Bridge \
 	--sig "run(uint32,uint256,address)" $(DESTINATION_CHAIN_ID) $(AMOUNT) $(RECIPIENT) \
 	--rpc-url $(CHAIN) \
-	--skip test --slow --non-interactive --broadcast
+	--skip test --slow --non-interactive $(EXECUTE_FLAGS)
 
 bridge-local: DESTINATION_CHAIN_ID=42161
 bridge-local: CHAIN=localhost
@@ -355,6 +373,14 @@ bridge-sepolia-to-monad-testnet: bridge
 bridge-monad-testnet-to-sepolia: DESTINATION_CHAIN_ID=11155111
 bridge-monad-testnet-to-sepolia: CHAIN=monad-testnet
 bridge-monad-testnet-to-sepolia: bridge
+
+bridge-sepolia-to-base-sepolia: DESTINATION_CHAIN_ID=84532
+bridge-sepolia-to-base-sepolia: CHAIN=sepolia
+bridge-sepolia-to-base-sepolia: bridge
+
+bridge-base-sepolia-to-sepolia: DESTINATION_CHAIN_ID=11155111
+bridge-base-sepolia-to-sepolia: CHAIN=base-sepolia
+bridge-base-sepolia-to-sepolia: bridge
 
 # Run slither
 slither :; FOUNDRY_PROFILE=production forge build --build-info --skip '*/test/**' --skip '*/script/**' --force && slither --compile-force-framework foundry --ignore-compile --sarif results.sarif --config-file slither.config.json .

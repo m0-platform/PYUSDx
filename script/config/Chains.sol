@@ -16,6 +16,8 @@ library Chains {
 
     uint32 internal constant MONAD_TESTNET = 10143;
 
+    uint32 internal constant BASE_SEPOLIA = 84532;
+
     /// @notice Thrown when a chain ID has no configuration registered.
     error UnsupportedChain(uint32 chainId);
 }

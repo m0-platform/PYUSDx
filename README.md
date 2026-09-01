@@ -133,6 +133,8 @@ Protocol specification PDFs are available in the `docs/` directory.
 
 Operational scripts in `script/` are driven through the `Makefile`. Secrets are injected at run time with the [1Password CLI](https://developer.1password.com/docs/cli/) via `op run --env-file=".env"`, so `.env` can store secret values as `op://` references (e.g. `PRIVATE_KEY="op://vault/item/field"`). Each command selects a network through the `CHAIN` variable, which resolves to a `[rpc_endpoints]` alias in `foundry.toml` and its matching `*_RPC_URL`.
 
+Any deploy, configure or bridge command accepts `DRY_RUN=true`, which simulates against the target chain and sends nothing (e.g. `make configure-portal-sepolia DRY_RUN=true`). The `propose-*` targets never broadcast: they write a Safe batch to `safe/<chainId>-*.json`.
+
 | Network       | `CHAIN` alias      | Chain ID   | LayerZero EID |
 | ------------- | ------------------ | ---------- | ------------- |
 | Ethereum      | `mainnet`          | `1`        | `30101`       |
@@ -141,6 +143,7 @@ Operational scripts in `script/` are driven through the `Makefile`. Secrets are 
 | Sepolia       | `sepolia`          | `11155111` | `40161`       |
 | Arb. Sepolia  | `arbitrum-sepolia` | `421614`   | `40231`       |
 | Monad testnet | `monad-testnet`    | `10143`    | `40442`       |
+| Base Sepolia  | `base-sepolia`     | `84532`    | `40245`       |
 | Anvil         | `localhost`        | `31337`    | —             |
 
 ### Build (production)
@@ -161,6 +164,7 @@ make deploy-arbitrum
 make deploy-monad
 make deploy-sepolia   # or: npm run deploy-sepolia
 make deploy-monad-testnet
+make deploy-base-sepolia
 ```
 
 Individual extensions have their own targets. `EXTENSION_NAME` is the internal handle recorded in `deployments/<chainId>.json`; MultiMint additionally reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json` ([schema](deploymentConfigs/README.md)).
