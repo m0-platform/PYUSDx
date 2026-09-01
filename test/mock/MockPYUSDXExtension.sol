@@ -93,11 +93,12 @@ contract MockPYUSDXExtension is ERC20 {
 
     /**
      * @notice EIP-2612 permit with bytes signature.
-     * @dev    Mock implementation - no-op for testing.
+     * @dev    Mock implementation - validates the deadline and grants the allowance without
+     *         verifying the signature itself.
      */
-    function permit(address owner, address spender, uint256 value, uint256 deadline, bytes memory signature) external {
-        // Mock implementation - no-op
-        // TODO: remove
+    function permit(address owner, address spender, uint256 value, uint256 deadline, bytes memory) external {
+        require(block.timestamp <= deadline, "MockPYUSDXExtension: expired permit");
+        _approve(owner, spender, value);
     }
 
     /**

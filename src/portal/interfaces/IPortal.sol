@@ -284,6 +284,70 @@ interface IPortal {
         address bridgeAdapter
     ) external payable returns (bytes32 messageId);
 
+    /// @notice Transfers PYUSDX or PYUSDX Extension to the destination chain using the default bridge adapter,
+    ///         approving the transfer via a permit signature.
+    /// @dev    If wrapping on the destination fails, the recipient will receive PYUSDX token.
+    ///         If the permit fails (e.g. it was front-run), the failure is swallowed and the transfer
+    ///         proceeds using the existing allowance.
+    ///         The permit is executed via M0's non-standard `permit(address,address,uint256,uint256,bytes)` overload,
+    ///         not the canonical EIP-2612 `permit(address,address,uint256,uint256,uint8,bytes32,bytes32)`.
+    ///         To grant allowance through this function, the source token must implement this overload
+    ///         (PYUSDX and PYUSDX Extensions do).
+    /// @param  amount             The amount of tokens to transfer.
+    /// @param  sourceToken        The address of the token (PYUSDX or PYUSDX Extension) on the source chain.
+    /// @param  destinationChainId The ID of the destination chain.
+    /// @param  destinationToken   The address of the token (PYUSDX or PYUSDX Extension) on the destination chain.
+    /// @param  recipient          The account to receive tokens.
+    /// @param  refundAddress      The address to receive excess native gas on the source chain.
+    /// @param  deadline           The last timestamp where the signature is still valid.
+    /// @param  signature          The signature of the EIP-2612 permit digest: either a 65-byte ECDSA signature
+    ///                            encoded as `abi.encodePacked(r, s, v)`, or an ERC-1271 contract signature
+    ///                            validated against the same digest.
+    /// @return messageId          The unique identifier of the message sent.
+    function sendTokenWithPermit(
+        uint256 amount,
+        address sourceToken,
+        uint32 destinationChainId,
+        bytes32 destinationToken,
+        bytes32 recipient,
+        bytes32 refundAddress,
+        uint256 deadline,
+        bytes calldata signature
+    ) external payable returns (bytes32 messageId);
+
+    /// @notice Transfers PYUSDX or PYUSDX Extension to the destination chain using the specified bridge adapter,
+    ///         approving the transfer via a permit signature.
+    /// @dev    If wrapping on the destination fails, the recipient will receive PYUSDX token.
+    ///         If the permit fails (e.g. it was front-run), the failure is swallowed and the transfer
+    ///         proceeds using the existing allowance.
+    ///         The permit is executed via M0's non-standard `permit(address,address,uint256,uint256,bytes)` overload,
+    ///         not the canonical EIP-2612 `permit(address,address,uint256,uint256,uint8,bytes32,bytes32)`.
+    ///         To grant allowance through this function, the source token must implement this overload
+    ///         (PYUSDX and PYUSDX Extensions do).
+    /// @param  amount             The amount of tokens to transfer.
+    /// @param  sourceToken        The address of the token (PYUSDX or PYUSDX Extension) on the source chain.
+    /// @param  destinationChainId The ID of the destination chain.
+    /// @param  destinationToken   The address of the token (PYUSDX or PYUSDX Extension) on the destination chain.
+    /// @param  recipient          The account to receive tokens.
+    /// @param  refundAddress      The address to receive excess native gas on the source chain.
+    /// @param  bridgeAdapter      The address of the bridge adapter to use.
+    /// @param  deadline           The last timestamp where the signature is still valid.
+    /// @param  signature          The signature of the EIP-2612 permit digest: either a 65-byte ECDSA signature
+    ///                            encoded as `abi.encodePacked(r, s, v)`, or an ERC-1271 contract signature
+    ///                            validated against the same digest.
+    /// @return messageId          The unique identifier of the message sent.
+    function sendTokenWithPermit(
+        uint256 amount,
+        address sourceToken,
+        uint32 destinationChainId,
+        bytes32 destinationToken,
+        bytes32 recipient,
+        bytes32 refundAddress,
+        address bridgeAdapter,
+        uint256 deadline,
+        bytes calldata signature
+    ) external payable returns (bytes32 messageId);
+
     /// @notice Receives a message from the bridge.
     /// @param  sourceChainId The chain Id of the source chain.
     /// @param  payload       The message payload.
