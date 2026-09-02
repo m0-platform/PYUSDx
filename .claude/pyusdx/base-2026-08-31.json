@@ -9,17 +9,22 @@
   "template": "pyusdx-chain-deployment.md",
   "repo": {
     "path": "/Users/uyoyou.uwuseba/Work/PYUSDX",
-    "head": "252913c",
+    "head": "dc22faf",
     "branch": "feat/base-mainnet",
     "accessible": true,
-    "anchors": "unproven (HEAD 252913c != provenance 721b812)",
+    "anchors": "unproven (HEAD dc22faf != provenance 721b812)",
     "anchors_provenance": "721b812",
     "rebased_onto": "origin/main 84a4ee5 (PR #92 squash-merged)"
   },
   "peers": {
     "1": {
-      "configure_portal": "pending",
-      "configure_lz": "pending"
+      "configure_portal_new_chain_side": "DONE 2026-09-01 16:45 UTC \u2014 5/5 txs",
+      "configure_portal_peer_side": "DONE 2026-09-01 16:54 UTC \u2014 15/15 txs (5 calls x 3 peers: 42161, 143, 8453)",
+      "configure_portal_reciprocal_verified_onchain": true,
+      "configure_lz_new_chain_side": "DONE 2026-09-02 14:16 UTC \u2014 2/2 txs, verified on-chain (requiredDVNCount 4->2)",
+      "configure_lz_peer_side": "DONE 2026-09-02 14:22 UTC \u2014 6/6 txs (2 per peer x 3 peers)",
+      "reciprocal": true,
+      "uln_reciprocal_verified": true
     }
   },
   "layerzero": {
@@ -50,17 +55,31 @@
   "intake_url": null,
   "deployment_doc_url": "https://app.notion.com/p/3ce858df176a81b899c7ff1386f48647",
   "created_at": "2026-08-31",
-  "status": "pr_open_awaiting_review_then_part4",
-  "current_step": "Part 4 \u2014 deploy, awaiting operator go-ahead",
-  "deployed_addresses": {},
+  "status": "deployed_awaiting_configure",
+  "current_step": "Part 8 - record and ship (commit artifacts, README, PR)",
+  "deployed_addresses": {
+    "pyusdx": "0xeBDB0942cE16386Ab90718C7BD10C91CDb66b14d",
+    "issuerGateway": "0x693CC3305342B02AC1549B509a704ff944Cd9499",
+    "swapFacility": "0x0bC305e7e13113cAEd3f5486849e9518a1cC4173",
+    "extensionFactory": "0x25c8aFfC5a63D8E047c12918C0438ABA5aA09c2A",
+    "portal": "0xaAD1466fE33d373189FB9dcC47270e608FeEE8A7",
+    "layerZeroBridgeAdapter": "0xEfF09B0C726789F4C123397C04F5Ed4a9A20070D",
+    "yieldToOneBeacon": "0x4c9989F704b52B230C7C38618CBef171986969e7",
+    "multiMintBeacon": "0x00B1c02CeBa9dbdccd4fddf822ea6DEAf6e412b3",
+    "pyusdxPortalOFTWrapper": "0x0000000000000000000000000000000000000000"
+  },
   "env": {
     "preflight_passed": false,
     "checked_at": "2026-08-31",
     "result": "OK - 34 variables present and well-formed"
   },
   "record": {
-    "row_url": null,
-    "written_at": null
+    "row_url": "https://app.notion.com/p/3ce858df176a81af9845ce9a0a3ebc57",
+    "written_at": "2026-09-01",
+    "round_trip": "IDENTICAL",
+    "labels_resolved_from": "Base Sepolia row (Deployer)",
+    "migration_dates": "both empty \u2014 correct, handovers pending",
+    "corrected_at": "2026-09-01 \u2014 peering paragraph updated twice as Part 5.1 then 5.2 landed mid-session"
   },
   "sites": {
     "P1": "present",
@@ -107,7 +126,7 @@
     "deploy_env": true
   },
   "blockers": [
-    "1Password not signed in (\"account is not signed in\") -- op run cannot resolve PRIVATE_KEY or BASE_RPC_URL. Interactive; only the operator can clear it."
+    "1Password not signed in \u2014 blocks `op run` (make integration, and any configure/bridge target needing PRIVATE_KEY or BASE_RPC_URL)"
   ],
   "unverifiable": [],
   "env_finding": {
@@ -118,7 +137,7 @@
     "resolution": "consolidate override values into canonical block, remove duplicate block; do NOT simply delete override",
     "precedent": "all 7 chains initialized with deployer in all 6 role slots; 3 mainnets since migrated away; Base Sepolia has not"
   },
-  "commit": "252913c",
+  "commit": "dc22faf",
   "tests": {
     "forge_build": "pass (exit 0)",
     "unit_ConfigureLayerZero": "28/28 pass, incl. 4 new Base cases",
@@ -139,7 +158,12 @@
     "gas_headroom": "102x",
     "targets_empty_on_base": true,
     "dry_run_artifacts": "broadcast/DeployAll.s.sol/8453/dry-run/ only; no tracked file changed",
-    "broadcast": "NOT EXECUTED \u2014 operator selected \"Stop and save state\" at the live-transaction gate"
+    "broadcast": "EXECUTED 2026-09-01 16:12 UTC \u2014 22/22 receipts status 0x1",
+    "commit": "dc22faf",
+    "addresses_match_deterministic_set": true,
+    "explorer_verification": "16/16 verified on basescan.org (8 proxies + 8 implementations), confirmed 2026-09-01",
+    "deployer_renounced": false,
+    "deployer_renounce_note": "Deployer RETAINS DEFAULT_ADMIN on all 8 contracts and owns all 8 ProxyAdmins. .env named the deployer in all 19 role slots, so DeployAll granted and renounced nothing. Migration pending \u2014 operator annotated this checkbox 'FOR AN EARLY DEPLOYMENT, THIS ISN'T THE CASE'."
   },
   "config_verified_against_ethereum_mainnet": {
     "issuer_gateway_rate_limit": "25000000000000 / 12500000000 \u2014 match",
@@ -149,7 +173,7 @@
     "mint_ttl": "10800 \u2014 match",
     "note": "the .env block labelled \"Mirrors Sepolia\" in fact carries Ethereum mainnet values"
   },
-  "resume_from": "Part 4 \u2014 run `make deploy-base` behind the live-transaction gate. Re-run the \u00a71.5.3 preflight and the dry run first; .env is untracked and may have changed.",
+  "resume_from": "Part 8: commit deployments/8453.json plus the DeployAll, ConfigurePortal, ConfigureLayerZero and Bridge broadcasts for Base and the refreshed Ethereum ones; add Base to the README network table and command blocks; update PR #94 with the deployed-address table. Parts 1-7 all complete and verified on-chain. Record row exists: update it, never create a second.",
   "pr": {
     "pushed": true,
     "url": "https://github.com/m0-platform/PYUSDx/pull/94",
@@ -297,5 +321,97 @@
       "Part 4: GET SIGN OFF and Broadcast onward \u2014 nothing broadcast"
     ],
     "hygiene": "0 HTML comments, 0 PREREQ_CONFIRM, 0 STEP_TYPE, 0 SITE: on the page"
+  },
+  "onchain_reads_2026_09_01": {
+    "roles": "all 19 slots = deployer, confirmed via hasRole",
+    "EARNER_MANAGER_ROLE": "granted to nobody (matches every chain)",
+    "ISSUER_ROLE": "IssuerGateway + Portal",
+    "lz_delegate": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "endpoint_eid": 30184,
+    "totalSupply": 0,
+    "peering": "NOT configured \u2014 getPeer(1)=0, defaultBridgeAdapter(1)=0, supportedBridgeAdapter(1,LZA)=false, payloadGasLimit(1)=0"
+  },
+  "part5": {
+    "base_side_txs": {
+      "setPeer": "0x0573514b53f1a211c23d735b5c74051bd2c20fdc55dacd5cdc6f980f0878eb9e",
+      "setBridgeChainId": "0xa95fe0d305611eadb3a0de12e49a08ddbd082af9f2dced3366b78fcddeeccfc6",
+      "setSupportedBridgeAdapter": "0xf39adb454b557f8841c7a9b0b63b9af385e9c6180c9cc89019356649db86b7fc",
+      "setPayloadGasLimit": "0xf98893c0507aab80e8ca6d61c9ec962c19f69e041a782d698d635d28fc12159f",
+      "setDefaultBridgeAdapter": "0x85b1a093e9e346c4f42b8dd6900f49eefd91cfdcb052a840dd35f994f876b551"
+    },
+    "ethereum_side_base_txs": {
+      "setPeer": "0x3fad8f84df125dee25025594fac733322911b1b58a76be1977a43f8db24790cf",
+      "setBridgeChainId": "0xd5c06a3c7c35873c8b646c63f0ffc7b8dc0e54611d6c767e2ac9eaa6e147f6b4",
+      "setSupportedBridgeAdapter": "0x680f26db119a3d706ec9a55f606d89e25d8a9dc05cfe92943bb6646924596a38",
+      "setPayloadGasLimit": "0x060ef533b3e3782be27a2d36fd8c547a07d0977b4520683987220de6b00d65a2",
+      "setDefaultBridgeAdapter": "0x64e93a2e551ad09042f910c3fed0f7f6d83eb6ec9c4304a6d33e7c09cc1d86e6"
+    },
+    "ethereum_run_note": "15 txs total; Arbitrum (42161) and Monad (143) re-applied idempotently alongside Base (8453)",
+    "verified_onchain": "both directions: defaultBridgeAdapter, supportedBridgeAdapter=true, payloadGasLimit=500000, getPeer set"
+  },
+  "part6": {
+    "base_side_txs": {
+      "setConfig_SendUln302": "0x24b501172ddbc20fd8293d5fbfd54ad06d7cc319ac7d0fc9d19505110fda5bea",
+      "setConfig_ReceiveUln302": "0x240c1b6c3c0abf6e7184b80999f775110ebe2ccdfcd61432a07e9b67cae7dc37"
+    },
+    "base_readback": "send (10,2,0,0,[LZLabs,Google]) / receive (15,2,0,0,[LZLabs,Google]) \u2014 matches Part 3",
+    "ethereum_side": "DONE 2026-09-02 14:22 UTC \u2014 6/6 txs",
+    "libraries": {
+      "base_send": "0xB5320B0B3a13cC860893E2Bd79FCd7e13484Dda2",
+      "base_receive": "0xc70AB6f32772f59fBfc23889Caf4Ba3376C84bAf",
+      "ethereum_send": "0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1",
+      "ethereum_receive": "0xc02Ab410f0734EFa3F14628780e6e695156024C2"
+    },
+    "ethereum_base_route_txs": {
+      "setConfig_SendUln302": "0x5605b05656bbafb100464d2174b0ab12a3a4d26b47e479daf502a7b9b12326bf",
+      "setConfig_ReceiveUln302": "0xa51d3c420fd1fd1f3684582bc3975fd8d9d14d091f534faf6e0b7967f4dd7014"
+    },
+    "ethereum_other_peer_txs": {
+      "arbitrum_send": "0x5af904c2ee0fda1ecc8abb83c835459674f9bc9f0a31888aa90c66912d678e72",
+      "arbitrum_receive": "0x0c363487033177b5f33941f2bb7b907ea4137a1da8abf9aa44bf06cf46d8bf13",
+      "monad_send": "0xdacfb03ed3c8bd5c3358746bbaadde0cc0f6e42d39c82676a615a58b2ec41d51",
+      "monad_receive": "0x2d637b5698c1d95d3fa922779fd60c1e8843c8a1d33f782769df697847e4cc2a"
+    },
+    "readback_6_3": {
+      "verdict": "PASS \u2014 all four routes, read 2026-09-02 14:23 UTC",
+      "base_send_to_eth": "(10, 2, 0, 0, [0x9e059a54, 0xD56e4eAb])",
+      "base_receive_from_eth": "(15, 2, 0, 0, [0x9e059a54, 0xD56e4eAb])",
+      "eth_send_to_base": "(15, 2, 0, 0, [0x589dEDbD, 0xD56e4eAb])",
+      "eth_receive_from_base": "(10, 2, 0, 0, [0x589dEDbD, 0xD56e4eAb])",
+      "note": "oapp = adapter, not address(0); address(0) returns the chain default and would confirm nothing"
+    }
+  },
+  "part7": {
+    "verdict": "PASS \u2014 round trip delivered both directions, verified by destination balance",
+    "eth_to_base_run1": {
+      "status": "DELIVERED",
+      "sent_utc": "2026-09-02 14:28",
+      "delivered_utc": "14:31",
+      "latency": "~150s",
+      "approve_tx": "0x868664ef414b0c95c23d025c58e3b7c6430f4f85291dd906a4ef476483824d5b",
+      "portal_tx": "0xe658664d5af11192d8bf81c295b3cd333212637c3339092f5c2cf16f734ac3d1"
+    },
+    "eth_to_base_run2": {
+      "status": "DELIVERED",
+      "sent_utc": "2026-09-02 14:42",
+      "delivered_utc": "~14:46",
+      "tx1": "0x00112fc79a6843d605d627ffb681951bf69af447ee00099ed5c897f4002048d7",
+      "tx2": "0xc18be1d4e3f0f86e5089079dff546e4077f36457d988c54f408f71415b17d1d1"
+    },
+    "base_to_eth": {
+      "status": "DELIVERED",
+      "sent_utc": "2026-09-02 14:45",
+      "latency": "~18s",
+      "approve_tx": "0x45df766e33e07b3e6f878604db3eb0f4990b164db2f72b8545d78c7fd3628045",
+      "sendToken_tx": "0xbd3612763ee0c063d4c3fbfc6de2594edcf5649b4d251e752213f5d7a8d83345",
+      "evidence": "ETH deployer 800000 -> 900000; Base totalSupply 100000 -> 0 on the burn"
+    },
+    "final_balances": {
+      "base_totalSupply": 100000,
+      "eth_deployer": 900000,
+      "conserved_total": 1000000
+    },
+    "latency_corroborates_confirmations": "~18s Base-source (10 conf x ~2s) vs ~150s Ethereum-source (15 conf x ~12s)",
+    "not_checked": "LayerZero Scan 'Delivered' status not inspected; delivery proven by on-chain balance instead"
   }
 }
