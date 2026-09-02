@@ -1,0 +1,31 @@
+###############################################################################
+# Security Pipeline — PYUSDX
+#
+# Public repos cannot call private m0-pipelines reusable workflows.
+# Powered by m0-platform/secret-scan.
+#
+# Active scans:
+#   - secret-scan   Gitleaks — detects committed secrets / leaked credentials
+#
+# Repo-level allow-listing: add a .gitleaks.toml to the repo root.
+# Docs: https://github.com/gitleaks/gitleaks#configuration
+###############################################################################
+
+name: Security
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  schedule:
+    # Monthly re-scan to catch secrets matched by newly published Gitleaks rules
+    - cron: "0 3 1 * *"
+  workflow_dispatch:
+
+jobs:
+  secret-scan:
+    permissions:
+      contents: read
+    uses: m0-platform/secret-scan/.github/workflows/secret-scan.yml@main
+    # .gitleaks.toml + .gitleaksignore at repo root are picked up automatically
