@@ -1,7 +1,8 @@
 ###############################################################################
 # Security Pipeline — PYUSDX
 #
-# Powered by m0-platform/m0-pipelines (centralised reusable workflows).
+# Public repos cannot call private m0-pipelines reusable workflows.
+# Powered by m0-platform/secret-scan.
 #
 # Active scans:
 #   - secret-scan   Gitleaks — detects committed secrets / leaked credentials
@@ -26,5 +27,5 @@ jobs:
   secret-scan:
     permissions:
       contents: read
-    uses: m0-platform/m0-pipelines/.github/workflows/secret-scan.yml@main
+    uses: m0-platform/secret-scan/.github/workflows/secret-scan.yml@main
     # .gitleaks.toml + .gitleaksignore at repo root are picked up automatically
