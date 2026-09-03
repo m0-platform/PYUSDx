@@ -20,6 +20,7 @@ library RouteConfig {
         if (destinationChainId == Chains.ETHEREUM) return DEFAULT_PAYLOAD_GAS_LIMIT;
         if (destinationChainId == Chains.ARBITRUM) return DEFAULT_PAYLOAD_GAS_LIMIT;
         if (destinationChainId == Chains.MONAD) return DEFAULT_PAYLOAD_GAS_LIMIT;
+        if (destinationChainId == Chains.BASE) return DEFAULT_PAYLOAD_GAS_LIMIT;
         if (destinationChainId == Chains.SEPOLIA) return DEFAULT_PAYLOAD_GAS_LIMIT;
         if (destinationChainId == Chains.ARBITRUM_SEPOLIA) return DEFAULT_PAYLOAD_GAS_LIMIT;
         if (destinationChainId == Chains.MONAD_TESTNET) return DEFAULT_PAYLOAD_GAS_LIMIT;

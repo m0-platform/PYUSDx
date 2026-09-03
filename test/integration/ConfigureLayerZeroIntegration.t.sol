@@ -21,6 +21,7 @@ interface IUln302Like {
 contract ConfigureLayerZeroIntegrationTests is IntegrationForkTest {
     uint32 internal constant _ARBITRUM_EID = 30110;
     uint32 internal constant _MONAD_EID = 30390;
+    uint32 internal constant _BASE_EID = 30184;
 
     ConfigureLayerZeroHarness internal configurer;
 
@@ -37,6 +38,11 @@ contract ConfigureLayerZeroIntegrationTests is IntegrationForkTest {
     function _monadPeer() internal pure returns (uint32[] memory peers) {
         peers = new uint32[](1);
         peers[0] = Chains.MONAD;
+    }
+
+    function _basePeer() internal pure returns (uint32[] memory peers) {
+        peers = new uint32[](1);
+        peers[0] = Chains.BASE;
     }
 
     function _applyConfig() internal {
@@ -139,5 +145,33 @@ contract ConfigureLayerZeroIntegrationTests is IntegrationForkTest {
         // ULN302 returns required DVNs sorted ascending; LayerZero Labs (0x589d..) < Nethermind (0xa59B..).
         assertEq(applied.requiredDVNs[0], LayerZeroConfig.getLayerZeroLabsDVN(dvnChain));
         assertEq(applied.requiredDVNs[1], LayerZeroConfig.getNethermindDVN(dvnChain));
+    }
+
+    /* ============ Base route ============ */
+
+    function test_configureLayerZero_appliesBaseSendUlnConfig() public {
+        _applyConfig(_basePeer());
+
+        address adapter = address(layerZeroBridgeAdapter);
+        address endpoint = layerZeroBridgeAdapter.endpoint();
+        address sendLib = ILayerZeroEndpointV2Like(endpoint).getSendLibrary(adapter, _BASE_EID);
+
+        UlnConfig memory applied = IUln302Like(sendLib).getUlnConfig(adapter, _BASE_EID);
+
+        assertEq(applied.confirmations, 15); // source = Ethereum
+        _assertAppliedDVNStack(applied, Chains.ETHEREUM);
+    }
+
+    function test_configureLayerZero_appliesBaseReceiveUlnConfig() public {
+        _applyConfig(_basePeer());
+
+        address adapter = address(layerZeroBridgeAdapter);
+        address endpoint = layerZeroBridgeAdapter.endpoint();
+        (address receiveLib, ) = ILayerZeroEndpointV2Like(endpoint).getReceiveLibrary(adapter, _BASE_EID);
+
+        UlnConfig memory applied = IUln302Like(receiveLib).getUlnConfig(adapter, _BASE_EID);
+
+        assertEq(applied.confirmations, 10); // source = Base
+        _assertAppliedDVNStack(applied, Chains.ETHEREUM);
     }
 }

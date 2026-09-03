@@ -10,6 +10,8 @@ library Chains {
 
     uint32 internal constant MONAD = 143;
 
+    uint32 internal constant BASE = 8453;
+
     uint32 internal constant SEPOLIA = 11155111;
 
     uint32 internal constant ARBITRUM_SEPOLIA = 421614;
