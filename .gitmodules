@@ -5,3 +5,9 @@
 [submodule "lib/evm-m-extensions"]
 	path = lib/evm-m-extensions
 	url = https://github.com/m0-platform/evm-m-extensions
+[submodule "lib/safe-utils"]
+	path = lib/safe-utils
+	url = https://github.com/m0-foundation/safe-utils
+[submodule "lib/foundry-slack"]
+	path = lib/foundry-slack
+	url = https://github.com/m0-platform/foundry-slack

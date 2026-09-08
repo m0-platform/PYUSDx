@@ -1,9 +1,16 @@
 [profile.default]
+remappings = [
+    "safe-smart-account/=lib/safe-utils/lib/safe-smart-account/contracts/",
+    "solidity-http/=lib/safe-utils/lib/solidity-http/src/",
+    "solidity-stringutils/=lib/safe-utils/lib/solidity-stringutils/src/",
+]
 evm_version = "cancun"
 fs_permissions = [
     { access = "read-write", path = "./deployments" },
     { access = "read-write", path = "./safe" },
     { access = "read", path = "./deploymentConfigs" },
+    # Scratch space for the deployment-record tests, so they never touch the checked-in records.
+    { access = "read-write", path = "./out/test-deployments" },
 ]
 gas_reports = ["*"]
 gas_reports_ignore = []

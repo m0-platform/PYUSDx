@@ -59,7 +59,13 @@ contract ConfigurePortalIntegrationTests is IntegrationForkTest {
 
     function test_configurePortal_isIdempotent() public {
         _wireArbitrum();
-        // Re-running the same wiring must not revert and must leave identical state.
+        // Re-running the same wiring must not revert and must leave identical state. Since INT-471
+        // it also emits nothing at all: the builder reads the wired state back and drops every call.
+        assertEq(
+            configurer.configurePeers(address(portal), address(layerZeroBridgeAdapter), _arbitrumPeer()).length,
+            0
+        );
+
         _wireArbitrum();
 
         assertEq(layerZeroBridgeAdapter.getPeer(Chains.ARBITRUM), arbitrumPeerAdapter.toBytes32());

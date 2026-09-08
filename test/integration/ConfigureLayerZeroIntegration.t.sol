@@ -4,15 +4,11 @@ pragma solidity 0.8.34;
 import { Chains } from "../../script/config/Chains.sol";
 import { LayerZeroConfig, UlnConfig } from "../../script/config/LayerZeroConfig.sol";
 import { ILayerZeroEndpointV2Like } from "../../script/interfaces/ILayerZeroEndpointV2Like.sol";
+import { IUln302Like } from "../../script/interfaces/IUln302Like.sol";
 import { Transaction, TransactionHelper } from "../../script/libraries/TransactionHelper.sol";
 
 import { ConfigureLayerZeroHarness } from "../harness/ConfigureLayerZeroHarness.sol";
 import { IntegrationForkTest } from "../utils/IntegrationForkTest.sol";
-
-/// @dev Minimal subset of the LayerZero V2 ULN302 message library used to read back applied config.
-interface IUln302Like {
-    function getUlnConfig(address oapp, uint32 remoteEid) external view returns (UlnConfig memory);
-}
 
 /// @title  ConfigureLayerZeroIntegrationTests
 /// @notice Executes the ULN `setConfig` transactions against the real LayerZero endpoint + ULN302

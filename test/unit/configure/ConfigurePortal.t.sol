@@ -43,13 +43,14 @@ contract ConfigurePortalTest is Test {
 
         assertEq(txs.length, 5);
 
-        // adapter.setPeer(ARBITRUM, arbitrumAdapter)
+        // adapter.setBridgeChainId(ARBITRUM, 30110) comes first: reassigning the bridge chain ID
+        // clears the peer, so the peer must be written after it, never before.
         assertEq(txs[0].target, localAdapter);
-        assertEq(txs[0].data, abi.encodeCall(IBridgeAdapter.setPeer, (Chains.ARBITRUM, arbitrumAdapter.toBytes32())));
+        assertEq(txs[0].data, abi.encodeCall(IBridgeAdapter.setBridgeChainId, (Chains.ARBITRUM, uint256(30110))));
 
-        // adapter.setBridgeChainId(ARBITRUM, 30110)
+        // adapter.setPeer(ARBITRUM, arbitrumAdapter)
         assertEq(txs[1].target, localAdapter);
-        assertEq(txs[1].data, abi.encodeCall(IBridgeAdapter.setBridgeChainId, (Chains.ARBITRUM, uint256(30110))));
+        assertEq(txs[1].data, abi.encodeCall(IBridgeAdapter.setPeer, (Chains.ARBITRUM, arbitrumAdapter.toBytes32())));
 
         // portal.setSupportedBridgeAdapter(ARBITRUM, localAdapter, true)
         assertEq(txs[2].target, portal);
@@ -105,8 +106,8 @@ contract ConfigurePortalTest is Test {
         Transaction[] memory txs = harness.configurePeers(portal, localAdapter, peers);
 
         assertEq(txs.length, 10);
-        assertEq(txs[0].data, abi.encodeCall(IBridgeAdapter.setPeer, (Chains.ARBITRUM, arbitrumAdapter.toBytes32())));
-        assertEq(txs[5].data, abi.encodeCall(IBridgeAdapter.setPeer, (Chains.ETHEREUM, ethereumAdapter.toBytes32())));
+        assertEq(txs[1].data, abi.encodeCall(IBridgeAdapter.setPeer, (Chains.ARBITRUM, arbitrumAdapter.toBytes32())));
+        assertEq(txs[6].data, abi.encodeCall(IBridgeAdapter.setPeer, (Chains.ETHEREUM, ethereumAdapter.toBytes32())));
     }
 
     /* ============ getLayerZeroEndpointId ============ */

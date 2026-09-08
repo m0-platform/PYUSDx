@@ -8,6 +8,10 @@ import { Transaction } from "../../../script/libraries/TransactionHelper.sol";
 import { EmptyTransactionBatch } from "../../../script/configure/SafeProposerBase.sol";
 import { SafeProposerHarness } from "../../harness/SafeProposerHarness.sol";
 
+/// @notice Covers the offline Safe Transaction Builder export, which is what a propose run produces
+///         by default.
+/// @dev    `SafeProposerHarness` is pinned to export-only, so nothing here can submit or alert.
+///         Submission and alerting are covered by `SafeProposerAlert.t.sol`.
 contract SafeProposerTest is Test {
     SafeProposerHarness internal harness;
 
@@ -23,7 +27,7 @@ contract SafeProposerTest is Test {
         harness.writeSafeBatch("unit-test", transactions);
     }
 
-    function test_writeSafeBatch_writesImportableJson() external {
+    function test_writeSafeBatch_exportsImportableJson() external {
         Transaction[] memory transactions = new Transaction[](2);
         transactions[0] = Transaction({ target: address(0xAAa), data: hex"1234", value: 0 });
         transactions[1] = Transaction({ target: address(0xBbB), data: hex"5678", value: 0 });

@@ -7,7 +7,7 @@ update:; forge update
 
 # Uses the 1Password CLI to inject secrets referenced in .env into the forge process.
 # In .env, set secret values as 1Password references, e.g. PRIVATE_KEY="op://vault/item/field".
-# `op run` injects every .env var, so the scripts read them (PRIVATE_KEY, PYUSDX_*, etc.) directly via vm.env*.
+# `op run` injects every .env var, so the scripts read them (PRIVATE_KEY, EXTENSION_NAME, etc.) directly via vm.env*.
 OP_RUN := op run --env-file=".env" --
 
 # Conditionally set broadcast and verify flags. DRY_RUN=true simulates without sending anything.
@@ -24,28 +24,12 @@ endif
 # Deployment helpers
 # CHAIN selects the foundry rpc_endpoints alias (localhost/mainnet/arbitrum/sepolia), resolved from
 # the matching *_RPC_URL env var that `op run` injects.
-# The non-secret config vars are listed explicitly so it's clear which env vars the deploy consumes;
-# PRIVATE_KEY (and the RPC URL) are the only secrets and are injected by `op run`.
+# Protocol configuration comes from deploymentConfigs/<chainid>/protocol.json (schema:
+# deploymentConfigs/README.md#deployment-configuration); PROTOCOL_CONFIG optionally overrides the path. PRIVATE_KEY (and the
+# RPC URL) are the only secrets and are injected by `op run`.
+# Add DRY_RUN=true to simulate against the chain without broadcasting or verifying.
 deploy:
-	PYUSDX_NAME=$(PYUSDX_NAME) PYUSDX_SYMBOL=$(PYUSDX_SYMBOL) \
-	PYUSDX_ADMIN=$(PYUSDX_ADMIN) PYUSDX_PAUSER=$(PYUSDX_PAUSER) \
-	PYUSDX_FREEZE_MANAGER=$(PYUSDX_FREEZE_MANAGER) PYUSDX_FORCED_TRANSFER_MANAGER=$(PYUSDX_FORCED_TRANSFER_MANAGER) \
-	PYUSDX_EARNER_MANAGER=$(PYUSDX_EARNER_MANAGER) PYUSDX_RATE_MANAGER=$(PYUSDX_RATE_MANAGER) \
-	PYUSDX_EARNER_MANAGER_RATE_LIMIT_CAPACITY=$(PYUSDX_EARNER_MANAGER_RATE_LIMIT_CAPACITY) \
-	PYUSDX_EARNER_MANAGER_RATE_LIMIT_REFILL=$(PYUSDX_EARNER_MANAGER_RATE_LIMIT_REFILL) \
-	ISSUER_GATEWAY_ADMIN=$(ISSUER_GATEWAY_ADMIN) ISSUER_GATEWAY_OPERATOR=$(ISSUER_GATEWAY_OPERATOR) \
-	ISSUER_GATEWAY_EXECUTOR=$(ISSUER_GATEWAY_EXECUTOR) ISSUER_GATEWAY_MINT_DELAY=$(ISSUER_GATEWAY_MINT_DELAY) \
-	ISSUER_GATEWAY_MINT_TTL=$(ISSUER_GATEWAY_MINT_TTL) \
-	ISSUER_GATEWAY_RATE_LIMIT_CAPACITY=$(ISSUER_GATEWAY_RATE_LIMIT_CAPACITY) \
-	ISSUER_GATEWAY_RATE_LIMIT_REFILL=$(ISSUER_GATEWAY_RATE_LIMIT_REFILL) \
-	SWAP_FACILITY_ADMIN=$(SWAP_FACILITY_ADMIN) SWAP_FACILITY_PAUSER=$(SWAP_FACILITY_PAUSER) \
-	FACTORY_ADMIN=$(FACTORY_ADMIN) FACTORY_MANAGER=$(FACTORY_MANAGER) \
-	PORTAL_ADMIN=$(PORTAL_ADMIN) PORTAL_PAUSER=$(PORTAL_PAUSER) PORTAL_OPERATOR=$(PORTAL_OPERATOR) \
-	PORTAL_FALLBACK_RECIPIENT=$(PORTAL_FALLBACK_RECIPIENT) \
-	PORTAL_RATE_LIMIT_CAPACITY=$(PORTAL_RATE_LIMIT_CAPACITY) PORTAL_RATE_LIMIT_REFILL=$(PORTAL_RATE_LIMIT_REFILL) \
-	LAYER_ZERO_ENDPOINT=$(LAYER_ZERO_ENDPOINT) \
-	LAYER_ZERO_BRIDGE_ADAPTER_ADMIN=$(LAYER_ZERO_BRIDGE_ADAPTER_ADMIN) \
-	LAYER_ZERO_BRIDGE_ADAPTER_OPERATOR=$(LAYER_ZERO_BRIDGE_ADAPTER_OPERATOR) \
+	$(if $(PROTOCOL_CONFIG),PROTOCOL_CONFIG="$(PROTOCOL_CONFIG)") \
 	FOUNDRY_PROFILE=production $(OP_RUN) \
 	forge script script/deploy/DeployAll.s.sol:DeployAll \
 	--rpc-url $(CHAIN) \
@@ -280,13 +264,14 @@ configure-lz-adapter-base-sepolia: CHAIN=base-sepolia
 configure-lz-adapter-base-sepolia: configure-lz-adapter
 
 # Safe multisig propose variants: write a Safe Transaction Builder batch to safe/<chainid>-*.json
-# (no broadcast). Import the file into the Safe UI to execute via the multisig.
+# Default: offline export. SAFE_SUBMIT=true queues on the Safe service; see README.md#multisig-alerts.
 propose-configure-portal:
-	FOUNDRY_PROFILE=production $(OP_RUN) \
+	FOUNDRY_PROFILE=production $(OP_RUN) env DRY_RUN=$(if $(filter true,$(DRY_RUN)),true,false) \
+	SAFE_SUBMIT=$(if $(filter true,$(SAFE_SUBMIT)),true,false) \
 	forge script script/configure/ProposeConfigurePortal.s.sol:ProposeConfigurePortal \
 	--sig "run(uint32[])" $(PEERS) \
 	--rpc-url $(CHAIN) \
-	--skip test --non-interactive
+	--skip test --non-interactive --ffi
 
 propose-configure-portal-local: PEERS = [42161]
 propose-configure-portal-local: CHAIN=localhost
@@ -309,11 +294,12 @@ propose-configure-portal-base: CHAIN=base
 propose-configure-portal-base: propose-configure-portal
 
 propose-configure-lz-adapter:
-	FOUNDRY_PROFILE=production $(OP_RUN) \
+	FOUNDRY_PROFILE=production $(OP_RUN) env DRY_RUN=$(if $(filter true,$(DRY_RUN)),true,false) \
+	SAFE_SUBMIT=$(if $(filter true,$(SAFE_SUBMIT)),true,false) \
 	forge script script/configure/ProposeConfigureLayerZero.s.sol:ProposeConfigureLayerZero \
 	--sig "run(uint32[])" $(PEERS) \
 	--rpc-url $(CHAIN) \
-	--skip test --non-interactive
+	--skip test --non-interactive --ffi
 
 propose-configure-lz-adapter-local: PEERS = [42161]
 propose-configure-lz-adapter-local: CHAIN=localhost
