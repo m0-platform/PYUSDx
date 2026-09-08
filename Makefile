@@ -321,6 +321,104 @@ propose-configure-lz-adapter-base: PEERS = [1]
 propose-configure-lz-adapter-base: CHAIN=base
 propose-configure-lz-adapter-base: propose-configure-lz-adapter
 
+# Role migration: move the deployed suite to the holders in deploymentConfigs/<chainid>/protocol.json.
+# Edit that file's role addresses and its `migration.outgoingHolders` list first (schema:
+# deploymentConfigs/README.md#role-migration). Nothing is deployed, so there is nothing to verify on
+# an explorer -- these use EXECUTE_FLAGS. Add DRY_RUN=true to simulate without broadcasting.
+# Only the calls the signer is authorised to send are broadcast; the rest are reported as deferred,
+# so a suite whose authority is split runs this once per current holder. verify-roles is what says
+# the handover is complete.
+migrate-roles:
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/migrate/MigrateRoles.s.sol:MigrateRoles \
+	--rpc-url $(CHAIN) \
+	--skip test --slow --non-interactive $(EXECUTE_FLAGS)
+
+migrate-roles-local: CHAIN=localhost
+migrate-roles-local: migrate-roles
+
+migrate-roles-mainnet: CHAIN=mainnet
+migrate-roles-mainnet: migrate-roles
+
+migrate-roles-arbitrum: CHAIN=arbitrum
+migrate-roles-arbitrum: migrate-roles
+
+migrate-roles-monad: CHAIN=monad
+migrate-roles-monad: migrate-roles
+
+migrate-roles-base: CHAIN=base
+migrate-roles-base: migrate-roles
+
+migrate-roles-sepolia: CHAIN=sepolia
+migrate-roles-sepolia: migrate-roles
+
+migrate-roles-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+migrate-roles-arbitrum-sepolia: migrate-roles
+
+migrate-roles-monad-testnet: CHAIN=monad-testnet
+migrate-roles-monad-testnet: migrate-roles
+
+migrate-roles-base-sepolia: CHAIN=base-sepolia
+migrate-roles-base-sepolia: migrate-roles
+
+# Safe multisig variant: writes safe/<chainid>-migrate-roles.json for the Safe that holds the
+# authority. The plan is built for SAFE_MULTISIG, not for the proposer, so SAFE_MULTISIG is required.
+propose-migrate-roles:
+	FOUNDRY_PROFILE=production $(OP_RUN) env DRY_RUN=$(if $(filter true,$(DRY_RUN)),true,false) \
+	SAFE_SUBMIT=$(if $(filter true,$(SAFE_SUBMIT)),true,false) \
+	forge script script/migrate/ProposeMigrateRoles.s.sol:ProposeMigrateRoles \
+	--rpc-url $(CHAIN) \
+	--skip test --non-interactive --ffi
+
+propose-migrate-roles-local: CHAIN=localhost
+propose-migrate-roles-local: propose-migrate-roles
+
+propose-migrate-roles-mainnet: CHAIN=mainnet
+propose-migrate-roles-mainnet: propose-migrate-roles
+
+propose-migrate-roles-arbitrum: CHAIN=arbitrum
+propose-migrate-roles-arbitrum: propose-migrate-roles
+
+propose-migrate-roles-monad: CHAIN=monad
+propose-migrate-roles-monad: propose-migrate-roles
+
+propose-migrate-roles-base: CHAIN=base
+propose-migrate-roles-base: propose-migrate-roles
+
+# Read-only. Reverts with MigrationIncomplete while anything is outstanding, and needs no signer key.
+verify-roles:
+	FOUNDRY_PROFILE=production $(OP_RUN) \
+	forge script script/migrate/VerifyRoles.s.sol:VerifyRoles \
+	--rpc-url $(CHAIN) \
+	--skip test --non-interactive
+
+verify-roles-local: CHAIN=localhost
+verify-roles-local: verify-roles
+
+verify-roles-mainnet: CHAIN=mainnet
+verify-roles-mainnet: verify-roles
+
+verify-roles-arbitrum: CHAIN=arbitrum
+verify-roles-arbitrum: verify-roles
+
+verify-roles-monad: CHAIN=monad
+verify-roles-monad: verify-roles
+
+verify-roles-base: CHAIN=base
+verify-roles-base: verify-roles
+
+verify-roles-sepolia: CHAIN=sepolia
+verify-roles-sepolia: verify-roles
+
+verify-roles-arbitrum-sepolia: CHAIN=arbitrum-sepolia
+verify-roles-arbitrum-sepolia: verify-roles
+
+verify-roles-monad-testnet: CHAIN=monad-testnet
+verify-roles-monad-testnet: verify-roles
+
+verify-roles-base-sepolia: CHAIN=base-sepolia
+verify-roles-base-sepolia: verify-roles
+
 # Bridge PYUSDX cross-chain via the PYUSDX Portal (default bridge adapter).
 # DESTINATION_CHAIN_ID is the target chain ID (set by the per-network targets below).
 # AMOUNT is the PYUSDX amount in base units (6 decimals); pass it on the CLI, e.g. AMOUNT=1000000.

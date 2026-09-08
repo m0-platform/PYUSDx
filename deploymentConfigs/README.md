@@ -238,6 +238,144 @@ They record **what was deployed**, not necessarily who holds each role today: ro
 expected to be, transferred to a multisig after a launch. Treat them as history plus a starting point,
 and re-review every value against the chain before reusing one for a redeploy.
 
+### Role migration
+
+The same `protocol.json` drives the handover from the holders a chain deployed with to the holders it
+should end up with. Editing the role addresses in the file _is_ the migration definition — there is no
+second target list and no script source to edit.
+
+```
+make deploy-base                     # deploy with the initial holders
+$EDITOR deploymentConfigs/8453/protocol.json   # set the desired holders + migration.outgoingHolders
+make migrate-roles-base DRY_RUN=true # read the plan without sending anything
+make migrate-roles-base              # send what this signer is authorised to send
+make verify-roles-base               # passes only when nothing is outstanding
+```
+
+#### Two migration-only blocks
+
+`DeployAll` reads its keys one at a time and ignores everything else, so both blocks are optional for a
+deploy and a config written before them still deploys unchanged. The migration scripts require the
+first one.
+
+| Field                       | Type      | Notes                                                                               |
+| --------------------------- | --------- | ----------------------------------------------------------------------------------- |
+| `migration.outgoingHolders` | address[] | The holders being migrated away from. Required, non-empty, no zero entries.         |
+| `portalOFTWrapper.admin`    | address   | Required only when `deployments/<chainId>.json` records a `pyusdxPortalOFTWrapper`. |
+| `portalOFTWrapper.operator` | address   | Same.                                                                               |
+
+`migration.outgoingHolders` records **who held the roles before**, which is not derivable any other
+way: this suite uses OpenZeppelin's non-enumerable `AccessControl`, so a contract cannot be asked who
+holds a role, and these scripts do not scan historical `RoleGranted` logs. Deriving the list from
+the signer or from the edited target addresses instead would quietly miss holders. An empty list is
+rejected rather than treated as "nothing to remove".
+
+Each listed address is checked against **every** migrated role. An address that is also the configured
+holder of a role keeps that role — the config decides who ends up holding what, the outgoing list only
+says who to check. Rate-limit buckets are the one exception to a blanket sweep: only a superseded
+earner manager's bucket is retired, and any listed address that actually holds `ISSUER_ROLE` keeps its
+bucket, because that bucket is what lets it mint. That covers the IssuerGateway and the Portal, which
+always hold it, and any issuer granted after deployment. The check is the on-chain role, not a list of
+known addresses; a membership that cannot be read fails preflight rather than being guessed either
+way.
+
+#### What is covered
+
+Both `DEFAULT_ADMIN_ROLE` and every named role on PYUSDX, the IssuerGateway, the SwapFacility, the
+ExtensionFactory, **both extension beacons**, the Portal, the LayerZeroBridgeAdapter and — when
+deployed — the PortalOFTWrapper; the `earnerManager` and `fallbackRecipient` singletons; the earner
+manager's rate-limit bucket; and every `ProxyAdmin` owner.
+
+The beacons take their holders from the `extensionFactory` block, matching how they are initialised at
+deploy time. Each `ProxyAdmin` owner follows that component's own `admin` field, matching the initial
+owner passed at deploy time; the beacons' follow `extensionFactory.admin`.
+
+A core or beacon address that is missing from the deployment record, or that holds no code, **fails
+preflight** — it is never skipped, because skipping would let a run report a complete handover for a
+contract it never touched. A recorded PortalOFTWrapper with no `portalOFTWrapper` block fails the same
+way, naming the address. A chain with no wrapper deployed simply has none planned.
+
+**Not covered:**
+
+- Deployed extension instances (YieldToOne, MultiMint and anything else the factory deploys). Their
+  holders live in `deploymentConfigs/<chainId>/<extensionName>.json` and are set and verified by
+  `DeployMultiMint`.
+- Per-token PortalOFTWrappers. Only the base PYUSDX wrapper — the one recorded as
+  `pyusdxPortalOFTWrapper` — is in scope. A wrapper for an extension token is recorded as
+  `<SYMBOL>PortalOFTWrapper` among the extension entries and is migrated with its extension, not here.
+- Everything in `protocol.json` that is not an authority: `issuerGateway.mintDelay`,
+  `issuerGateway.mintTTL` and the `issuerGateway.rateLimit` / `portal.rateLimit` capacities. They are
+  validated when the file is read and applied at deploy time, but a migration neither reconciles nor
+  verifies them. Only the earner manager's bucket is touched, because the handover ordering couples it
+  to `setEarnerManager`.
+
+`verify-roles` says nothing about any of these, and a passing run must not be read as having migrated
+them.
+
+The wrapper's own initial holders come from `PORTAL_OFT_WRAPPER_ADMIN` / `PORTAL_OFT_WRAPPER_OPERATOR`
+at deploy time (see [README.md](../README.md#portal-oft-wrapper-decision-and-runbook)); `portalOFTWrapper` in this
+file is the **desired end state** the migration moves it to, which is deliberately a separate input.
+
+Also deliberately untouched: `ISSUER_ROLE` on the IssuerGateway and the Portal, which is not
+represented in the config. Preflight asserts both still hold it, along with the wiring identities
+between the recorded contracts and the configured LayerZero endpoint, and refuses to plan anything
+against a suite that does not match.
+
+#### Signers, and resuming across several holders
+
+Only the calls the signer can actually send are broadcast. Everything else is listed as `[defer]` with
+the authority it needs, and left for that holder's own run. A suite whose authority is split — say the
+admin on a multisig and the rate-limit manager on an EOA — is migrated by each holder running
+`migrate-roles` in turn until `verify-roles` passes. A signer that can send none of the outstanding
+work fails with `NothingExecutable` rather than broadcasting an empty batch and looking successful.
+
+Authority the batch itself grants is not assumed mid-batch: a newly granted holder uses its role on
+its **next** invocation. Three orderings are enforced so a resume can never strand the work:
+
+- a role is never revoked while earlier outstanding work on that contract still needs it, which is
+  what keeps `DEFAULT_ADMIN_ROLE` until last and the rate-limit manager until the buckets are set;
+- `setEarnerManager` waits until the incoming manager's bucket exists, so it is never live without
+  one;
+- the LayerZero `setDelegate` waits for the operator revoke that clears it.
+
+Both of the last two hand work to the **incoming** holder, so plan for one follow-up run by whoever
+the config names. A typical two-round handover on one chain:
+
+```bash
+make migrate-roles-base    # as the outgoing admin: grants, revokes, buckets, ProxyAdmin transfers
+make migrate-roles-base    # as the NEW admin + LayerZero operator: setEarnerManager, setDelegate
+make verify-roles-base     # only now is the handover complete
+```
+
+That last one is the only genuine second step in the suite. `LayerZeroBridgeAdapter._revokeRole`
+clears the endpoint delegate on **every** successful `OPERATOR_ROLE` revocation — a self-renounce
+included — and only an operator can restore it. So when the adapter's operator changes, the delegate
+is restored by the **incoming** operator in a later run, and `verify-roles` fails until it is. Nothing
+else needs an acceptance step: OpenZeppelin's `ProxyAdmin` is `Ownable`, so upgrade authority moves in
+a single `transferOwnership`.
+
+#### Safe multisig
+
+`make propose-migrate-roles-<chain>` writes `safe/<chainId>-migrate-roles.json` for import into the
+Safe Transaction Builder, using the same `SAFE_SUBMIT` / `SAFE_MULTISIG` / alert setup as the
+configuration proposals ([README.md#multisig-alerts](../README.md#multisig-alerts)). The plan is built
+for `SAFE_MULTISIG` — the Safe is what executes the calls, so the Safe's authority decides what can be
+batched; building it for the proposer would queue calls the Safe cannot execute. Queuing a batch is not
+a completed handover: only `verify-roles`, run after the Safe has executed, says the migration is done.
+
+#### What verification can and cannot prove
+
+`verify-roles` is the migration plan asserted empty — one predicate decides both what still needs doing
+and whether anything does, so a check cannot drift from the work. It reads only, needs no signer key,
+and fails with `MigrationIncomplete` while anything is outstanding. A getter it cannot read leaves the
+obligation outstanding, so unreadable state fails rather than passing quietly.
+
+Its one limit follows from the non-enumerable `AccessControl`: it can only prove that the addresses in
+`migration.outgoingHolders` no longer hold what they were migrated out of. A holder granted a role
+outside that list is invisible to it. Proving the absence of an unknown holder needs the full
+`RoleGranted`/`RoleRevoked` log history, which these scripts do not scan — run that scan
+out of band against an archive RPC if a chain needs it.
+
 ### Deployment records
 
 `deployments/<chainId>.json` records the deployed core addresses. Two fields are new:

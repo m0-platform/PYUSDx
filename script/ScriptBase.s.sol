@@ -3,6 +3,7 @@ pragma solidity ^0.8.34;
 
 import { Config } from "./Config.sol";
 
+import { console } from "../lib/forge-std/src/console.sol";
 import { Script } from "../lib/forge-std/src/Script.sol";
 import { VmSafe } from "../lib/forge-std/src/Vm.sol";
 
@@ -297,5 +298,165 @@ contract ScriptBase is Script, Config {
         } else {
             return deployments_.multiMintBeacon;
         }
+    }
+
+    /* ============ Protocol Config Loading ============ */
+
+    /// @dev Overridable for the same reason as `_deployOutputDir`: `PROTOCOL_CONFIG` is a
+    ///      process-global that forge shares across concurrently running suites, so a test that
+    ///      wrote it would change what every other suite reads. Tests point their own scripts at a
+    ///      scratch config instead.
+    function _protocolConfigPath(uint256 chainId) internal view virtual returns (string memory) {
+        string memory overridePath = vm.envOr("PROTOCOL_CONFIG", string(""));
+        if (bytes(overridePath).length != 0) return overridePath;
+
+        return string.concat(vm.projectRoot(), "/deploymentConfigs/", vm.toString(chainId), "/protocol.json");
+    }
+
+    /// @dev Split out of `_readProtocolConfig` so the role-migration scripts can parse their own
+    ///      migration-only blocks out of the same file without re-implementing the lookup or the
+    ///      missing-file message.
+    function _readProtocolConfigFile(uint256 chainId) internal view returns (string memory) {
+        string memory path = _protocolConfigPath(chainId);
+        require(
+            vm.isFile(path),
+            string.concat(
+                "missing protocol config file (see deploymentConfigs/README.md#deployment-configuration): ",
+                path
+            )
+        );
+
+        console.log("Config file:", path);
+
+        return vm.readFile(path);
+    }
+
+    function _readProtocolConfig(uint256 chainId) internal view returns (ProtocolConfig memory) {
+        return _parseProtocolConfig(_readProtocolConfigFile(chainId), chainId);
+    }
+
+    /// @dev `chainId` is passed in rather than read from `block.chainid` so the guard is testable.
+    function _parseProtocolConfig(
+        string memory json,
+        uint256 chainId
+    ) internal pure returns (ProtocolConfig memory config) {
+        require(vm.parseJsonUint(json, ".chainId") == chainId, "config chainId does not match the target chain");
+
+        config.pyusdx = PYUSDXConfig({
+            name: vm.parseJsonString(json, ".pyusdx.name"),
+            symbol: vm.parseJsonString(json, ".pyusdx.symbol"),
+            admin: vm.parseJsonAddress(json, ".pyusdx.admin"),
+            pauser: vm.parseJsonAddress(json, ".pyusdx.pauser"),
+            freezeManager: vm.parseJsonAddress(json, ".pyusdx.freezeManager"),
+            forcedTransferManager: vm.parseJsonAddress(json, ".pyusdx.forcedTransferManager"),
+            earnerManager: vm.parseJsonAddress(json, ".pyusdx.earnerManager"),
+            rateManager: vm.parseJsonAddress(json, ".pyusdx.rateManager"),
+            earnerManagerRateLimitCapacity: _parseUint128(json, ".pyusdx.earnerManagerRateLimit.capacity"),
+            earnerManagerRateLimitRefillPerSecond: _parseUint128(json, ".pyusdx.earnerManagerRateLimit.refillPerSecond")
+        });
+
+        config.issuerGateway = IssuerGatewayConfig({
+            admin: vm.parseJsonAddress(json, ".issuerGateway.admin"),
+            operator: vm.parseJsonAddress(json, ".issuerGateway.operator"),
+            executor: vm.parseJsonAddress(json, ".issuerGateway.executor"),
+            mintDelay: _parseUint32(json, ".issuerGateway.mintDelay"),
+            mintTTL: _parseUint32(json, ".issuerGateway.mintTTL"),
+            rateLimitCapacity: _parseUint128(json, ".issuerGateway.rateLimit.capacity"),
+            rateLimitRefillPerSecond: _parseUint128(json, ".issuerGateway.rateLimit.refillPerSecond")
+        });
+
+        config.swapFacility = SwapFacilityConfig({
+            admin: vm.parseJsonAddress(json, ".swapFacility.admin"),
+            pauser: vm.parseJsonAddress(json, ".swapFacility.pauser")
+        });
+
+        config.extensionFactory = FactoryConfig({
+            admin: vm.parseJsonAddress(json, ".extensionFactory.admin"),
+            factoryManager: vm.parseJsonAddress(json, ".extensionFactory.factoryManager")
+        });
+
+        config.portal = PortalConfig({
+            admin: vm.parseJsonAddress(json, ".portal.admin"),
+            pauser: vm.parseJsonAddress(json, ".portal.pauser"),
+            operator: vm.parseJsonAddress(json, ".portal.operator"),
+            fallbackRecipient: vm.parseJsonAddress(json, ".portal.fallbackRecipient"),
+            rateLimitCapacity: _parseUint128(json, ".portal.rateLimit.capacity"),
+            rateLimitRefillPerSecond: _parseUint128(json, ".portal.rateLimit.refillPerSecond")
+        });
+
+        config.layerZeroBridgeAdapter = LayerZeroBridgeAdapterConfig({
+            lzEndpoint: vm.parseJsonAddress(json, ".layerZeroBridgeAdapter.endpoint"),
+            admin: vm.parseJsonAddress(json, ".layerZeroBridgeAdapter.admin"),
+            operator: vm.parseJsonAddress(json, ".layerZeroBridgeAdapter.operator")
+        });
+
+        _validateProtocolConfig(config);
+    }
+
+    /// @dev JSON numbers are read as uint256 and range-checked here, so an out-of-range value fails
+    ///      with a readable message instead of silently truncating on the cast.
+    function _parseUint128(string memory json, string memory key) internal pure returns (uint128) {
+        uint256 value = vm.parseJsonUint(json, key);
+        require(value <= type(uint128).max, string.concat(key, " exceeds uint128"));
+        return uint128(value);
+    }
+
+    function _parseUint32(string memory json, string memory key) internal pure returns (uint32) {
+        uint256 value = vm.parseJsonUint(json, key);
+        require(value <= type(uint32).max, string.concat(key, " exceeds uint32"));
+        return uint32(value);
+    }
+
+    /* ============ Protocol Config Validation ============ */
+
+    function _validateProtocolConfig(ProtocolConfig memory config) internal pure {
+        require(bytes(config.pyusdx.name).length != 0, "zero pyusdx.name");
+        require(bytes(config.pyusdx.symbol).length != 0, "zero pyusdx.symbol");
+        require(config.pyusdx.admin != address(0), "zero pyusdx.admin");
+        require(config.pyusdx.pauser != address(0), "zero pyusdx.pauser");
+        require(config.pyusdx.freezeManager != address(0), "zero pyusdx.freezeManager");
+        require(config.pyusdx.forcedTransferManager != address(0), "zero pyusdx.forcedTransferManager");
+        require(config.pyusdx.earnerManager != address(0), "zero pyusdx.earnerManager");
+        require(config.pyusdx.rateManager != address(0), "zero pyusdx.rateManager");
+        _validateRateLimit(
+            "pyusdx.earnerManagerRateLimit",
+            config.pyusdx.earnerManagerRateLimitCapacity,
+            config.pyusdx.earnerManagerRateLimitRefillPerSecond
+        );
+
+        require(config.issuerGateway.admin != address(0), "zero issuerGateway.admin");
+        require(config.issuerGateway.operator != address(0), "zero issuerGateway.operator");
+        require(config.issuerGateway.executor != address(0), "zero issuerGateway.executor");
+        // IssuerGateway._setMintTTL reverts on a zero TTL; mintDelay may legitimately be zero.
+        require(config.issuerGateway.mintTTL != 0, "zero issuerGateway.mintTTL");
+        _validateRateLimit(
+            "issuerGateway.rateLimit",
+            config.issuerGateway.rateLimitCapacity,
+            config.issuerGateway.rateLimitRefillPerSecond
+        );
+
+        require(config.swapFacility.admin != address(0), "zero swapFacility.admin");
+        require(config.swapFacility.pauser != address(0), "zero swapFacility.pauser");
+
+        require(config.extensionFactory.admin != address(0), "zero extensionFactory.admin");
+        require(config.extensionFactory.factoryManager != address(0), "zero extensionFactory.factoryManager");
+
+        require(config.portal.admin != address(0), "zero portal.admin");
+        require(config.portal.pauser != address(0), "zero portal.pauser");
+        require(config.portal.operator != address(0), "zero portal.operator");
+        require(config.portal.fallbackRecipient != address(0), "zero portal.fallbackRecipient");
+        _validateRateLimit("portal.rateLimit", config.portal.rateLimitCapacity, config.portal.rateLimitRefillPerSecond);
+
+        require(config.layerZeroBridgeAdapter.lzEndpoint != address(0), "zero layerZeroBridgeAdapter.endpoint");
+        require(config.layerZeroBridgeAdapter.admin != address(0), "zero layerZeroBridgeAdapter.admin");
+        require(config.layerZeroBridgeAdapter.operator != address(0), "zero layerZeroBridgeAdapter.operator");
+    }
+
+    /// @dev Every rate limit `DeployAll` sets is enabled, and `RateLimiter.setRateLimit` reverts with
+    ///      `InvalidRateLimitConfig` on a zero capacity — catch it here rather than mid-deploy. A
+    ///      refill above the capacity refills a full bucket in under a second, which is never intended.
+    function _validateRateLimit(string memory label, uint128 capacity, uint128 refillPerSecond) internal pure {
+        require(capacity != 0, string.concat("zero ", label, ".capacity: an enabled rate limit needs capacity"));
+        require(refillPerSecond <= capacity, string.concat(label, ".refillPerSecond exceeds capacity"));
     }
 }
