@@ -1,0 +1,22 @@
+{
+  "extensionName": "CUSD",
+  "tokenName": "Confidential USD",
+  "tokenSymbol": "CUSD",
+  "roles": {
+    "admin": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "assetCapManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "freezeManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "pauser": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "versionManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "yieldRecipient": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "yieldRecipientManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"
+  },
+  "assets": [
+    {
+      "symbol": "USDC",
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "cap": 100000000000000
+    }
+  ],
+  "replaceAssetWhitelist": []
+}
