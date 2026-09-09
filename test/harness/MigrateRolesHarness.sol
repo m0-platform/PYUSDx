@@ -33,6 +33,20 @@ contract MigrateRolesHarness is MigrateRolesBase {
         return _stagedTransactions(actions);
     }
 
+    /// @dev Keep filtering and recounting in one call; an external ABI roundtrip would hide aliasing.
+    function stagedThenDeferredCount(
+        Deployments memory deployments,
+        ProtocolConfig memory config,
+        Config.MigrationConfig memory migration,
+        address executor
+    ) external view returns (uint256 staged, uint256 deferredBefore, uint256 deferredAfter) {
+        MigrationAction[] memory actions = _planMigration(deployments, config, migration, executor);
+
+        deferredBefore = _deferredCount(actions);
+        staged = _stagedTransactions(actions).length;
+        deferredAfter = _deferredCount(actions);
+    }
+
     function outstandingCount(MigrationAction[] memory actions) external pure returns (uint256) {
         return _outstandingCount(actions);
     }

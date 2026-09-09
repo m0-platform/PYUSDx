@@ -89,61 +89,25 @@ pinning). If a deployment request lists a "Proxy Admin", map that conversation a
 
 ## Deployment configuration
 
-How a chain's desired configuration is written, what `DeployAll` does with it, and what it records.
-
-Two things changed:
-
-- **Protocol configuration moved from `.env` to per-chain JSON.** `deploymentConfigs/<chainId>/protocol.json`
-  is now the single reviewable statement of a chain's non-secret protocol settings — the roles, rate
-  limits and endpoint. Other non-secret inputs stay where they are (`EXTENSION_NAME`, `PEERS`,
-  `FORCE_REPLAY`, the `CHAIN` alias), and `PRIVATE_KEY` and the RPC URLs stay in the existing `op run`
-  secret workflow.
-- **The deployment record tracks both extension beacon proxies.** `deployments/<chainId>.json` now carries
-  `yieldToOneBeacon` and `multiMintBeacon` alongside the other core addresses.
-
 ### Protocol configuration
 
-#### Where it lives
-
-```
-deploymentConfigs/<chainId>/protocol.json
-```
-
-`deploymentConfigs/example-protocol.json` is the template — copy it for a new chain. Set
-`PROTOCOL_CONFIG` to point the script at a different file; its `chainId` must still match the chain
-being deployed to.
-
-Committing the file and reviewing it in a PR **is** the deployment review: every address, role and
-rate limit that will go on chain is in one document, and the diff is readable. That is the reason for
-the move — a `.env` file is untracked, per-machine, and silently different between two people running
-the same `make deploy-*` target.
-
-What "desired" means moves with the chain. Before deployment the file holds the initial holders
-`DeployAll` installs — commonly the deployer across most role fields, since a launch needs one address
-that can finish wiring the suite. After deployment it is edited towards the holders the suite should end
-up with, and that edit is what the role-migration scripts read (see [role migration](#role-migration)).
-On a live chain a diff here is a change of intent for a deployed suite; review it as one.
+`deploymentConfigs/<chainId>/protocol.json` holds non-secret protocol settings shared by deployment
+and role migration. Before deployment, use initial holders (usually the deployer); afterwards, edit
+the role addresses to the reviewed migration targets. Git history and broadcast receipts preserve
+launch inputs. `deployments/<chainId>.json` records contract addresses, and chain reads establish
+actual state. Credentials remain in the `op run` workflow.
 
 #### Workflow
 
-1. Copy `deploymentConfigs/example-protocol.json` to `deploymentConfigs/<chainId>/protocol.json` and
-   fill in the chain's role addresses, rate limits and LayerZero endpoint.
-2. Add a new chain to both fixed-size chain lists in `DeployAllConfigTests._chainIds()` (and its caller array type) and `DeploymentRecordTests.test_checkedInRecords_carryBackfilledBeacons` (updating each array length) and run `forge test --match-path "test/unit/deploy/*.t.sol"`. Review the file and test result in a PR; the gas-report workflow also runs the suite.
-3. Dry-run against the target chain and read the `protocol config` block the script prints — it echoes
-   every value that a broadcast would use:
+1. Copy `deploymentConfigs/example-protocol.json` for a new chain and fill in addresses and limits.
+   `PROTOCOL_CONFIG` may select another file; its `chainId` must match the target chain.
+2. Add the chain to `DeployAllConfigTests._chainIds()` and
+   `DeploymentRecordTests.test_checkedInRecords_carryBackfilledBeacons`, updating their fixed array
+   sizes. Run `forge test --match-path 'test/unit/deploy/*.t.sol'` and review the config diff.
+3. Run `make deploy-base DRY_RUN=true` and inspect the printed protocol config.
+4. Run `make deploy-base` to deploy. Use the corresponding target for other networks.
 
-   ```bash
-   make deploy-base DRY_RUN=true
-   ```
-
-4. Deploy:
-
-   ```bash
-   make deploy-base
-   ```
-
-`DeployAll` fails immediately, before deploying anything, if the file is missing, if its `chainId` does
-not match the chain, if a required key is absent, or if any value fails validation.
+Missing files/keys, a wrong chain ID and invalid values fail before deployment.
 
 #### Schema
 
@@ -185,22 +149,9 @@ survives tooling that reads the file as double-precision JSON.
 
 #### Validation
 
-Every address is rejected if zero, and `pyusdx.name` / `pyusdx.symbol` are rejected if empty. Beyond
-that, three checks exist because the corresponding contract would otherwise revert deep inside a
-partially completed deploy:
-
-- **`mintTTL` must be non-zero.** `IssuerGateway._setMintTTL` reverts with `ZeroMintTTL`.
-- **Every rate-limit `capacity` must be non-zero.** `DeployAll` sets all three limits with
-  `enabled = true`, and `RateLimiter.setRateLimit` reverts with `InvalidRateLimitConfig` on a zero
-  capacity. This is the most likely configuration mistake to inherit from the old `.env` defaults,
-  which shipped `*_RATE_LIMIT_CAPACITY=0`.
-- **`refillPerSecond` must not exceed `capacity`.** A bucket that refills faster than it can hold is
-  an unlimited bucket written to look limited.
-
-`refillPerSecond` of `0` and `mintDelay` of `0` are both legitimate and accepted.
-
-Out-of-range numbers fail with an explicit message (`.issuerGateway.mintTTL exceeds uint32`) rather
-than silently truncating on the cast.
+Addresses and token name/symbol must be nonzero/nonempty. `mintTTL` and rate-limit capacities must be
+positive; refill rates cannot exceed capacity. Zero refill and zero mint delay are allowed. Numeric
+values outside their declared uint32/uint128 range are rejected before casting.
 
 #### Migrating from `.env`
 
@@ -246,39 +197,13 @@ override the reviewed file.
 
 #### Configuration for already-deployed chains
 
-The eight deployed chains — `deploymentConfigs/{1,143,8453,42161,10143,84532,421614,11155111}/protocol.json` —
-were **seeded** from the checked-in `broadcast/DeployAll.s.sol/<chainId>/run-latest.json` receipts: the
-initializer calldata of each proxy, the `TransparentUpgradeableProxy` constructor's initial owner, the
-`LayerZeroBridgeAdapter` implementation's constructor argument, and the three `setRateLimit` calls.
+The eight deployed-chain configs were seeded from `DeployAll` broadcast receipts, then reconciled
+against reviewed role-migration intent and read-only chain evidence. Keep current reviewed addresses
+here; preserve launch history in Git and receipts.
 
-That is where they came from, not what they are for. They are **not frozen deployment snapshots**; Git
-history and the broadcast receipts already preserve the original deployment inputs, so the working file
-is free to carry current intent instead.
-
-##### Establishing a deployed chain's baseline
-
-A deployed chain's baseline reconciles two sources:
-
-1. **The latest reviewed intent** — the most recent launch record, runbook or review covering that
-   value. A historical runbook is evidence of what was intended at the time, not an automatic override
-   of what the chain shows now: a later reviewed decision supersedes it, and some retention is
-   deliberate (an operator, pauser or fallback recipient kept on the deployer can be a decision rather
-   than a leftover).
-2. **Read-only on-chain evidence** — reads of the live suite, which say who holds what now and nothing
-   about whether that is correct.
-
-Where they agree, the value is settled. Where they differ, write the latest reviewed intent into
-`protocol.json`, list the current holder in `migration.outgoingHolders`, and let `migrate-roles` close
-the gap — the difference is carried as pending work, not resolved by copying the chain into the file. A
-difference no reviewed record explains is an **unknown change: flag it for review** rather than
-settling it in either direction. Until a chain's values have been reconciled and reviewed, treat them as
-seeded but unconfirmed. All eight have now been through this once — see
-[current baseline](#current-baseline-and-verification) below.
-
-`make verify-roles-<chain>` is the fastest read of the gap: no key, read-only, and it lists every
-obligation the chain does not carry whoever runs it. `cast call` covers anything outside the migrated
-scope. Every migration target parses `migration.outgoingHolders` first, so a missing or empty list fails
-preflight with `NoOutgoingHolders` rather than reporting a plan.
+If reviewed intent differs from the chain, retain the intended target and document the pending work.
+Flag unexplained differences for review. `verify-roles` reports the authority gap without a signer;
+use direct reads for settings outside its [scope](#what-is-covered).
 
 ##### Current baseline and verification
 
@@ -312,11 +237,8 @@ PROTOCOL_CONFIG="$PWD/deploymentConfigs/8453/protocol.json" \
   --rpc-url https://mainnet.base.org --fork-block-number 51081965 --skip test --non-interactive
 ```
 
-Two caveats on the RPCs. The hosts above are the ones that actually answered; several public endpoints
-refuse an archive fork at a historical block (`403 Archive requests require a personal token`,
-`-32000 metadata is not found`), which is why Ethereum was verified through `eth.drpc.org` rather than
-the host its evidence was collected from. The two **bold** blocks are fresh: the tested providers could not
-serve a fork at those chains' evidence blocks, so verification used the newer blocks shown above.
+Some public providers could not serve the evidence blocks. The bold verification blocks are newer
+reads; the table identifies the blocks and providers actually used, not a freshness guarantee.
 
 ##### The Ethereum gap
 
@@ -351,31 +273,18 @@ gateway roles. Other chains' candidate checks also do not rule out unknown holde
 
 ### Role migration
 
-The same `protocol.json` drives the handover from the holders a chain deployed with to the holders it
-should end up with. Editing the role addresses in the file _is_ the migration definition — there is no
-second target list and no script source to edit. The scripts read the file as the desired state and the
-chain as the actual state; everything they do is the difference between the two.
+Edit the deployed chain's role addresses and outgoing holders in `protocol.json`, then review the diff.
+The scripts compare that intent with the chain:
 
-```
-make deploy-base                     # deploy with the initial holders
-$EDITOR deploymentConfigs/8453/protocol.json   # set the desired holders + migration.outgoingHolders
-                                     # review the diff — it is the migration definition
-make migrate-roles-base DRY_RUN=true # read the plan without sending anything
-make migrate-roles-base              # send what this signer is authorised to send
-make verify-roles-base               # passes only when nothing is outstanding
+```bash
+$EDITOR deploymentConfigs/8453/protocol.json
+make migrate-roles-base DRY_RUN=true # simulate for the configured PRIVATE_KEY
+make migrate-roles-base              # send what this signer is authorized to send
+make verify-roles-base               # read-only, no key; fails while obligations remain
 ```
 
-Four stages:
-
-| Stage       | What runs                                | Chain writes | Signer                                                                                                                                                                                                                                          |
-| ----------- | ---------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Review**  | The `protocol.json` diff, in a PR        | No           | —. The only stage where the intended end state is decided; a plan executes whatever the file says, a wrong address included.                                                                                                                    |
-| **Plan**    | `migrate-roles` with `DRY_RUN=true`      | No           | Signer-dependent. `DRY_RUN=true` only drops `--broadcast`; the script still reads `PRIVATE_KEY`, stages against that signer's on-chain authority, and reverts `NothingExecutable` when work is outstanding and that signer can send none of it. |
-| **Execute** | `migrate-roles`, once per current holder | Yes          | Sends only what that signer's current on-chain authority allows; the rest print as `[defer]`.                                                                                                                                                   |
-| **Verify**  | `verify-roles`                           | No           | Signer-independent — the plan is built with no executor and no key is read. The only thing that declares the handover complete.                                                                                                                 |
-
-So `verify-roles` is the target that reports the gap regardless of who runs it; a dry-run
-`migrate-roles` answers a different question — what _this_ signer could send right now.
+A dry run still needs the signer key and reports only what that signer can execute.
+`verify-roles` reports all outstanding obligations independently of the signer.
 
 #### Two migration-only blocks
 
@@ -389,102 +298,49 @@ first one.
 | `portalOFTWrapper.admin`    | address   | Required only when `deployments/<chainId>.json` records a `pyusdxPortalOFTWrapper`. |
 | `portalOFTWrapper.operator` | address   | Same.                                                                               |
 
-`migration.outgoingHolders` records **who held the roles before**, which is not derivable any other
-way: this suite uses OpenZeppelin's non-enumerable `AccessControl`, so a contract cannot be asked who
-holds a role, and these scripts do not scan historical `RoleGranted` logs. Deriving the list from
-the signer or from the edited target addresses instead would quietly miss holders. An empty list is
-rejected rather than treated as "nothing to remove".
-
-Each listed address is checked against **every** migrated role. An address that is also the configured
-holder of a role keeps that role — the config decides who ends up holding what, the outgoing list only
-says who to check. Rate-limit buckets are the one exception to a blanket sweep: only a superseded
-earner manager's bucket is retired, and any listed address that actually holds `ISSUER_ROLE` keeps its
-bucket, because that bucket is what lets it mint. That covers the IssuerGateway and the Portal, which
-always hold it, and any issuer granted after deployment. The check is the on-chain role, not a list of
-known addresses; a membership that cannot be read fails preflight rather than being guessed either
-way.
+List known former/current holders explicitly: AccessControl is not enumerable and these scripts do
+not scan role logs. Each listed address is checked against every migrated role, retaining roles for
+which it remains the configured target. Superseded earner buckets are retired, but current issuers
+keep theirs; unreadable issuer membership aborts planning.
 
 #### What is covered
 
-Both `DEFAULT_ADMIN_ROLE` and every named role on PYUSDX, the IssuerGateway, the SwapFacility, the
-ExtensionFactory, **both extension beacons**, the Portal, the LayerZeroBridgeAdapter and — when
-deployed — the PortalOFTWrapper; the `earnerManager` and `fallbackRecipient` singletons; the earner
-manager's rate-limit bucket; and every `ProxyAdmin` owner.
+The migration covers named roles and `DEFAULT_ADMIN_ROLE` on PYUSDX, IssuerGateway, SwapFacility,
+ExtensionFactory, both beacons, Portal, LayerZeroBridgeAdapter and the recorded base PortalOFTWrapper.
+It also covers `earnerManager`, `fallbackRecipient`, the earner bucket, ProxyAdmin ownership and the
+LayerZero delegate. Beacons use `extensionFactory` holders; each ProxyAdmin follows its component's
+`admin`.
 
-The beacons take their holders from the `extensionFactory` block, matching how they are initialised at
-deploy time. Each `ProxyAdmin` owner follows that component's own `admin` field, matching the initial
-owner passed at deploy time; the beacons' follow `extensionFactory.admin`.
+Preflight requires deployed code, valid suite wiring, the configured endpoint, and preserved PYUSDX
+`ISSUER_ROLE` membership for IssuerGateway and Portal. A recorded wrapper requires its config block.
 
-A core or beacon address that is missing from the deployment record, or that holds no code, **fails
-preflight** — it is never skipped, because skipping would let a run report a complete handover for a
-contract it never touched. A recorded PortalOFTWrapper with no `portalOFTWrapper` block fails the same
-way, naming the address. A chain with no wrapper deployed simply has none planned.
+**Outside this migration and verification:**
 
-**Not covered:**
+- Individual extension instances and per-token OFT wrappers.
+- Token name/symbol, mint delay/TTL, and IssuerGateway/Portal rate-limit settings. They remain deployment
+  inputs; editing them on a live chain needs a separate operation. Only the earner bucket is migrated.
 
-- Deployed extension instances (YieldToOne, MultiMint and anything else the factory deploys). Their
-  holders live in `deploymentConfigs/<chainId>/<extensionName>.json` and are set and verified by
-  `DeployMultiMint`.
-- Per-token PortalOFTWrappers. Only the base PYUSDX wrapper — the one recorded as
-  `pyusdxPortalOFTWrapper` — is in scope. A wrapper for an extension token is recorded as
-  `<SYMBOL>PortalOFTWrapper` among the extension entries and is migrated with its extension, not here.
-- Everything in `protocol.json` that is not an authority: `issuerGateway.mintDelay`,
-  `issuerGateway.mintTTL` and the `issuerGateway.rateLimit` / `portal.rateLimit` capacities. They are
-  validated when the file is read and applied at deploy time, but a migration neither reconciles nor
-  verifies them. Only the earner manager's bucket is touched, because the handover ordering couples it
-  to `setEarnerManager`.
-
-`verify-roles` says nothing about any of these, and a passing run must not be read as having migrated
-them.
-
-One file, but not one sync: `protocol.json` states the desired configuration of the whole core suite,
-while the migration covers only the authority part of it, listed above. Editing anything outside that
-set changes the stated intent and nothing else — no plan line, no `[defer]`, no verification failure.
-Changing such a setting on a live chain is a separate operation against the deployed contract; update
-the file so intent stays accurate, and do not expect these scripts to notice either way.
-
-The wrapper's own initial holders come from `PORTAL_OFT_WRAPPER_ADMIN` / `PORTAL_OFT_WRAPPER_OPERATOR`
-at deploy time (see [README.md](../README.md#portal-oft-wrapper-decision-and-runbook)); `portalOFTWrapper` in this
-file is the **desired end state** the migration moves it to, which is deliberately a separate input:
-the deploy-time inputs stay in the existing secret/env workflow.
-
-Also deliberately untouched: `ISSUER_ROLE` on the IssuerGateway and the Portal, which is not
-represented in the config. Preflight asserts both still hold it, along with the wiring identities
-between the recorded contracts and the configured LayerZero endpoint, and refuses to plan anything
-against a suite that does not match.
+The base wrapper is deployed separately using `PORTAL_OFT_WRAPPER_ADMIN` / `PORTAL_OFT_WRAPPER_OPERATOR`;
+its JSON block supplies migration targets. See the [wrapper runbook](../README.md#portal-oft-wrapper-decision-and-runbook).
 
 #### Signers, and resuming across several holders
 
-Only the calls the signer can actually send are broadcast. Everything else is listed as `[defer]` with
-the authority it needs, and left for that holder's own run. A suite whose authority is split — say the
-admin on a multisig and the rate-limit manager on an EOA — is migrated by each holder running
-`migrate-roles` in turn until `verify-roles` passes. A signer that can send none of the outstanding
-work fails with `NothingExecutable` rather than broadcasting an empty batch and looking successful.
+Each holder runs the migration with its current authority. Unsendable work is `[defer]`; if nothing
+outstanding is executable, the run fails with `NothingExecutable`. Newly granted authority is used
+on a later invocation. Ordering preserves:
 
-Authority the batch itself grants is not assumed mid-batch: a newly granted holder uses its role on
-its **next** invocation. Three orderings are enforced so a resume can never strand the work:
-
-- a role is never revoked while earlier outstanding work on that contract still needs it, which is
-  what keeps `DEFAULT_ADMIN_ROLE` until last and the rate-limit manager until the buckets are set;
-- `setEarnerManager` waits until the incoming manager's bucket exists, so it is never live without
-  one;
-- the LayerZero `setDelegate` waits for the operator revoke that clears it.
-
-Both of the last two hand work to the **incoming** holder, so plan for one follow-up run by whoever
-the config names. A typical two-round handover on one chain:
+- Roles needed by earlier outstanding work; default-admin handover comes last.
+- The incoming earner bucket before switching `earnerManager`.
+- Delegate restoration after LayerZero operator revocation, which clears the delegate even on renounce.
 
 ```bash
-make migrate-roles-base    # as the outgoing admin: grants, revokes, buckets, ProxyAdmin transfers
-make migrate-roles-base    # as the NEW admin + LayerZero operator: setEarnerManager, setDelegate
-make verify-roles-base     # only now is the handover complete
+make migrate-roles-base # outgoing holders: grants, revokes, buckets, ProxyAdmin transfers
+make migrate-roles-base # incoming holders: remaining manager/delegate work
+make verify-roles-base
 ```
 
-That last one is the only genuine second step in the suite. `LayerZeroBridgeAdapter._revokeRole`
-clears the endpoint delegate on **every** successful `OPERATOR_ROLE` revocation — a self-renounce
-included — and only an operator can restore it. So when the adapter's operator changes, the delegate
-is restored by the **incoming** operator in a later run, and `verify-roles` fails until it is. Nothing
-else needs an acceptance step: OpenZeppelin's `ProxyAdmin` is `Ownable`, so upgrade authority moves in
-a single `transferOwnership`.
+Split authorities may need more runs. The incoming LayerZero operator must restore the delegate after
+revocation. ProxyAdmin ownership transfers in one step and needs no acceptance transaction.
 
 #### Safe multisig
 
@@ -497,23 +353,13 @@ a completed handover: only `verify-roles`, run after the Safe has executed, says
 
 #### What verification can and cannot prove
 
-`verify-roles` is the migration plan asserted empty — one predicate decides both what still needs doing
-and whether anything does, so a check cannot drift from the work. It reads only, needs no signer key,
-and fails with `MigrationIncomplete` while anything is outstanding. A getter it cannot read leaves the
-obligation outstanding, so unreadable state fails rather than passing quietly.
+`verify-roles` requires an empty migration plan and fails with `MigrationIncomplete` while work remains.
+Unreadable state cannot pass. A pass covers the configured targets and listed outgoing holders at the
+block read; it does not approve those targets or verify settings outside the migration scope.
 
-A pass says: every holder, singleton, bucket, ProxyAdmin owner and delegate in the covered scope
-matches this file, and no address in `migration.outgoingHolders` still holds what it was migrated out
-of. It does not say that the file is right — it compares the chain to the desired state and never
-questions it, so a reviewed but wrong address verifies clean — nor that the settings outside the
-migrated scope match, nor that the result still holds: a pass describes the chain at the block it read,
-so re-run it rather than citing an old run.
-
-Its one structural limit follows from the non-enumerable `AccessControl`: it can only prove that the
-addresses in `migration.outgoingHolders` no longer hold what they were migrated out of. A holder granted
-a role outside that list is invisible to it, and no enumeration of current holders is possible here.
-Proving the absence of an unknown holder needs the full `RoleGranted`/`RoleRevoked` log history, which
-these scripts do not scan — run that scan out of band against an archive RPC if a chain needs it.
+Unknown holders are invisible because AccessControl is not enumerable. A full holder inventory needs
+historical `RoleGranted`/`RoleRevoked` logs and current membership checks outside these scripts. Resolve
+the [additional testnet holder](#additional-testnet-holder-awaiting-review) before migrating those roles.
 
 ### Deployment records
 
@@ -529,10 +375,7 @@ at one of these two beacons, so upgrading a beacon's implementation moves every 
 at once. They are top-level keys and never appear in the `extensionNames` / `extensionAddresses` pair,
 which continues to hold individual extension proxies keyed by their `EXTENSION_NAME` handle.
 
-`DeployAll` writes both on every fresh deployment. `ScriptBase` exposes them as
-`_getYieldToOneBeacon()` and `_getMultiMintBeacon()`, falling back to the `YIELD_TO_ONE_BEACON` /
-`MULTI_MINT_BEACON` environment variables when the record has no entry, matching the other core
-address getters. These internal helpers currently have no script callers; setting those overrides has no effect on existing entry points.
+`DeployAll` writes both beacon addresses on every fresh deployment.
 
 #### Reading older records
 
@@ -553,22 +396,13 @@ The two addresses are the same on all eight chains because both beacons are depl
 with `CREATE3`, by the same deployer, with cross-chain redeploy protection disabled — so the salt, and
 therefore the address, is chain-independent.
 
-Each value was established twice, and never guessed:
+Both addresses were checked against successful CREATE3 broadcast receipts and the factory's immutable
+beacon getters on all eight chains:
 
-1. **From the broadcast receipts.** In each `broadcast/DeployAll.s.sol/<chainId>/run-latest.json` (all
-   with `status: 0x1`), the `deployCreate3(bytes32,bytes)` call whose salt ends in
-   `bytes11(keccak256("PYUSDXYieldToOneBeacon"))` = `0x79ab16825afe7ec19ec4c8` — respectively
-   `bytes11(keccak256("PYUSDXMultiMintBeacon"))` = `0x60e79680f90fbd4f6421d7` — creates the proxy.
-   The same procedure reproduces the `pyusdx`, `portal`, `swapFacility` and `extensionFactory`
-   addresses already on record, which is what makes the mapping trustworthy.
-2. **Against the live chain.** `ExtensionFactory.yieldToOneBeacon()` and
-   `ExtensionFactory.multiMintBeacon()` are immutable constructor arguments. Reading them from
-   `0x25c8aFfC5a63D8E047c12918C0438ABA5aA09c2A` on all eight chains returns exactly these addresses:
-
-   ```bash
-   cast call 0x25c8aFfC5a63D8E047c12918C0438ABA5aA09c2A "yieldToOneBeacon()(address)" --rpc-url <chain>
-   cast call 0x25c8aFfC5a63D8E047c12918C0438ABA5aA09c2A "multiMintBeacon()(address)"  --rpc-url <chain>
-   ```
+```bash
+cast call 0x25c8aFfC5a63D8E047c12918C0438ABA5aA09c2A "yieldToOneBeacon()(address)" --rpc-url <chain>
+cast call 0x25c8aFfC5a63D8E047c12918C0438ABA5aA09c2A "multiMintBeacon()(address)" --rpc-url <chain>
+```
 
 `DeploymentRecordTests.test_checkedInRecords_carryBackfilledBeacons` pins both values for every chain.
 

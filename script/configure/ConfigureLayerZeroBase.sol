@@ -149,6 +149,7 @@ abstract contract ConfigureLayerZeroBase is ScriptBase, LayerZeroUlnConfig {
     ///      library answered at all, so a library that does not expose `getAppUlnConfig` produces a
     ///      labelled, re-sent route rather than a silent degradation. `FORCE_REPLAY` forces every
     ///      route back into the batch without suppressing the read.
+    ///      Canonical encoding compares every decoded field, including DVN list order.
     function _pinState(
         address adapter,
         address lib,
@@ -164,29 +165,8 @@ abstract contract ConfigureLayerZeroBase is ScriptBase, LayerZeroUlnConfig {
 
         if (!readable) return (false, false);
 
-        applied = _ulnConfigsMatch(abi.decode(returnData, (UlnConfig)), intended) && !_forceReplay();
-    }
+        UlnConfig memory current = abi.decode(returnData, (UlnConfig));
 
-    /// @dev Field-by-field equality, including DVN list order. `_buildUlnConfig` sorts both DVN
-    ///      lists ascending and ULN302 stores the config as submitted, so an unchanged rerun reads
-    ///      back exactly what the previous run wrote.
-    function _ulnConfigsMatch(UlnConfig memory current, UlnConfig memory intended) private pure returns (bool) {
-        if (current.confirmations != intended.confirmations) return false;
-        if (current.requiredDVNCount != intended.requiredDVNCount) return false;
-        if (current.optionalDVNCount != intended.optionalDVNCount) return false;
-        if (current.optionalDVNThreshold != intended.optionalDVNThreshold) return false;
-        if (!_dvnsMatch(current.requiredDVNs, intended.requiredDVNs)) return false;
-
-        return _dvnsMatch(current.optionalDVNs, intended.optionalDVNs);
-    }
-
-    function _dvnsMatch(address[] memory current, address[] memory intended) private pure returns (bool) {
-        if (current.length != intended.length) return false;
-
-        for (uint256 i; i < current.length; ++i) {
-            if (current[i] != intended[i]) return false;
-        }
-
-        return true;
+        applied = keccak256(abi.encode(current)) == keccak256(abi.encode(intended)) && !_forceReplay();
     }
 }

@@ -503,6 +503,20 @@ contract MigrateRolesIntegrationTests is IntegrationForkTest {
         assertEq(_adminHolder.stagedTransactions(complete).length, 0);
     }
 
+    /// @dev Filtering must preserve the deferred count that both entry points report afterwards.
+    function test_stagedTransactions_doNotMutateThePlan() public view {
+        (uint256 staged, uint256 deferredBefore, uint256 deferredAfter) = _adminHolder.stagedThenDeferredCount(
+            _record(),
+            _desiredConfig(),
+            _migrationConfig(),
+            address(_rateHolder)
+        );
+
+        assertGt(staged, 0);
+        assertGt(deferredBefore, 0);
+        assertEq(deferredAfter, deferredBefore);
+    }
+
     function test_stagedTransactions_carryNoValue() public view {
         Transaction[] memory staged = _stagedFor(address(_adminHolder));
 

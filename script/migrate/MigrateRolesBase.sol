@@ -681,7 +681,7 @@ abstract contract MigrateRolesBase is ScriptBase {
     }
 
     /// @dev Plans a role named by its getter on the contract that owns it. Every non-admin role is
-    ///      reached this way, so the hash is always the one that contract actually checks.
+    ///      reached this way.
     function _planRoleFor(
         PlanBuilder memory plan,
         address target,
@@ -815,17 +815,15 @@ abstract contract MigrateRolesBase is ScriptBase {
     }
 
     /// @notice The batch this executor can send now, in order.
-    /// @dev    Compacted through `ConfigurationPlan`, so the direct and Safe paths reduce the same
-    ///         plan to the same transactions for the same executor.
-    function _stagedTransactions(MigrationAction[] memory actions) internal pure returns (Transaction[] memory) {
-        PlannedAction[] memory staged = new PlannedAction[](actions.length);
+    /// @dev Do not modify applied/executable flags: callers report deferred work after filtering.
+    function _stagedTransactions(MigrationAction[] memory actions) internal pure returns (Transaction[] memory staged) {
+        staged = new Transaction[](_outstandingCount(actions) - _deferredCount(actions));
+
+        uint256 count;
 
         for (uint256 i; i < actions.length; ++i) {
-            staged[i] = actions[i].planned;
-            staged[i].applied = actions[i].planned.applied || !actions[i].executable;
+            if (!actions[i].planned.applied && actions[i].executable) staged[count++] = actions[i].planned.transaction;
         }
-
-        return staged.compact();
     }
 
     /// @notice Prints the obligations, then what this executor can send and what waits for someone else.

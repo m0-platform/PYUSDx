@@ -278,28 +278,6 @@ contract ScriptBase is Script, Config {
         }
     }
 
-    /// @dev The YieldToOne `ExtensionBeacon` proxy — the upgrade lever shared by every YieldToOne
-    ///      extension, not an extension proxy itself.
-    function _getYieldToOneBeacon() internal view returns (address) {
-        Deployments memory deployments_ = _readDeployment(block.chainid);
-        if (deployments_.yieldToOneBeacon == address(0)) {
-            return vm.envAddress("YIELD_TO_ONE_BEACON");
-        } else {
-            return deployments_.yieldToOneBeacon;
-        }
-    }
-
-    /// @dev The MultiMint `ExtensionBeacon` proxy — the upgrade lever shared by every MultiMint
-    ///      extension, not an extension proxy itself.
-    function _getMultiMintBeacon() internal view returns (address) {
-        Deployments memory deployments_ = _readDeployment(block.chainid);
-        if (deployments_.multiMintBeacon == address(0)) {
-            return vm.envAddress("MULTI_MINT_BEACON");
-        } else {
-            return deployments_.multiMintBeacon;
-        }
-    }
-
     /* ============ Protocol Config Loading ============ */
 
     /// @dev Overridable for the same reason as `_deployOutputDir`: `PROTOCOL_CONFIG` is a
