@@ -1,13 +1,24 @@
 # Deployment Configs
 
-This directory holds the reviewable, non-secret deployment configuration, one JSON file per chain:
+This directory holds the reviewable, non-secret **desired configuration** — what each chain's suite is
+meant to look like — one JSON file per chain:
 
 ```
-deploymentConfigs/<chainid>/protocol.json          # the core stack, read by DeployAll
+deploymentConfigs/<chainid>/protocol.json          # the core stack, read by DeployAll and the role-migration scripts
 deploymentConfigs/<chainid>/<extension-name>.json  # one MultiMint extension, read by DeployMultiMint
 ```
 
 `protocol.json` uses `example-protocol.json` as its template; see [protocol configuration](#deployment-configuration) below. The first section covers extension configs.
+
+Three artefacts carry a chain through its lifecycle. Keep them apart:
+
+| Artefact                                    | What it is                                                                                                                                      | Who writes it                                                       |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `deploymentConfigs/<chainid>/protocol.json` | **Desired state.** The roles, rate limits and endpoint the chain is meant to carry. Reviewed in a PR; the same file feeds deploy and migration. | People, in a PR.                                                    |
+| `deployments/<chainid>.json`                | **Contract addresses.** Where the suite lives on that chain. Says nothing about who holds a role.                                               | `DeployAll` and the extension deploy scripts, on a broadcast run.   |
+| The chain                                   | **Actual active state.** The only authority on who holds what right now.                                                                        | Every transaction ever sent, including ones this repo did not send. |
+
+The migration scripts compare the first against the third. Nothing here keeps the first true on its own.
 
 ## Extension Deployment Configs
 
@@ -78,13 +89,15 @@ pinning). If a deployment request lists a "Proxy Admin", map that conversation a
 
 ## Deployment configuration
 
-How `DeployAll` is configured, and what it records.
+How a chain's desired configuration is written, what `DeployAll` does with it, and what it records.
 
 Two things changed:
 
 - **Protocol configuration moved from `.env` to per-chain JSON.** `deploymentConfigs/<chainId>/protocol.json`
-  is now the single reviewable source for every non-secret input to a core deploy. `PRIVATE_KEY` and the
-  RPC URLs stay in the existing `op run` secret workflow.
+  is now the single reviewable statement of a chain's non-secret protocol settings — the roles, rate
+  limits and endpoint. Other non-secret inputs stay where they are (`EXTENSION_NAME`, `PEERS`,
+  `FORCE_REPLAY`, the `CHAIN` alias), and `PRIVATE_KEY` and the RPC URLs stay in the existing `op run`
+  secret workflow.
 - **The deployment record tracks both extension beacon proxies.** `deployments/<chainId>.json` now carries
   `yieldToOneBeacon` and `multiMintBeacon` alongside the other core addresses.
 
@@ -96,7 +109,7 @@ Two things changed:
 deploymentConfigs/<chainId>/protocol.json
 ```
 
-`deploymentConfigs/example-protocol.json` is the annotated template — copy it for a new chain. Set
+`deploymentConfigs/example-protocol.json` is the template — copy it for a new chain. Set
 `PROTOCOL_CONFIG` to point the script at a different file; its `chainId` must still match the chain
 being deployed to.
 
@@ -104,6 +117,12 @@ Committing the file and reviewing it in a PR **is** the deployment review: every
 rate limit that will go on chain is in one document, and the diff is readable. That is the reason for
 the move — a `.env` file is untracked, per-machine, and silently different between two people running
 the same `make deploy-*` target.
+
+What "desired" means moves with the chain. Before deployment the file holds the initial holders
+`DeployAll` installs — commonly the deployer across most role fields, since a launch needs one address
+that can finish wiring the suite. After deployment it is edited towards the holders the suite should end
+up with, and that edit is what the role-migration scripts read (see [role migration](#role-migration)).
+On a live chain a diff here is a change of intent for a deployed suite; review it as one.
 
 #### Workflow
 
@@ -227,30 +246,136 @@ override the reviewed file.
 
 #### Configuration for already-deployed chains
 
-Each reconstructed file carries an ignored `_provenance` warning. These files preserve initial deployment inputs; they do not track subsequent role transfers.
-
-`deploymentConfigs/{1,143,8453,42161,10143,84532,421614,11155111}/protocol.json` were reconstructed
-from the checked-in `broadcast/DeployAll.s.sol/<chainId>/run-latest.json` receipts — the initializer
-calldata of each proxy, the `TransparentUpgradeableProxy` constructor's initial owner, the
+The eight deployed chains — `deploymentConfigs/{1,143,8453,42161,10143,84532,421614,11155111}/protocol.json` —
+were **seeded** from the checked-in `broadcast/DeployAll.s.sol/<chainId>/run-latest.json` receipts: the
+initializer calldata of each proxy, the `TransparentUpgradeableProxy` constructor's initial owner, the
 `LayerZeroBridgeAdapter` implementation's constructor argument, and the three `setRateLimit` calls.
 
-They record **what was deployed**, not necessarily who holds each role today: roles can be, and are
-expected to be, transferred to a multisig after a launch. Treat them as history plus a starting point,
-and re-review every value against the chain before reusing one for a redeploy.
+That is where they came from, not what they are for. They are **not frozen deployment snapshots**; Git
+history and the broadcast receipts already preserve the original deployment inputs, so the working file
+is free to carry current intent instead.
+
+##### Establishing a deployed chain's baseline
+
+A deployed chain's baseline reconciles two sources:
+
+1. **The latest reviewed intent** — the most recent launch record, runbook or review covering that
+   value. A historical runbook is evidence of what was intended at the time, not an automatic override
+   of what the chain shows now: a later reviewed decision supersedes it, and some retention is
+   deliberate (an operator, pauser or fallback recipient kept on the deployer can be a decision rather
+   than a leftover).
+2. **Read-only on-chain evidence** — reads of the live suite, which say who holds what now and nothing
+   about whether that is correct.
+
+Where they agree, the value is settled. Where they differ, write the latest reviewed intent into
+`protocol.json`, list the current holder in `migration.outgoingHolders`, and let `migrate-roles` close
+the gap — the difference is carried as pending work, not resolved by copying the chain into the file. A
+difference no reviewed record explains is an **unknown change: flag it for review** rather than
+settling it in either direction. Until a chain's values have been reconciled and reviewed, treat them as
+seeded but unconfirmed. All eight have now been through this once — see
+[current baseline](#current-baseline-and-verification) below.
+
+`make verify-roles-<chain>` is the fastest read of the gap: no key, read-only, and it lists every
+obligation the chain does not carry whoever runs it. `cast call` covers anything outside the migrated
+scope. Every migration target parses `migration.outgoingHolders` first, so a missing or empty list fails
+preflight with `NoOutgoingHolders` rather than reporting a plan.
+
+##### Current baseline and verification
+
+The eight configs were reconciled against reviewed intent and read-only chain evidence at the blocks
+below, then checked with `VerifyRoles` (read-only, no key, no `--broadcast`). Chains 1, 143 and 42161
+carry the MoonPay and M0 Main V2 authority assignments recorded in `plans/m0-migration.md` and
+`plans/moonpay-migration.md` (historical branch, `ef94b21`); the rest retain their bootstrap holders.
+The [deployments-by-chain notes](https://app.notion.com/p/PYUSDX-Deployments-by-Chain-3c9858df176a811a9985f0ca8ec54111) and linked [role-transfer receipts](https://app.notion.com/p/3bb858df176a80a4bbd8db1bb364167c) corroborate these mainnet handovers. Keep migration notes and verification evidence here or in the linked records; protocol JSON contains configuration values only.
+
+Per those runbooks the deployer is deliberately **not** retired — it keeps `PAUSER` on SwapFacility and
+Portal, `OPERATOR` on Portal and the LayerZero adapter, the endpoint delegate and Portal's
+`fallbackRecipient` — so those fields name the deployer by intent, not by omission.
+
+| Chain          | Evidence block | Verified at   | Public RPC used for verification              | `VerifyRoles` result |
+| -------------- | -------------- | ------------- | --------------------------------------------- | -------------------- |
+| Ethereum 1     | 25939479       | 25939479      | `https://eth.drpc.org`                        | 2 outstanding        |
+| Monad 143      | 103311789      | 103311789     | `https://rpc.monad.xyz`                       | clean 0/32/32        |
+| Arbitrum 42161 | 503349206      | **503355815** | `https://arb1.arbitrum.io/rpc`                | clean 0/35/35        |
+| Base 8453      | 51081965       | 51081965      | `https://mainnet.base.org`                    | clean 0/32/32        |
+| Sepolia        | 11667620       | 11667620      | `https://ethereum-sepolia-rpc.publicnode.com` | clean 0/32/32        |
+| Arb. Sepolia   | 307054552      | **307061985** | `https://sepolia-rollup.arbitrum.io/rpc`      | clean 0/32/32        |
+| Monad testnet  | 61031690       | 61031690      | `https://testnet-rpc.monad.xyz`               | clean 0/32/32        |
+| Base Sepolia   | 46592362       | 46592362      | `https://sepolia.base.org`                    | clean 0/32/32        |
+
+`0/32/32` is planned / already applied / inspected; 42161 inspects 35 because it also carries a
+`pyusdxPortalOFTWrapper`. Reproduce any row with the config path made explicit:
+
+```bash
+PROTOCOL_CONFIG="$PWD/deploymentConfigs/8453/protocol.json" \
+  forge script script/migrate/VerifyRoles.s.sol:VerifyRoles \
+  --rpc-url https://mainnet.base.org --fork-block-number 51081965 --skip test --non-interactive
+```
+
+Two caveats on the RPCs. The hosts above are the ones that actually answered; several public endpoints
+refuse an archive fork at a historical block (`403 Archive requests require a personal token`,
+`-32000 metadata is not found`), which is why Ethereum was verified through `eth.drpc.org` rather than
+the host its evidence was collected from. The two **bold** blocks are fresh: the tested providers could not
+serve a fork at those chains' evidence blocks, so verification used the newer blocks shown above.
+
+##### The Ethereum gap
+
+Ethereum is the one chain that does not verify clean, and the shortfall is the one
+`plans/moonpay-migration.md` already records against mainnet — "earner-manager bucket still missing,
+MoonPay must fix". Two obligations remain, both `setRateLimit` on PYUSDX and both needing
+`RATE_LIMIT_MANAGER_ROLE`, which MoonPay holds:
+
+- the incoming earner manager `0x3141…B78e` has no bucket (`0/0`), and
+- the superseded deployer bucket `5000000000000 / 2500000000` is still live.
+
+`verify-roles` reports `MigrationIncomplete(2)` with both actions deferred to that role holder. The
+config states the intended `5000000000000 / 2500000000` for the incoming manager regardless: zeroing it
+to match the chain would retire a real obligation by editing a document, and this repository does not
+execute the fix.
+
+##### Additional testnet holder awaiting review
+
+On Sepolia (11155111) and Arbitrum Sepolia (421614),
+`0x77bab32f75996de8075eba62aea7b1205cf7e004` also holds IssuerGateway `OPERATOR_ROLE` and
+`EXECUTOR_ROLE`, alongside the deployer. Log discovery and direct membership reads confirmed this
+additional address. Its intended retention or removal is unresolved.
+
+The files retain the bootstrap targets; this section records the discrepancy. They do not
+add the extra address to `migration.outgoingHolders`: doing so would prescribe removal without a
+reviewed decision. Each role field currently names one target, so it cannot describe two retained
+holders. Resolve this intent before using those files for a role migration.
+
+The passing verifier rows for these two chains cover configured targets and the listed outgoing
+holder only. They are **not** evidence of a complete holder inventory or a resolved baseline for those
+gateway roles. Other chains' candidate checks also do not rule out unknown holders.
 
 ### Role migration
 
 The same `protocol.json` drives the handover from the holders a chain deployed with to the holders it
 should end up with. Editing the role addresses in the file _is_ the migration definition — there is no
-second target list and no script source to edit.
+second target list and no script source to edit. The scripts read the file as the desired state and the
+chain as the actual state; everything they do is the difference between the two.
 
 ```
 make deploy-base                     # deploy with the initial holders
 $EDITOR deploymentConfigs/8453/protocol.json   # set the desired holders + migration.outgoingHolders
+                                     # review the diff — it is the migration definition
 make migrate-roles-base DRY_RUN=true # read the plan without sending anything
 make migrate-roles-base              # send what this signer is authorised to send
 make verify-roles-base               # passes only when nothing is outstanding
 ```
+
+Four stages:
+
+| Stage       | What runs                                | Chain writes | Signer                                                                                                                                                                                                                                          |
+| ----------- | ---------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Review**  | The `protocol.json` diff, in a PR        | No           | —. The only stage where the intended end state is decided; a plan executes whatever the file says, a wrong address included.                                                                                                                    |
+| **Plan**    | `migrate-roles` with `DRY_RUN=true`      | No           | Signer-dependent. `DRY_RUN=true` only drops `--broadcast`; the script still reads `PRIVATE_KEY`, stages against that signer's on-chain authority, and reverts `NothingExecutable` when work is outstanding and that signer can send none of it. |
+| **Execute** | `migrate-roles`, once per current holder | Yes          | Sends only what that signer's current on-chain authority allows; the rest print as `[defer]`.                                                                                                                                                   |
+| **Verify**  | `verify-roles`                           | No           | Signer-independent — the plan is built with no executor and no key is read. The only thing that declares the handover complete.                                                                                                                 |
+
+So `verify-roles` is the target that reports the gap regardless of who runs it; a dry-run
+`migrate-roles` answers a different question — what _this_ signer could send right now.
 
 #### Two migration-only blocks
 
@@ -312,9 +437,16 @@ way, naming the address. A chain with no wrapper deployed simply has none planne
 `verify-roles` says nothing about any of these, and a passing run must not be read as having migrated
 them.
 
+One file, but not one sync: `protocol.json` states the desired configuration of the whole core suite,
+while the migration covers only the authority part of it, listed above. Editing anything outside that
+set changes the stated intent and nothing else — no plan line, no `[defer]`, no verification failure.
+Changing such a setting on a live chain is a separate operation against the deployed contract; update
+the file so intent stays accurate, and do not expect these scripts to notice either way.
+
 The wrapper's own initial holders come from `PORTAL_OFT_WRAPPER_ADMIN` / `PORTAL_OFT_WRAPPER_OPERATOR`
 at deploy time (see [README.md](../README.md#portal-oft-wrapper-decision-and-runbook)); `portalOFTWrapper` in this
-file is the **desired end state** the migration moves it to, which is deliberately a separate input.
+file is the **desired end state** the migration moves it to, which is deliberately a separate input:
+the deploy-time inputs stay in the existing secret/env workflow.
 
 Also deliberately untouched: `ISSUER_ROLE` on the IssuerGateway and the Portal, which is not
 represented in the config. Preflight asserts both still hold it, along with the wiring identities
@@ -370,11 +502,18 @@ and whether anything does, so a check cannot drift from the work. It reads only,
 and fails with `MigrationIncomplete` while anything is outstanding. A getter it cannot read leaves the
 obligation outstanding, so unreadable state fails rather than passing quietly.
 
-Its one limit follows from the non-enumerable `AccessControl`: it can only prove that the addresses in
-`migration.outgoingHolders` no longer hold what they were migrated out of. A holder granted a role
-outside that list is invisible to it. Proving the absence of an unknown holder needs the full
-`RoleGranted`/`RoleRevoked` log history, which these scripts do not scan — run that scan
-out of band against an archive RPC if a chain needs it.
+A pass says: every holder, singleton, bucket, ProxyAdmin owner and delegate in the covered scope
+matches this file, and no address in `migration.outgoingHolders` still holds what it was migrated out
+of. It does not say that the file is right — it compares the chain to the desired state and never
+questions it, so a reviewed but wrong address verifies clean — nor that the settings outside the
+migrated scope match, nor that the result still holds: a pass describes the chain at the block it read,
+so re-run it rather than citing an old run.
+
+Its one structural limit follows from the non-enumerable `AccessControl`: it can only prove that the
+addresses in `migration.outgoingHolders` no longer hold what they were migrated out of. A holder granted
+a role outside that list is invisible to it, and no enumeration of current holders is possible here.
+Proving the absence of an unknown holder needs the full `RoleGranted`/`RoleRevoked` log history, which
+these scripts do not scan — run that scan out of band against an archive RPC if a chain needs it.
 
 ### Deployment records
 

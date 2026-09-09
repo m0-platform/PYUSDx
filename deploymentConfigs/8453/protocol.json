@@ -1,5 +1,4 @@
 {
-  "_provenance": "Historical DeployAll broadcast reconstruction, not current role ownership. Review every role and upgrade authority before a new deployment. Source: broadcast/DeployAll.s.sol/8453/run-latest.json",
   "chainId": 8453,
   "pyusdx": {
     "name": "PYUSDx",
@@ -48,5 +47,8 @@
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "admin": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
     "operator": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"
+  },
+  "migration": {
+    "outgoingHolders": ["0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"]
   }
 }

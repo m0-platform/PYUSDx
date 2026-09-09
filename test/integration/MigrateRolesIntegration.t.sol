@@ -452,12 +452,9 @@ contract MigrateRolesIntegrationTests is IntegrationForkTest {
         assertEq(migration.portalOFTWrapper.operator, address(0x16));
     }
 
-    /// @dev The checked-in chain configs predate the migration block, so they still deploy but are
-    ///      not migration-ready: the scripts must refuse them rather than migrating nothing away.
-    function test_parseMigrationConfig_checkedInChainConfigHasNoMigrationBlock() public {
-        Config.MigrationConfig memory migration = _adminHolder.parseMigrationConfig(
-            vm.readFile(string.concat(vm.projectRoot(), "/deploymentConfigs/1/protocol.json"))
-        );
+    /// @dev Keep the missing-block safety check independent of mutable deployed-chain configs.
+    function test_parseMigrationConfig_configWithoutMigrationBlocks() public {
+        Config.MigrationConfig memory migration = _adminHolder.parseMigrationConfig("{}");
 
         assertEq(migration.outgoingHolders.length, 0);
         assertFalse(migration.hasPortalOFTWrapper);

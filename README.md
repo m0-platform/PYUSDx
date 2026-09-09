@@ -133,7 +133,7 @@ Protocol specification PDFs are available in the `docs/` directory.
 
 Operational scripts in `script/` are driven through the `Makefile`. Secrets are injected at run time with the [1Password CLI](https://developer.1password.com/docs/cli/) via `op run --env-file=".env"`, so `.env` can store secret values as `op://` references (e.g. `PRIVATE_KEY="op://vault/item/field"`). Each command selects a network through the `CHAIN` variable, which resolves to a `[rpc_endpoints]` alias in `foundry.toml` and its matching `*_RPC_URL`.
 
-`DeployAll` reads non-secret protocol settings from `deploymentConfigs/<chainId>/protocol.json`; `PROTOCOL_CONFIG` can select another file with a matching `chainId`. Validate and review that file before deploying. Credentials remain in the secret workflow. See [configuration migration and beacon records](deploymentConfigs/README.md#deployment-configuration).
+`deploymentConfigs/<chainId>/protocol.json` is the chain's **desired configuration** of the non-secret protocol settings — roles, rate limits and the LayerZero endpoint. `DeployAll` reads it to install the initial holders, and the role-migration scripts read the same file as the end state to move the deployed suite towards; `PROTOCOL_CONFIG` can select another file with a matching `chainId`. Keep it distinct from `deployments/<chainId>.json`, which records deployed contract addresses only, and from the chain, which is the only authority on who holds a role now. Validate and review it before deploying or migrating. Credentials remain in the secret workflow. See [configuration migration and beacon records](deploymentConfigs/README.md#deployment-configuration).
 
 Any deploy, configure or bridge command accepts `DRY_RUN=true`, which simulates against the target chain and sends nothing (e.g. `make configure-portal-sepolia DRY_RUN=true`). The `propose-*` targets export a Safe batch by default. `SAFE_SUBMIT=true` additionally queues it on the Safe transaction service; `DRY_RUN=true` suppresses submission and alerts.
 
@@ -157,7 +157,7 @@ npm run build
 
 ### Deploy
 
-Deploys the full core stack (PYUSDX, IssuerGateway, SwapFacility, ExtensionBeacon/Factory, Portal, LayerZeroBridgeAdapter) via `script/deploy/DeployAll.s.sol`, reading roles and protocol settings from `deploymentConfigs/<chainId>/protocol.json`. For a new chain (including local chain 31337), prepare a matching file from `deploymentConfigs/example-protocol.json` first; see [the migration runbook](deploymentConfigs/README.md#deployment-configuration). Artifacts, including both beacon proxy addresses, are written to `deployments/<chainId>.json`, which the configure and bridge commands consume.
+Deploys the full core stack (PYUSDX, IssuerGateway, SwapFacility, ExtensionBeacon/Factory, Portal, LayerZeroBridgeAdapter) via `script/deploy/DeployAll.s.sol`, reading roles and protocol settings from `deploymentConfigs/<chainId>/protocol.json`. For a new chain (including local chain 31337), prepare a matching file from `deploymentConfigs/example-protocol.json` first; see [the configuration runbook](deploymentConfigs/README.md#deployment-configuration). At deploy time the file holds the **initial** holders — commonly the deployer across most role fields — and is edited to the intended end state afterwards, which is what [Migrate roles](#migrate-roles) then reads. Artifacts, including both beacon proxy addresses, are written to `deployments/<chainId>.json`, which the configure and bridge commands consume; that record carries addresses only, never role holders.
 
 ```bash
 anvil                 # local only, in a separate shell
@@ -226,7 +226,9 @@ make propose-configure-lz-adapter-base
 
 ### Migrate roles
 
-Hands the deployed suite over from the holders it launched with to the holders named in the chain's `deploymentConfigs/<chainId>/protocol.json`. Editing that file is the whole migration definition — no second address list, no script edits. The full flow, schema and limits are in [the role migration runbook](deploymentConfigs/README.md#role-migration).
+Hands the deployed suite over from the holders it launched with to the holders named in the chain's `deploymentConfigs/<chainId>/protocol.json`. Editing that file is the whole migration definition — no second address list, no script edits. The scripts read the file as the desired state and the chain as the actual state, and do exactly the difference. The full flow, schema and limits are in [the role migration runbook](deploymentConfigs/README.md#role-migration).
+
+Review the config diff before running anything: it is the only stage where the intended end state is decided, since a plan executes whatever the file says and `verify-roles` then passes on it. Where the file and the chain differ, write the latest reviewed intent into the file and let the migration close the gap; a difference no reviewed record explains is an unknown change to flag for review, not something to settle by copying the chain into the file.
 
 ```bash
 $EDITOR deploymentConfigs/8453/protocol.json   # desired holders + migration.outgoingHolders
@@ -238,7 +240,9 @@ make propose-migrate-roles-base                # or: Safe batch for the multisig
 
 Covers `DEFAULT_ADMIN_ROLE` and every named role across PYUSDX, the IssuerGateway, the SwapFacility, the ExtensionFactory, both extension beacons, the Portal, the LayerZeroBridgeAdapter and any deployed PortalOFTWrapper, plus the `earnerManager` and `fallbackRecipient` singletons, the earner-manager rate-limit bucket and every `ProxyAdmin` owner. Deployed **extension instances are not covered** — their holders live in the per-extension configs and are verified by `DeployMultiMint`.
 
-Only the calls the signer is authorised to send are broadcast; the rest print as `[defer]` with the authority each needs, so a suite whose authority is split across holders is migrated by each of them running the target in turn. A signer that can send none of the outstanding work fails with `NothingExecutable` rather than reporting an empty, successful run, and `verify-roles` — which needs no key — is the only thing that declares the handover complete. One genuine follow-up exists: changing the LayerZero adapter's operator clears the endpoint delegate, and only the incoming operator can restore it.
+The plan itself is built from `staticcall`s, but the two read-only paths differ. `verify-roles` is signer-independent: it plans with no executor, reads no key, and reports the whole gap whoever runs it. `migrate-roles DRY_RUN=true` is not — `DRY_RUN=true` only drops `--broadcast`, so the script still reads `PRIVATE_KEY`, stages against that signer's current on-chain authority, and reverts `NothingExecutable` when work is outstanding and that signer can send none of it. It answers what _this_ signer could send, not what remains overall.
+
+Only the calls the signer's current authority allows are broadcast; the rest print as `[defer]` with the authority each needs, so a suite whose authority is split across holders is migrated by each of them running the target in turn. `verify-roles` is the only thing that declares the handover complete, and a pass is bounded by the covered scope above, by the block it read, and by the non-enumerable `AccessControl` — it cannot see a holder granted outside `migration.outgoingHolders`. One genuine follow-up exists: changing the LayerZero adapter's operator clears the endpoint delegate, and only the incoming operator can restore it.
 
 ### Bridge PYUSDX cross-chain
 
@@ -257,6 +261,7 @@ make bridge-local-to-arbitrum   AMOUNT=1000000
 ## Deployment workflow runbooks
 
 - [Protocol JSON configuration and beacon deployment records](deploymentConfigs/README.md#deployment-configuration)
+- [Establishing a deployed chain's desired-state baseline](deploymentConfigs/README.md#configuration-for-already-deployed-chains)
 - [Role migration: deploy, edit the JSON, migrate, verify](deploymentConfigs/README.md#role-migration)
 - [Configuration reruns and planned changes](#configuration-reruns)
 - [Safe submission and optional multisig alerts](#multisig-alerts)
@@ -684,5 +689,7 @@ Run `forge test --match-path 'test/unit/portal/oft/PortalOFTWrapper/*.t.sol'`. T
 - For each newly onboarded consumer, run a small-value cross-chain smoke test and retain source/destination receipts; local unit tests are not that rollout evidence.
 
 ## Deployment workflow validation
+
+Evidence for the workflow itself, at the time it was gathered. Not an approval of any chain's desired configuration, not a claim that any chain has been reconciled or migrated, and not a freshness guarantee — re-run the checks rather than citing them.
 
 INT-466 was validated with 962 passing tests across 64 suites, including 156 mainnet-fork integration tests and 64 OFT wrapper tests. A Base fork dry run at block 51,022,201 reached `SIMULATION COMPLETE` without broadcasting. Both beacon addresses were matched to successful CREATE3 receipts on all eight chains and cross-checked with factory reads. No live deployment, Safe proposal or Slack message was sent.
