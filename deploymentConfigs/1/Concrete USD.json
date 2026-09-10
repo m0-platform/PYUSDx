@@ -1,0 +1,27 @@
+{
+  "extensionName": "Concrete USD",
+  "tokenName": "Concrete USD",
+  "tokenSymbol": "ConcUSD",
+  "roles": {
+    "admin": "0x4D6f1603753E05CfDec95F5B6aD25A032722F27e",
+    "assetCapManager": "0x8F5f1d40243b259cEB7aB44bA421Ff191bCD3381",
+    "freezeManager": "0x3Ce96e8c75e44C0bD7542FC1A862fceaF8320413",
+    "pauser": "0x48372AD9a778016349173D5c2F5A6AcC2a083aA9",
+    "versionManager": "0x8F5f1d40243b259cEB7aB44bA421Ff191bCD3381",
+    "yieldRecipient": "0x8F5f1d40243b259cEB7aB44bA421Ff191bCD3381",
+    "yieldRecipientManager": "0x8F5f1d40243b259cEB7aB44bA421Ff191bCD3381"
+  },
+  "assets": [
+    {
+      "symbol": "USDC",
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "cap": 10000000000000
+    },
+    {
+      "symbol": "PYUSD",
+      "address": "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8",
+      "cap": 10000000000000
+    }
+  ],
+  "replaceAssetWhitelist": []
+}
