@@ -128,6 +128,9 @@ deploy-multi-mint-mainnet: deploy-multi-mint
 deploy-multi-mint-arbitrum: CHAIN=arbitrum
 deploy-multi-mint-arbitrum: deploy-multi-mint
 
+deploy-multi-mint-base: CHAIN=base
+deploy-multi-mint-base: deploy-multi-mint
+
 deploy-multi-mint-sepolia: CHAIN=sepolia
 deploy-multi-mint-sepolia: deploy-multi-mint
 
