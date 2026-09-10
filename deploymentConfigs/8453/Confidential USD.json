@@ -1,5 +1,5 @@
 {
-  "extensionName": "CUSD",
+  "extensionName": "Confidential USD",
   "tokenName": "Confidential USD",
   "tokenSymbol": "CUSD",
   "roles": {
@@ -14,7 +14,7 @@
   "assets": [
     {
       "symbol": "USDC",
-      "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       "cap": 100000000000000
     }
   ],
