@@ -133,7 +133,9 @@ Protocol specification PDFs are available in the `docs/` directory.
 
 Operational scripts in `script/` are driven through the `Makefile`. Secrets are injected at run time with the [1Password CLI](https://developer.1password.com/docs/cli/) via `op run --env-file=".env"`, so `.env` can store secret values as `op://` references (e.g. `PRIVATE_KEY="op://vault/item/field"`). Each command selects a network through the `CHAIN` variable, which resolves to a `[rpc_endpoints]` alias in `foundry.toml` and its matching `*_RPC_URL`.
 
-Any deploy, configure or bridge command accepts `DRY_RUN=true`, which simulates against the target chain and sends nothing (e.g. `make configure-portal-sepolia DRY_RUN=true`). The `propose-*` targets never broadcast: they write a Safe batch to `safe/<chainId>-*.json`.
+`deploymentConfigs/<chainId>/protocol.json` supplies roles and settings for deployment and role migration. `deployments/<chainId>.json` records deployed contract addresses. See the [configuration guide](deploymentConfigs/README.md#deployment-configuration).
+
+Any deploy, configure or bridge command accepts `DRY_RUN=true`, which simulates against the target chain and sends nothing (e.g. `make configure-portal-sepolia DRY_RUN=true`). The `propose-*` targets export a Safe batch by default. `SAFE_SUBMIT=true` additionally queues it on the Safe transaction service; `DRY_RUN=true` suppresses submission and alerts.
 
 | Network       | `CHAIN` alias      | Chain ID   | LayerZero EID |
 | ------------- | ------------------ | ---------- | ------------- |
@@ -155,7 +157,7 @@ npm run build
 
 ### Deploy
 
-Deploys the full core stack (PYUSDX, IssuerGateway, SwapFacility, ExtensionBeacon/Factory, Portal, LayerZeroBridgeAdapter) via `script/deploy/DeployAll.s.sol`, reading role and config addresses from `.env`. Artifacts are written to `deployments/<chainId>.json`, which the configure and bridge commands consume.
+Deploys the core suite using `deploymentConfigs/<chainId>/protocol.json` and saves contract addresses to `deployments/<chainId>.json`. For a new chain, copy `deploymentConfigs/example-protocol.json` and set the chain ID, initial role holders and settings.
 
 ```bash
 anvil                 # local only, in a separate shell
@@ -169,7 +171,7 @@ make deploy-monad-testnet
 make deploy-base-sepolia
 ```
 
-Individual extensions have their own targets. `EXTENSION_NAME` is the internal handle recorded in `deployments/<chainId>.json`; MultiMint additionally reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json` ([schema](deploymentConfigs/README.md)).
+Use the full token name for `EXTENSION_NAME` and quote names containing spaces. MultiMint reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json`; see the [schema](deploymentConfigs/README.md).
 
 ```bash
 make deploy-yield-to-one-mainnet EXTENSION_NAME="<name>"
@@ -181,7 +183,7 @@ Swap `-mainnet` for `-arbitrum`, `-sepolia` or `-local`.
 
 ### Configure the Portal
 
-Wires each peer chain on the Portal and LayerZeroBridgeAdapter (peer adapter, bridge chain id, supported/default adapter, payload gas limit). The signer must hold `OPERATOR_ROLE` on the Portal and the adapter. `PEERS` is a Solidity `uint32[]` of remote chain IDs; it defaults per target and can be overridden with `PEERS='[...]'`.
+Configures Portal and LayerZeroBridgeAdapter peers. The signer needs `OPERATOR_ROLE` on both. `PEERS` is an array of remote EVM chain IDs; override the defaults with `PEERS='[...]'`. [Reruns](#configuration-reruns) send only changed settings.
 
 ```bash
 make configure-portal-mainnet     # wires Arbitrum (42161) + Monad (143) + Base (8453) as peers
@@ -195,7 +197,7 @@ Peering is reciprocal: adding a chain means re-running the configure target on e
 
 ### Configure LayerZero security
 
-Applies the LayerZero V2 ULN/DVN `setConfig` for each peer route. The signer must be the adapter's LayerZero delegate.
+Applies LayerZero V2 ULN/DVN settings for each peer route. The signer must be the adapter's LayerZero delegate. [Reruns](#configuration-reruns) send only changed routes.
 
 Routes between Ethereum, Arbitrum and Base pin the LayerZero default stack of `[LayerZero Labs, Google]`. Google runs no DVN on Monad, so every Monad route uses `[LayerZero Labs, Nethermind]` instead; testnet routes use `[LayerZero Labs]` alone.
 
@@ -209,7 +211,7 @@ make configure-lz-adapter-local
 
 ### Propose via Safe multisig
 
-When the Portal/adapter roles are held by a multisig, the `propose-*` variants write a Safe Transaction Builder batch to `safe/<chainId>-*.json` (no broadcast) for import into the Safe UI.
+Use `propose-*` when a Safe holds the required roles. By default, these export `safe/<chainId>-*.json` for import into Safe Transaction Builder. Set `SAFE_SUBMIT=true` to queue the proposal; see [submission and alerts](#multisig-alerts).
 
 ```bash
 make propose-configure-portal-mainnet
@@ -221,6 +223,23 @@ make propose-configure-lz-adapter-arbitrum
 make propose-configure-lz-adapter-monad
 make propose-configure-lz-adapter-base
 ```
+
+### Migrate roles
+
+Update the desired holders in `deploymentConfigs/<chainId>/protocol.json` and list holders to remove in `migration.outgoingHolders`. Review the config diff, then:
+
+```bash
+make migrate-roles-base DRY_RUN=true    # preview for the current signer
+make migrate-roles-base                 # execute that signer's portion
+make verify-roles-base                  # check all remaining work; no key needed
+make propose-migrate-roles-base         # Safe alternative; requires SAFE_MULTISIG
+```
+
+`DRY_RUN=true` still requires a signing key and reverts with `NothingExecutable` if that signer cannot act. Use `verify-roles` for a keyless check.
+
+Each signer executes only the calls they have authority for; other calls are marked `[defer]`. Repeat with the required signers, then verify. After an adapter operator change, the incoming operator must restore the LayerZero delegate.
+
+Verification checks the config, including listed outgoing holders; it cannot discover unlisted role holders. See the [role migration runbook](deploymentConfigs/README.md#role-migration) for scope and ordering. Individual extension instances are outside this migration’s scope.
 
 ### Bridge PYUSDX cross-chain
 
@@ -238,17 +257,54 @@ make bridge-local-to-arbitrum   AMOUNT=1000000
 
 ## CI
 
-GitHub Actions workflows run on push and pull requests:
-
-| Workflow               | Description                                      |
-| ---------------------- | ------------------------------------------------ |
-| `coverage.yml`         | Build + test coverage (reported on PRs via lcov) |
-| `test-gas.yml`         | Gas report (diff reported on PRs)                |
-| `test-fuzz.yml`        | Fuzz tests (10,000 runs)                         |
-| `test-integration.yml` | Integration tests                                |
-| `test-invariant.yml`   | Invariant tests (depth 250)                      |
+Pull requests and pushes to `main` run coverage and gas reports. Standalone fuzz, integration and invariant workflows are disabled (`*.yml.disabled`); their tests remain part of full-suite runs.
 
 Repository secrets required: `MNEMONIC_FOR_TESTS`, `MAINNET_RPC_URL`.
+
+## Configuration reruns
+
+Configure and propose targets send only settings that differ from the chain. An unchanged run sends nothing and writes no Safe batch; don't reuse an older export. Unreadable settings remain in the plan for review.
+
+Use `FORCE_REPLAY=true` to resend every setting. If a bridge-chain mapping conflicts with another peer in the batch, configure the displaced peer separately first. Review the plan for displaced peers outside the batch: their mappings will be cleared.
+
+```bash
+make configure-portal-mainnet FORCE_REPLAY=true
+```
+
+## Multisig alerts
+
+Set `SAFE_MULTISIG` to the Safe holding authority for submission or migration proposals. Offline export is the default; submission also requires `PRIVATE_KEY` and `curl`.
+
+```bash
+make propose-configure-portal-mainnet DRY_RUN=true  # inspect without submitting
+make propose-configure-portal-mainnet SAFE_SUBMIT=true
+```
+
+Set `SLACK_WEBHOOK_URL` through the existing 1Password workflow for optional alerts after acceptance. Use unquoted `true`/`false` for flags in `.env`. `DRY_RUN=true` suppresses submission and alerts.
+
+- Review and sign accepted proposals in Safe; submission does not execute them.
+- If submission times out or is interrupted, check the Safe queue before retrying.
+- If an alert fails, share the proposal's `safeTxHash`; do not resubmit just to retry the alert.
+- Arbitrum Sepolia supports offline export only. Monad Testnet alerts have no signing link.
+
+Submission uses [safe-utils](https://github.com/m0-foundation/safe-utils); alerts use [foundry-slack](https://github.com/m0-platform/foundry-slack).
+
+## Portal OFT wrapper
+
+Deploy a wrapper only when a consumer needs an `IOFT` send interface. Direct Portal integrations and receive-only destinations do not need one. Each represented token needs its own wrapper.
+
+`DeployAll` does not deploy wrappers. Set `PORTAL_OFT_WRAPPER_ADMIN` and `PORTAL_OFT_WRAPPER_OPERATOR`; leave `PORTAL_OFT_WRAPPER_TOKEN` empty for PYUSDX or set it to the extension address.
+
+```bash
+make deploy-portal-oft-wrapper CHAIN=mainnet DRY_RUN=true
+make deploy-portal-oft-wrapper CHAIN=mainnet
+```
+
+Before use, verify the deployed token, Portal, adapter and roles, configure Portal/LayerZero routes, then set each wrapper destination with `setDestinationToken(destinationEid, destinationToken)`. Encode the destination token address as a left-zero-padded `bytes32`, not a wrapper address; the ID is a LayerZero EID, not an EVM chain ID.
+
+Read back routes with `getDestinationToken(eid)`; remove them with `removeDestinationToken(eid)`. Extension wrapper records use token symbols, so check for duplicates before deploying.
+
+Keep wrappers unfrozen: Portal sees the wrapper as the sender. Approve the wrapper, quote the fee, then call `send`. Never transfer tokens directly to it: there is no rescue function. See the [quote/send test](test/unit/portal/oft/PortalOFTWrapper/quoteThenSend.t.sol) for a complete example. Validate each live route with a small transfer before onboarding consumers.
 
 ## License
 
