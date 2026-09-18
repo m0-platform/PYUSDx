@@ -169,7 +169,7 @@ make deploy-monad-testnet
 make deploy-base-sepolia
 ```
 
-Individual extensions have their own targets. `EXTENSION_NAME` is the internal handle recorded in `deployments/<chainId>.json`; MultiMint additionally reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json` ([schema](deploymentConfigs/README.md)).
+Individual extensions have their own targets. `EXTENSION_NAME` is the full token name recorded in `deployments/<chainId>.json`; MultiMint additionally reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json` ([schema](deploymentConfigs/README.md)).
 
 ```bash
 make deploy-yield-to-one-mainnet EXTENSION_NAME="<name>"
@@ -178,6 +178,27 @@ make configure-multi-mint-asset-cap-mainnet EXTENSION_NAME="<name>" ASSET=<addre
 ```
 
 Swap `-mainnet` for `-arbitrum`, `-sepolia` or `-local`.
+
+### Migrate extension roles
+
+Edit the desired `roles` in `deploymentConfigs/<chainId>/<full token name>.json` and add
+`migration.outgoingHolders` listing the previous holders to remove. The token name, `extensionName`,
+filename and `EXTENSION_NAME` must agree. The script resolves the deployed address from the chain's record.
+
+```bash
+make migrate-extension-roles CHAIN=base EXTENSION_NAME="Confidential USD" DRY_RUN=true
+make migrate-extension-roles CHAIN=base EXTENSION_NAME="Confidential USD"
+make verify-extension-roles CHAIN=base EXTENSION_NAME="Confidential USD"
+```
+
+One run grants missing roles, verifies grants, updates the yield recipient, then removes listed old
+holders (executing admin last). Holders still desired keep their roles. Missing signer authority is
+warned and skipped; rerun with an authorized signer to finish. If the recipient cannot be updated,
+old roles stay in place. Failed calls and unreadable state remain errors.
+
+`DRY_RUN=true` simulates; omitting it broadcasts separate transactions. Verification is read-only,
+requires no signing key and fails while work remains. It checks only listed outgoing holders.
+Both MultiMint and YieldToOne are supported. See the [configuration notes](deploymentConfigs/README.md#role-migration).
 
 ### Configure the Portal
 
