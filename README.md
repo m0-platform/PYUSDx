@@ -241,6 +241,19 @@ Each signer executes only the calls they have authority for; other calls are mar
 
 Verification checks the config, including listed outgoing holders; it cannot discover unlisted role holders. See the [role migration runbook](deploymentConfigs/README.md#role-migration) for scope and ordering. Individual extension instances are outside this migration’s scope.
 
+### Migrate extension roles
+
+Set the desired `roles` and `migration.outgoingHolders` in the extension config. Use `[]` to keep existing holders.
+
+```bash
+make migrate-extension-roles CHAIN=base EXTENSION_NAME="My Token" DRY_RUN=true
+make migrate-extension-roles CHAIN=base EXTENSION_NAME="My Token"
+make verify-extension-roles CHAIN=base EXTENSION_NAME="My Token"
+```
+
+Grants and checks new roles, updates the yield recipient, then removes listed old holders.
+Missing authority is warned and skipped. See [configuration](deploymentConfigs/README.md#extension-role-migration).
+
 ### Bridge PYUSDX cross-chain
 
 Bridges PYUSDX through the Portal using the default bridge adapter (`script/execute/Bridge.s.sol`). `AMOUNT` is in base units (6 decimals); `RECIPIENT` is optional and defaults to the signer. The signer must hold the PYUSDX being bridged and enough native gas for the LayerZero fee, which is quoted automatically.

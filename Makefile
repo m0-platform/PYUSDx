@@ -525,3 +525,18 @@ sizes:
 
 clean:
 	forge clean && rm -rf ./abi && rm -rf ./bytecode && rm -rf ./types
+
+# Migrate one recorded extension using its existing JSON and the signer's available authority.
+migrate-extension-roles:
+	$(if $(strip $(EXTENSION_NAME)),,$(error EXTENSION_NAME is required; use the full token name))
+	FOUNDRY_PROFILE=production $(OP_RUN) env \
+	EXTENSION_NAME="$(EXTENSION_NAME)" $(if $(EXTENSION_CONFIG),EXTENSION_CONFIG="$(EXTENSION_CONFIG)") \
+	forge script script/migrate/MigrateExtensionRoles.s.sol:MigrateExtensionRoles \
+	--rpc-url $(CHAIN) --skip test --slow --non-interactive $(EXECUTE_FLAGS)
+
+verify-extension-roles:
+	$(if $(strip $(EXTENSION_NAME)),,$(error EXTENSION_NAME is required; use the full token name))
+	FOUNDRY_PROFILE=production $(OP_RUN) env \
+	EXTENSION_NAME="$(EXTENSION_NAME)" $(if $(EXTENSION_CONFIG),EXTENSION_CONFIG="$(EXTENSION_CONFIG)") \
+	forge script script/migrate/MigrateExtensionRoles.s.sol:MigrateExtensionRoles \
+	--sig "verify()" --rpc-url $(CHAIN) --skip test --non-interactive

@@ -87,6 +87,25 @@ Note: there is no per-extension proxy admin. Extensions are beacon proxies — u
 sits with M0's `ExtensionBeacon`; the client-side lever is `roles.versionManager` (version
 pinning). If a deployment request lists a "Proxy Admin", map that conversation accordingly.
 
+### Extension role migration
+
+Update `roles` in `deploymentConfigs/<chainId>/<full token name>.json` and add:
+
+```json
+"migration": { "outgoingHolders": [] }
+```
+
+Use `[]` to retain existing holders; list addresses to remove their superseded roles.
+The filename, `extensionName`, `tokenName`, and `EXTENSION_NAME` must match.
+MultiMint requires `assetCapManager`; omit it for YieldToOne.
+
+Run `migrate-extension-roles`, then `verify-extension-roles` (see [commands](../README.md#migrate-extension-roles)).
+`DRY_RUN=true` simulates; omitting it broadcasts. Reruns skip completed changes.
+Missing authority is warned and skipped; rerun with an authorized signer.
+Old roles stay if the yield recipient cannot be updated. The executing admin is removed last.
+Changing the yield recipient may pay accrued yield to the previous recipient.
+Verification fails while changes remain and checks only listed outgoing holders.
+
 ## Deployment configuration
 
 ### Protocol configuration
