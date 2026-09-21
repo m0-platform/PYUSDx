@@ -2,7 +2,6 @@
 pragma solidity 0.8.34;
 
 import { IPortal } from "../../../../src/portal/interfaces/IPortal.sol";
-import { PayloadType } from "../../../../src/portal/libraries/PayloadEncoder.sol";
 
 import { MockBridgeAdapter } from "../../../mock/MockBridgeAdapter.sol";
 import { PortalUnitTestBase } from "./PortalUnitTestBase.sol";
@@ -64,9 +63,7 @@ contract QuoteUnitTest is PortalUnitTestBase {
         vm.prank(operator);
         portal.setDefaultBridgeAdapter(newChainId, address(bridgeAdapter));
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IPortal.PayloadGasLimitNotSet.selector, newChainId, PayloadType.TokenTransfer)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IPortal.PayloadGasLimitNotSet.selector, newChainId));
         portal.quote(newChainId);
     }
 
@@ -77,9 +74,7 @@ contract QuoteUnitTest is PortalUnitTestBase {
         vm.prank(operator);
         portal.setSupportedBridgeAdapter(newChainId, address(bridgeAdapter), true);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IPortal.PayloadGasLimitNotSet.selector, newChainId, PayloadType.TokenTransfer)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IPortal.PayloadGasLimitNotSet.selector, newChainId));
         portal.quote(newChainId, address(bridgeAdapter));
     }
 }
