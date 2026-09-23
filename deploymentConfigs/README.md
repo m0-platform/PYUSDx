@@ -32,7 +32,8 @@ deploymentConfigs/<chainid>/<extension-name>.json
 `<extension-name>` is the internal handle passed to the deploy script as `EXTENSION_NAME`. It
 seeds the CREATE3 salt (so it determines the deployed address, deterministically per
 deployer + name) and is the key under which the address is recorded in
-`deployments/<chainid>.json`. It is **not** the on-chain ERC20 name/symbol.
+`deployments/<chainid>.json`. It must equal the ERC20 `tokenName`, not `tokenSymbol`.
+The config's `extensionName` and filename stem must match that same value.
 
 The handle must be unique per chain and is used **verbatim** — casing and whitespace are part
 of the salt, so `concusd` and `Concrete USD` are different extensions at different addresses.
@@ -47,11 +48,11 @@ cap that will go on chain is in this one document.
 
 1. Collect the client's role addresses and initial collateral list (assets + caps) in their
    deployment request.
-2. Add `deploymentConfigs/<chainid>/<name>.json` and open a PR for review.
+2. Add `deploymentConfigs/<chainid>/<full token name>.json` and open a PR for review.
 3. After merge, deploy:
 
    ```bash
-   make deploy-multi-mint-mainnet EXTENSION_NAME="<name>"
+   make deploy-multi-mint-mainnet EXTENSION_NAME="<full token name>"
    ```
 
    The script sets the initial asset caps atomically in the deploy run — the extension is
@@ -63,12 +64,12 @@ cap that will go on chain is in this one document.
 
 ### Schema
 
-See `example.json` for a complete template.
+Copy `example.json` to `<chainid>/<full token name>.json`, setting both `extensionName` and `tokenName` to that name.
 
 | Field                         | Type      | Notes                                                                                                                                                                                   |
 | ----------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `extensionName`               | string    | Must match the file name / `EXTENSION_NAME` (copy-paste guard).                                                                                                                         |
-| `tokenName`                   | string    | On-chain ERC20 name.                                                                                                                                                                    |
+| `extensionName`               | string    | Must equal `tokenName`, `EXTENSION_NAME`, and the config filename stem.                                                                                                                 |
+| `tokenName`                   | string    | On-chain ERC20 name; also used as the extension handle.                                                                                                                                 |
 | `tokenSymbol`                 | string    | On-chain ERC20 symbol.                                                                                                                                                                  |
 | `roles.admin`                 | address   | `DEFAULT_ADMIN_ROLE` — controls all role assignment.                                                                                                                                    |
 | `roles.assetCapManager`       | address   | May add/update/disable collateral asset caps after deploy.                                                                                                                              |
@@ -96,7 +97,7 @@ Update `roles` in `deploymentConfigs/<chainId>/<full token name>.json` and add:
 ```
 
 Use `[]` to retain existing holders; list addresses to remove their superseded roles.
-The filename, `extensionName`, `tokenName`, and `EXTENSION_NAME` must match.
+The filename stem, `extensionName`, `tokenName`, and `EXTENSION_NAME` must match.
 MultiMint requires `assetCapManager`; omit it for YieldToOne.
 
 Run `migrate-extension-roles`, then `verify-extension-roles` (see [commands](../README.md#migrate-extension-roles)).

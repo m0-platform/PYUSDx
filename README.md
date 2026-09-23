@@ -171,12 +171,12 @@ make deploy-monad-testnet
 make deploy-base-sepolia
 ```
 
-Use the full token name for `EXTENSION_NAME` and quote names containing spaces. MultiMint reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json`; see the [schema](deploymentConfigs/README.md).
+`EXTENSION_NAME` is the internal deployment handle and CREATE3 salt input. It must equal the ERC20 token name, as must `extensionName` and the config filename stem. Quote names containing spaces. MultiMint reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json`; see the [schema](deploymentConfigs/README.md).
 
 ```bash
-make deploy-yield-to-one-mainnet EXTENSION_NAME="<name>"
-make deploy-multi-mint-mainnet EXTENSION_NAME="<name>"
-make configure-multi-mint-asset-cap-mainnet EXTENSION_NAME="<name>" ASSET=<address> ASSET_CAP=<amount>
+make deploy-yield-to-one-mainnet EXTENSION_NAME="<full token name>"
+make deploy-multi-mint-mainnet EXTENSION_NAME="<full token name>"
+make configure-multi-mint-asset-cap-mainnet EXTENSION_NAME="<full token name>" ASSET=<address> ASSET_CAP=<amount>
 ```
 
 Swap `-mainnet` for `-arbitrum`, `-sepolia` or `-local`.
