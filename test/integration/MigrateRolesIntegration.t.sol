@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.34;
 
+// JSON fixtures use the quoting selected by Prettier to avoid escaped property names.
+/* solhint-disable quotes */
+
 import { IAccessControl } from "../../lib/evm-m-extensions/lib/common/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 import { Config } from "../../script/Config.sol";
@@ -9,7 +12,6 @@ import { Transaction } from "../../script/libraries/TransactionHelper.sol";
 import {
     MigrationAction,
     MissingDeployment,
-    NoOutgoingHolders,
     NotAContract,
     PortalOFTWrapperNotConfigured,
     UnexpectedWiring,
@@ -114,12 +116,64 @@ contract MigrateRolesIntegrationTests is IntegrationForkTest {
         _adminHolder.planMigration(record, _desiredConfig(), _migrationConfig(), address(_adminHolder));
     }
 
-    function test_planMigration_noOutgoingHolders() public {
+    function test_migrateRoles_emptyOutgoingHoldersRetainsExistingRoles() public {
         Config.MigrationConfig memory migration = _migrationConfig();
-        migration.outgoingHolders = new address[](0);
+        migration.outgoingHolders = _adminHolder
+            .parseMigrationConfig('{"migration":{"outgoingHolders":[]}}')
+            .outgoingHolders;
 
-        vm.expectRevert(NoOutgoingHolders.selector);
-        _adminHolder.planMigration(_record(), _desiredConfig(), migration, address(_adminHolder));
+        _assertMigrationRetainsExistingRoles(migration);
+    }
+
+    function test_migrateRoles_omittedOutgoingHoldersRetainsExistingRoles() public {
+        Config.MigrationConfig memory migration = _migrationConfig();
+        migration.outgoingHolders = _adminHolder.parseMigrationConfig("{}").outgoingHolders;
+
+        _assertMigrationRetainsExistingRoles(migration);
+    }
+
+    function _assertMigrationRetainsExistingRoles(Config.MigrationConfig memory migration) internal {
+        Config.ProtocolConfig memory config = _desiredConfig();
+        MigrationAction[] memory before = _adminHolder.planMigration(
+            _record(),
+            config,
+            migration,
+            address(_adminHolder)
+        );
+
+        for (uint256 i; i < before.length; ++i) {
+            bytes4 selector = bytes4(before[i].planned.transaction.data);
+            assertTrue(selector != IAccessControl.revokeRole.selector);
+            assertTrue(selector != IAccessControl.renounceRole.selector);
+        }
+
+        (uint128 oldCapacity, uint128 oldRefill) = IRateLimiter(_stack.pyusdxProxy).getRateLimitConfig(earnerManager);
+        _runAs(_adminHolder, config, migration);
+        _runAs(_rateHolder, config, migration);
+        _runAs(_newLzOperator, config, migration);
+        _runAs(_adminHolder, config, migration);
+
+        MigrationAction[] memory complete = _adminHolder.planMigration(_record(), config, migration, address(0));
+        assertEq(_adminHolder.outstandingCount(complete), 0);
+        assertEq(_adminHolder.stagedTransactions(complete).length, 0);
+        assertTrue(_hasRole(_stack.pyusdxProxy, 0x00, _newAdmin));
+        assertTrue(_hasRole(_stack.pyusdxProxy, _pyusdx().PAUSER_ROLE(), _newPauser));
+        assertTrue(_hasRole(_stack.pyusdxProxy, 0x00, address(_adminHolder)));
+        assertTrue(_hasRole(_stack.pyusdxProxy, _pyusdx().PAUSER_ROLE(), pauser));
+        assertTrue(_hasRole(_stack.pyusdxProxy, _pyusdx().RATE_LIMIT_MANAGER_ROLE(), address(_rateHolder)));
+        assertTrue(_hasRole(_wrapper, 0x00, address(_adminHolder)));
+        assertTrue(_hasRole(_wrapper, _wrapperOperatorRole(), address(_adminHolder)));
+        (uint128 capacity, uint128 refill) = IRateLimiter(_stack.pyusdxProxy).getRateLimitConfig(earnerManager);
+        assertEq(capacity, oldCapacity);
+        assertEq(refill, oldRefill);
+        assertEq(_pyusdx().earnerManager(), _newEarnerManager);
+        assertEq(_portal().fallbackRecipient(), _newFallbackRecipient);
+        assertEq(_proxyOwner(_stack.pyusdxProxy), _newAdmin);
+        assertEq(_proxyOwner(_wrapper), _newAdmin);
+        assertEq(
+            ILayerZeroEndpointV2(LZ_ENDPOINT).delegates(_stack.layerZeroBridgeAdapterProxy),
+            address(_newLzOperator)
+        );
     }
 
     function test_planMigration_zeroOutgoingHolder() public {
@@ -452,14 +506,14 @@ contract MigrateRolesIntegrationTests is IntegrationForkTest {
         assertEq(migration.portalOFTWrapper.operator, address(0x16));
     }
 
-    /// @dev Keep the missing-block safety check independent of mutable deployed-chain configs.
+    /// @dev Omitting outgoing holders does not waive the deployed wrapper's target config.
     function test_parseMigrationConfig_configWithoutMigrationBlocks() public {
         Config.MigrationConfig memory migration = _adminHolder.parseMigrationConfig("{}");
 
         assertEq(migration.outgoingHolders.length, 0);
         assertFalse(migration.hasPortalOFTWrapper);
 
-        vm.expectRevert(NoOutgoingHolders.selector);
+        vm.expectRevert(abi.encodeWithSelector(PortalOFTWrapperNotConfigured.selector, _wrapper));
         _adminHolder.planMigration(_record(), _desiredConfig(), migration, address(_adminHolder));
     }
 

@@ -309,16 +309,22 @@ A dry run still needs the signer key and reports only what that signer can execu
 #### Two migration-only blocks
 
 `DeployAll` reads its keys one at a time and ignores everything else, so both blocks are optional for a
-deploy and a config written before them still deploys unchanged. The migration scripts require the
-first one.
+deploy and a config written before them still deploys unchanged. The outgoing-holder list is also
+optional for migration; the wrapper block is required when a wrapper is deployed.
 
-| Field                       | Type      | Notes                                                                               |
-| --------------------------- | --------- | ----------------------------------------------------------------------------------- |
-| `migration.outgoingHolders` | address[] | The holders being migrated away from. Required, non-empty, no zero entries.         |
-| `portalOFTWrapper.admin`    | address   | Required only when `deployments/<chainId>.json` records a `pyusdxPortalOFTWrapper`. |
-| `portalOFTWrapper.operator` | address   | Same.                                                                               |
+| Field                       | Type      | Notes                                                                                                                   |
+| --------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `migration.outgoingHolders` | address[] | Optional holders to remove superseded roles/buckets from. Omit or use `[]` to retain existing holders; no zero entries. |
+| `portalOFTWrapper.admin`    | address   | Required only when `deployments/<chainId>.json` records a `pyusdxPortalOFTWrapper`.                                     |
+| `portalOFTWrapper.operator` | address   | Same.                                                                                                                   |
 
-List known former/current holders explicitly: AccessControl is not enumerable and these scripts do
+With no outgoing holders, migration grants the target roles without revoking existing roles or
+retiring old buckets. It still applies the configured ProxyAdmin owners, earner manager and incoming
+bucket, fallback recipient, and LayerZero delegate. Verification checks that configured end state;
+it does not assert exclusive role ownership. Add outgoing holders in a later migration to remove
+their superseded roles and buckets.
+
+To remove holders, list known former/current holders explicitly: AccessControl is not enumerable and these scripts do
 not scan role logs. Each listed address is checked against every migrated role, retaining roles for
 which it remains the configured target. Superseded earner buckets are retired, but current issuers
 keep theirs; unreadable issuer membership aborts planning.

@@ -226,7 +226,7 @@ make propose-configure-lz-adapter-base
 
 ### Migrate roles
 
-Update the desired holders in `deploymentConfigs/<chainId>/protocol.json` and list holders to remove in `migration.outgoingHolders`. Review the config diff, then:
+Update the desired holders in `deploymentConfigs/<chainId>/protocol.json` and list holders to remove in `migration.outgoingHolders`. Omit that field or use `[]` to retain existing roles and buckets; ownership and single-address settings still move to their configured targets. Review the config diff, then:
 
 ```bash
 make migrate-roles-base DRY_RUN=true    # preview for the current signer

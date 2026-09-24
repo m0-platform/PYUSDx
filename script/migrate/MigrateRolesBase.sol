@@ -53,12 +53,6 @@ error MissingDeployment(string name);
 /// @notice Thrown when a recorded address holds no code on the target chain.
 error NotAContract(string name, address target);
 
-/// @notice Thrown when the config names no outgoing holders.
-/// @dev    `AccessControl` here is not enumerable and these scripts do not scan historical logs,
-///         so the addresses being migrated away from must be supplied explicitly. An empty list
-///         would silently migrate nothing away, which is the failure this refuses to ship.
-error NoOutgoingHolders();
-
 /// @notice Thrown when `migration.outgoingHolders` carries a zero address.
 error ZeroOutgoingHolder(uint256 index);
 
@@ -226,8 +220,6 @@ abstract contract MigrateRolesBase is ScriptBase {
     }
 
     function _revertIfInvalidMigration(Config.MigrationConfig memory migration) private pure {
-        if (migration.outgoingHolders.length == 0) revert NoOutgoingHolders();
-
         for (uint256 i; i < migration.outgoingHolders.length; ++i) {
             if (migration.outgoingHolders[i] == address(0)) revert ZeroOutgoingHolder(i);
         }
@@ -893,7 +885,8 @@ abstract contract MigrateRolesBase is ScriptBase {
     /* ============ Config ============ */
 
     /// @dev The migration-only blocks. Read separately from `_parseProtocolConfig` so a config that
-    ///      predates them still deploys, and so `DeployAll` never depends on them.
+    ///      predates them still deploys, and so `DeployAll` never depends on them. Missing or empty
+    ///      outgoing holders retain existing roles and buckets; singleton and ownership targets still apply.
     function _parseMigrationConfig(string memory json) internal view returns (Config.MigrationConfig memory migration) {
         migration.outgoingHolders = vm.keyExistsJson(json, ".migration.outgoingHolders")
             ? vm.parseJsonAddressArray(json, ".migration.outgoingHolders")
