@@ -35,6 +35,27 @@ contract CoreDeployer is DeployBase {
                 layerZeroBridgeAdapterConfig_
             );
     }
+
+    /// @notice Exposes DeployBase._deployPortalOFTWrapper() externally, for the same reason.
+    /// @dev    The wrapper is deployed separately from the core suite in production
+    ///         (`DeployPortalOFTWrapper.s.sol`), so it is a separate call here too.
+    function deployPortalOFTWrapper(
+        address portalProxy_,
+        address token_,
+        address layerZeroBridgeAdapterProxy_,
+        string memory saltSuffix_,
+        PortalOFTWrapperConfig memory config_
+    ) external returns (address proxy, address proxyAdmin, address implementation) {
+        return
+            _deployPortalOFTWrapper(
+                address(this),
+                portalProxy_,
+                token_,
+                layerZeroBridgeAdapterProxy_,
+                saltSuffix_,
+                config_
+            );
+    }
 }
 
 /// @title IntegrationForkTest

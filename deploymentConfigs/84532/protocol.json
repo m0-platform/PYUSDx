@@ -1,0 +1,54 @@
+{
+  "chainId": 84532,
+  "pyusdx": {
+    "name": "PYUSDx",
+    "symbol": "PYUSDx",
+    "admin": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "pauser": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "freezeManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "forcedTransferManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "earnerManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "rateManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "earnerManagerRateLimit": {
+      "capacity": 5000000000000,
+      "refillPerSecond": 2500000000
+    }
+  },
+  "issuerGateway": {
+    "admin": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "operator": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "executor": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "mintDelay": 300,
+    "mintTTL": 10800,
+    "rateLimit": {
+      "capacity": 25000000000000,
+      "refillPerSecond": 12500000000
+    }
+  },
+  "swapFacility": {
+    "admin": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "pauser": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"
+  },
+  "extensionFactory": {
+    "admin": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "factoryManager": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"
+  },
+  "portal": {
+    "admin": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "pauser": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "operator": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "fallbackRecipient": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "rateLimit": {
+      "capacity": 10000000000000,
+      "refillPerSecond": 5000000000
+    }
+  },
+  "layerZeroBridgeAdapter": {
+    "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+    "admin": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "operator": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"
+  },
+  "migration": {
+    "outgoingHolders": ["0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"]
+  }
+}

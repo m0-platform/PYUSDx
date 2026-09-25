@@ -5,28 +5,32 @@ import { console } from "../../lib/forge-std/src/console.sol";
 
 import { DeployBase } from "./DeployBase.s.sol";
 
+/// @title  DeployAll
+/// @notice Deploys the full PYUSDX core stack (PYUSDX, IssuerGateway, SwapFacility, both extension
+///         beacons, ExtensionFactory, Portal, LayerZeroBridgeAdapter) and records the resulting
+///         addresses in `deployments/<chainid>.json`.
+/// @dev    Protocol configuration is read from `deploymentConfigs/<chainid>/protocol.json` (schema in
+///         deploymentConfigs/README.md), overridable via PROTOCOL_CONFIG. PRIVATE_KEY stays in the
+///         secret workflow (`op run`) and is the only credential read directly by this entry point.
 contract DeployAll is DeployBase {
     function run() public {
         address deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
         console.log("Deployer:", deployer);
 
-        PYUSDXConfig memory pyusdxConfig = _loadPYUSDXConfig();
-        IssuerGatewayConfig memory issuerGatewayConfig = _loadIssuerGatewayConfig();
-        SwapFacilityConfig memory swapConfig = _loadSwapFacilityConfig();
-        FactoryConfig memory factoryConfig = _loadFactoryConfig();
-        PortalConfig memory portalConfig = _loadPortalConfig();
-        LayerZeroBridgeAdapterConfig memory layerZeroBridgeAdapterConfig = _loadLayerZeroBridgeAdapterConfig();
+        ProtocolConfig memory config = _readProtocolConfig(block.chainid);
+
+        _logProtocolConfig(config);
 
         vm.startBroadcast(deployer);
 
         CoreDeployments memory deployment = _deployCore(
             deployer,
-            pyusdxConfig,
-            issuerGatewayConfig,
-            swapConfig,
-            factoryConfig,
-            portalConfig,
-            layerZeroBridgeAdapterConfig
+            config.pyusdx,
+            config.issuerGateway,
+            config.swapFacility,
+            config.extensionFactory,
+            config.portal,
+            config.layerZeroBridgeAdapter
         );
 
         vm.stopBroadcast();
@@ -64,56 +68,60 @@ contract DeployAll is DeployBase {
         _writeDeployment(block.chainid, "extensionFactory", deployment.factoryProxy);
         _writeDeployment(block.chainid, "portal", deployment.portalProxy);
         _writeDeployment(block.chainid, "layerZeroBridgeAdapter", deployment.layerZeroBridgeAdapterProxy);
+        _writeDeployment(block.chainid, "yieldToOneBeacon", deployment.yieldToOneBeaconProxy);
+        _writeDeployment(block.chainid, "multiMintBeacon", deployment.multiMintBeaconProxy);
     }
 
-    function _loadPYUSDXConfig() private view returns (PYUSDXConfig memory config) {
-        config.name = vm.envString("PYUSDX_NAME");
-        require(bytes(config.name).length != 0, "PYUSDX_NAME must be set");
-        config.symbol = vm.envString("PYUSDX_SYMBOL");
-        require(bytes(config.symbol).length != 0, "PYUSDX_SYMBOL must be set");
-        config.admin = vm.envAddress("PYUSDX_ADMIN");
-        config.pauser = vm.envAddress("PYUSDX_PAUSER");
-        config.freezeManager = vm.envAddress("PYUSDX_FREEZE_MANAGER");
-        config.forcedTransferManager = vm.envAddress("PYUSDX_FORCED_TRANSFER_MANAGER");
-        config.earnerManager = vm.envAddress("PYUSDX_EARNER_MANAGER");
-        config.rateManager = vm.envAddress("PYUSDX_RATE_MANAGER");
-        config.earnerManagerRateLimitCapacity = uint128(vm.envUint("PYUSDX_EARNER_MANAGER_RATE_LIMIT_CAPACITY"));
-        config.earnerManagerRateLimitRefillPerSecond = uint128(vm.envUint("PYUSDX_EARNER_MANAGER_RATE_LIMIT_REFILL"));
-    }
+    /* ============ Logging ============ */
 
-    function _loadIssuerGatewayConfig() private view returns (IssuerGatewayConfig memory config) {
-        config.admin = vm.envAddress("ISSUER_GATEWAY_ADMIN");
-        config.operator = vm.envAddress("ISSUER_GATEWAY_OPERATOR");
-        config.executor = vm.envAddress("ISSUER_GATEWAY_EXECUTOR");
-        config.mintDelay = uint32(vm.envUint("ISSUER_GATEWAY_MINT_DELAY"));
-        config.mintTTL = uint32(vm.envUint("ISSUER_GATEWAY_MINT_TTL"));
-        config.rateLimitCapacity = uint128(vm.envUint("ISSUER_GATEWAY_RATE_LIMIT_CAPACITY"));
-        config.rateLimitRefillPerSecond = uint128(vm.envUint("ISSUER_GATEWAY_RATE_LIMIT_REFILL"));
-    }
-
-    function _loadSwapFacilityConfig() private view returns (SwapFacilityConfig memory config) {
-        config.admin = vm.envAddress("SWAP_FACILITY_ADMIN");
-        config.pauser = vm.envAddress("SWAP_FACILITY_PAUSER");
-    }
-
-    function _loadFactoryConfig() private view returns (FactoryConfig memory config) {
-        config.admin = vm.envAddress("FACTORY_ADMIN");
-        config.factoryManager = vm.envAddress("FACTORY_MANAGER");
-    }
-
-    function _loadPortalConfig() private view returns (PortalConfig memory config) {
-        config.admin = vm.envAddress("PORTAL_ADMIN");
-        config.pauser = vm.envAddress("PORTAL_PAUSER");
-        config.operator = vm.envAddress("PORTAL_OPERATOR");
-        config.fallbackRecipient = vm.envAddress("PORTAL_FALLBACK_RECIPIENT");
-        require(config.fallbackRecipient != address(0), "PORTAL_FALLBACK_RECIPIENT must be set");
-        config.rateLimitCapacity = uint128(vm.envUint("PORTAL_RATE_LIMIT_CAPACITY"));
-        config.rateLimitRefillPerSecond = uint128(vm.envUint("PORTAL_RATE_LIMIT_REFILL"));
-    }
-
-    function _loadLayerZeroBridgeAdapterConfig() private view returns (LayerZeroBridgeAdapterConfig memory config) {
-        config.lzEndpoint = vm.envAddress("LAYER_ZERO_ENDPOINT");
-        config.admin = vm.envAddress("LAYER_ZERO_BRIDGE_ADAPTER_ADMIN");
-        config.operator = vm.envAddress("LAYER_ZERO_BRIDGE_ADAPTER_OPERATOR");
+    /// @dev Echoes every deployment input so a dry run shows exactly what a broadcast would use.
+    function _logProtocolConfig(ProtocolConfig memory config) internal pure {
+        console.log("---------------------------- protocol config ----------------------------");
+        console.log("PYUSDX name / symbol:              ", config.pyusdx.name, "/", config.pyusdx.symbol);
+        console.log("PYUSDX admin:                      ", config.pyusdx.admin);
+        console.log("PYUSDX pauser:                     ", config.pyusdx.pauser);
+        console.log("PYUSDX freezeManager:              ", config.pyusdx.freezeManager);
+        console.log("PYUSDX forcedTransferManager:      ", config.pyusdx.forcedTransferManager);
+        console.log("PYUSDX earnerManager:              ", config.pyusdx.earnerManager);
+        console.log("PYUSDX rateManager:                ", config.pyusdx.rateManager);
+        console.log(
+            "PYUSDX earnerManager rate limit:   ",
+            config.pyusdx.earnerManagerRateLimitCapacity,
+            "@",
+            config.pyusdx.earnerManagerRateLimitRefillPerSecond
+        );
+        console.log("IssuerGateway admin:               ", config.issuerGateway.admin);
+        console.log("IssuerGateway operator:            ", config.issuerGateway.operator);
+        console.log("IssuerGateway executor:            ", config.issuerGateway.executor);
+        console.log(
+            "IssuerGateway mintDelay / mintTTL: ",
+            config.issuerGateway.mintDelay,
+            "/",
+            config.issuerGateway.mintTTL
+        );
+        console.log(
+            "IssuerGateway rate limit:          ",
+            config.issuerGateway.rateLimitCapacity,
+            "@",
+            config.issuerGateway.rateLimitRefillPerSecond
+        );
+        console.log("SwapFacility admin:                ", config.swapFacility.admin);
+        console.log("SwapFacility pauser:               ", config.swapFacility.pauser);
+        console.log("ExtensionFactory admin:            ", config.extensionFactory.admin);
+        console.log("ExtensionFactory factoryManager:   ", config.extensionFactory.factoryManager);
+        console.log("Portal admin:                      ", config.portal.admin);
+        console.log("Portal pauser:                     ", config.portal.pauser);
+        console.log("Portal operator:                   ", config.portal.operator);
+        console.log("Portal fallbackRecipient:          ", config.portal.fallbackRecipient);
+        console.log(
+            "Portal rate limit:                 ",
+            config.portal.rateLimitCapacity,
+            "@",
+            config.portal.rateLimitRefillPerSecond
+        );
+        console.log("LayerZero endpoint:                ", config.layerZeroBridgeAdapter.lzEndpoint);
+        console.log("LayerZeroBridgeAdapter admin:      ", config.layerZeroBridgeAdapter.admin);
+        console.log("LayerZeroBridgeAdapter operator:   ", config.layerZeroBridgeAdapter.operator);
+        console.log("-------------------------------------------------------------------------");
     }
 }

@@ -87,4 +87,27 @@ contract Config {
         address admin;
         address operator;
     }
+
+    /// @dev Aggregate of the per-contract config structs above, as laid out in
+    ///      `deploymentConfigs/<chainId>/protocol.json`. Loaded by `ScriptBase._parseProtocolConfig`.
+    struct ProtocolConfig {
+        PYUSDXConfig pyusdx;
+        IssuerGatewayConfig issuerGateway;
+        SwapFacilityConfig swapFacility;
+        FactoryConfig extensionFactory;
+        PortalConfig portal;
+        LayerZeroBridgeAdapterConfig layerZeroBridgeAdapter;
+    }
+
+    /// @dev The `migration` and `portalOFTWrapper` blocks of the same file. Both are read only by the
+    ///      role-migration scripts: `DeployAll` reads its keys one by one and therefore ignores them,
+    ///      which is what keeps the checked-in configs valid for a deploy that predates either block.
+    struct MigrationConfig {
+        /// @dev The role holders being migrated away from. Explicit because `AccessControl` here is
+        ///      not enumerable, so the chain cannot be asked who currently holds a role.
+        address[] outgoingHolders;
+        PortalOFTWrapperConfig portalOFTWrapper;
+        /// @dev False when the file carries no `portalOFTWrapper` block at all.
+        bool hasPortalOFTWrapper;
+    }
 }

@@ -1,0 +1,58 @@
+{
+  "chainId": 1,
+  "pyusdx": {
+    "name": "PYUSDx",
+    "symbol": "PYUSDx",
+    "admin": "0x314160525f5eA6677D3908112fF9Bd885F3BB78e",
+    "pauser": "0x314160525f5eA6677D3908112fF9Bd885F3BB78e",
+    "freezeManager": "0x314160525f5eA6677D3908112fF9Bd885F3BB78e",
+    "forcedTransferManager": "0x314160525f5eA6677D3908112fF9Bd885F3BB78e",
+    "earnerManager": "0x314160525f5eA6677D3908112fF9Bd885F3BB78e",
+    "rateManager": "0x314160525f5eA6677D3908112fF9Bd885F3BB78e",
+    "earnerManagerRateLimit": {
+      "capacity": 5000000000000,
+      "refillPerSecond": 2500000000
+    }
+  },
+  "issuerGateway": {
+    "admin": "0x314160525f5eA6677D3908112fF9Bd885F3BB78e",
+    "operator": "0x6017927a1375cE8962116ecDa22ACda4A345403A",
+    "executor": "0x6017927a1375cE8962116ecDa22ACda4A345403A",
+    "mintDelay": 300,
+    "mintTTL": 10800,
+    "rateLimit": {
+      "capacity": 25000000000000,
+      "refillPerSecond": 12500000000
+    }
+  },
+  "swapFacility": {
+    "admin": "0x48670B46380FE1645f0E3e821a25162dB2589D19",
+    "pauser": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"
+  },
+  "extensionFactory": {
+    "admin": "0x48670B46380FE1645f0E3e821a25162dB2589D19",
+    "factoryManager": "0x48670B46380FE1645f0E3e821a25162dB2589D19"
+  },
+  "portal": {
+    "admin": "0x48670B46380FE1645f0E3e821a25162dB2589D19",
+    "pauser": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "operator": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "fallbackRecipient": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB",
+    "rateLimit": {
+      "capacity": 10000000000000,
+      "refillPerSecond": 5000000000
+    }
+  },
+  "layerZeroBridgeAdapter": {
+    "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+    "admin": "0x48670B46380FE1645f0E3e821a25162dB2589D19",
+    "operator": "0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"
+  },
+  "portalOFTWrapper": {
+    "admin": "0x48670B46380FE1645f0E3e821a25162dB2589D19",
+    "operator": "0x48670B46380FE1645f0E3e821a25162dB2589D19"
+  },
+  "migration": {
+    "outgoingHolders": ["0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB"]
+  }
+}
