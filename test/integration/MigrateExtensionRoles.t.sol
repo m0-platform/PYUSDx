@@ -58,7 +58,9 @@ contract ExtensionMigrationTests is IntegrationForkTest {
     function test_outgoingListMustStillBeExplicit() public {
         _deploy(true);
         _inputs(vm.replace(_json(), "outgoingHolders", "omittedOutgoingHolders"));
-        vm.expectRevert();
+        vm.expectRevert(
+            bytes('vm.parseJsonAddressArray: path ".migration.outgoingHolders" must return exactly one JSON value')
+        );
         _migration.run();
     }
 
@@ -136,6 +138,45 @@ contract ExtensionMigrationTests is IntegrationForkTest {
         );
         _complete();
         assertFalse(IAccessControl(_extension).hasRole(0, other));
+    }
+
+    /// @notice Regression: the executing admin leaves last through `renounceRole`, as the suite
+    ///         migration does, rather than revoking itself through its own admin authority.
+    function test_executingAdminRenouncesLast() public {
+        _deploy(false);
+        vm.expectCall(_extension, abi.encodeCall(IAccessControl.renounceRole, (bytes32(0), _old)), 1);
+        vm.expectCall(_extension, abi.encodeCall(IAccessControl.revokeRole, (bytes32(0), _old)), 0);
+        _complete();
+    }
+
+    /// @notice Regression: a signer without admin authority skips another outgoing holder it cannot
+    ///         revoke, and still retires its own role once the incoming holder has it.
+    function test_nonAdminSignerRenouncesAfterOtherOutgoingHolder() public {
+        (address holder, bytes32 pauserRole) = _nonAdminPauser(true, true);
+        _inputs(_withOutgoing(string.concat('["', vm.toString(_old), '","', vm.toString(holder), '"]')));
+        _migration.run();
+        assertFalse(IAccessControl(_extension).hasRole(pauserRole, holder), "signer must renounce its own role");
+        assertTrue(IAccessControl(_extension).hasRole(pauserRole, _old), "unauthorized revoke must be skipped");
+        assertTrue(IAccessControl(_extension).hasRole(pauserRole, _next));
+    }
+
+    /// @notice A non-admin signer cannot grant its replacement, so it keeps its role until the
+    ///         incoming holder has been granted it.
+    function test_nonAdminSignerRetainsRoleWithoutIncomingHolder() public {
+        (address holder, bytes32 pauserRole) = _nonAdminPauser(false, true);
+        _inputs(_withOutgoing(string.concat('["', vm.toString(holder), '"]')));
+        _migration.run();
+        assertTrue(IAccessControl(_extension).hasRole(pauserRole, holder), "signer must keep an unreplaced role");
+        assertFalse(IAccessControl(_extension).hasRole(pauserRole, _next));
+    }
+
+    /// @notice No role is removed while the yield recipient still has to change.
+    function test_nonAdminSignerRetainsRoleWhileYieldRecipientPending() public {
+        (address holder, bytes32 pauserRole) = _nonAdminPauser(true, false);
+        _inputs(_withOutgoing(string.concat('["', vm.toString(holder), '"]')));
+        _migration.run();
+        assertTrue(IAccessControl(_extension).hasRole(pauserRole, holder), "signer must wait for the yield recipient");
+        assertEq(IYieldToOne(_extension).yieldRecipient(), _old);
     }
 
     function test_holderStillDesiredKeepsRole() public {
@@ -266,6 +307,26 @@ contract ExtensionMigrationTests is IntegrationForkTest {
         );
         vm.expectRevert(bytes("extension not registered"));
         _migration.run();
+    }
+
+    /// @dev A signer holding only the pauser role; `_old` keeps every role, including admin.
+    function _nonAdminPauser(bool incomingGranted, bool recipientSet) private returns (address holder, bytes32 role) {
+        _deploy(false);
+        uint256 key;
+        (holder, key) = makeAddrAndKey("nonAdminPauser");
+        role = IPausable(_extension).PAUSER_ROLE();
+        vm.startPrank(_old);
+
+        IAccessControl(_extension).grantRole(role, holder);
+        if (incomingGranted) IAccessControl(_extension).grantRole(role, _next);
+        if (recipientSet) IYieldToOne(_extension).setYieldRecipient(_recipient);
+
+        vm.stopPrank();
+        _migration.signer(key);
+    }
+
+    function _withOutgoing(string memory outgoing) private view returns (string memory) {
+        return vm.replace(_json(), string.concat('["', vm.toString(_old), '"]'), outgoing);
     }
 
     function _inputs(string memory json) private {

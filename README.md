@@ -171,6 +171,9 @@ make deploy-monad-testnet
 make deploy-base-sepolia
 ```
 
+`deploy-local` defaults to `deploymentConfigs/example-protocol.json`. Replace its placeholder
+addresses for your local setup, or pass `PROTOCOL_CONFIG="<path>"` to use your own config.
+
 `EXTENSION_NAME` is the internal deployment handle and CREATE3 salt input. It must equal the ERC20 token name, as must `extensionName` and the config filename stem. Quote names containing spaces. MultiMint reads roles and asset caps from `deploymentConfigs/<chainId>/<EXTENSION_NAME>.json`; see the [schema](deploymentConfigs/README.md).
 
 ```bash

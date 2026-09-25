@@ -75,14 +75,29 @@ contract MigrateExtensionRoles is ScriptBase {
             for (uint256 j; j < migration.outgoing.length; ++j) {
                 address old = migration.outgoing[j];
                 if (old == desired.holder || !access.hasRole(desired.role, old)) continue;
-                if (!_hasAuthority(access, access.getRoleAdmin(desired.role), signer)) break;
+                // Self-removal needs no authority, so it is decided before the admin check.
+                if (old == signer) {
+                    removeSelf = true;
+                    continue;
+                }
+                if (!_hasAuthority(access, access.getRoleAdmin(desired.role), signer)) continue;
                 _requireRole(access, desired.role, desired.holder);
-                if (old == signer) removeSelf = true;
-                else access.revokeRole(desired.role, old);
+                access.revokeRole(desired.role, old);
             }
-            // Other admins must leave before the signer, regardless of outgoing-list order.
-            if (removeSelf) access.revokeRole(desired.role, signer);
+            // Process other holders before the signer, regardless of outgoing-list order.
+            if (removeSelf) _renounceIfReplaced(access, desired, signer);
         }
+    }
+
+    /// @dev Same self-removal call as the suite migration's `_pushRevoke`: OpenZeppelin only lets an
+    ///      account renounce for itself, and `revokeRole` would demand an admin role it may not hold.
+    function _renounceIfReplaced(IAccessControl access, RoleTarget memory desired, address signer) private {
+        if (!access.hasRole(desired.role, desired.holder)) {
+            console.log("WARNING: keeping signer role until the incoming holder has it:", desired.holder);
+            console.logBytes32(desired.role);
+            return;
+        }
+        access.renounceRole(desired.role, signer);
     }
 
     function _hasAuthority(IAccessControl access, bytes32 role, address signer) private view returns (bool) {

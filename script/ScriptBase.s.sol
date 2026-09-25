@@ -10,8 +10,8 @@ import { VmSafe } from "../lib/forge-std/src/Vm.sol";
 contract ScriptBase is Script, Config {
     /// @dev Fields MUST be in alphabetical order: `vm.writeJson` emits object keys sorted, so keeping
     ///      the struct in the same order keeps the record and the struct visually aligned.
-    ///      `_readDeployment` reads key by key rather than `abi.decode`-ing the whole object, so a
-    ///      record written before a field existed still loads (the missing field reads as address(0)).
+    ///      An existing record must carry every key `_writeDeployment` emits; a contract that is not
+    ///      deployed yet is recorded as an explicit address(0), never as an absent key.
     struct Deployments {
         address[] extensionAddresses;
         address extensionFactory;
@@ -179,6 +179,9 @@ contract ScriptBase is Script, Config {
         return keccak256(bytes(key_)) == keccak256(bytes(field_)) ? value_ : current_;
     }
 
+    /// @dev A missing file is a chain that has never been deployed and reads as empty, so the first
+    ///      write can create it. A file that exists is parsed strictly: a missing key reverts rather
+    ///      than reading as address(0), so an incomplete record cannot be silently rewritten.
     function _readDeployment(uint256 chainId_) internal view returns (Deployments memory deployments_) {
         string memory path = _deployOutputPath(chainId_);
 
@@ -186,33 +189,23 @@ contract ScriptBase is Script, Config {
 
         string memory json = vm.readFile(path);
 
-        deployments_.extensionAddresses = vm.keyExistsJson(json, ".extensionAddresses")
-            ? vm.parseJsonAddressArray(json, ".extensionAddresses")
-            : new address[](0);
-
-        deployments_.extensionNames = vm.keyExistsJson(json, ".extensionNames")
-            ? vm.parseJsonStringArray(json, ".extensionNames")
-            : new string[](0);
+        deployments_.extensionAddresses = vm.parseJsonAddressArray(json, ".extensionAddresses");
+        deployments_.extensionNames = vm.parseJsonStringArray(json, ".extensionNames");
 
         require(
             deployments_.extensionNames.length == deployments_.extensionAddresses.length,
             "deployment record: extension names/addresses length mismatch"
         );
 
-        deployments_.extensionFactory = _readAddress(json, ".extensionFactory");
-        deployments_.issuerGateway = _readAddress(json, ".issuerGateway");
-        deployments_.layerZeroBridgeAdapter = _readAddress(json, ".layerZeroBridgeAdapter");
-        deployments_.multiMintBeacon = _readAddress(json, ".multiMintBeacon");
-        deployments_.portal = _readAddress(json, ".portal");
-        deployments_.pyusdx = _readAddress(json, ".pyusdx");
-        deployments_.pyusdxPortalOFTWrapper = _readAddress(json, ".pyusdxPortalOFTWrapper");
-        deployments_.swapFacility = _readAddress(json, ".swapFacility");
-        deployments_.yieldToOneBeacon = _readAddress(json, ".yieldToOneBeacon");
-    }
-
-    /// @dev Missing keys read as address(0) so records written before a field existed still load.
-    function _readAddress(string memory json_, string memory key_) private view returns (address) {
-        return vm.keyExistsJson(json_, key_) ? vm.parseJsonAddress(json_, key_) : address(0);
+        deployments_.extensionFactory = vm.parseJsonAddress(json, ".extensionFactory");
+        deployments_.issuerGateway = vm.parseJsonAddress(json, ".issuerGateway");
+        deployments_.layerZeroBridgeAdapter = vm.parseJsonAddress(json, ".layerZeroBridgeAdapter");
+        deployments_.multiMintBeacon = vm.parseJsonAddress(json, ".multiMintBeacon");
+        deployments_.portal = vm.parseJsonAddress(json, ".portal");
+        deployments_.pyusdx = vm.parseJsonAddress(json, ".pyusdx");
+        deployments_.pyusdxPortalOFTWrapper = vm.parseJsonAddress(json, ".pyusdxPortalOFTWrapper");
+        deployments_.swapFacility = vm.parseJsonAddress(json, ".swapFacility");
+        deployments_.yieldToOneBeacon = vm.parseJsonAddress(json, ".yieldToOneBeacon");
     }
 
     function _getPYUSDX() internal view returns (address) {

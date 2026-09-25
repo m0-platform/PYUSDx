@@ -1,8 +1,8 @@
 [profile.default]
+# Safe.sol imports these aliases transitively. Pin them to the top-level safe-utils dependency.
 remappings = [
     "safe-smart-account/=lib/safe-utils/lib/safe-smart-account/contracts/",
     "solidity-http/=lib/safe-utils/lib/solidity-http/src/",
-    "solidity-stringutils/=lib/safe-utils/lib/solidity-stringutils/src/",
 ]
 evm_version = "cancun"
 fs_permissions = [

@@ -187,7 +187,7 @@ contract DeployMultiMintIntegrationTests is IntegrationForkTest {
 
     /// @notice Keeps `deploymentConfigs/example.json` in sync with the schema the script expects.
     function test_parseConfig_exampleTemplate() public view {
-        Config.MultiMintConfig memory config_ = scriptDeployer.parseMultiMintConfig(_exampleJson(), "example");
+        Config.MultiMintConfig memory config_ = scriptDeployer.parseMultiMintConfig(_exampleJson(), "Example USD");
 
         assertEq(config_.name, "Example USD");
         assertEq(config_.symbol, "exUSD");
@@ -216,9 +216,9 @@ contract DeployMultiMintIntegrationTests is IntegrationForkTest {
     }
 
     function test_deployMultiMint_fromExampleConfigFile() public {
-        Config.MultiMintConfig memory config_ = scriptDeployer.parseMultiMintConfig(_exampleJson(), "example");
+        Config.MultiMintConfig memory config_ = scriptDeployer.parseMultiMintConfig(_exampleJson(), "Example USD");
 
-        (address proxy, ) = scriptDeployer.deployMultiMintWith(address(factory), "example", config_);
+        (address proxy, ) = scriptDeployer.deployMultiMintWith(address(factory), "Example USD", config_);
 
         scriptDeployer.verifyMultiMintDeployment(address(factory), proxy, config_);
         assertTrue(swapFacility.isApprovedExtension(proxy));

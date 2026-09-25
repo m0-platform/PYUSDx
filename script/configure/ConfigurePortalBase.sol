@@ -27,6 +27,11 @@ error PeerAdapterNotDeployed(uint32 peerChainId);
 ///         configure the displaced holder first in a separate run, then the claiming peer.
 error ConflictingBridgeChainId(uint32 peerChainId, uint32 conflictingChainId, uint256 bridgeChainId);
 
+/// @notice Thrown when the adapter's current holder of a bridge chain ID cannot be read back.
+/// @dev    That holder decides whether `setBridgeChainId` would strip another peer, so an unreadable
+///         holder aborts planning instead of being assumed unheld.
+error BridgeChainIdHolderUnreadable(uint32 peerChainId, uint256 bridgeChainId);
+
 /// @title  ConfigurePortalBase
 /// @notice Builds the Portal + LayerZeroBridgeAdapter wiring transactions for a list of peer chains,
 ///         skipping the settings the chain already carries.
@@ -204,7 +209,8 @@ abstract contract ConfigurePortalBase is ScriptBase {
 
     /// @dev Refuses a batch that would strip a peer configured in the same run. Recover by
     ///      configuring the displaced holder in a separate run first. A holder outside this run
-    ///      is returned so the plan discloses the collateral mapping and peer teardown.
+    ///      is returned so the plan discloses the collateral mapping and peer teardown. A holder
+    ///      that cannot be read reverts, since an unknown holder may be a peer in this run.
     function _revertIfBridgeChainIdConflicts(
         address localAdapter,
         uint32 peerChainId,
@@ -215,7 +221,8 @@ abstract contract ConfigurePortalBase is ScriptBase {
             abi.encodeCall(IBridgeAdapter.getChainId, (endpointId))
         );
 
-        if (!readable) return 0;
+        if (!readable || uint256(holder) > type(uint32).max)
+            revert BridgeChainIdHolderUnreadable(peerChainId, endpointId);
 
         uint32 holderChainId = uint32(uint256(holder));
         if (holderChainId == 0 || holderChainId == peerChainId) return 0;

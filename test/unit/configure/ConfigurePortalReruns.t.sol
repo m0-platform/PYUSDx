@@ -14,6 +14,11 @@ import { RouteConfig } from "../../../script/config/RouteConfig.sol";
 import { ConfigurationPlan, PlannedAction } from "../../../script/libraries/ConfigurationPlan.sol";
 import { Transaction } from "../../../script/libraries/TransactionHelper.sol";
 
+import {
+    BridgeChainIdHolderUnreadable,
+    ConflictingBridgeChainId
+} from "../../../script/configure/ConfigurePortalBase.sol";
+
 import { ConfigurePortalHarness } from "../../harness/ConfigurePortalHarness.sol";
 import { SafeProposerHarness } from "../../harness/SafeProposerHarness.sol";
 
@@ -42,6 +47,10 @@ contract ConfigurePortalRerunsTest is Test {
         harness = new ConfigurePortalHarness();
         harness.setPeerAdapter(Chains.ARBITRUM, arbitrumAdapter);
         harness.setPeerAdapter(Chains.MONAD, monadAdapter);
+
+        // No bridge chain ID is held by another chain unless a test says otherwise. The reverse
+        // lookup fails closed, so an adapter address with no code would otherwise abort every plan.
+        vm.mockCall(localAdapter, abi.encodeWithSelector(IBridgeAdapter.getChainId.selector), abi.encode(0));
     }
 
     /* ============ helpers ============ */
@@ -264,6 +273,71 @@ contract ConfigurePortalRerunsTest is Test {
         _assertApplied(plan, [false, false, true, true, true]);
         assertTrue(vm.contains(plan[0].description, "[current state unreadable]"));
         assertTrue(vm.contains(plan[1].description, "re-asserted"));
+    }
+
+    /* ============ reverse bridge chain ID lookup ============ */
+
+    /// @notice Regression: the holder of a bridge chain ID decides whether `setBridgeChainId` strips
+    ///         another peer, so an unreadable holder must abort the plan rather than read as "none".
+    function test_planPeers_bridgeChainIdHolderReverts() external {
+        _mockFullyConfigured(Chains.ARBITRUM, arbitrumAdapter);
+        _mockBridgeChainId(Chains.ARBITRUM, 0);
+        vm.mockCallRevert(localAdapter, abi.encodeCall(IBridgeAdapter.getChainId, (arbitrumEid)), "unreadable");
+
+        vm.expectRevert(abi.encodeWithSelector(BridgeChainIdHolderUnreadable.selector, Chains.ARBITRUM, arbitrumEid));
+        _plan(_peers(Chains.ARBITRUM));
+    }
+
+    function test_planPeers_bridgeChainIdHolderShortReturnData() external {
+        _mockFullyConfigured(Chains.ARBITRUM, arbitrumAdapter);
+        _mockBridgeChainId(Chains.ARBITRUM, 0);
+        vm.mockCall(
+            localAdapter,
+            abi.encodeCall(IBridgeAdapter.getChainId, (arbitrumEid)),
+            abi.encodePacked(uint16(Chains.MONAD))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(BridgeChainIdHolderUnreadable.selector, Chains.ARBITRUM, arbitrumEid));
+        _plan(_peers(Chains.ARBITRUM));
+    }
+
+    function test_planPeers_bridgeChainIdHolderOutOfRange() external {
+        _mockFullyConfigured(Chains.ARBITRUM, arbitrumAdapter);
+        _mockBridgeChainId(Chains.ARBITRUM, 0);
+        vm.mockCall(
+            localAdapter,
+            abi.encodeCall(IBridgeAdapter.getChainId, (arbitrumEid)),
+            abi.encode(uint256(1) << 32)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(BridgeChainIdHolderUnreadable.selector, Chains.ARBITRUM, arbitrumEid));
+        _plan(_peers(Chains.ARBITRUM));
+    }
+
+    /// @notice The reverse lookup only guards a mapping change, so an applied mapping never reads it.
+    function test_planPeers_bridgeChainIdApplied_skipsTheHolderLookup() external {
+        _mockFullyConfigured(Chains.ARBITRUM, arbitrumAdapter);
+        vm.mockCallRevert(localAdapter, abi.encodeCall(IBridgeAdapter.getChainId, (arbitrumEid)), "unreadable");
+
+        assertEq(harness.configurePeers(portal, localAdapter, _peers(Chains.ARBITRUM)).length, 0);
+    }
+
+    function test_planPeers_bridgeChainIdHeldByAnotherPeerInTheRun() external {
+        vm.mockCall(localAdapter, abi.encodeCall(IBridgeAdapter.getChainId, (arbitrumEid)), abi.encode(Chains.MONAD));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ConflictingBridgeChainId.selector, Chains.ARBITRUM, Chains.MONAD, arbitrumEid)
+        );
+        _plan(_peers(Chains.MONAD, Chains.ARBITRUM));
+    }
+
+    function test_planPeers_bridgeChainIdHeldByAChainOutsideTheRun_disclosesTheDisplacement() external {
+        vm.mockCall(localAdapter, abi.encodeCall(IBridgeAdapter.getChainId, (arbitrumEid)), abi.encode(Chains.MONAD));
+
+        PlannedAction[] memory plan = _plan(_peers(Chains.ARBITRUM));
+
+        assertFalse(plan[0].applied);
+        assertTrue(vm.contains(plan[0].description, "also clears chain"));
     }
 
     function test_planPeers_localAdapterRotated_plansThePortalSideOnly() external {

@@ -27,6 +27,9 @@ contract ConfigurePortalTest is Test {
 
     function setUp() external {
         harness = new ConfigurePortalHarness();
+
+        // The reverse bridge chain ID lookup fails closed; report every ID as unheld.
+        vm.mockCall(localAdapter, abi.encodeWithSelector(IBridgeAdapter.getChainId.selector), abi.encode(0));
     }
 
     function _peers(uint32 chainId) internal pure returns (uint32[] memory peers) {

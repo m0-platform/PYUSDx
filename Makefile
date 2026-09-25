@@ -36,6 +36,7 @@ deploy:
 	--skip test --slow --non-interactive $(BROADCAST_FLAGS)
 
 deploy-local: CHAIN=localhost
+deploy-local: PROTOCOL_CONFIG ?= deploymentConfigs/example-protocol.json
 deploy-local: deploy
 
 deploy-mainnet: CHAIN=mainnet
@@ -514,6 +515,7 @@ integration:
 invariant:
 	@./test.sh -d test/invariant -p $(profile)
 
+# Coverage disables optimization; the IR pipeline avoids stack-too-deep compilation errors.
 coverage:
 	FOUNDRY_PROFILE=$(profile) forge coverage --ir-minimum --report lcov && lcov --ignore-errors inconsistent --extract lcov.info -o lcov.info 'src/*' && genhtml lcov.info -o coverage
 

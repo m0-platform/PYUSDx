@@ -5,6 +5,7 @@ pragma solidity 0.8.34;
 /* solhint-disable quotes */
 
 import { Test } from "../../../lib/forge-std/src/Test.sol";
+import { VmSafe } from "../../../lib/forge-std/src/Vm.sol";
 
 import { DeployAll } from "../../../script/deploy/DeployAll.s.sol";
 import { DeployAllHarness } from "../../harness/DeployAllHarness.sol";
@@ -25,11 +26,6 @@ contract DeployAllConfigTests is Test {
     }
 
     /* ============ Helpers ============ */
-
-    /// @dev Every chain with a checked-in `deploymentConfigs/<chainid>/protocol.json`.
-    function _chainIds() internal pure returns (uint256[8] memory) {
-        return [uint256(1), 143, 8453, 42161, 10143, 84532, 421614, 11155111];
-    }
 
     function _exampleJson() internal view returns (string memory) {
         return vm.readFile(string.concat(vm.projectRoot(), "/deploymentConfigs/example-protocol.json"));
@@ -87,20 +83,40 @@ contract DeployAllConfigTests is Test {
 
     /// @notice Every chain config in the repo must parse and validate. A config that only fails at
     ///         deploy time is a config that fails with a funded deployer and a half-deployed stack.
+    /// @dev    Chains are discovered from the numeric directories under `deploymentConfigs/`, so a new
+    ///         chain cannot be left out. Templates and other non-numeric entries are skipped. The file
+    ///         is read directly rather than through `PROTOCOL_CONFIG`, which may point elsewhere.
     function test_readConfig_everyCheckedInChainConfigIsValid() external view {
-        uint256[8] memory chainIds = _chainIds();
+        VmSafe.DirEntry[] memory entries = vm.readDir(string.concat(vm.projectRoot(), "/deploymentConfigs"));
+        uint256 checked;
 
-        for (uint256 i; i < chainIds.length; ++i) {
-            uint256 chainId = chainIds[i];
+        for (uint256 i; i < entries.length; ++i) {
+            assertEq(entries[i].errorMessage, "", entries[i].path);
+            if (!entries[i].isDir) continue;
 
-            assertTrue(
-                vm.isFile(harness.protocolConfigPath(chainId)),
-                string.concat("missing protocol config for chain ", vm.toString(chainId))
-            );
+            string[] memory segments = vm.split(entries[i].path, "/");
+            string memory name = segments[segments.length - 1];
 
-            // Reverts on a bad chainId guard, a missing key, or a validation failure.
-            harness.readProtocolConfig(chainId);
+            // `vm.parseUint` reverts on a non-numeric name; round-tripping also rejects hex and
+            // leading zeros, so only canonical chain ID directories are treated as chain configs.
+            try vm.parseUint(name) returns (uint256 chainId) {
+                assertGt(chainId, 0, string.concat("invalid chain config directory: ", name));
+                assertEq(vm.toString(chainId), name, string.concat("noncanonical chain config directory: ", name));
+
+                string memory path = string.concat(entries[i].path, "/protocol.json");
+
+                assertTrue(vm.isFile(path), string.concat("missing protocol config for chain ", name));
+
+                // Reverts on a directory/chainId mismatch, a missing key, or a validation failure.
+                harness.parseProtocolConfig(vm.readFile(path), chainId);
+
+                ++checked;
+            } catch {
+                continue;
+            }
         }
+
+        assertGt(checked, 0, "no chain configs discovered");
     }
 
     function test_configPath_defaultsToPerChainFile() external view {
